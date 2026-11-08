@@ -980,7 +980,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\"})",
+              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category!=\"\"})",
               "instant": true
             }
           ],

@@ -193,7 +193,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category=~\"interactive|exec_untracked|other\"}) / sum(k3dm_codex_api_cost_usd{window=\"$window\"})",
+              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category=~\"interactive|exec_untracked|other\"}) / sum(k3dm_codex_api_cost_usd{window=\"$window\",category!=\"\"})",
               "instant": true
             }
           ],
@@ -435,7 +435,7 @@ data:
           "id": 116,
           "type": "bargauge",
           "title": "Codex spend by category",
-          "description": "Priced Codex API-equivalent spend by category. Unpriced models (such as codex-auto-review) show + N unpriced tokens and contribute /opt/homebrew/bin/zsh until priced.",
+          "description": "Priced Codex API-equivalent spend by category. Unpriced models (such as codex-auto-review) show their unpriced token count, not dollars, and contribute $0 until priced.",
           "gridPos": {
             "h": 6,
             "w": 6,
@@ -448,14 +448,16 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (category) (k3dm_codex_api_cost_usd{window=\"$window\"})",
+              "expr": "sum by (category) (k3dm_codex_api_cost_usd{window=\"$window\",category!=\"\"})",
               "instant": true,
-              "legendFormat": "{{category}}"
+              "legendFormat": "{{category}}",
+              "refId": "A"
             },
             {
               "expr": "sum by (model) (k3dm_codex_unpriced_tokens{window=\"$window\"}) > 0",
               "instant": true,
-              "legendFormat": "+ {{model}} unpriced tokens"
+              "legendFormat": "+ {{model}} unpriced tokens",
+              "refId": "B"
             }
           ],
           "fieldConfig": {
@@ -472,10 +474,17 @@ data:
                 ]
               }
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {"id": "byFrameRefID", "options": "B"},
+                "properties": [{"id": "unit", "value": "short"}]
+              }
+            ]
           },
           "options": {
-            "displayMode": "basic"
+            "displayMode": "basic",
+            "orientation": "horizontal",
+            "namePlacement": "left"
           }
         },
         {

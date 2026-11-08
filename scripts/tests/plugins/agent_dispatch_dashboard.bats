@@ -152,7 +152,7 @@ text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split(
 by_id={p["id"]:p for p in d["panels"]}
 cost=by_id[58]; excluded=by_id[83]
 assert "priced sessions only" in cost["description"]
-assert cost["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window"})'
+assert cost["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category!=""})'
 assert excluded["title"]=="Unpriced Codex sessions"
 assert excluded["targets"][0]["expr"]=='sum(k3dm_codex_unpriced_sessions{window="$window"})'
 assert cost["gridPos"]["y"]==excluded["gridPos"]["y"] and cost["gridPos"]["x"]+cost["gridPos"]["w"]==excluded["gridPos"]["x"]
@@ -303,7 +303,8 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
       if field=="options" and panel["id"]==48:
         continue
-      if panel["id"]==12 or (field=="targets" and panel["id"] in (54,56)):
+      # agent-audit: allow panel 58 targets exempt; the category!="" filter is pinned in the Codex API cost test
+      if panel["id"]==12 or (field=="targets" and panel["id"] in (54,56,58)):
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
@@ -840,7 +841,7 @@ coverage=by_title["Dispatch coverage (by cost)"]
 assert coverage["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category="dispatch"}) / sum(k3dm_codex_api_cost_usd{window="$window",category=~"dispatch|dispatch_unrecorded|exec_untracked"})'
 
 spend=by_title["Codex spend by category"]
-assert spend["targets"][0]["expr"]=='sum by (category) (k3dm_codex_api_cost_usd{window="$window"})'
+assert spend["targets"][0]["expr"]=='sum by (category) (k3dm_codex_api_cost_usd{window="$window",category!=""})'
 assert spend["targets"][1]["expr"]=='sum by (model) (k3dm_codex_unpriced_tokens{window="$window"}) > 0'
 assert "unpriced" in spend["description"].lower()
 
@@ -849,7 +850,7 @@ assert gaps["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window"
 assert gaps["targets"][1]["expr"]=='sum(k3dm_codex_sessions{window="$window",category="dispatch_unrecorded"})'
 
 outside=by_title["Spend outside dispatch"]
-assert outside["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category=~"interactive|exec_untracked|other"}) / sum(k3dm_codex_api_cost_usd{window="$window"})'
+assert outside["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category=~"interactive|exec_untracked|other"}) / sum(k3dm_codex_api_cost_usd{window="$window",category!=""})'
 
 assert not any(p["title"]=="Ledger coverage" for p in panels)
 
@@ -858,6 +859,47 @@ for i,a_panel in enumerate(panels):
     for b_panel in panels[i+1:]:
         b=b_panel["gridPos"]
         assert not (a["x"]<b["x"]+b["w"] and b["x"]<a["x"]+a["w"] and a["y"]<b["y"]+b["h"] and b["y"]<a["y"]+a["h"]),(a_panel["id"],b_panel["id"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Codex API cost queries never add the mode and category series together" {
+  run python3 - "$BASE" <<'PY'
+import json,re,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+def load(name,key):
+    text=(base/name).read_text()
+    return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+seen=0
+for name,key in (("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+    for panel in load(name,key)["panels"]:
+        for target in panel.get("targets",[]):
+            for selector in re.findall(r"k3dm_codex_api_cost_usd\{([^}]*)\}",target.get("expr","")):
+                seen+=1
+                assert re.search(r"\b(category|mode)\s*(=|!=|=~)",selector),(name,panel["title"],selector)
+assert seen>=6,seen
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Codex spend by category is readable and shows tokens as counts" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
+spend={p["title"]:p for p in d["panels"]}["Codex spend by category"]
+assert spend["options"]["orientation"]=="horizontal"
+assert spend["options"]["namePlacement"]=="left"
+refs={t["refId"]:t for t in spend["targets"]}
+assert "k3dm_codex_unpriced_tokens" in refs["B"]["expr"]
+assert spend["fieldConfig"]["defaults"]["unit"]=="currencyUSD"
+units=[prop["value"] for o in spend["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byFrameRefID","options":"B"} for prop in o["properties"] if prop["id"]=="unit"]
+assert units==["short"],units
+assert "$0" in spend["description"] and "/bin/" not in spend["description"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
