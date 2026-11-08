@@ -1,11 +1,11 @@
 # Bug: the Vault unseal watchdog gives up while Vault is still booting
 
 **Filed:** 2026-10-12
-**Branch:** `k3d-manager-v1.44.0`
+**Branch:** `k3d-manager-v1.46.0`
 **Status:** OPEN
 **Priority:** P2 — Vault, and every secret read through it, stays sealed up to 5 minutes longer than needed after a restart; it recovers on its own
-**Release:** v1.44.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
-**Approval:** explicit 2026-10-12 "let's get those two to v1.44.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
+**Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
+**Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** medium
 
 ## Symptom

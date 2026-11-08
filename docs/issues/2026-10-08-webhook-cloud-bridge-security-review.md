@@ -117,7 +117,7 @@ allowlist fixes are present. Do not reopen those fixed bugs as if absent.
   permission is its current submission boundary. Allowlisted tests and fixed AWS sandbox
   lifecycle actions are possible; arbitrary commands/URLs remain disallowed.
 - Existing submitter-authentication plan covers that future boundary:
-  [v1.44.0 plan](../plans/v1.44.0-cloud-request-submitter-authentication.md).
+  [v1.46.0 plan](../plans/v1.46.0-cloud-request-submitter-authentication.md).
 - Cloudflare Access policies, deployed token binding, firewall/listeners, agent OS permissions,
   actual sandbox activation and runtime versions were not verified.
 - Public tunnel hostname does not itself prove Access policy protection. Verify machine

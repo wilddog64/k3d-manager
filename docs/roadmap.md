@@ -63,11 +63,36 @@ Next: v1.43.9 (full at five plans), then v1.43.10.
 
 ## Queued milestones (scoped)
 
+Renumbered 2026-11-07 (operator): each feature release is now its own minor; patches are bug-fix only.
+
+| Old | New |
+|---|---|
+| v1.43.16 | v1.44.0 |
+| v1.43.17 | v1.45.0 |
+| v1.44.0 | v1.46.0 |
+| v1.44.1 | v1.47.0 |
+| v1.44.2 | v1.48.0 |
+| v1.44.3 | v1.49.0 |
+| v1.45.0 | v1.50.0 |
+| v1.45.1 | v1.51.0 |
+| v1.45.2 | v1.52.0 |
+| v1.45.3 | v1.53.0 |
+| v1.45.4 | v1.54.0 |
+| v1.46.0 | v1.55.0 |
+| v1.46.1 | v1.56.0 |
+| v1.47.0 | v1.57.0 |
+| v1.48.0 | v1.58.0 |
+| v1.48.1 | v1.59.0 |
+| v1.49.0 | v1.60.0 |
+| v1.50.0 | v1.61.0 |
+| v1.50.1 | v1.61.1 (bug-fix-only patch of the renamed v1.61.0) |
+| v1.51.0 | v1.62.0 |
+
 Candidate sections for releases already tagged (v1.42.0 through v1.43.7) have shipped; they stay
 below as the record of each release's scope. `docs/releases.md` is the ledger.
 
 Queued with committed version numbers: v1.43.9 and v1.43.10 (each full at five plans), then the
-v1.44–v1.48 milestones below. Unversioned work stays under Forward themes until it gets a scope doc.
+v1.44–v1.59 milestones below. Unversioned work stays under Forward themes until it gets a scope doc.
 
 ### Candidate milestone — v1.42.0: k3d-manager Dot
 
@@ -101,7 +126,7 @@ have no Priority. Once it lands, Claude backfills priorities on the open bugs.
 Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
 for v1.43.0: [`v1.43.0-hub-data-export-schedule.md`](plans/v1.43.0-hub-data-export-schedule.md)
 (daily unattended export, 5-day retention; P1 2026-10-10, took the slot of the e2e failure-artifacts
-spec, now v1.48.0),
+spec, now v1.58.0),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
 [`v1.43.0-worktree-isolated-codex-dispatch.md`](plans/v1.43.0-worktree-isolated-codex-dispatch.md)
 (dispatched first: Codex work stays sequential until each spec can run in its own git worktree), and the
@@ -119,7 +144,7 @@ with the drill. The drill gains a Keychain credential allowlist (audit, then enf
 that every destructive call targets the drill cluster. Scope:
 [`v1.43.1-hub-data-recover.md`](plans/v1.43.1-hub-data-recover.md),
 [`v1.43.1-dr-clean-room-checks.md`](plans/v1.43.1-dr-clean-room-checks.md). v1.43.1 is at 2 of 5
-plans. Full-hub recovery on the M2 moves into the v1.47.0 candidate-hub engine.
+plans. Full-hub recovery on the M2 moves into the v1.57.0 candidate-hub engine.
 
 ### Candidate milestone — v1.43.2
 
@@ -217,7 +242,7 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
   - [`v1.43.3-pr-checks-dashboard`](plans/v1.43.3-pr-checks-dashboard.md) (plan 2 of 5, operator
     2026-10-16): Hermes publishes the check runs of every open k3d-manager PR each poll
     (Pushgateway job `k3dm-pr-checks`), shown on a new **k3dm PR Checks** dashboard. k3d-manager
-    and lib-foundation (widened 2026-10-16, operator; shopping-cart retires after v1.50.x); Copilot
+    and lib-foundation (widened 2026-10-16, operator; shopping-cart retires after v1.61.x); Copilot
     reviews are not checks. Independent of the two above.
   - [`v1.43.3-lib-foundation-bug-tracking`](plans/v1.43.3-lib-foundation-bug-tracking.md) (plan 3
     of 5, operator 2026-10-16): lib-foundation's own `docs/bugs/` on the Bug Tracking dashboard, read
@@ -252,7 +277,7 @@ the Bug Tracking dashboard, with execution, verification and dispatch kept as se
 touches the metrics producers and the dashboard, not `bin/k3dm-webhook`, so it can run in parallel
 with the Slack fixes. Plan 2 of 5 is
 [`release-forecast`](plans/v1.43.5-release-forecast.md). It forecasts the remaining releases to
-v1.50.0 as date ranges, read from a new `docs/release-milestones.json`. A blocked release, and every
+v1.61.0 as date ranges, read from a new `docs/release-milestones.json`. A blocked release, and every
 release after it, shows no date. Plan 3 of 5 is
 [`dispatch-release-scope`](plans/v1.43.5-dispatch-release-scope.md). It lets the dispatch dashboard's
 Window selector also pick a release, from v1.43.0 (the first ledger release) onward. Plan 4 of 5 is
@@ -275,7 +300,7 @@ The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fix
   (no code fix; needs the hPanel activity log to say who powered the VM off) and P3
   [`frontend-cart-badge-stale-across-logout`](bugs/2026-10-17-frontend-cart-badge-stale-across-logout.md)
   (shopping-cart-frontend; approval pending).
-- The 2026-10-06 Slack bugs with no Priority line go to the v1.50.1 status cleanup unless one of these
+- The 2026-10-06 Slack bugs with no Priority line go to the v1.61.1 status cleanup unless one of these
   fixes covers them.
 
 ### Candidate milestone — v1.43.6 (patch)
@@ -283,7 +308,7 @@ The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fix
 **Per-agent dispatch data** (operator, 2026-10-18; re-themed 2026-10-24). Branch `k3d-manager-v1.43.6`, cut from
 `main` after v1.43.5 merges. Plan 1 of 5 is [`dispatch-agy-agent-ledger`](plans/v1.43.6-dispatch-agy-agent-ledger.md)
 (operator, 2026-10-24): the dispatcher runs specs on agy (Gemini 4 Argon) as well as Codex, and the ledger records agent and
-model for both, so per-vendor data accrues before Claude's weekly quota runs out. Split from v1.44.1's agy plan, which keeps
+model for both, so per-vendor data accrues before Claude's weekly quota runs out. Split from v1.47.0's agy plan, which keeps
 the dashboard. The Pod IP pool cleanup plan that was plan 1 moved to v1.43.9 to make room (Claude's call, operator-approved).
 
 Plan 2 of 5 is [`dispatch-verified-delivery-cost`](plans/v1.43.6-dispatch-verified-delivery-cost.md)
@@ -394,7 +419,7 @@ Plan 5 of 5 is [`orbstack-upgrade-coordinated`](plans/v1.43.9-orbstack-upgrade-c
 2026-10-25, after an OrbStack update stopped the hub). Hermes announces an available update;
 `make orbstack-upgrade` refuses while the hub is busy, updates OrbStack on a typed yes, then unseals Vault,
 fixes host-network drift, refills the Pushgateway and verifies against preflight counts. Its prerequisite,
-the 2026-10-12 OrbStack monitoring bug, moved from v1.44.0 to v1.43.9. v1.43.9 is now full.
+the 2026-10-12 OrbStack monitoring bug, moved from v1.46.0 to v1.43.9. v1.43.9 is now full.
 
 ### Candidate milestone — v1.43.10 (patch)
 
@@ -492,7 +517,7 @@ and the roughly 95–100K floor is the main cost lever.
 
 **v1.43.14 plan 3:** [`bug-open-history-from-git`](plans/v1.43.14-bug-open-history-from-git.md) (operator, 2026-10-30): a 30-day open-bugs-by-priority trend computed from git (last commit of each UTC day), published as one Pushgateway group so Prometheus's 3-day retention no longer limits it. The transition ledger stays deferred. 
 
-**v1.43.14 plan 4:** moved to v1.43.16 on 2026-11-07 by Claude (`fleet-host-cpu-memory-alerts`, not started, fixture precondition unmet). v1.43.14 is back to five plans.
+**v1.43.14 plan 4:** moved to v1.44.0 on 2026-11-07 by Claude (`fleet-host-cpu-memory-alerts`, not started, fixture precondition unmet). v1.43.14 is back to five plans.
 
 **v1.43.14 plan 5:** [`agent-instruction-files-refresh`](plans/v1.43.14-agent-instruction-files-refresh.md) (operator, 2026-10-31; dispatch go given, first after the branch is cut): rewrite `AGENTS.md` and `GEMINI.md` to match the dispatch prompt (no git writes, no memory-bank), drop the stale M2/ubuntu-k3s cluster facts and the SDET persona, carry the Acceptance and test-control rules, and guard a shared rules block with `make check-agent-docs`. v1.43.14 is now at its 5-plan cap; the rest of the operator-adopted sequence (2026-10-31) follows in a later release, in order: blind calibration on 3–4 PRs with instructions unchanged, unspoken-rule mining kept only where calibration showed a miss, a thinking-budget benchmark on the calibration set, and extra adversarial reviewers only where measured.
 
@@ -501,8 +526,8 @@ and the roughly 95–100K floor is the main cost lever.
 **Bug scope trimmed (Claude, 2026-11-07; operator: "can we focus on complete 5 plans and P1/P2 bugs fixes?", then "go ahead to move that four bugs to v1.43.15").** v1.43.14 ships the plans and the P1/P2 bugs that have a landed fix waiting for a live check. Four P2s with no fix to verify moved to v1.43.15. Also in v1.43.14: the P3 [forecast milestones drift and folded releases](bugs/2026-11-07-forecast-milestones-drift-and-folded-releases.md) (dispatched to Luna 2026-11-07); v1.43.10 and v1.43.11 are marked `folded` in `docs/release-milestones.json` (operator: "mark them fold").
 
 **P0 delivery split (Claude, 2026-11-05; operator: "go with your suggestion").** The P0 plan is built in five slices, read-only first:
-- **S1 (v1.43.14):** record and read only. Ledger state ladder (implemented → offline-tested → independently verified → landed → deployed → live-verified, with live pending), typed gate events, read-only `gate-status`, and the 2026-11-02 CA-trust stall as a replay fixture. It is a scoped section of the existing P0 plan doc, not a new plan file. Two agents in parallel against a fixed event schema with fixture ledgers: Codex (Luna) builds the `bin/k3dm-codex-dispatch` half; agy (Flash 3.8) builds the `bin/k3dm-dispatch-metrics` and dashboard half. Claude lands Luna's half first, then agy's, and runs a combined end-to-end check. S1 starts after D3 Part B and the two alert P2s are verified. S1 also records split work (operator, 2026-11-05: "sounds good"): `dispatch start --parent <task> --role build|review|verify`, a `combine` event (parts merged, conflicts, end-to-end result with evidence), and a "Split work" panel on Agent Dispatch with one row per parent task. S1 is its first row. The `claude-context-cost-per-turn` plan waits for S1, because both edit `bin/k3dm-dispatch-metrics`. **Update 2026-11-06:** the operator lifted the wait on D3 Part B and the alert P2s ("go ahead to work on S1 spec then dispatch to Luna"); it was ordering, not a code dependency. The second review (2026-11-06) moved prompts by model out of S1 into `prompts-by-model` (v1.43.16), which starts after S1 lands because both edit the same files.
-- **S2–S5 (v1.43.16):** S2 G0 + G1 (acceptance contract, stall gate), S3 G2 (scope gate), S4 G3 + G4 (verification truth, escalation), S5 G5 + metrics addendum + evaluation baseline. S2–S4 are serial, Luna only, because they all edit the dispatcher's start, resume and land paths. agy reviews each slice spec before dispatch and writes the independent black-box tests from the Acceptance block; live checks stay with the operator or Claude. They join `lead-model-activity-dashboard` there; v1.43.15 is already at five plans.
+- **S1 (v1.43.14):** record and read only. Ledger state ladder (implemented → offline-tested → independently verified → landed → deployed → live-verified, with live pending), typed gate events, read-only `gate-status`, and the 2026-11-02 CA-trust stall as a replay fixture. It is a scoped section of the existing P0 plan doc, not a new plan file. Two agents in parallel against a fixed event schema with fixture ledgers: Codex (Luna) builds the `bin/k3dm-codex-dispatch` half; agy (Flash 3.8) builds the `bin/k3dm-dispatch-metrics` and dashboard half. Claude lands Luna's half first, then agy's, and runs a combined end-to-end check. S1 starts after D3 Part B and the two alert P2s are verified. S1 also records split work (operator, 2026-11-05: "sounds good"): `dispatch start --parent <task> --role build|review|verify`, a `combine` event (parts merged, conflicts, end-to-end result with evidence), and a "Split work" panel on Agent Dispatch with one row per parent task. S1 is its first row. The `claude-context-cost-per-turn` plan waits for S1, because both edit `bin/k3dm-dispatch-metrics`. **Update 2026-11-06:** the operator lifted the wait on D3 Part B and the alert P2s ("go ahead to work on S1 spec then dispatch to Luna"); it was ordering, not a code dependency. The second review (2026-11-06) moved prompts by model out of S1 into `prompts-by-model` (v1.44.0), which starts after S1 lands because both edit the same files.
+- **S2–S5 (v1.44.0):** S2 G0 + G1 (acceptance contract, stall gate), S3 G2 (scope gate), S4 G3 + G4 (verification truth, escalation), S5 G5 + metrics addendum + evaluation baseline. S2–S4 are serial, Luna only, because they all edit the dispatcher's start, resume and land paths. agy reviews each slice spec before dispatch and writes the independent black-box tests from the Acceptance block; live checks stay with the operator or Claude. They join `lead-model-activity-dashboard` there; v1.43.15 is already at five plans.
 
 ### Patch release — v1.43.15
 
@@ -518,47 +543,47 @@ Bugs moved from v1.43.14 on 2026-11-07 (bugs do not count toward the plan cap): 
 
 **v1.43.15 plan 4:** [`cost-attribution-coverage`](plans/v1.43.15-cost-attribution-coverage.md) (operator, 2026-11-01): the agent-cost dashboard's "Ledger coverage 36.3%" counts sessions, so 200 guardian approval reviews drag it down, and "Outside ledger $76.77" lumps the operator's own interactive Codex (60% of 30d cost) with real ledger gaps ($0.48). Every Codex session gets one category from `session_meta`, guardian reviews are charged to their parent via `parent_thread_id`, unpriced `codex-auto-review` tokens are shown instead of $0, and coverage becomes dispatch cost / agent-run cost (~65% 30d, ~99.8% 7d).
 
-**v1.43.15 plan 5:** [`hub-deploy-ref-and-live-write-guard`](plans/v1.43.15-hub-deploy-ref-and-live-write-guard.md) (operator, 2026-11-07: "how we prevent working on live system directly"; chose "a separate ref so we are at least to make hub stable"). The hub's ApplicationSets read only `deploy/hub`. It moves only through `make hub-promote` (commit on origin, CI green, typed confirmation, `hub-promote/<UTC>` tag) or `make hub-rollback`. `make platform-ops` applies a `git archive` of `deploy/hub`, never the working tree. **Supersedes the 2026-07-24 decision** that ApplicationSets track the release branch; CLAUDE.md's reapply and platform-ops release rules change once it lands. Hub spec: dispatch waits for the operator's go. Follow-up candidate (v1.43.17): preview Grafana in `platform-ops-preview` for branch live checks, and read-only hub credentials for agents. Moved from v1.43.16 by Claude on 2026-11-07 after the operator's dispatch go, so the P1 goes out first.
-
-### Patch release — v1.43.16
-
-**v1.43.16 plan 5:** [`claude-cost-task-attribution`](plans/v1.43.16-claude-cost-task-attribution.md) (operator, 2026-11-01): Claude is 97.5% of 30d model spend ($1,097 vs $28.54 Codex dispatch), but its per-task cost is split evenly across every dispatch open at that moment, and spec writing and verification fall outside those intervals. This plan charges each Claude turn to the tasks its tool calls name, and reports attribution coverage by cost. It lands after plan 4. **v1.43.15 is at the 5-plan cap.** The outcome half of the same gap is a P2 bug carried in v1.43.13: `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md`. Moved from v1.43.15 by Claude on 2026-11-07 to make room for the hub deploy ref.
-
-**v1.43.16 plan 4:** [`dev-hub-vcluster`](plans/v1.43.16-dev-hub-vcluster.md) (operator, 2026-11-07: "can we have vCluster running on m5 side by side as hub for the development purpose and verify there?"). A `dev-hub` vCluster in its own namespace reads the release branch, runs ArgoCD and the branch's dashboards against the hub Prometheus read-only, holds no hub credentials, and is capped by a 3 GiB quota at a preemptible PriorityClass. Live checks happen there; the hub changes only by `hub-promote`. Moved from v1.43.17 by Claude on 2026-11-07.
-
-**v1.43.16 plan 3:** [`fleet-host-cpu-memory-alerts`](plans/v1.43.16-fleet-host-cpu-memory-alerts.md) (operator, 2026-10-31): CPU and memory for the M2, M4 and M5 on a Host Resources dashboard. The alerts trigger on the swap-in rate and on CPU idle or load (never on "memory used"), and route to `k3dm-analyze`, which posts a top-process diagnosis to Slack. Amended 2026-11-01 (operator): laptop temperature, with the `pmset -g therm` throttling level as an alert and `macmon` °C as a dashboard trend (machine-setup installs `macmon` via lib-foundation `_install_macmon`, in v0.5.5; no sudo). v1.43.14 is at 4 of 5 plans. Moved from v1.43.14 on 2026-11-07: needs fresh real captures before dispatch.
-
-**v1.43.16 plan 2:** [`prompts-by-model`](plans/v1.43.16-prompts-by-model.md) (operator, 2026-11-06, moved from P0 S1 by Claude on the review's advice): which model a continuation prompt was charged to, who wrote it, and whether the spec or the worker was the cause.
-
-**v1.43.16 plan 1:** [`lead-model-activity-dashboard`](plans/v1.43.16-lead-model-activity-dashboard.md) (operator, 2026-11-05): a `k3dm Lead Model Activity` dashboard that shows, per lead (coordinator) model, the tasks led, first-run land rate, corrections per landed task, stalled tasks, tokens and cost, together with a lead timeline. It reads agy's own transcripts, so interactive Argon lead sessions are counted: the 2026-11-03 5 h Argon session recorded nothing. It depends on bugs `2026-10-29-non-claude-coordinator-work-unattributed`, `2026-11-04-agy-activity-no-data-local-ledger-coverage` and `2026-11-05-dispatch-resume-ignores-task-model-and-records-wrong-worker`.
-
-**Candidate plan:** `claude-quota-grace-window` (operator, 2026-11-01: "usually we may still be able to run 10 ~ 30 mins even reach 100% weekly quota base on the last couple releases. if you can capture that metrics in grafana dashboard that would be very helpful"). Record when the weekly Claude quota reached 100% and when the session was actually cut off, and show the grace window per release on a Grafana dashboard, so release-day planning can count on a measured margin rather than a guess. Placed here because v1.43.14 and v1.43.15 are both at the 5-plan cap. The spec still needs a source for the quota-reached and cut-off timestamps.
-
-**Unscheduled candidate plan:** `merge-to-deploy-promotion-pr` (operator, 2026-11-06: "open a PR then approve it makes more sense. we can do this in a later release"). Today an app merge to `main` pushes a signed `sha-*` image to GHCR, but the pin in `services/<app>/kustomization.yaml` changes only by hand, or by `app-cve-scan` when the deployed image has HIGH/CRITICAL findings. Add a second rule to that promoter, triggered by the app's main CI through the existing scan trigger: when the new `main` build is signed, attested, and has no CRITICAL/HIGH the deployed image lacks, **open a k3d-manager PR** bumping the pin, for the operator to approve; never commit directly. Reuse the CVE path's git-write and remediation-verify events, so each deploy shows on the dashboard. Not Image Updater: following `:latest` was removed on 2026-06-30 (`docs/bugs/2026-06-30-image-updater-always-follows-latest-instead-of-vuln-gated-promotion.md`). The "not worse" gate is required: the payment build of 2026-11-05 (`docs/bugs/2026-11-05-payment-runtime-base-on-eol-temurin-24.md`) would have replaced 1 CRITICAL with 5. Release to be chosen when v1.43.16 is scoped.
-
-### Patch release — v1.43.17
-
-Branch `k3d-manager-v1.43.17`, cut from `main` after v1.43.16 merges (it depends on the v1.43.16 dev hub). Operator dispatch go 2026-11-07.
-
-**Operator prerequisite (before the v1.43.16 dev hub):** raise OrbStack `memory_mib` on the M5 from 16384 to 24576 (the 16 GB cap dates from the 24 GB M4 Air, 2026-09-13); it restarts the hub, so it is a planned step with the 2026-09-13 restart checklist. **Done 2026-11-07 06:38 PST** (Docker 23.5 GiB; hub recovered by 06:51, details in the dev-hub spec P0).
-
-**v1.43.17 plan 1:** [`argocd-ha-zero-downtime-upgrade`](plans/v1.43.17-argocd-ha-zero-downtime-upgrade.md) (operator, 2026-11-07: "do we have room to support argocd no downtime upgrade (for cve patch)"). ArgoCD server, repo-server and applicationset-controller at 2 replicas with PDBs; `argocd_upgrade` probes availability through the rollout and refuses a hub upgrade without a passing rehearsal in the dev hub. Takes over the ArgoCD part of the parked `v1.28.0-platform-zero-downtime-rollouts`.
-
-**v1.43.17 plan 2:** [`service-password-travel-bundle`](plans/v1.43.17-service-password-travel-bundle.md) (operator, 2026-11-07: "is there a secure way to send make show-service-passwords to me if I travel"; "yes, write a spec for option 2"). The hub age-encrypts the `show-service-passwords` output for each enrolled laptop's key into iCloud Drive whenever it changes; the laptop decrypts it with a Keychain-held identity. Never plaintext on disk or in a message. Tailscale (pull over ssh) is plan 3.
-
-**v1.43.17 plan 3:** [`service-password-tailnet-read`](plans/v1.43.17-service-password-tailnet-read.md) (operator, 2026-11-07: "talescale another function is for non Mac system like windows or linux can reach hub and show service passwords securely"). A Windows or Linux machine reads the passwords over the tailnet with `ssh -T`. Its key is valid only from tailnet addresses, carries `restrict`, and is forced to `bin/k3dm-password-read`, which runs `show-service-passwords` and nothing else. The output goes only to the caller's terminal, and each read leaves an audit line with no output in it. Tailnet setup is operator-only and needs its own go.
-
-**v1.43.17 plan 4:** [`human-operator-turns`](plans/v1.43.17-human-operator-turns.md) (operator, 2026-11-07: "the truely what I want to know if this a really human intervention or your interaction with sub-agents. can we capture turn human interaction?"; "can we aslo capture agy and codex if I use them occationaly?"). The "Human continuation prompts" panel counts coordinator → sub-agent resumes, not operator effort. A `UserPromptSubmit`/`Stop` hook counts Claude Code operator turns; the exporter counts interactive Codex turns from `~/.codex/history.jsonl` and agy turns from its conversation stores (a separable phase), excluding dispatched sessions. Resumes gain `turn_origin`, corrections gain a required `--cause`, and the panel is renamed "Coordinator → agent prompts" beside a new "Human operator turns" panel. Counts, timestamps and session IDs only, never prompt text. P3; the correction-cause P3 is folded in ("small P3 is fine").
+**v1.43.15 plan 5:** [`hub-deploy-ref-and-live-write-guard`](plans/v1.43.15-hub-deploy-ref-and-live-write-guard.md) (operator, 2026-11-07: "how we prevent working on live system directly"; chose "a separate ref so we are at least to make hub stable"). The hub's ApplicationSets read only `deploy/hub`. It moves only through `make hub-promote` (commit on origin, CI green, typed confirmation, `hub-promote/<UTC>` tag) or `make hub-rollback`. `make platform-ops` applies a `git archive` of `deploy/hub`, never the working tree. **Supersedes the 2026-07-24 decision** that ApplicationSets track the release branch; CLAUDE.md's reapply and platform-ops release rules change once it lands. Hub spec: dispatch waits for the operator's go. Follow-up candidate (v1.45.0): preview Grafana in `platform-ops-preview` for branch live checks, and read-only hub credentials for agents. Moved from v1.44.0 by Claude on 2026-11-07 after the operator's dispatch go, so the P1 goes out first.
 
 ### Candidate milestone — v1.44.0
 
+**v1.44.0 plan 5:** [`claude-cost-task-attribution`](plans/v1.44.0-claude-cost-task-attribution.md) (operator, 2026-11-01): Claude is 97.5% of 30d model spend ($1,097 vs $28.54 Codex dispatch), but its per-task cost is split evenly across every dispatch open at that moment, and spec writing and verification fall outside those intervals. This plan charges each Claude turn to the tasks its tool calls name, and reports attribution coverage by cost. It lands after plan 4. **v1.43.15 is at the 5-plan cap.** The outcome half of the same gap is a P2 bug carried in v1.43.13: `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md`. Moved from v1.43.15 by Claude on 2026-11-07 to make room for the hub deploy ref.
+
+**v1.44.0 plan 4:** [`dev-hub-vcluster`](plans/v1.44.0-dev-hub-vcluster.md) (operator, 2026-11-07: "can we have vCluster running on m5 side by side as hub for the development purpose and verify there?"). A `dev-hub` vCluster in its own namespace reads the release branch, runs ArgoCD and the branch's dashboards against the hub Prometheus read-only, holds no hub credentials, and is capped by a 3 GiB quota at a preemptible PriorityClass. Live checks happen there; the hub changes only by `hub-promote`. Moved from v1.45.0 by Claude on 2026-11-07.
+
+**v1.44.0 plan 3:** [`fleet-host-cpu-memory-alerts`](plans/v1.44.0-fleet-host-cpu-memory-alerts.md) (operator, 2026-10-31): CPU and memory for the M2, M4 and M5 on a Host Resources dashboard. The alerts trigger on the swap-in rate and on CPU idle or load (never on "memory used"), and route to `k3dm-analyze`, which posts a top-process diagnosis to Slack. Amended 2026-11-01 (operator): laptop temperature, with the `pmset -g therm` throttling level as an alert and `macmon` °C as a dashboard trend (machine-setup installs `macmon` via lib-foundation `_install_macmon`, in v0.5.5; no sudo). v1.43.14 is at 4 of 5 plans. Moved from v1.43.14 on 2026-11-07: needs fresh real captures before dispatch.
+
+**v1.44.0 plan 2:** [`prompts-by-model`](plans/v1.44.0-prompts-by-model.md) (operator, 2026-11-06, moved from P0 S1 by Claude on the review's advice): which model a continuation prompt was charged to, who wrote it, and whether the spec or the worker was the cause.
+
+**v1.44.0 plan 1:** [`lead-model-activity-dashboard`](plans/v1.44.0-lead-model-activity-dashboard.md) (operator, 2026-11-05): a `k3dm Lead Model Activity` dashboard that shows, per lead (coordinator) model, the tasks led, first-run land rate, corrections per landed task, stalled tasks, tokens and cost, together with a lead timeline. It reads agy's own transcripts, so interactive Argon lead sessions are counted: the 2026-11-03 5 h Argon session recorded nothing. It depends on bugs `2026-10-29-non-claude-coordinator-work-unattributed`, `2026-11-04-agy-activity-no-data-local-ledger-coverage` and `2026-11-05-dispatch-resume-ignores-task-model-and-records-wrong-worker`.
+
+**Candidate plan:** `claude-quota-grace-window` (operator, 2026-11-01: "usually we may still be able to run 10 ~ 30 mins even reach 100% weekly quota base on the last couple releases. if you can capture that metrics in grafana dashboard that would be very helpful"). Record when the weekly Claude quota reached 100% and when the session was actually cut off, and show the grace window per release on a Grafana dashboard, so release-day planning can count on a measured margin rather than a guess. Placed here because v1.43.14 and v1.43.15 are both at the 5-plan cap. The spec still needs a source for the quota-reached and cut-off timestamps.
+
+**Unscheduled candidate plan:** `merge-to-deploy-promotion-pr` (operator, 2026-11-06: "open a PR then approve it makes more sense. we can do this in a later release"). Today an app merge to `main` pushes a signed `sha-*` image to GHCR, but the pin in `services/<app>/kustomization.yaml` changes only by hand, or by `app-cve-scan` when the deployed image has HIGH/CRITICAL findings. Add a second rule to that promoter, triggered by the app's main CI through the existing scan trigger: when the new `main` build is signed, attested, and has no CRITICAL/HIGH the deployed image lacks, **open a k3d-manager PR** bumping the pin, for the operator to approve; never commit directly. Reuse the CVE path's git-write and remediation-verify events, so each deploy shows on the dashboard. Not Image Updater: following `:latest` was removed on 2026-06-30 (`docs/bugs/2026-06-30-image-updater-always-follows-latest-instead-of-vuln-gated-promotion.md`). The "not worse" gate is required: the payment build of 2026-11-05 (`docs/bugs/2026-11-05-payment-runtime-base-on-eol-temurin-24.md`) would have replaced 1 CRITICAL with 5. Release to be chosen when v1.44.0 is scoped.
+
+### Candidate milestone — v1.45.0
+
+Branch `k3d-manager-v1.45.0`, cut from `main` after v1.44.0 merges (it depends on the v1.44.0 dev hub). Operator dispatch go 2026-11-07.
+
+**Operator prerequisite (before the v1.44.0 dev hub):** raise OrbStack `memory_mib` on the M5 from 16384 to 24576 (the 16 GB cap dates from the 24 GB M4 Air, 2026-09-13); it restarts the hub, so it is a planned step with the 2026-09-13 restart checklist. **Done 2026-11-07 06:38 PST** (Docker 23.5 GiB; hub recovered by 06:51, details in the dev-hub spec P0).
+
+**v1.45.0 plan 1:** [`argocd-ha-zero-downtime-upgrade`](plans/v1.45.0-argocd-ha-zero-downtime-upgrade.md) (operator, 2026-11-07: "do we have room to support argocd no downtime upgrade (for cve patch)"). ArgoCD server, repo-server and applicationset-controller at 2 replicas with PDBs; `argocd_upgrade` probes availability through the rollout and refuses a hub upgrade without a passing rehearsal in the dev hub. Takes over the ArgoCD part of the parked `v1.28.0-platform-zero-downtime-rollouts`.
+
+**v1.45.0 plan 2:** [`service-password-travel-bundle`](plans/v1.45.0-service-password-travel-bundle.md) (operator, 2026-11-07: "is there a secure way to send make show-service-passwords to me if I travel"; "yes, write a spec for option 2"). The hub age-encrypts the `show-service-passwords` output for each enrolled laptop's key into iCloud Drive whenever it changes; the laptop decrypts it with a Keychain-held identity. Never plaintext on disk or in a message. Tailscale (pull over ssh) is plan 3.
+
+**v1.45.0 plan 3:** [`service-password-tailnet-read`](plans/v1.45.0-service-password-tailnet-read.md) (operator, 2026-11-07: "talescale another function is for non Mac system like windows or linux can reach hub and show service passwords securely"). A Windows or Linux machine reads the passwords over the tailnet with `ssh -T`. Its key is valid only from tailnet addresses, carries `restrict`, and is forced to `bin/k3dm-password-read`, which runs `show-service-passwords` and nothing else. The output goes only to the caller's terminal, and each read leaves an audit line with no output in it. Tailnet setup is operator-only and needs its own go.
+
+**v1.45.0 plan 4:** [`human-operator-turns`](plans/v1.45.0-human-operator-turns.md) (operator, 2026-11-07: "the truely what I want to know if this a really human intervention or your interaction with sub-agents. can we capture turn human interaction?"; "can we aslo capture agy and codex if I use them occationaly?"). The "Human continuation prompts" panel counts coordinator → sub-agent resumes, not operator effort. A `UserPromptSubmit`/`Stop` hook counts Claude Code operator turns; the exporter counts interactive Codex turns from `~/.codex/history.jsonl` and agy turns from its conversation stores (a separable phase), excluding dispatched sessions. Resumes gain `turn_origin`, corrections gain a required `--cause`, and the panel is renamed "Coordinator → agent prompts" beside a new "Human operator turns" panel. Counts, timestamps and session IDs only, never prompt text. P3; the correction-cause P3 is folded in ("small P3 is fine").
+
+### Candidate milestone — v1.46.0
+
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
-`cloud-requests` branch as enough to submit a request, and `requested_by` is unsigned. v1.44.0
+`cloud-requests` branch as enough to submit a request, and `requested_by` is unsigned. v1.46.0
 authenticates the submitter, lets one request route its Slack notices to an approved channel, and
 turns the operator's manual acceptance checks into repeatable scenarios with evidence. Branch
-`k3d-manager-v1.44.0`, cut from `main` after v1.43.2 merges.
+`k3d-manager-v1.46.0`, cut from `main` after v1.43.2 merges.
 
-Bug fixes carried into v1.44.0 (operator, 2026-10-12; found when the OrbStack upgrade restarted the hub):
+Bug fixes carried into v1.46.0 (operator, 2026-10-12; found when the OrbStack upgrade restarted the hub):
 - `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (P2): the watchdog retries for up to a minute while Vault boots.
 - `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (P3): a read-only `vault_seal` Hermes sensor; no repair.
 - `docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md` (P3; **moved to v1.43.7 on 2026-10-25**, prerequisite of v1.43.9 plan 5): Hermes publishes OrbStack's version and `orbctl update --check` hourly; email-only `OrbStackUpdateAvailable` alert and an "OrbStack upgraded" dashboard annotation. Phase 2 (scheduled unattended `orbctl update`) waits for both Vault fixes and an operator-approved restart window.
@@ -572,30 +597,30 @@ Bug fixes carried into v1.44.0 (operator, 2026-10-12; found when the OrbStack up
 
 | Spec | What it adds |
 |---|---|
-| [`v1.44.0-cloud-request-submitter-authentication.md`](plans/v1.44.0-cloud-request-submitter-authentication.md) | Verify which agent submitted a request before the action and argument allowlists run. |
-| [`v1.44.0-cloud-request-slack-notification-routing.md`](plans/v1.44.0-cloud-request-slack-notification-routing.md) | A request may name an approved channel alias; nothing else changes the global `SLACK_CHANNEL_ID`. |
-| [`v1.44.0-operator-acceptance-automation.md`](plans/v1.44.0-operator-acceptance-automation.md) | An acceptance harness with explicit oracles; pilot on the k3dm Tests dashboard. |
-| [`v1.44.0-bounded-index-metrics-diagnostics.md`](plans/v1.44.0-bounded-index-metrics-diagnostics.md) | One read-only bridge action that explains a gap in the vector-store index-age panel. |
-| [`v1.44.0-bug-lifecycle-metrics.md`](plans/v1.44.0-bug-lifecycle-metrics.md) | Bug age, reopen rate and fix verification: `**Filed:**`, `**Recurred:**` and `**Verified by:**` lines, `make bug-close` (closes only after the named regression test passes), pre-commit checks, and a Lifecycle row on the Bug Tracking dashboard. Operator request 2026-10-10. |
+| [`v1.46.0-cloud-request-submitter-authentication.md`](plans/v1.46.0-cloud-request-submitter-authentication.md) | Verify which agent submitted a request before the action and argument allowlists run. |
+| [`v1.46.0-cloud-request-slack-notification-routing.md`](plans/v1.46.0-cloud-request-slack-notification-routing.md) | A request may name an approved channel alias; nothing else changes the global `SLACK_CHANNEL_ID`. |
+| [`v1.46.0-operator-acceptance-automation.md`](plans/v1.46.0-operator-acceptance-automation.md) | An acceptance harness with explicit oracles; pilot on the k3dm Tests dashboard. |
+| [`v1.46.0-bounded-index-metrics-diagnostics.md`](plans/v1.46.0-bounded-index-metrics-diagnostics.md) | One read-only bridge action that explains a gap in the vector-store index-age panel. |
+| [`v1.46.0-bug-lifecycle-metrics.md`](plans/v1.46.0-bug-lifecycle-metrics.md) | Bug age, reopen rate and fix verification: `**Filed:**`, `**Recurred:**` and `**Verified by:**` lines, `make bug-close` (closes only after the named regression test passes), pre-commit checks, and a Lifecycle row on the Bug Tracking dashboard. Operator request 2026-10-10. |
 
-Also in v1.44.0, as a how-to rather than a spec: an inventory of every request channel (Slack,
+Also in v1.46.0, as a how-to rather than a spec: an inventory of every request channel (Slack,
 cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
 [Engineering-contract gaps](#engineering-contract-gaps-assessed-2026-10-10)).
-[`v1.44.0-bug-lifecycle-dashboard.md`](plans/v1.44.0-bug-lifecycle-dashboard.md) was folded into
-v1.43.0 and is superseded. v1.44.0 is at its five-plan cap.
+[`v1.46.0-bug-lifecycle-dashboard.md`](plans/v1.46.0-bug-lifecycle-dashboard.md) was folded into
+v1.43.0 and is superseded. v1.46.0 is at its five-plan cap.
 
-### Candidate milestone — v1.44.1 (patch)
+### Candidate milestone — v1.47.0
 
-**Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.44.1`, cut from
-`main` after v1.44.0 merges. Split out because v1.43.4 is bug-fix-only, v1.43.5 and v1.44.0 are at
-their five-plan caps, and this plan depends on v1.44.0's submitter authentication. Plan 1 of 5 is
-[`cloud-bridge-e2e-sandbox`](plans/v1.44.1-cloud-bridge-e2e-sandbox.md): a cloud session may run
+**Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.47.0`, cut from
+`main` after v1.46.0 merges. Split out because v1.43.4 is bug-fix-only, v1.43.5 and v1.46.0 are at
+their five-plan caps, and this plan depends on v1.46.0's submitter authentication. Plan 1 of 5 is
+[`cloud-bridge-e2e-sandbox`](plans/v1.47.0-cloud-bridge-e2e-sandbox.md): a cloud session may run
 `make-e2e-sandbox` (Tier 2 against an existing sandbox; `e2e-sandbox-provision` stays refused)
 under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, no lifecycle
 overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
 explicit exclusion of `e2e-sandbox`.
 
-Plan 2 (operator, 2026-10-23: "let's do v1.44.0"; placed in v1.44.1 because v1.44.0 is at its cap and
+Plan 2 (operator, 2026-10-23: "let's do v1.46.0"; placed in v1.47.0 because v1.46.0 is at its cap and
 this depends on its submitter authentication): **agents in Slack threads, first slice.**
 `@codex dispatch <spec>` and `@gemini review <task>` from the operator's Slack identity run through
 the relay, the webhook allowlist and `make codex-dispatch`, and each agent replies in the thread when
@@ -603,47 +628,47 @@ its step finishes. Design and limits: [agents working together in Slack
 threads](#candidate-theme--v2x-agents-working-together-in-slack-threads). Spec to be written.
 
 Plan 3 (operator, 2026-10-24: "we should also track each agent's 5-hour session comsuption in agent
-dispatch dashboard in a proper rlease"): [`dispatch-agent-five-hour-window-usage`](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md).
+dispatch dashboard in a proper rlease"): [`dispatch-agent-five-hour-window-usage`](plans/v1.47.0-dispatch-agent-five-hour-window-usage.md).
 A **Session windows** row on the agent dispatch dashboard shows each agent's 5-hour and 7-day used
 percent, from Codex rollout files and the statusline's usage cache (no API call, no credential),
 and how much of the 5-hour window each Codex dispatch used. agy shows "no source" until it has
 one. Depends on v1.43.8's Claude cost-by-reference plan.
 
-Plan 4 (operator, 2026-10-24: add Gemini 4 Argon "into current workflow"): [`dispatch-agy-agent`](plans/v1.44.1-dispatch-agy-agent.md).
+Plan 4 (operator, 2026-10-24: add Gemini 4 Argon "into current workflow"): [`dispatch-agy-agent`](plans/v1.47.0-dispatch-agy-agent.md).
 `make codex-dispatch AGENT=agy` runs a spec on `agy` (default `gemini-4-argon-medium`, validated
 against `agy models`) through the same worktree, ledger and land flow as Codex. A commit by the agent
 makes the task unlandable, and side-by-side runs of one spec land only one. `gemini.sh` reads its
 models from `agy models` instead of a stale hardcoded list.
 
-Plan 5 (operator, 2026-10-24: "try each agent as a primar coorindator"): [`coordinator-rotation-trial`](plans/v1.44.1-coordinator-rotation-trial.md).
+Plan 5 (operator, 2026-10-24: "try each agent as a primar coorindator"): [`coordinator-rotation-trial`](plans/v1.47.0-coordinator-rotation-trial.md).
 Claude, Codex and agy each take the coordinator role for a period. `bin/k3dm-coord` records each
 activity (bug sweep, spec writing, review, land, live check) with the agent's 5-hour and weekly used
 percent at its start and end. A **Coordinator** row shows quota used per activity kind per agent,
 alongside the outcomes: specs landed, bugs closed, rework rounds and defects found later. Live checks
 stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
-**v1.44.1 is now at its five-plan cap.**
+**v1.47.0 is now at its five-plan cap.**
 
-**Codex role-attribution telemetry (2026-10-27):** Extend v1.44.1's existing
-[session-window plan](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+**Codex role-attribution telemetry (2026-10-27):** Extend v1.47.0's existing
+[session-window plan](plans/v1.47.0-dispatch-agent-five-hour-window-usage.md)
 with Coordinator / Worker / Unattributed views for independently linked Codex
 sessions and measured tokens; show shared Codex quota at pool level only (not a
 fabricated per-model split). Keep stale/missing readings, legacy sessions and
 unpriced sessions visible, with coverage denominators. No new plan slot or
 implementation approval.
 
-**Quota-aware coordinator rotation amendment (2026-10-27):** The same v1.44.1
-[coordinator trial](plans/v1.44.1-coordinator-rotation-trial.md) and
-[session-window telemetry](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+**Quota-aware coordinator rotation amendment (2026-10-27):** The same v1.47.0
+[coordinator trial](plans/v1.47.0-coordinator-rotation-trial.md) and
+[session-window telemetry](plans/v1.47.0-dispatch-agent-five-hour-window-usage.md)
 now specify independent Claude/Codex quota pools, explicit shared Sol+Luna Codex
 capacity, advisory worker reserve, source-freshness-aware admission, and durable,
 idempotent operator-controlled Opus ↔ Sol handoffs with worker/worktree, approval,
 verification and run-state reconciliation. Missing reset/source data stays unknown;
 no automatic failover or vendor-side quota reservation is claimed. No additional
-v1.44.1 slot is consumed; implementation requires separate dispatch approval.
+v1.47.0 slot is consumed; implementation requires separate dispatch approval.
 
 **Multi-vendor Agent Dispatch telemetry amendment (2026-10-27):** The existing
-[session-window usage](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
-and [coordinator-rotation](plans/v1.44.1-coordinator-rotation-trial.md) plans
+[session-window usage](plans/v1.47.0-dispatch-agent-five-hour-window-usage.md)
+and [coordinator-rotation](plans/v1.47.0-coordinator-rotation-trial.md) plans
 now explicitly handle any vendor/runtime/model, distinguish coordinator from
 worker, preserve missing or stale usage as unknown, and enable evidence-grounded
 Sol → Luna versus Opus → Sonnet/Haiku comparisons. No new plan slot; no CLI
@@ -651,24 +676,24 @@ credentials, provider APIs or live changes authorized. Retain backwards-compatib
 legacy metrics and avoid treating subscription quota as API token cost.
 
 
-### Candidate milestone — v1.44.2 (patch)
+### Candidate milestone — v1.48.0
 
 **Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
-their specs"). Branch `k3d-manager-v1.44.2`, cut from `main` after v1.44.1 merges. Plan 1 of 5 is
-[`cloud-bridge-offline-test-run-diagnostics`](plans/v1.44.2-cloud-bridge-offline-test-run-diagnostics.md):
+their specs"). Branch `k3d-manager-v1.48.0`, cut from `main` after v1.47.0 merges. Plan 1 of 5 is
+[`cloud-bridge-offline-test-run-diagnostics`](plans/v1.48.0-cloud-bridge-offline-test-run-diagnostics.md):
 a reader-scoped cloud action returns the most recent recorded offline test run, with its failing
 suites, missing stages and bounded, redacted failure reasons. No test runs remotely, and no raw log
 leaves the laptop. It follows the 2026-10-20 `test-all` alerts the operator could not triage while away.
 
 Plan 2 (operator, 2026-10-23: "go ahead") is
-[`command-ledger-and-cluster-reconciliation`](plans/v1.44.2-command-ledger-and-cluster-reconciliation.md):
+[`command-ledger-and-cluster-reconciliation`](plans/v1.48.0-command-ledger-and-cluster-reconciliation.md):
 every webhook job gets a command id, an explicit target and a lease (retries return the first job;
 a lost job is `lost`, not `failed`), and a read-only per-cluster desired/observed record reports
 stale signals and drift. No auto-repair in this slice. It follows the 2026-10-23 tunnel, shared
 `observability-acg` and snapshot-age bugs. Design review pending before dispatch.
 
 Plans 3 and 4 (operator, 2026-10-24: "plan those two caveats with proper release"; specs to be
-written). Both depend on v1.44.1's coordinator rotation trial, so this is the first release they can
+written). Both depend on v1.47.0's coordinator rotation trial, so this is the first release they can
 go in:
 - **Coordinator activity analysis.** Use at least one week of the trial's per-activity data to test
   the 2026-10-24 impression that a Claude bug sweep uses the weekly quota slowly. Fill any
@@ -678,32 +703,32 @@ go in:
   Write the spec before Codex's period starts.
 
 Plan 5 (operator, 2026-10-26: private break-glass access while webhook is down) is
-[`tailscale-break-glass-access`](plans/v1.44.2-tailscale-break-glass-access.md): operator-only
+[`tailscale-break-glass-access`](plans/v1.48.0-tailscale-break-glass-access.md): operator-only
 Tailscale access to m4 (then m2), restricted to macOS SSH over tcp:22 with explicit grants and
 negative-access tests, independent of webhook/cloud-bridge/Hostinger. This is a deliberate,
 restricted private management channel—not new public ingress or an AI-agent SSH path.
-The operator must separately approve enrollment and live rollout. **v1.44.2 is now at its five-plan cap.**
+The operator must separately approve enrollment and live rollout. **v1.48.0 is now at its five-plan cap.**
 
-### Candidate milestone — v1.44.3 (patch)
+### Candidate milestone — v1.49.0
 
-**Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
-from `main` after v1.44.2 merges. Plan 1 of 5 is
-[`cloud-bridge-vault-health`](plans/v1.44.3-cloud-bridge-vault-health.md): one fixed reader-scoped
+**Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.49.0`, cut
+from `main` after v1.48.0 merges. Plan 1 of 5 is
+[`cloud-bridge-vault-health`](plans/v1.49.0-cloud-bridge-vault-health.md): one fixed reader-scoped
 action, `vault-status`, for `hub` or `hostinger` only. It separates sealed, unreachable, Kubernetes
 API down and ESO failing, with no token and no unseal. It follows the 2026-10-20 Hostinger 502 incident.
 
-Plan 2 is [`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.md) (operator,
+Plan 2 is [`feature-flags-first-slice`](plans/v1.49.0-feature-flags-first-slice.md) (operator,
 2026-10-23: "go for it"): flagd on the ACG sandbox only (stage 1; Hostinger is a later, gated one-line stage), one `basket-cart-summary` flag in
 `shopping-cart-basket`, per-variant metrics and a rollout-health dashboard, and `make flag-set` recording
-each flip on the v1.44.2 command ledger. Depends on v1.44.2 and on v1.43.7's cross-repo dispatch.
+each flip on the v1.48.0 command ledger. Depends on v1.48.0 and on v1.43.7's cross-repo dispatch.
 
-Plan 3 of 5 is [`dispatch-prior-art-usage`](plans/v1.44.3-dispatch-prior-art-usage.md) (operator, 2026-10-26). It records advisory lookup results in the task ledger, distinguishes agent-reported reads from retrieved candidates, validates citations in landed commit trailers, and adds release-scoped usage and outcome-correlation measures to Agent Dispatch. It depends on the v1.43.7 dispatch contract and v1.43.9 retrieval quality probe. Read reports are self-reported; agent session files are out of scope and require separate approval. Low-volume outcome comparisons are correlation only and show denominators, with no conclusions below n=30.
+Plan 3 of 5 is [`dispatch-prior-art-usage`](plans/v1.49.0-dispatch-prior-art-usage.md) (operator, 2026-10-26). It records advisory lookup results in the task ledger, distinguishes agent-reported reads from retrieved candidates, validates citations in landed commit trailers, and adds release-scoped usage and outcome-correlation measures to Agent Dispatch. It depends on the v1.43.7 dispatch contract and v1.43.9 retrieval quality probe. Read reports are self-reported; agent session files are out of scope and require separate approval. Low-volume outcome comparisons are correlation only and show denominators, with no conclusions below n=30.
 
-**Plan 4 of 5 — Host control-plane lifecycle management** (operator, 2026-10-26: "go ahead to do that"). [`host-control-plane-lifecycle-management`](plans/v1.44.3-host-control-plane-lifecycle-management.md) defines a deterministic launchd-supervised host controller independent of Hermes, webhook, cloud-bridge and OrbStack. Phase 1 collects functional evidence and permits only bounded local recovery; Phase 2 detects cloudflared security advisories, distinguishes installed/running versions, stages approved immutable Hermes/webhook/bridge revisions and package-manager cloudflared updates, requires operator approval for disruption, verifies routes and supports bounded rollback. Coordinates with the v1.43.9 heartbeat P2, v1.44.2 Tailscale break-glass and v1.46.0 HermesNotRunning plan, avoiding competing restart authorities. Documentation approval does not authorize deployment or unattended updates. **v1.44.3 has four planned slots assigned.**
+**Plan 4 of 5 — Host control-plane lifecycle management** (operator, 2026-10-26: "go ahead to do that"). [`host-control-plane-lifecycle-management`](plans/v1.49.0-host-control-plane-lifecycle-management.md) defines a deterministic launchd-supervised host controller independent of Hermes, webhook, cloud-bridge and OrbStack. Phase 1 collects functional evidence and permits only bounded local recovery; Phase 2 detects cloudflared security advisories, distinguishes installed/running versions, stages approved immutable Hermes/webhook/bridge revisions and package-manager cloudflared updates, requires operator approval for disruption, verifies routes and supports bounded rollback. Coordinates with the v1.43.9 heartbeat P2, v1.48.0 Tailscale break-glass and v1.55.0 HermesNotRunning plan, avoiding competing restart authorities. Documentation approval does not authorize deployment or unattended updates. **v1.49.0 has four planned slots assigned.**
 
-**Plan 5 of 5 — Platform component inventory and lifecycle intelligence** (operator, 2026-10-26). [`platform-component-inventory-lifecycle-intelligence`](plans/v1.44.3-platform-component-inventory-lifecycle-intelligence.md) inventories desired/installed/running versions and provenance across Mac hosts, hub, Hostinger, ACG and applications; correlates security advisories, support status and compatibility constraints; publishes source-freshness-aware read-only reports and Platform Lifecycle observability. All upgrades remain observe/recommend only in this initial slice; host-controller and GitOps executors require separately authorized deployment policies. **v1.44.3 is now at its five-plan cap.**
+**Plan 5 of 5 — Platform component inventory and lifecycle intelligence** (operator, 2026-10-26). [`platform-component-inventory-lifecycle-intelligence`](plans/v1.49.0-platform-component-inventory-lifecycle-intelligence.md) inventories desired/installed/running versions and provenance across Mac hosts, hub, Hostinger, ACG and applications; correlates security advisories, support status and compatibility constraints; publishes source-freshness-aware read-only reports and Platform Lifecycle observability. All upgrades remain observe/recommend only in this initial slice; host-controller and GitOps executors require separately authorized deployment policies. **v1.49.0 is now at its five-plan cap.**
 
-### Candidate milestone — v1.45.0
+### Candidate milestone — v1.50.0
 
 **Docs drift detection.** Facts that can be derived from code (module tables, route tables,
 make targets, line counts) move into generated blocks that `make docs-regen` rewrites and
@@ -713,13 +738,13 @@ substantially since the doc was last edited; far-behind docs get a drafted bug d
 edits a doc. Hermes also publishes per-doc drift to the hub Pushgateway for a new Grafana
 "Docs Health" dashboard, with one `info` rule that fires if the check stops running. Prompted by the 2026-10-09 audit that found all four sampled docs stale.
 
-Scope: [`v1.45.0-docs-drift-detection.md`](plans/v1.45.0-docs-drift-detection.md). Also queued for
-v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve-remediation-terminal-notifications.md),
-[`v1.45.0-node-tunnel-fault-drill.md`](plans/v1.45.0-node-tunnel-fault-drill.md),
-[`v1.45.0-alert-intake-draft-bugs.md`](plans/v1.45.0-alert-intake-draft-bugs.md) (a long-firing or recurring alert drafts a bug doc outside the repo for the operator to promote), and
-[`v1.45.0-autonomous-incident-investigation.md`](plans/v1.45.0-autonomous-incident-investigation.md) (advanced from v2.0.x). v1.45.0 is at its five-plan cap; test-metrics log retention moved to v1.45.4 on 2026-10-29.
+Scope: [`v1.50.0-docs-drift-detection.md`](plans/v1.50.0-docs-drift-detection.md). Also queued for
+v1.50.0: [`v1.50.0-cve-remediation-terminal-notifications.md`](plans/v1.50.0-cve-remediation-terminal-notifications.md),
+[`v1.50.0-node-tunnel-fault-drill.md`](plans/v1.50.0-node-tunnel-fault-drill.md),
+[`v1.50.0-alert-intake-draft-bugs.md`](plans/v1.50.0-alert-intake-draft-bugs.md) (a long-firing or recurring alert drafts a bug doc outside the repo for the operator to promote), and
+[`v1.50.0-autonomous-incident-investigation.md`](plans/v1.50.0-autonomous-incident-investigation.md) (advanced from v2.0.x). v1.50.0 is at its five-plan cap; test-metrics log retention moved to v1.54.0 on 2026-10-29.
 
-### Candidate milestone — v1.45.1 (patch)
+### Candidate milestone — v1.51.0
 
 **Bug-count questions in plain English.** Slack count questions that miss the regex router are
 translated by the model into a small query object (releases, priority, state, Filed date range),
@@ -727,8 +752,8 @@ validated against a closed schema, and answered by `bug-tally`. The model never 
 produces a number, and every reply states what was counted. Amended 2026-10-12 (operator): a follow-up in the same
 Slack thread (`ask-docs how about v1.43.2`) reuses the thread's query with the named field changed,
 and count replies list the docs they counted instead of `Sources: none`. Split into a patch release because
-v1.45.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.44.0 Filed date. Scope:
-[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md).
+v1.50.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.46.0 Filed date. Scope:
+[`v1.51.0-bug-count-query-translation.md`](plans/v1.51.0-bug-count-query-translation.md).
 
 **Engineering Decision Digest** (operator, 2026-10-11). One digest answers: what did I request,
 which requests became specs, what did Claude and Codex complete, what changed without my explicit
@@ -737,41 +762,41 @@ explicit|standing|pending` header) and on agent commits (`Approval:` trailer, or
 inherit an approved spec), enforced by a new `commit-msg` hook and derived from git by
 `scripts/decision-digest.py`. Surfaces: `make decision-digest`, a "k3dm Decision Digest" Grafana
 dashboard (incl. spec approval by release) and an `/ask-docs` fast path. Scope:
-[`v1.45.1-engineering-decision-digest.md`](plans/v1.45.1-engineering-decision-digest.md).
+[`v1.51.0-engineering-decision-digest.md`](plans/v1.51.0-engineering-decision-digest.md).
 
-Also queued: [`v1.45.1-codex-model-routing-and-efficiency.md`](plans/v1.45.1-codex-model-routing-and-efficiency.md) — optional operator-approved Luna/Astra Codex model routing and per-task Grafana efficiency metrics; depends on v1.43.2 dispatch telemetry, no automatic escalation.
+Also queued: [`v1.51.0-codex-model-routing-and-efficiency.md`](plans/v1.51.0-codex-model-routing-and-efficiency.md) — optional operator-approved Luna/Astra Codex model routing and per-task Grafana efficiency metrics; depends on v1.43.2 dispatch telemetry, no automatic escalation.
 
-Also queued: [`v1.45.1-cve-post-remediation-rescan-verification.md`](plans/v1.45.1-cve-post-remediation-rescan-verification.md) — correlate each deployed immutable digest and targeted CVE list with a fresh post-deployment scan; distinguish “applied and healthy” from “CVE eliminated” in Grafana. Coordinate with v1.45.0 terminal notifications.
+Also queued: [`v1.51.0-cve-post-remediation-rescan-verification.md`](plans/v1.51.0-cve-post-remediation-rescan-verification.md) — correlate each deployed immutable digest and targeted CVE list with a fresh post-deployment scan; distinguish “applied and healthy” from “CVE eliminated” in Grafana. Coordinate with v1.50.0 terminal notifications.
 
-Also queued: [`v1.45.1-per-suite-test-metrics.md`](plans/v1.45.1-per-suite-test-metrics.md) — publish independent BATS/Python suite results with parent-child run correlation, prevent double-counting in Grafana, and preserve existing test exit-code semantics.
+Also queued: [`v1.51.0-per-suite-test-metrics.md`](plans/v1.51.0-per-suite-test-metrics.md) — publish independent BATS/Python suite results with parent-child run correlation, prevent double-counting in Grafana, and preserve existing test exit-code semantics.
 
 Bug carried here (triage 2026-10-15): [`repeated-cve-remediation-needs-research`](bugs/2026-10-13-repeated-cve-remediation-needs-research.md) (P2 research), alongside the rescan spec.
 
-v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+v1.51.0 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.51.0` is cut from `main` after v1.50.0 merges.
 
-### Candidate milestone — v1.45.2 (patch)
-**VectorDB indexing provenance and freshness dashboard** (operator, 2026-10-15): distinguish last attempt, last successful indexing, runtime duration, tracked/fetched Git SHA and last fully indexed SHA; do not infer successful indexing from `noop` or zero backlog. Scope: [`v1.45.2-vectordb-index-provenance-dashboard.md`](plans/v1.45.2-vectordb-index-provenance-dashboard.md). Complements v1.44.0 bounded read-only index diagnostics. v1.45.2 had **2 of 5 plans** before the Gemini usage proposal.
-
-
-**Engineering Work Tracking / spec lifecycle** (operator, 2026-10-14). v1.45.1 already has a full five-spec load and ships the Decision Digest approval metrics. Extend that existing collector and dashboard with an **independent implementation status**, verified completion, and per-release five-spec capacity, without mixing bug counts with feature specs. Link from Bug Tracking to the spec view. Specification authored on the current v1.43.2 branch; implementation after v1.45.1 lands. Scope: [`v1.45.2-engineering-work-tracking.md`](plans/v1.45.2-engineering-work-tracking.md). v1.45.2 currently has **1 of 5 plans**.
+### Candidate milestone — v1.52.0
+**VectorDB indexing provenance and freshness dashboard** (operator, 2026-10-15): distinguish last attempt, last successful indexing, runtime duration, tracked/fetched Git SHA and last fully indexed SHA; do not infer successful indexing from `noop` or zero backlog. Scope: [`v1.52.0-vectordb-index-provenance-dashboard.md`](plans/v1.52.0-vectordb-index-provenance-dashboard.md). Complements v1.46.0 bounded read-only index diagnostics. v1.52.0 had **2 of 5 plans** before the Gemini usage proposal.
 
 
-**Gemini embedding API usage and quota visibility** (operator, 2026-10-15): instrument actual embedding HTTP attempts including retries and 429s, cache reuse, durable Pacific-day totals, and optional operator-configured daily cap; show trends and unknown quota explicitly in existing VectorDB dashboard. Scope: [`v1.45.2-gemini-embedding-usage-quota-visibility.md`](plans/v1.45.2-gemini-embedding-usage-quota-visibility.md). v1.45.2 is now **3 of 5 plans**.
+**Engineering Work Tracking / spec lifecycle** (operator, 2026-10-14). v1.51.0 already has a full five-spec load and ships the Decision Digest approval metrics. Extend that existing collector and dashboard with an **independent implementation status**, verified completion, and per-release five-spec capacity, without mixing bug counts with feature specs. Link from Bug Tracking to the spec view. Specification authored on the current v1.43.2 branch; implementation after v1.51.0 lands. Scope: [`v1.52.0-engineering-work-tracking.md`](plans/v1.52.0-engineering-work-tracking.md). v1.52.0 currently has **1 of 5 plans**.
 
-**Selective memory-bank RAG indexing** (operator, 2026-10-15): index allowlisted current `memory-bank/` context as stable, content-hashed chunks with source provenance, safety exclusions, advisory retrieval semantics, and correct file-vs-chunk metrics. Complements the same-release index provenance and Gemini quota specs. Scope: [`v1.45.2-memory-bank-selective-vector-indexing.md`](plans/v1.45.2-memory-bank-selective-vector-indexing.md). v1.45.2 is now **4 of 5 plans**; scheduling remains subject to operator triage.
+
+**Gemini embedding API usage and quota visibility** (operator, 2026-10-15): instrument actual embedding HTTP attempts including retries and 429s, cache reuse, durable Pacific-day totals, and optional operator-configured daily cap; show trends and unknown quota explicitly in existing VectorDB dashboard. Scope: [`v1.52.0-gemini-embedding-usage-quota-visibility.md`](plans/v1.52.0-gemini-embedding-usage-quota-visibility.md). v1.52.0 is now **3 of 5 plans**.
+
+**Selective memory-bank RAG indexing** (operator, 2026-10-15): index allowlisted current `memory-bank/` context as stable, content-hashed chunks with source provenance, safety exclusions, advisory retrieval semantics, and correct file-vs-chunk metrics. Complements the same-release index provenance and Gemini quota specs. Scope: [`v1.52.0-memory-bank-selective-vector-indexing.md`](plans/v1.52.0-memory-bank-selective-vector-indexing.md). v1.52.0 is now **4 of 5 plans**; scheduling remains subject to operator triage.
 
 Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
 
-PR lifecycle history moved to v1.45.4 on 2026-10-29 (over the five-plan cap).
+PR lifecycle history moved to v1.54.0 on 2026-10-29 (over the five-plan cap).
 
-### Candidate milestone — v1.45.3 (patch)
+### Candidate milestone — v1.53.0
 
 **Mac workstation protection for the two operator MacBooks** (operator, 2026-10-23). Everything
 security-related so far watches the cluster: Trivy, cosign and Kyverno at admission, and Falco
-(v1.51.0) on Linux nodes only. The laptops get nothing beyond Apple's built-ins. Yet they hold the
+(v1.62.0) on Linux nodes only. The laptops get nothing beyond Apple's built-ins. Yet they hold the
 login Keychain, the SSH keys and the GitHub tokens, and they run agents that execute code. Malware
 that rewrites itself defeats signature checks such as XProtect, so this release relies on allowlists
-and watching behaviour instead. It needs no cluster changes and nothing from v1.44.x or v1.45.x.
+and watching behaviour instead. It needs no cluster changes and nothing from the v1.46–v1.54 releases.
 
 | Piece | What it does | Rollout |
 |---|---|---|
@@ -789,22 +814,22 @@ Constraints:
   It sends only names, paths and counts, under the same label rules as the Falco plan.
 - Agent sandboxes (the Codex seatbelt and the ssh-config guard) are kept, not replaced.
 
-Deliverables: a `docs/guides/` page for Mac workstation protection, and one plan doc. v1.45.3
-holds **1 of 5 plans** (spec not yet written). Branch `k3d-manager-v1.45.3` is cut from `main`
-after v1.45.2 merges.
+Deliverables: a `docs/guides/` page for Mac workstation protection, and one plan doc. v1.53.0
+holds **1 of 5 plans** (spec not yet written). Branch `k3d-manager-v1.53.0` is cut from `main`
+after v1.52.0 merges.
 
-### Candidate milestone — v1.45.4 (patch)
+### Candidate milestone — v1.54.0
 
-Split 2026-10-29 by Claude: v1.45.0 and v1.45.2 each held six active plans. Overflow from both, with no dependency on v1.45.3.
+Split 2026-10-29 by Claude: v1.50.0 and v1.52.0 each held six active plans. Overflow from both, with no dependency on v1.53.0.
 
-- [`v1.45.4-test-metrics-log-retention.md`](plans/v1.45.4-test-metrics-log-retention.md): from v1.45.0. That release keeps the operator-advanced incident investigation instead.
-- **PR lifecycle history and merge visibility** (operator, 2026-10-27): extend the existing Hermes PR Checks dashboard with bounded 30-day Recently Merged and Closed Without Merge views. Retain current Open PR counts; track authoritative GitHub merge/close timestamps and final observed CI evidence with freshness, not CVE deployment `applied` state or guessed Copilot attribution. Scope: [`v1.45.4-pr-lifecycle-history-and-merge-visibility.md`](plans/v1.45.4-pr-lifecycle-history-and-merge-visibility.md). **v1.45.2 is now full at 5 of 5 plans.** Documentation only; implementation remains operator-gated.
+- [`v1.54.0-test-metrics-log-retention.md`](plans/v1.54.0-test-metrics-log-retention.md): from v1.50.0. That release keeps the operator-advanced incident investigation instead.
+- **PR lifecycle history and merge visibility** (operator, 2026-10-27): extend the existing Hermes PR Checks dashboard with bounded 30-day Recently Merged and Closed Without Merge views. Retain current Open PR counts; track authoritative GitHub merge/close timestamps and final observed CI evidence with freshness, not CVE deployment `applied` state or guessed Copilot attribution. Scope: [`v1.54.0-pr-lifecycle-history-and-merge-visibility.md`](plans/v1.54.0-pr-lifecycle-history-and-merge-visibility.md). **v1.52.0 is now full at 5 of 5 plans.** Documentation only; implementation remains operator-gated.
 
-**Unified Engineering Knowledge Query + validated semantic plan cache** (operator, 2026-11-02): one LLM-first, read-only /ask-docs query layer over the entire indexed engineering corpus (bugs, issues, plans, retros, job failures, and selectively indexed context), with Git-revision-scoped complete enumeration for exact lists/counts, bounded semantic retrieval for exploratory questions, provenance, thread follow-ups, and parameterized plan-template caching in existing SQLite/pgvector. No natural-language regex gate; validated typed operations, RBAC and current-source execution remain deterministic. Depends on v1.45.1 bug-query groundwork and v1.45.2 index provenance; no replacement of those specs or automatic fixes. Scope: [`v1.45.4-unified-knowledge-query-and-plan-cache.md`](plans/v1.45.4-unified-knowledge-query-and-plan-cache.md). **v1.45.4 is now at 3 of 5 plans.** Specification only; implementation requires separate approval.
+**Unified Engineering Knowledge Query + validated semantic plan cache** (operator, 2026-11-02): one LLM-first, read-only /ask-docs query layer over the entire indexed engineering corpus (bugs, issues, plans, retros, job failures, and selectively indexed context), with Git-revision-scoped complete enumeration for exact lists/counts, bounded semantic retrieval for exploratory questions, provenance, thread follow-ups, and parameterized plan-template caching in existing SQLite/pgvector. No natural-language regex gate; validated typed operations, RBAC and current-source execution remain deterministic. Depends on v1.51.0 bug-query groundwork and v1.52.0 index provenance; no replacement of those specs or automatic fixes. Scope: [`v1.54.0-unified-knowledge-query-and-plan-cache.md`](plans/v1.54.0-unified-knowledge-query-and-plan-cache.md). **v1.54.0 is now at 3 of 5 plans.** Specification only; implementation requires separate approval.
 
-**AI-assisted attack-surface and trust-boundary hardening** (operator request, 2026-11-03): inventory public ingress, cloud-bridge/webhook/Slack authorization, CI and credential boundaries; specify deterministic read-only versus privileged tool checks, untrusted-log/RAG/Slack regression fixtures, network reachability and independent alerting requirements. This is a P1 **documentation-only** hardening scope, not permission to deploy, mutate security policy or automate containment. Reuse v1.48.1 SHA-bound approvals, v1.51.0 Falco runtime detection, v2.2 identity/provenance enforcement, v1.45.3 Mac protection and v1.46.0 offsite watchdog; avoid parallel implementations. Scope: [`v1.45.4-ai-attack-surface-security-boundary-hardening.md`](plans/v1.45.4-ai-attack-surface-security-boundary-hardening.md). **v1.45.4 now has 4 of 5 plans assigned** (subject to release-branch reconciliation).
+**AI-assisted attack-surface and trust-boundary hardening** (operator request, 2026-11-03): inventory public ingress, cloud-bridge/webhook/Slack authorization, CI and credential boundaries; specify deterministic read-only versus privileged tool checks, untrusted-log/RAG/Slack regression fixtures, network reachability and independent alerting requirements. This is a P1 **documentation-only** hardening scope, not permission to deploy, mutate security policy or automate containment. Reuse v1.59.0 SHA-bound approvals, v1.62.0 Falco runtime detection, v2.2 identity/provenance enforcement, v1.53.0 Mac protection and v1.55.0 offsite watchdog; avoid parallel implementations. Scope: [`v1.54.0-ai-attack-surface-security-boundary-hardening.md`](plans/v1.54.0-ai-attack-surface-security-boundary-hardening.md). **v1.54.0 now has 4 of 5 plans assigned** (subject to release-branch reconciliation).
 
-### Candidate milestone — v1.46.0
+### Candidate milestone — v1.55.0
 
 **Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
 new webhook route that diagnoses the Hermes LaunchAgent with a fixed routine (no model): not loaded,
@@ -812,7 +837,7 @@ interpreter missing (reports the `brew install`), mid-cycle, or on cooldown are 
 otherwise it runs `launchctl kickstart` at most once an hour. Every outcome posts to Slack. Prompted
 by the 2026-10-09 exit-78 outage.
 
-Scope: [`v1.46.0-hermes-not-running-recovery.md`](plans/v1.46.0-hermes-not-running-recovery.md).
+Scope: [`v1.55.0-hermes-not-running-recovery.md`](plans/v1.55.0-hermes-not-running-recovery.md).
 
 **Offsite hub watch from Hostinger.** Hostinger runs two independent checks of the hub: a blackbox
 probe of a public endpoint (`argocd.3ai-talk.org/healthz`) and a one-series `/federate` read of the
@@ -820,20 +845,20 @@ hub Prometheus. When both fail, `HubExternallyUnreachable` sends email at 10 min
 When only the Prometheus read fails, `HubPrometheusUnreachable` sends email. A stale Hermes
 heartbeat alerts only while the hub is reachable. Planned downtime takes a `make hub-watch-silence`
 maintenance silence. Scope:
-[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md).
+[`v1.55.0-hostinger-offsite-hub-watch.md`](plans/v1.55.0-hostinger-offsite-hub-watch.md).
 
 **Weekly DR drill, unattended** (operator, 2026-10-11). A GUI LaunchAgent on the M2 runs the drill
 on Sunday 05:00 in an explicit unattended mode. That mode requires the `enforce` Keychain guard,
 refuses on a locked keychain, never widens an ACL, and writes a failed result on refusal so
 `DRDrillFailed` fires the same day. The M4 pulls and publishes daily, so the M2 never holds the data
-repo key. Scope: [`v1.46.0-scheduled-dr-drill.md`](plans/v1.46.0-scheduled-dr-drill.md). v1.46.0 is
-**full at 5 of 5 plans** (also `v1.46.0-dr-drill-dashboard.md`,
-`v1.46.0-hub-data-backup-integrity.md`); the next v1.46.0 item goes to v1.46.1.
+repo key. Scope: [`v1.55.0-scheduled-dr-drill.md`](plans/v1.55.0-scheduled-dr-drill.md). v1.55.0 is
+**full at 5 of 5 plans** (also `v1.55.0-dr-drill-dashboard.md`,
+`v1.55.0-hub-data-backup-integrity.md`); the next v1.55.0 item goes to v1.56.0.
 
-### Candidate milestone — v1.46.1 (patch)
+### Candidate milestone — v1.56.0
 
 Both items are from the operator, 2026-10-17. No specs have been written yet. Branch
-`k3d-manager-v1.46.1`, cut from `main` after v1.46.0 merges.
+`k3d-manager-v1.56.0`, cut from `main` after v1.55.0 merges.
 
 **Monthly in-place hub rebuild.** The weekly drill restores into a separate drill cluster, so it
 never exercises the in-place path. That path is the restarts of hub dependents after the restore
@@ -848,7 +873,7 @@ attended, from the operator's tmux shell (the Keychain must be readable). The sc
 - An ArgoCD API token reissue step, because a rebuild invalidates every token.
 - The result is published to the Pushgateway: a success flag, the step that failed, and the RTO
   from `_hub_data_record_rto`.
-- A "Last in-place rebuild" row on the v1.46.0 DR drill dashboard.
+- A "Last in-place rebuild" row on the v1.55.0 DR drill dashboard.
 - A `HubRebuildStale` alert after 35 days with no successful rebuild (email, `platform-warning`).
 
 Tests stub the publisher; they never push to the live hub's Pushgateway.
@@ -858,7 +883,7 @@ hostnames show Cloudflare's tunnel error (530 / 1033). This applies to a planned
 outage. Instead, a Worker on those routes passes requests to the origin. When the origin is
 unreachable, the Worker returns a small static maintenance page.
 
-- The page must carry HTTP **503 with `Retry-After`**, never 200. The v1.46.0 offsite hub watch
+- The page must carry HTTP **503 with `Retry-After`**, never 200. The v1.55.0 offsite hub watch
   probes `argocd.3ai-talk.org/healthz`; a 200 from the Worker would hide a real outage from it.
 - A planned window is switched on explicitly, and pairs with `make hub-watch-silence`.
 - The page shows the window's expected end time.
@@ -868,30 +893,30 @@ Check whether Cloudflare's own custom error pages are available on this plan bef
 Worker.
 
 **One E2E command with runner selection** (operator, 2026-10-23). Plan 1 of 5 is
-[`e2e-unified-runner-command`](plans/v1.46.1-e2e-unified-runner-command.md): `k3dm e2e-remote
+[`e2e-unified-runner-command`](plans/v1.56.0-e2e-unified-runner-command.md): `k3dm e2e-remote
 RUNNER=m2|m4|aws` with a validated runner per execution environment, replacing the three separate
 E2E commands, with a deprecation path for `e2e-sandbox`. Split out of a v1.43.5 P3 bug, which keeps
-only the error-message fix. Design spec; Files and Acceptance are written when v1.46.1 starts.
+only the error-message fix. Design spec; Files and Acceptance are written when v1.56.0 starts.
 
-### Candidate milestone — v1.47.0
+### Candidate milestone — v1.57.0
 
 **Infra e2e and promotion gate — the only item in this release** (operator, 2026-10-10). `make
 hub-e2e REF=<release branch>` builds a full candidate hub on the M2 from that commit (the M2's
 other clusters are stopped for the run), proves it cannot act on the outside world, checks every
 required Application, Vault/ESO, Keycloak/LDAP logins, Prometheus rules, Alertmanager, dashboards
-and `make smoke`, and records the platform RTO (absorbs the former v1.46.0 full-recovery spec,
+and `make smoke`, and records the platform RTO (absorbs the former v1.55.0 full-recovery spec,
 option A). `make appsets-reapply` and `make hub-up` then refuse without a passing run for the exact
 commit, unless a recorded override is given. Scope:
-[`v1.47.0-hub-e2e-promotion-gate.md`](plans/v1.47.0-hub-e2e-promotion-gate.md).
+[`v1.57.0-hub-e2e-promotion-gate.md`](plans/v1.57.0-hub-e2e-promotion-gate.md).
 
-### Candidate milestone — v1.48.0
+### Candidate milestone — v1.58.0
 
 **Scheduled baseline load test** (operator, 2026-10-11, after the Checkout Load Test dashboard was
 found empty). A light 5–10 VU baseline every 12h keeps the k6 panels filled, plus a full stress run
 as a gate for major releases. Moved from the never-cut v1.41.1. Credentials and preflight come
-first. Its life is bounded: v2.0.0 retires shopping-cart and v1.50.0 re-points the load test.
-Scope: [`v1.48.0-loadtest-credentials-and-preflight.md`](plans/v1.48.0-loadtest-credentials-and-preflight.md),
-then [`v1.48.0-scheduled-baseline-loadtest.md`](plans/v1.48.0-scheduled-baseline-loadtest.md).
+first. Its life is bounded: v2.0.0 retires shopping-cart and v1.61.0 re-points the load test.
+Scope: [`v1.58.0-loadtest-credentials-and-preflight.md`](plans/v1.58.0-loadtest-credentials-and-preflight.md),
+then [`v1.58.0-scheduled-baseline-loadtest.md`](plans/v1.58.0-scheduled-baseline-loadtest.md).
 
 **Operational quality and incident severity** (operator, 2026-10-12; specs written 2026-10-12). A
 "k3dm Operational Quality" dashboard, rolling 30 days, with six headline numbers and targets:
@@ -901,10 +926,10 @@ Severity levels: SEV1 hub unavailable or unrecoverable data loss (frequency, rec
 Argo CD unavailable or a production-like app outage (frequency, duration); SEV3 agent task fails or a
 monitoring panel misleads (frequency, recurrence); SEV4 minor defect with no operational impact
 (backlog, resolution time).
-- [`v1.48.0-incident-severity-records.md`](plans/v1.48.0-incident-severity-records.md): bug docs gain a new
+- [`v1.58.0-incident-severity-records.md`](plans/v1.58.0-incident-severity-records.md): bug docs gain a new
   `**Incident:** SEV1–SEV4` line (the existing `**Severity:**` line is left as is) and
   `**Detected by:** alert | sensor | test | human`; the bug-docs exporter counts both over 30 days.
-- [`v1.48.0-operational-quality-dashboard.md`](plans/v1.48.0-operational-quality-dashboard.md): hub Prometheus keeps
+- [`v1.58.0-operational-quality-dashboard.md`](plans/v1.58.0-operational-quality-dashboard.md): hub Prometheus keeps
   3 days and Pushgateway gauges are time-weighted, so a new `bin/k3dm-quality-metrics` computes per-run
   30-day and weekly ratios from durable records (a new webhook deployment ledger, drill results, the
   dispatch ledger, classified bug docs) and pushes the finished ratios. Closed weeks are frozen in a
@@ -912,35 +937,35 @@ monitoring panel misleads (frequency, recurrence); SEV4 minor defect with no ope
   hub-data export, age-encrypted, so the v2 → v3 history survives a lost laptop. Key availability and deployment measures to the
   platform, not shopping-cart, which v2.0.0 retires.
 
-Placed here because its inputs land earlier: bug Filed/Recurred/Verified dates (v1.44.0), CVE
-remediation data (v1.45.0), the offsite availability probe and the weekly DR drill (v1.46.0), and
-platform RTO (v1.47.0).
+Placed here because its inputs land earlier: bug Filed/Recurred/Verified dates (v1.46.0), CVE
+remediation data (v1.50.0), the offsite availability probe and the weekly DR drill (v1.55.0), and
+platform RTO (v1.57.0).
 
 **Human effort per verified release** (operator, 2026-10-12; spec written 2026-10-12). One number per
-release that passed the v1.47.0 `hub-e2e` gate: how many times the operator had to act. It starts
-here so v1.48–v2.x give the baseline that v3.0.0 (multi-agent product team) must push down; it is
+release that passed the v1.57.0 `hub-e2e` gate: how many times the operator had to act. It starts
+here so v1.58–v2.x give the baseline that v3.0.0 (multi-agent product team) must push down; it is
 the same measure as that section's "coordinator interventions".
-- [`v1.48.0-human-effort-per-release.md`](plans/v1.48.0-human-effort-per-release.md): counts explicit approvals (Decision Digest, v1.45.1),
+- [`v1.58.0-human-effort-per-release.md`](plans/v1.58.0-human-effort-per-release.md): counts explicit approvals (Decision Digest, v1.51.0),
   operator-authored commits, and operator-only steps and agent corrections recorded through a new
   `make log-intervention KIND=… NOTE=…` ledger (git cannot see these); branch-cut-to-merge hours as
   context. Minutes are optional and self-reported. A trend panel on the Operational Quality
   dashboard, one point per verified release.
 
-v1.48.0 is **full at 5 of 5 plans**; the next v1.48.0 item goes to v1.48.1.
+v1.58.0 is **full at 5 of 5 plans**; the next v1.58.0 item goes to v1.59.0.
 
-**Deferred to v1.48.1:** [`v1.48.1-semantic-change-approval-gate.md`](plans/v1.48.1-semantic-change-approval-gate.md) introduces trusted PR risk classification and SHA-bound approval (P2, approval pending, advisory-first). Authored on the current v1.43.2 branch; do not start implementation before its release is cut and operator approves.
+**Deferred to v1.59.0:** [`v1.59.0-semantic-change-approval-gate.md`](plans/v1.59.0-semantic-change-approval-gate.md) introduces trusted PR risk classification and SHA-bound approval (P2, approval pending, advisory-first). Authored on the current v1.43.2 branch; do not start implementation before its release is cut and operator approves.
 
 
-### Candidate milestone — v1.48.1 (patch)
+### Candidate milestone — v1.59.0
 
-**Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0 and v1.48.0) on 2026-10-12,
-when v1.48.0 took the operational-quality bundle. It depends on nothing in that bundle. Scope:
-[`v1.48.1-e2e-failure-artifacts.md`](plans/v1.48.1-e2e-failure-artifacts.md). Branch
-`k3d-manager-v1.48.1` is cut from `main` after v1.48.0 merges.
+**Structured E2E failure evidence**, moved from v1.43.0 (via v1.57.0 and v1.58.0) on 2026-10-12,
+when v1.58.0 took the operational-quality bundle. It depends on nothing in that bundle. Scope:
+[`v1.59.0-e2e-failure-artifacts.md`](plans/v1.59.0-e2e-failure-artifacts.md). Branch
+`k3d-manager-v1.59.0` is cut from `main` after v1.58.0 merges.
 
-Also here (triage 2026-10-15): [`v1.48.1-e2e-current-release-head-sync.md`](plans/v1.48.1-e2e-current-release-head-sync.md),
+Also here (triage 2026-10-15): [`v1.59.0-e2e-current-release-head-sync.md`](plans/v1.59.0-e2e-current-release-head-sync.md),
 which makes the E2E preflight test the current release-branch HEAD (renamed from the unversioned
-proposal). With the semantic approval gate, v1.48.1 holds 3 of 5 plans.
+proposal). With the semantic approval gate, v1.59.0 holds 3 of 5 plans.
 
 **Unscheduled P3 backlog** (triage 2026-10-15):
 [`argocd-image-updater-dashboard-kpi-alignment`](bugs/2026-10-13-argocd-image-updater-dashboard-kpi-alignment.md),
@@ -959,7 +984,7 @@ study is 15 × 2 languages × 3 runs = **90 records**, and human scoring doubles
 mapped to Chinese place names with a fixed district table, not by model guesswork.
 
 Shopping-cart is the platform's acceptance contract today:
-- the Tier 1 and Tier 2 e2e tests, and the v1.47.0 promotion gate;
+- the Tier 1 and Tier 2 e2e tests, and the v1.57.0 promotion gate;
 - image signing and Kyverno, loadtest;
 - the Keycloak realm, ESO and Vault paths, Dependabot coverage;
 - about 100 files in `scripts/`, `bin/` and `scripts/etc/`.
@@ -988,9 +1013,9 @@ Postgres only; the LLM and MCP are external APIs. That would take the node to ab
 memory requested. Even if every pod hit its memory limit at once, the total would be about 13.6 GB
 of 16 GB.
 
-So the app now runs **beside** shopping-cart on Hostinger for the v1.49.0 → v1.50.0 window. The
+So the app now runs **beside** shopping-cart on Hostinger for the v1.60.0 → v1.61.0 window. The
 platform proofs move to the app while the old target still runs, so there is never a gap with
-nothing proven. Shopping-cart leaves Hostinger at the end of v1.50.0, once those proofs are green
+nothing proven. Shopping-cart leaves Hostinger at the end of v1.61.0, once those proofs are green
 against the app. The 10-10 rule still holds: no long side-by-side period.
 
 To watch while both run:
@@ -999,19 +1024,19 @@ To watch while both run:
   continuous.
 
 **Timing, revised 2026-10-10 (operator).** The two tracks are independent until they meet at
-v1.49.0. App specs and the M1 `tools/list` spike live in the app repo and touch no cluster, so they
+v1.60.0. App specs and the M1 `tools/list` spike live in the app repo and touch no cluster, so they
 may start any time, in the gaps while agents work k3d-manager batches. M2 and later are not run in
-parallel with the platform releases. The v1.47.0 gate stays mandatory for every infra promotion and
-is never weakened for the app. Deploying the app onto the platform (v1.49.0) waits for v1.47.0 to
-ship and for app M1. v1.47.0 and v1.48.0 are written workload-agnostic, so v1.50.0 re-points them
+parallel with the platform releases. The v1.57.0 gate stays mandatory for every infra promotion and
+is never weakened for the app. Deploying the app onto the platform (v1.60.0) waits for v1.57.0 to
+ship and for app M1. v1.57.0 and v1.58.0 are written workload-agnostic, so v1.61.0 re-points them
 by editing lists, not code.
 
 | Step | Where | Scope |
 |---|---|---|
 | App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
-| v1.49.0 | k3d-manager | Starts when app M1 is near done. Onboard the app on Hostinger beside shopping-cart (revised 2026-10-30: the 4 CPU / 16 GB node fits both). Before onboarding, re-read node requests read-only and confirm about 0.9 CPU / 3 GiB of headroom. Onboard: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
-| v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. Then, once they are green against the app, confirm read-only that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards); the operator removes shopping-cart from Hostinger (moved here from v1.49.0, 2026-10-30). |
-| v1.50.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
+| v1.60.0 | k3d-manager | Starts when app M1 is near done. Onboard the app on Hostinger beside shopping-cart (revised 2026-10-30: the 4 CPU / 16 GB node fits both). Before onboarding, re-read node requests read-only and confirm about 0.9 CPU / 3 GiB of headroom. Onboard: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
+| v1.61.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. Then, once they are green against the app, confirm read-only that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards); the operator removes shopping-cart from Hostinger (moved here from v1.60.0, 2026-10-30). |
+| v1.61.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 
 Release splits, new patches, and dropped milestones must update `docs/release-milestones.json` in the same commit as the roadmap change.
@@ -1020,8 +1045,8 @@ Release splits, new patches, and dropped milestones must update `docs/release-mi
 platform against an app it has never seen: a Bolt.new-generated app, exported to its own repo and
 onboarded cold. The headline metric is manual interventions (target 0 long-term), with 100%
 deployment success for supported templates and functional + operational e2e, including
-observability onboarding. Generating the app may start any time; deploying it waits for v1.47.0.
-Scope: [`v1.49.0-unfamiliar-app-onboarding.md`](plans/v1.49.0-unfamiliar-app-onboarding.md).
+observability onboarding. Generating the app may start any time; deploying it waits for v1.57.0.
+Scope: [`v1.60.0-unfamiliar-app-onboarding.md`](plans/v1.60.0-unfamiliar-app-onboarding.md).
 
 What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
 of those only if a platform feature still needs it to prove itself.
@@ -1029,7 +1054,7 @@ of those only if a platform feature still needs it to prove itself.
 ### Candidate tool — dirused: Windows disk usage and purge, from one node across many machines
 
 **Proposed 2026-11-06 (operator).** A private C#/.NET tool in its own
-repo, independent of v2.0.0 and of k3d-manager's version numbers. M1 runs in a gap between releases; the main work starts after v1.46.1 and pauses during v1.47.0's e2e and gate work. It is also the pilot for the intent workflow:
+repo, independent of v2.0.0 and of k3d-manager's version numbers. M1 runs in a gap between releases; the main work starts after v1.56.0 and pauses during v1.57.0's e2e and gate work. It is also the pilot for the intent workflow:
 a real request from draft to verified software. Reads ship before deletes; `/autopurge` ships last on
 its own go. Development on Vagrant with VirtualBox, multi-node tests on ACG AWS; both are proven first.
 Scope: [`dirused-windows-disk-usage-tool.md`](plans/dirused-windows-disk-usage-tool.md).
@@ -1045,9 +1070,9 @@ Starts only after v2.0.0 is stable, never in parallel with the v1.4x releases.
 | Layer | Exists today | Gap |
 |---|---|---|
 | Application | TwinkleAI app from v2.0.0 (API, Postgres, Kubernetes) | none at v2.0.0 |
-| Observability | Prometheus, Grafana, Alertmanager, Loki, Pushgateway | app-level metrics (v1.49.0) |
-| Validation | e2e Tier 1/2, v1.47.0 promotion gate, nightly offline suite, smoke, DR drill | re-pointed at v1.50.0 |
-| Gateway | Hermes triage and bug drafts, webhook action allowlist, cloud-bridge roles, v1.45.0 alert intake, v1.46.0 Hermes self-recovery | one MCP tool server, an LLM provider adapter, an explicit policy engine |
+| Observability | Prometheus, Grafana, Alertmanager, Loki, Pushgateway | app-level metrics (v1.60.0) |
+| Validation | e2e Tier 1/2, v1.57.0 promotion gate, nightly offline suite, smoke, DR drill | re-pointed at v1.61.0 |
+| Gateway | Hermes triage and bug drafts, webhook action allowlist, cloud-bridge roles, v1.50.0 alert intake, v1.55.0 Hermes self-recovery | one MCP tool server, an LLM provider adapter, an explicit policy engine |
 | Providers | Claude, Codex, Gemini, each wired separately | one interface; per-provider scoring on recorded incidents |
 | Remediation | Slack approval (pull model), Codex dispatch | the full loop, with retest and audit |
 
@@ -1128,7 +1153,7 @@ be validated by deterministic code and existing policy gates before any executio
 - **Provider-independent:** reuse the v2.x MCP gateway and provider adapter; start read-only,
   measure correctness on fixed ambiguous/negative query fixtures, and fail closed for unsupported,
   expensive or destructive requests.
-- **Reuse existing work:** `v1.45.1-bug-count-query-translation.md` is a narrow predecessor
+- **Reuse existing work:** `v1.51.0-bug-count-query-translation.md` is a narrow predecessor
   (natural language to a validated bug-count query object); do not duplicate it. Build on
   /ask-docs retrieval improvements and the established Git-backed spec/memory-bank conventions.
 
@@ -1241,14 +1266,14 @@ rather than inventing accuracy or cost targets now.
 
 **Not in this milestone:** autonomous remediation, broad network IDS, unattended release
 management, arbitrary repository writes, generalized product development or unbounded
-multi-agent orchestration. Integrate the separate proposed Falco IDS work from v1.51.0
+multi-agent orchestration. Integrate the separate proposed Falco IDS work from v1.62.0
 only if it has actually shipped and exposes approved read-only signals; it is not a hard
 dependency. This milestone feeds v3.0.0's multi-agent product team with more trustworthy
 incident investigation, but does not itself implement the product team.
 
 **Candidate slice — v2.6.4: security triage of runtime detections** (operator, 2026-10-23, after a
 public design exercise on agent-based detection over streaming telemetry; design here is our own).
-Deterministic rules see every event; the agent sees only what they flag. Falco (v1.51.0) and the
+Deterministic rules see every event; the agent sees only what they flag. Falco (v1.62.0) and the
 existing Alertmanager rules are the detection stage. The v2.6.0–v2.6.3 investigation loop becomes
 the triage stage for their findings, with these additions:
 
@@ -1264,9 +1289,9 @@ the triage stage for their findings, with these additions:
 - **Reproducible verdicts.** Each triage records the rule version, the event, the evidence it read and
   the model and prompt version, so a verdict can be replayed later.
 - **Report only.** A verdict drafts a `docs/bugs/` entry or a Slack notice; no quarantine, pod
-  deletion or network change (the v1.51.0 non-goals hold).
+  deletion or network change (the v1.62.0 non-goals hold).
 
-Depends on v1.51.0 actually shipping Falco with read-only signals, and on v2.6.0–v2.6.3.
+Depends on v1.62.0 actually shipping Falco with read-only signals, and on v2.6.0–v2.6.3.
 
 **Scheduling:** roadmap candidate only; no `docs/plans/v2.6.x-*.md` files, new
 branch, live action, or dispatch is authorized by this entry. Scope each slice only
@@ -1339,12 +1364,12 @@ e2e gate passed.
 - **Units:** share of weekly quota per plan, plus tokens where the CLI reports them, not dollars;
   record the model ID and plan for every run. Results are directional (small n).
 - **Inputs it reuses:** per-spec dispatch metrics (v1.43.3), Codex model routing and efficiency
-  (v1.45.1), human effort per verified release (v1.48.0).
+  (v1.51.0), human effort per verified release (v1.58.0).
 - **Cheap early step (separate item, not scheduled):** record Codex tokens per dispatch so real
   data exists by v2.4.
 
 **v3.0.0 dependency:** this is the cost baseline the multi-agent product team must beat, alongside
-v1.48.0's human-effort baseline. It also answers RQ2–RQ4 of the research paper plan,
+v1.58.0's human-effort baseline. It also answers RQ2–RQ4 of the research paper plan,
 [`docs/research/2026-10-16-research-paper-plan.md`](research/2026-10-16-research-paper-plan.md).
 
 ### Engineering-contract gaps (assessed 2026-10-10)
@@ -1355,16 +1380,16 @@ stands; the scores are judgement, not measurement.
 | Principle | Today | Main gap |
 |---|---|---|
 | Intent as an engineering contract | ~80%: every change is a spec with files, exact commit message, Definition of Done, "What NOT to do", stubbed and mutation tests, live acceptance | Operational requirements (resource budget, capacity, rollback) are rarely stated; required sections are checked by review, not by tooling |
-| Verification as the release authority | ~65%, ~80% after v1.47.0: agents' claims are re-verified; CI, CodeQL, ggshield, Copilot, nightly suite, e2e, DR drill | Infra changes reach the hub untested (v1.47.0); the PR gate is a followed checklist, not enforced; the evidence behind a release decision is not kept |
+| Verification as the release authority | ~65%, ~80% after v1.57.0: agents' claims are re-verified; CI, CodeQL, ggshield, Copilot, nightly suite, e2e, DR drill | Infra changes reach the hub untested (v1.57.0); the PR gate is a followed checklist, not enforced; the evidence behind a release decision is not kept |
 | Common operational interfaces | ~40%: Slack, cloud bridge and Hermes enter through the webhook's action allowlist and roles | The CLI and local agents bypass it; the cloud bridge does not yet authenticate submitters |
 
 Next steps, smallest first:
 
 | Step | Lands in | Scope |
 |---|---|---|
-| Operational requirements in every spec | DONE 2026-10-10, with `v1.44.0-bug-lifecycle-metrics.md` | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
-| Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
-| One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
+| Operational requirements in every spec | DONE 2026-10-10, with `v1.46.0-bug-lifecycle-metrics.md` | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
+| Release evidence record | v1.58.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.57.0 gate result, open P0/P1 bugs. |
+| One authorization path, inventoried | v1.46.0 | Ship `v1.46.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
 ### Candidate theme — v2.x: agents working together in Slack threads
 
@@ -1388,7 +1413,7 @@ there: Codex implements, Gemini reviews, Codex fixes, Claude verifies and asks t
   (`project_hermes_slack_approval`).
 
 **Placement:** the first slice (`@codex dispatch <spec>`, `@gemini review <task>`, threaded replies)
-is v1.44.1 plan 2 (operator, 2026-10-23), after v1.44.0's submitter authentication, because a chat
+is v1.47.0 plan 2 (operator, 2026-10-23), after v1.46.0's submitter authentication, because a chat
 message must not start a dispatch until its sender is authenticated. The full multi-agent
 conversation stays v2.x and is the interface of v3.0.0 below.
 
@@ -1414,13 +1439,13 @@ each step, and promote or roll back on evidence. Prompted by a public system-des
 - **Feedback tied to the change.** Per-variant and per-step metrics, a Grafana rollout-health row, and
   a small feedback endpoint whose records carry the flag variant and release.
 - **Promotion record.** Each flag flip and canary promotion is a command with an id, target, actor and
-  reason, on the command ledger of `v1.44.2-command-ledger-and-cluster-reconciliation`.
+  reason, on the command ledger of `v1.48.0-command-ledger-and-cluster-reconciliation`.
 - **Read-only first.** As with the healing gateway: report and recommend before any automatic
   promotion; automatic rollback on a failed analysis is the one exception.
 
 **Placement:** first slice (flagd on the ACG sandbox first, then Hostinger, one `shopping-cart-basket` flag, per-variant
-metrics, flag-change record) is v1.44.3 plan 2 (operator, 2026-10-23: "go for it"):
-[`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.md). Basket is already Go, so
+metrics, flag-change record) is v1.49.0 plan 2 (operator, 2026-10-23: "go for it"):
+[`feature-flags-first-slice`](plans/v1.49.0-feature-flags-first-slice.md). Basket is already Go, so
 it does not wait for the order/payment rewrite. Canaries, feedback endpoint and targeting are later
 slices.
 
@@ -1472,7 +1497,7 @@ agents, building TwinkleAI features end to end:
 Their work lands through merge gates → CI → e2e → deployment, on k3d-manager (GitOps, vCluster,
 Grafana, security, recovery).
 
-**Ordering:** the v1.4x releases through v1.50.0 first, then v2.0.0 (the TwinkleAI workload). This
+**Ordering:** the v1.4x releases through v1.61.0 first, then v2.0.0 (the TwinkleAI workload). This
 explicitly depends on the proposed **v2.x intent interpretation and planning engine** above,
 in addition to the existing "Intent as an engineering contract" work, so the agents receive
 validated intent contracts rather than unreviewed prompts or hand-written specs.
@@ -1484,7 +1509,7 @@ validated intent contracts rather than unreviewed prompts or hand-written specs.
 2. **QA tests from the spec, never from A's or B's code.**
 3. **Gates decide, not the coordinator.** Claude steps in on a gate failure or a conflict.
 4. **Measure the experiment.** Time per agent from task handed out to work landed,
-   coordinator interventions per feature, bugs caught by QA versus e2e, and tokens per role. The baseline is v1.48.0's "human effort per verified release", collected from v1.48 through v2.x.
+   coordinator interventions per feature, bugs caught by QA versus e2e, and tokens per role. The baseline is v1.58.0's "human effort per verified release", collected from v1.48 through v2.x.
 
 On 2026-10-12, eight finished Codex worktrees were waiting on Claude's verify-and-land step. That
 step is the known bottleneck the experiment must test.
@@ -1553,7 +1578,7 @@ milestone only when it gets a scope doc.
     how this Grafana renders it;
   - list the upstream-workaround bugs (see the version-review rule in `CLAUDE.md`), and remove each workaround once
     its fix is confirmed live.
-  Needs its own release (it does not fit v1.43.16 or v1.43.17).
+  Needs its own release (it does not fit v1.44.0 or v1.45.0).
 
 - **Vendor-neutral AI engineering collaboration (future enhancement; P1-blocked).** Separate the agent
   coordinator from the worker backend in a proposed `k3dm-agent-dispatch`, with shared task identity,

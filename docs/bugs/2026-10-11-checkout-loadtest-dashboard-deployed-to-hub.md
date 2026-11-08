@@ -31,7 +31,7 @@ Read-only checks the same day:
    no remote-write receiver and no k6 run, so its copy of this dashboard is empty by construction.
 2. The six k6 panels are empty on Hostinger too, because no load test has run in 15 days: the run is
    manual only. That part is not this bug; it is
-   [`v1.48.0-scheduled-baseline-loadtest.md`](../plans/v1.48.0-scheduled-baseline-loadtest.md).
+   [`v1.58.0-scheduled-baseline-loadtest.md`](../plans/v1.58.0-scheduled-baseline-loadtest.md).
 3. `docs/guides/grafana-dashboards.md` still says nothing applies this ConfigMap ("**nothing — see
    below**", "has no applier"). The ACG ApplicationSet has applied it since at least
    2026-09-04 (Hostinger ConfigMap age 37 days), so a reader is told to expect it to be missing.

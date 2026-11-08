@@ -1,6 +1,6 @@
 # dirused: a Windows disk usage and purge tool
 
-**Status:** SCOPED; sequenced, not started. Own repo, so it takes no k3d-manager version and does not count toward any release's plan cap. M1 runs in a gap between releases; the main work starts after v1.46.1 and pauses while v1.47.0's e2e and gate work is active (operator, 2026-11-06). Dates are re-estimated after the move to the $100 plan. No implementation until the open decisions below are answered and each milestone has its own spec with an Acceptance block.
+**Status:** SCOPED; sequenced, not started. Own repo, so it takes no k3d-manager version and does not count toward any release's plan cap. M1 runs in a gap between releases; the main work starts after v1.56.0 and pauses while v1.57.0's e2e and gate work is active (operator, 2026-11-06). Dates are re-estimated after the move to the $100 plan. No implementation until the open decisions below are answered and each milestone has its own spec with an Acceptance block.
 **Approval:** Scoping: operator, 2026-11-06 ("modify plan accordingly base on your analysis"). Implementation: pending.
 **Filed:** 2026-11-06
 **Branch (when scheduled):** none here; it gets its own repo.
@@ -83,7 +83,7 @@ command line part:
 | Daily development | Vagrant + Windows 11 ARM VM, on the M4 | GUI by eye, local paths, `\\localhost\c$` |
 | Multi-node | Windows Server x64 on an ACG AWS sandbox: one central node, two or more targets | UNC, admin shares, unreachable nodes, fleet purge, real x64 |
 
-- **Vagrant on the M4 (operator, 2026-11-06: "go ahead to use M4").** The M4 has 24 GiB and 161 GB free disk, and it is where agents run; v1.47.0 dedicates the M2 to its own run. The M5 is the hub, so nothing runs there, and the operator is uninstalling its copies. The VM stays halted when not in use.
+- **Vagrant on the M4 (operator, 2026-11-06: "go ahead to use M4").** The M4 has 24 GiB and 161 GB free disk, and it is where agents run; v1.57.0 dedicates the M2 to its own run. The M5 is the hub, so nothing runs there, and the operator is uninstalling its copies. The VM stays halted when not in use.
 - **Vagrant provider: VirtualBox (operator, 2026-11-06).** VirtualBox 7.2 added Windows 11/Arm guests.
   The M4 has VirtualBox 7.2.22, which lists OS type `Windows11_arm64`, and Vagrant 2.4.9, reported to
   support 7.2 (read 2026-11-06). Three things

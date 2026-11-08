@@ -274,7 +274,7 @@ Docs-only, no implementation test rerun or live coordinator mutation/request.
 ## Operator Target state normal-width screenshot — PASS
 
 Supplied screenshot after reload shows Target state reason in three readable
-wrapped lines: `blocked at v1.49.0:`, `TwinkleAI app M1 near`, `done (app repo)`.
+wrapped lines: `blocked at v1.60.0:`, `TwinkleAI app M1 near`, `done (app repo)`.
 Full reason visible with prominent orange `blocked` below, no overlap/clipping.
 Remaining row tiles show18releases/median0.510/no-date forecast labels.
 Visual sizing/wrapping at supplied normal width PASS. Narrow window still

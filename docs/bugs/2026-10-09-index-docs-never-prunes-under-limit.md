@@ -14,10 +14,10 @@
 
 ```
 in index, not in corpus: ['docs/plans/v1.43.0-test-metrics-log-retention.md',
-                          'docs/plans/v1.45.0-worktree-isolated-codex-dispatch.md']
+                          'docs/plans/v1.50.0-worktree-isolated-codex-dispatch.md']
 ```
 
-These are the **old** paths of the two plans swapped between v1.43.0 and v1.45.0 that day. The new
+These are the **old** paths of the two plans swapped between v1.43.0 and v1.50.0 that day. The new
 paths were indexed; the old rows were never removed. `/ask-docs` and prior-art search can still
 return them, with a version that is no longer true.
 

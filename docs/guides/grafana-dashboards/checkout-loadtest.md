@@ -9,7 +9,7 @@ The **shopping-cart-apps CPU saturation** panel fills there at all times because
 ordinary Kubernetes metrics. The six k6 panels fill only during and after a load test;
 Hostinger retains 15 days of remote-write data. Until a run exists, `count(k6_checkout_load_requests_total_total) = 0`
 and `No data` is expected for those panels (`docs/issues/2026-09-17-checkout-loadtest-dashboard-no-data.md`).
-The scheduled baseline in [`v1.48.0-scheduled-baseline-loadtest.md`](../../plans/v1.48.0-scheduled-baseline-loadtest.md)
+The scheduled baseline in [`v1.58.0-scheduled-baseline-loadtest.md`](../../plans/v1.58.0-scheduled-baseline-loadtest.md)
 is the plan that keeps those panels filled.
 
 

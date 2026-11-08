@@ -9,7 +9,7 @@
 **Detected by:** Terra's abandoned Phase C worktree inventory (`docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md`, archived 2026-11-05 in `~/.local/share/k3d-manager/archive/2026-11-02-acg-up-stalls-at-system-keychain-trust/untracked.tar.gz` after its worktree was abandoned), re-checked by Claude against `bin/install-sudoers.sh` on `k3d-manager-v1.43.14` (`7c9927e9`).
 **Branch:** `k3d-manager-v1.43.14`
 **Approval:** Operator, 2026-11-05: "please proceed with P1 bug that dispatch to Luna".
-**Related:** `docs/bugs/2026-11-02-acg-up-stalls-at-system-keychain-trust.md`, `docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md`, `docs/plans/v1.45.4-*` (AI attack surface).
+**Related:** `docs/bugs/2026-11-02-acg-up-stalls-at-system-keychain-trust.md`, `docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md`, `docs/plans/v1.54.0-*` (AI attack surface).
 
 ## Evidence
 

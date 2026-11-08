@@ -16,9 +16,9 @@
 
 ## Symptom and evidence
 
-The Bug Tracking dashboard's **Target state** panel shows the large orange `blocked` status correctly, but the explanatory line is rendered in extremely small text (operator could not read it at normal dashboard zoom). The explanatory message refers to the external v1.49.0 blocker, `TwinkleAI app M1 near done (app repo)`. The panel has space available but does not wrap the longer sentence into legible lines.
+The Bug Tracking dashboard's **Target state** panel shows the large orange `blocked` status correctly, but the explanatory line is rendered in extremely small text (operator could not read it at normal dashboard zoom). The explanatory message refers to the external v1.60.0 blocker, `TwinkleAI app M1 near done (app repo)`. The panel has space available but does not wrap the longer sentence into legible lines.
 
-The existing October 25 bug fixed the **meaning** of the blocker (identify v1.49.0 and its cause), and was live-verified. This is a **new presentation/readability regression or remaining defect**, not grounds to reopen the prior calculation bug. The exact Grafana panel config and its available text modes require inspection before selecting an implementation; do not assume changing a `fontSize` field unsupported by the deployed panel solves it.
+The existing October 25 bug fixed the **meaning** of the blocker (identify v1.60.0 and its cause), and was live-verified. This is a **new presentation/readability regression or remaining defect**, not grounds to reopen the prior calculation bug. The exact Grafana panel config and its available text modes require inspection before selecting an implementation; do not assume changing a `fontSize` field unsupported by the deployed panel solves it.
 
 ## Expected behavior
 
@@ -48,7 +48,7 @@ The existing October 25 bug fixed the **meaning** of the blocker (identify v1.49
 ```yaml
 must:
   - id: M1
-    text: Target state retains the correct main status and identifies the external blocker (v1.49.0 / TwinkleAI app M1).
+    text: Target state retains the correct main status and identifies the external blocker (v1.60.0 / TwinkleAI app M1).
   - id: M2
     text: Entire explanation is readable at normal zoom with >=14px equivalent text and wraps at narrow widths, without needing a hover tooltip.
   - id: M3
@@ -78,7 +78,7 @@ evidence:
 
 ## What NOT to Do
 
-- Do not change TwinkleAI milestone dependency or claim that v1.49.0 is unblocked.
+- Do not change TwinkleAI milestone dependency or claim that v1.60.0 is unblocked.
 - Do not use browser zoom or a tooltip as the only readability solution.
 - Do not deploy, merge, create a PR or commit to `main` while filing this bug.
 
@@ -123,7 +123,7 @@ Full and narrow rendering/wrapping remain operator acceptance, not assumed.
 ## Operator normal-width live rendering — PASS (2026-10-28)
 
 Screenshot shows full supporting reason across three visible lines:
-`blocked at v1.49.0:` / `TwinkleAI app M1 near` / `done (app repo)`.
+`blocked at v1.60.0:` / `TwinkleAI app M1 near` / `done (app repo)`.
 Reason is visibly larger than the original tiny annotation, wraps without
 truncation, and does not overlap the prominent orange `blocked` status.
 Other forecast tiles remain present (18 releases, median0.510, no-date labels).
@@ -134,7 +134,7 @@ acceptance before LIVE-VERIFIED. No screenshot export or runtime mutation.
 ## Operator requested narrow-view check — PASS (2026-10-28)
 
 After the narrower-window request, operator supplied a cropped Target state
-panel. Complete reason `blocked at v1.49.0: TwinkleAI app M1 near done (app repo)`
+panel. Complete reason `blocked at v1.60.0: TwinkleAI app M1 near done (app repo)`
 wraps across three visible lines. Orange blocked status remains below without
 clipping or overlap. This is acceptance of the supplied operator view, not a
 measurement of viewport width or a claim about every possible browser size.

@@ -24,7 +24,7 @@ between v1.8.0 and v1.10.0), and the reply ran off the Slack screen.
 - `match()` understands `last|past|previous|recent N releases` (digits or one–ten) and
   `this|current|latest release` (= last 1). An explicit version still wins.
 - "Last N" counts back from the current release branch (`K3DM_INDEX_REF`, or the checked-out
-  branch for `HEAD`), so releases scheduled later (`v1.44.0`, `v1.43.2` from `Branch:` lines) are
+  branch for `HEAD`), so releases scheduled later (`v1.46.0`, `v1.43.2` from `Branch:` lines) are
   not counted as recent. The reply names the releases it chose.
 - All-release answers are sorted newest version first, start with a total, skip releases with
   no match and show at most ten, saying how many were left out.
@@ -40,5 +40,5 @@ fails two.
 ## Follow-up
 
 The router is still regex. Count questions phrased another way ("bugs we closed since August")
-fall through to similarity search. Planned for v1.45.1:
-[`v1.45.1-bug-count-query-translation.md`](../plans/v1.45.1-bug-count-query-translation.md).
+fall through to similarity search. Planned for v1.51.0:
+[`v1.51.0-bug-count-query-translation.md`](../plans/v1.51.0-bug-count-query-translation.md).

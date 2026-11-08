@@ -10,7 +10,7 @@
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator 2026-10-28 explicitly requested review/dispatch to Luna; isolated focused implementation/testing authorized, full published rerun and live deployment remain operator-owned
 **Component:** `scripts/tests/lib/grep_q_pipe_guard.bats`, `scripts/tests/plugins/e2e_remote.bats`, `scripts/plugins/e2e_remote.sh`, offline test metrics/Alertmanager
-**Related:** `docs/bugs/2026-10-17-grep-q-pipeline-sigpipe-false-absent.md`, `docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md`, `docs/plans/v1.44.2-cloud-bridge-offline-test-run-diagnostics.md`
+**Related:** `docs/bugs/2026-10-17-grep-q-pipeline-sigpipe-false-absent.md`, `docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md`, `docs/plans/v1.48.0-cloud-bridge-offline-test-run-diagnostics.md`
 
 ## Evidence / symptom
 

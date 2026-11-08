@@ -6,7 +6,7 @@
 
 ## Goal
 
-`docs/issues/2026-11-06-s1-spec-second-review-findings.md` listed four blockers and four should-fix items against slice S1 of `docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md`. Claude has revised the slice and `scripts/tests/fixtures/dispatch-gates/expected.json`, and moved prompts by model to `docs/plans/v1.43.16-prompts-by-model.md`. Do not implement anything.
+`docs/issues/2026-11-06-s1-spec-second-review-findings.md` listed four blockers and four should-fix items against slice S1 of `docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md`. Claude has revised the slice and `scripts/tests/fixtures/dispatch-gates/expected.json`, and moved prompts by model to `docs/plans/v1.44.0-prompts-by-model.md`. Do not implement anything.
 
 This is a narrow check, not a new open-ended review. Answer, with `file:line` evidence:
 
