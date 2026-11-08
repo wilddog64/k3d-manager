@@ -17,7 +17,7 @@ INTENT_RULE_DATE = dt.date(2026, 11, 8)
 def _first_commit_date(path: Path) -> dt.date | None:
     try:
         result = subprocess.run(
-            ["git", "-C", str(path.parent), "log", "--follow", "--format=%cs", "--", path.name],
+            ["git", "-C", str(path.parent), "log", "--format=%cs", "--", path.name],
             check=True,
             capture_output=True,
             text=True,

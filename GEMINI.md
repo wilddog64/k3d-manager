@@ -28,7 +28,9 @@ You receive a worktree and a spec. Do not run git add, git commit, git push, or 
 ## Spec contract
 
 Read the full spec and the current memory-bank context before acting. The `## Acceptance` block is the contract: implement its `must` and `must_not` requirements, and show each `must_not` test red on the pre-fix code. If the spec is ambiguous or contradicts the code, stop and say so in the last message; do not guess.
+<!-- shared:begin intent-approval -->
 Every evidence item carries an operator-facing `intent`, and the spec carries `**Intent approved:**` before dispatch.
+<!-- shared:end intent-approval -->
 
 ## Test rules
 

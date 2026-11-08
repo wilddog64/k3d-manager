@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-NAMES = ('plan-cap', 'bug-priority', 'security')
+NAMES = ('plan-cap', 'bug-priority', 'security', 'intent-approval')
 FILES = ('CLAUDE.md', 'AGENTS.md', 'GEMINI.md')
 
 
