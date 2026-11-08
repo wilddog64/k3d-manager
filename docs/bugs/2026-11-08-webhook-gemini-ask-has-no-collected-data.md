@@ -89,8 +89,24 @@ interface:
   - "bin/cluster-status (k3s-hostinger and hub) as the read-only collectors, invoked as the status commands invoke them"
 ```
 
+## Definition of done (worker)
+
+Before your last message, do all of these and paste the evidence:
+1. Run every test suite that covers a file you changed, not only the new tests. For each, give the command, the exit
+   code and every error line. An error you can't explain is a failure, not a pass. If the sandbox blocks a test, say
+   so and name it; don't skip it silently.
+2. For each `must_not` item: break the guard that enforces it (comment out the check, invert the condition), run its
+   test, show it red, then restore the guard and show it green. List any `must_not` whose test stayed green with the
+   guard broken.
+3. Where the spec allows a read-only run against real data (a real file, a real ledger, a real container image), run
+   the changed code once that way and paste what it printed. Otherwise say "no read-only real-data run possible" and
+   why.
+4. List every place where you chose something the spec did not decide (a default, a path, a mode, an edge case).
+
 ## Notes
 
+- First-pass trial dispatch 1 of 3 (`docs/howto/dispatch-first-pass-trial.md`): a spec review by a second agent runs
+  before intent approval, and a cross-vendor diff review runs before Claude's review.
 - Stubbed status-report output must be taken from a real read-only run of `bin/cluster-status` (host and date in a
   comment), not imagined. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary is reachable on PATH.
 - The webhook must be restarted after the fix lands for E2 (`feedback_restart_webhook_after_verify`).
