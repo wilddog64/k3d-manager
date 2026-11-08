@@ -145,7 +145,7 @@ def _scratch_dispatch_repo(tmp_path: Path, monkeypatch, *, baseline: bool = Fals
     dispatcher = source_repo / "bin/k3dm-codex-dispatch"
     dispatcher_text = dispatcher.read_text(encoding="utf-8")
     gate = '''  local spec_intent_output spec_intent_rc
-  if spec_intent_output="$(python3 "$_dispatch_repo_root/scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
+  if spec_intent_output="$(python3 "$_dispatch_script_dir/../scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
     :
   else
     spec_intent_rc=$?

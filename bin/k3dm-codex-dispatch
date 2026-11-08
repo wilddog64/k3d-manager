@@ -895,7 +895,7 @@ _dispatch_start() {
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
   [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
   local spec_intent_output spec_intent_rc
-  if spec_intent_output="$(python3 "$_dispatch_repo_root/scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
+  if spec_intent_output="$(python3 "$_dispatch_script_dir/../scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
     :
   else
     spec_intent_rc=$?
