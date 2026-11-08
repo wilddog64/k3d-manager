@@ -11,7 +11,16 @@ New ideas land here first, as one line each. They are not plans, not bugs, and n
 - Nothing here counts toward the dispatch WIP limit or the 5-plan cap.
 - Keep a row short: what, why, and where it came from. Detail belongs in the plan once promoted.
 
-**Status words:** `inbox`, `promoted` (plan path), `dropped` (one-line reason).
+**Triage rules (operator, 2026-11-08):**
+- **Every row gets a decision at every review.** Each `inbox` or `deferred` row leaves the review as `promoted`,
+  `dropped` or `deferred` to a named release. "Still thinking" is not an outcome.
+- **Age limit.** A row deferred twice is dropped at its next review unless the operator gives a new reason, written
+  into the row. A dropped row stays in the table with its reason and can come back as a new row.
+- **Size cap.** At most 8 rows open (`inbox` plus `deferred`). Adding a 9th triggers a review straight away, without
+  waiting for the release cut.
+
+**Status words:** `inbox`, `promoted` (plan path), `deferred` (target release; count, e.g. `deferred (v1.45.0, 1×)`),
+`dropped` (one-line reason).
 
 | Added | Idea | Source | Status |
 |---|---|---|---|
