@@ -1607,7 +1607,10 @@ milestone only when it gets a scope doc.
   lifecycle, scoped permissions, Git/test evidence, independent acceptance, and backward-compatible
   Codex dispatch history. Any authorized Claude, Codex, Gemini, Hermes or human coordinator may
   dispatch a supported backend; optional MCP/A2A transport is deferred. **Do not start or schedule
-  implementation until the dispatcher worker-lifecycle P1 is fixed and verified.** Proposal:
+  implementation until the dispatcher worker-lifecycle P1 is fixed and verified.** (Cleared: that P1,
+  `docs/bugs/2026-10-20-codex-dispatch-background-process-lost-no-terminal-status.md`, is LIVE-VERIFIED
+  2026-10-20; noted 2026-11-08 when the operator asked for the `k3dm-agent-dispatch` rename. Bring to the next
+  release cut; the old name stays as a wrapper.) Proposal:
   [`future-vendor-neutral-agent-collaboration-contract.md`](plans/future-vendor-neutral-agent-collaboration-contract.md).
 
 - **Re-home the hub's ESO off the app-cluster ApplicationSet** — the hub's External Secrets
