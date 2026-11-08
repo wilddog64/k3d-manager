@@ -1,12 +1,13 @@
 # Bug: hub-promote tags a promote that moves nothing, and a later rollback goes nowhere; push failures all read "lease rejected"
 
-**Status:** OPEN — spec filed; waiting for intent approval before dispatch
+**Status:** OPEN — dispatched 2026-11-08: Luna implements, Gemini 3.8 Flash verifies from the Acceptance block
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-08 (intent approval)
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** `897cfe72` (v1.43.15, deploy/hub ref with make hub-promote, hub-rollback and hub-promote-status)
 **Should have been caught by:** spec
 **Severity:** medium — `make hub-rollback`, the recovery lever, currently returns `deploy/hub` to the commit it is already on; the operator must roll back twice and may not notice. Workaround: run it twice.
 **Approval:** operator, 2026-11-08 ("go ahead to file those and dispatch to Luna/Flash 3.8 base on our rules")
+**Intent approved:** operator, 2026-11-08 ("go ahead"), all evidence items
 **Filed:** 2026-11-08
 **Detected by:** Claude, `git ls-remote origin 'refs/tags/hub-promote/*'` after the second promote
 **Affected:** `bin/k3dm-hub-promote` (`main` promote path, `record_move`, `resolve_on_origin`, `rollback`)
