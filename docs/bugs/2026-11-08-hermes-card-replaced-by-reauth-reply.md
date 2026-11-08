@@ -2,12 +2,13 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08
+**Waiting on:** dispatch — since 2026-11-08
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
 to post the repair again, or `bin/k3dm-hermes approve <id>` on the hub
-**Approval:** pending — filed by Claude 2026-11-08; operator approval and intent approval asked the same day
+**Approval:** operator, 2026-11-08 ("approved those two requests")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack `#grafana-notification`, 2026-11-08. The k3d-manager card for `r9-d9add2e2` was posted
 at 11:14 PST; the operator pressed Deny before running `/hermes-auth`. The card then read only "🔐 Re-authenticate
@@ -100,7 +101,7 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
-- Needs `**Intent approved:**` before dispatch.
+- Bug and E1/E2 intents approved by the operator on 2026-11-08 ("approved those two requests").
 - Batch with `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md` (same file, both P3; CLAUDE.md
   P3 batching).
 - Until it lands: run `/hermes-auth` before pressing a card's button. A reauth lasts 24h.
