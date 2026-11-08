@@ -2,10 +2,10 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED 2026-11-07 — `d70047d5` (Luna; Claude made the launchd-PATH test macOS-only for Linux CI); independent verifier pending; live check blocked until the M5 checkout includes the fix (it is at `8e483765`)
+**Status:** LANDED 2026-11-07 — `d70047d5`; live M1 met 2026-11-08 (push age 42.6 s, flat across many Hermes cycles since ~15:30 on 2026-11-07; operator screenshot, below); `HostDiskMetricsStale` resolution not yet seen; independent verifier pending
 **Fix commit:** d70047d5
 **Priority:** P2 — every host's disk gauges are frozen, so the critical disk-space alert cannot fire; running the script by hand is a workaround
-**Waiting on:** live check — since 2026-11-07
+**Waiting on:** dispatch — since 2026-11-08 (independent verifier)
 **Approval:** explicit 2026-11-07 "can you investigate this issue, file bug if necessary and dispatch to Luna" (operator)
 **Severity:** high
 **Related:** `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md` (its 2026-11-06 recurrence note; this doc is that recurrence's root cause)
@@ -76,3 +76,9 @@ evidence:
     kind: live
     what: "Claude: after the M5 checkout has the fix, push_time_seconds{job=\"k3dm-disk\"} is under 600 s old for two Hermes cycles, and HostDiskMetricsStale resolves."
 ```
+
+## Live check — 2026-11-08 (operator screenshot, Host Disk dashboard on the M5 hub, ~04:10 PT)
+
+- Probe status: hostinger, m2, m4, m5 all `up`. Used %: hostinger 19.8, m2 69.7, m4 69.1, m5 14.9. Free: 155, 281, 142, 789 GiB (m5 matches the M5 disk, 822 GiB free on 2026-10-31; m4 is no longer the M5's disk).
+- Last push age 42.6 s, and the push-age sparkline stays flat from about 15:30 on 2026-11-07, so the launchd-scheduled Hermes runs push every cycle again. Used % over time has no data from about 07:00 to 15:30 on 2026-11-07, the window before the M5 checkout had `d70047d5`.
+- Not shown: `HostDiskMetricsStale` resolved. The hub was not reachable from Claude's M4 session, so the Prometheus query was not run by Claude.

@@ -1,3 +1,4 @@
+- [x] **2026-11-08 deploy/hub bootstrap:** promote 86585e4c, appsets on deploy/hub, platform-ops applied, exporter rolled out; hub-promote P2 VERIFIED.
 - [x] **P2 — spec-intent test unused import fails CI lint** (`docs/bugs/2026-11-08-spec-intent-test-unused-import-fails-ci-lint.md`): fix pushed 2026-11-08; awaiting green CI.
 - [ ] **P3 — GitHub Actions major bumps (Dependabot #157–#159)** (`docs/bugs/2026-11-08-github-actions-major-bumps-held-by-dependabot.md`): intents approved 2026-11-08; waiting on batched dispatch.
 - [x] **P2 — dashboard query test rejects label_replace-built column** (`docs/bugs/2026-11-08-dashboard-query-test-rejects-label-replace-built-columns.md`): test fix pushed 2026-11-08; awaiting green CI.

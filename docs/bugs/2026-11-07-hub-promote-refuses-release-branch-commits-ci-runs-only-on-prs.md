@@ -1,8 +1,7 @@
 # Bug: `make hub-promote` refuses every release-branch commit, because CI runs only on pull requests
 
-**Status:** LANDED — option 1 (operator, 2026-11-07): `.github/workflows/ci.yml` also runs on `push` to `k3d-manager-v*`; the `lint` job's fork guard admits push events. Two ci.yml bats suites green (0 failures).
+**Status:** VERIFIED — 2026-11-08: push CI run 42481822700 green on `86585e4c`; the operator's `make hub-promote` on M5 passed the check-run gate without BREAK_GLASS (tag `hub-promote/20261108T131509Z`)
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-07 (the push of this fix must produce green check runs on the branch head; then `make hub-promote REF=k3d-manager-v1.43.15` passes without BREAK_GLASS)
 **Introduced by:** `897cfe72` (v1.43.15, hub-deploy-ref)
 **Should have been caught by:** spec
 **Severity:** medium — the hub cannot be promoted to a release-branch commit, so no live check of ArgoCD or platform-ops changes can run during development without `BREAK_GLASS=1`
@@ -45,3 +44,19 @@ The offline tests stub `gh api …/check-runs` with runs present, so they share 
    it in the tag. Weakens the gate the plan added.
 
 Claude recommends option 1.
+
+## Live check — 2026-11-08 (operator on M5; refs checked by Claude from M4)
+
+- CI on push: runs 42478234554 (`f454ad13`, red), 42479985975 (`84268ee6`, red), 42481822700 (`86585e4c`,
+  green), all triggered by pushes to `k3d-manager-v1.43.15`. The check-run gate now has runs to read.
+- `make hub-promote REF=86585e4c6a860bc35834365e20d56663a8c1c647` (no BREAK_GLASS): created `deploy/hub` at
+  `86585e4c`; tag `hub-promote/20261108T131509Z` (`fcb486f0`) peels to `86585e4c` (`git ls-remote origin`).
+  The first try failed in the pre-push fast gate: PyYAML missing on M5 (`ci_workflow_no_stage2.bats`). The
+  retry ran with `K3DM_SKIP_FAST_GATE=1`; that test is green in run 42481822700 on the same commit.
+- `make hub-promote-status`: `deploy/hub: 86585e4c…`, `k3d-manager-v1.43.15 ahead of deploy/hub: 0`.
+- `make appsets-check`: "checked 21 k3d-manager references (2 tracking HEAD, ignored)", "All Applications
+  reference values branch deploy/hub".
+- `make platform-ops`: "[platform-ops] applied deploy/hub 86585e4c…"; four Keychain items unreadable (login
+  Keychain locked), so those secrets were left as they were.
+- `kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter`: "successfully rolled out".
+

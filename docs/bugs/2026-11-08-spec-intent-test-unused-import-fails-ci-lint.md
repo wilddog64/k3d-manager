@@ -1,8 +1,7 @@
 # Bug: unused `textwrap` import in the spec-intent test fails CI lint
 
-**Status:** LANDED — import removed on the release branch, 2026-11-08
+**Status:** VERIFIED — CI run 42481822700 green on `86585e4c` (origin head), 2026-11-08
 **Priority:** P2
-**Waiting on:** scheduled run — since 2026-11-08 (the next CI run on the release branch)
 **Introduced by:** `f1bab51e` (v1.43.15, specs filed from 2026-11-08 need approved evidence intents)
 **Should have been caught by:** offline test
 **Severity:** medium — CI red on the release branch, which blocks the `deploy/hub` bootstrap (`make hub-promote` needs a CI-green commit)
