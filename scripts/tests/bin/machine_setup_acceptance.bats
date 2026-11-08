@@ -450,7 +450,7 @@ STUB
         if grep -qE "^make .*$t( |\$)" "$CALLS"; then false; fi
       fi
     done
-    if grep -E 'hub-(snapshot|data-export)|webhook\.plist|hermes\.plist|heartbeat\.plist' "$CALLS"; then false; fi
+    if sed -e "s|$BATS_RUN_TMPDIR||g" -e "s|$TREE||g" "$CALLS" | grep -E 'hub-(snapshot|data-export)|webhook\.plist|hermes\.plist|heartbeat\.plist'; then false; fi
   done
 }
 
