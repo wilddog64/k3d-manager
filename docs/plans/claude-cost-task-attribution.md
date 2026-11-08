@@ -1,6 +1,6 @@
-# v1.44.0 — Claude cost task attribution: tie each Claude dollar to the task it worked on, and say how much is untied
+# Claude cost task attribution: tie each Claude dollar to the task it worked on, and say how much is untied
 
-**Status:** PLANNED — moved from v1.43.15 by Claude on 2026-11-07 to make room for the P1 hub deploy ref; dispatch after `k3d-manager-v1.44.0` is cut (`v1.43.15-cost-attribution-coverage` lands in v1.43.15 first)
+**Status:** PLANNED — moved from v1.43.15 by Claude on 2026-11-07 to make room for the P1 hub deploy ref; dispatch after `k3d-manager-v1.44.0` is cut (`v1.43.15-cost-attribution-coverage` lands in v1.43.15 first) **Unnumbered 2026-11-08 by Claude (operator: release grooming, 5 plans per release):** replaced in v1.44.0 by the sprint picks `hub-deploy-one-command` and `hermes-slack-config-sensors`; now an ordered backlog item in `docs/roadmap.md`, numbered when groomed into the next release.
 **Approval:** operator, 2026-11-01 ("how could we close the gap … investigate and file bug/plan accordly for next avaiable spot"), quoting a review: "approximate model-cost attribution … needs closing before making strong efficiency claims"
 **Intent approved:** pending
 **Branch:** `k3d-manager-v1.44.0`

@@ -1,5 +1,5 @@
 {
-  "note": "Hand-derived from the rules in docs/plans/v1.44.0-prompts-by-model.md, by case, not by running worker code.",
+  "note": "Hand-derived from the rules in docs/plans/prompts-by-model.md, by case, not by running worker code.",
   "now": 1794000000,
   "windows": {
     "1d": {

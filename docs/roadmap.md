@@ -10,7 +10,7 @@
 > **How we plan (operator, 2026-11-08).** Work is picked weekly, Sunday afternoon (`/sprint-plan`), 1–3 items from
 > `docs/ideas.md` and the bug queue. Only the open release and the next one have committed version numbers. Version
 > numbers further down this file are an ordering and a theme, not a commitment: they are reassigned when the work is
-> picked. v2.0.0 (retire shopping-cart) and v3.0.0 (multi-agent product team) stay as milestones.
+> picked. v2.0.0 (retire shopping-cart, only if the app needs the room: 2026-11-08) and v3.0.0 (multi-agent product team) stay as milestones.
 
 ---
 
@@ -552,13 +552,13 @@ Bugs moved from v1.43.14 on 2026-11-07 (bugs do not count toward the plan cap): 
 
 ### Candidate milestone — v1.44.0
 
-**v1.44.0 plan 5:** [`claude-cost-task-attribution`](plans/v1.44.0-claude-cost-task-attribution.md) (operator, 2026-11-01): Claude is 97.5% of 30d model spend ($1,097 vs $28.54 Codex dispatch), but its per-task cost is split evenly across every dispatch open at that moment, and spec writing and verification fall outside those intervals. This plan charges each Claude turn to the tasks its tool calls name, and reports attribution coverage by cost. It lands after plan 4. **v1.43.15 is at the 5-plan cap.** The outcome half of the same gap is a P2 bug carried in v1.43.13: `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md`. Moved from v1.43.15 by Claude on 2026-11-07 to make room for the hub deploy ref.
+**v1.44.0 plan 5:** [`hermes-slack-config-sensors`](plans/v1.44.0-hermes-slack-config-sensors.md) (operator, 2026-11-08 sprint pick; design "Manifest + unsigned probe"): a Hermes sensor reads the relay Slack app's manifest and degrades when Interactivity is off or a Request URL is wrong, the two Slack-setting failures that passed every offline test on 2026-11-08; a second sensor checks the relay answers 401 to an unsigned POST. Needs the operator's Slack config token in Keychain and live captures of `apps.manifest.export` before dispatch. Replaces `claude-cost-task-attribution`, unnumbered by Claude on 2026-11-08 (see the ordered backlog under Forward themes).
 
 **v1.44.0 plan 4:** [`dev-hub-vcluster`](plans/v1.44.0-dev-hub-vcluster.md) (operator, 2026-11-07: "can we have vCluster running on m5 side by side as hub for the development purpose and verify there?"). A `dev-hub` vCluster in its own namespace reads the release branch, runs ArgoCD and the branch's dashboards against the hub Prometheus read-only, holds no hub credentials, and is capped by a 3 GiB quota at a preemptible PriorityClass. Live checks happen there; the hub changes only by `hub-promote`. Moved from v1.45.0 by Claude on 2026-11-07.
 
 **v1.44.0 plan 3:** [`fleet-host-cpu-memory-alerts`](plans/v1.44.0-fleet-host-cpu-memory-alerts.md) (operator, 2026-10-31): CPU and memory for the M2, M4 and M5 on a Host Resources dashboard. The alerts trigger on the swap-in rate and on CPU idle or load (never on "memory used"), and route to `k3dm-analyze`, which posts a top-process diagnosis to Slack. Amended 2026-11-01 (operator): laptop temperature, with the `pmset -g therm` throttling level as an alert and `macmon` °C as a dashboard trend (machine-setup installs `macmon` via lib-foundation `_install_macmon`, in v0.5.5; no sudo). v1.43.14 is at 4 of 5 plans. Moved from v1.43.14 on 2026-11-07: needs fresh real captures before dispatch.
 
-**v1.44.0 plan 2:** [`prompts-by-model`](plans/v1.44.0-prompts-by-model.md) (operator, 2026-11-06, moved from P0 S1 by Claude on the review's advice): which model a continuation prompt was charged to, who wrote it, and whether the spec or the worker was the cause.
+**v1.44.0 plan 2:** [`hub-deploy-one-command`](plans/v1.44.0-hub-deploy-one-command.md) (operator, 2026-11-08 sprint pick): `make hub-deploy REF=<sha>` runs promote (typed confirmation kept), the ApplicationSet reapply only when `scripts/etc/argocd/applicationsets/` changed, `appsets-check`, `platform-ops` and the exporter rollout check, stopping at the first failure. Replaces `prompts-by-model`, unnumbered by Claude on 2026-11-08.
 
 **v1.44.0 plan 1:** [`lead-model-activity-dashboard`](plans/v1.44.0-lead-model-activity-dashboard.md) (operator, 2026-11-05): a `k3dm Lead Model Activity` dashboard that shows, per lead (coordinator) model, the tasks led, first-run land rate, corrections per landed task, stalled tasks, tokens and cost, together with a lead timeline. It reads agy's own transcripts, so interactive Argon lead sessions are counted: the 2026-11-03 5 h Argon session recorded nothing. It depends on bugs `2026-10-29-non-claude-coordinator-work-unattributed`, `2026-11-04-agy-activity-no-data-local-ledger-coverage` and `2026-11-05-dispatch-resume-ignores-task-model-and-records-wrong-worker`.
 
@@ -1045,6 +1045,13 @@ platform proofs move to the app while the old target still runs, so there is nev
 nothing proven. Shopping-cart leaves Hostinger at the end of v1.61.0, once those proofs are green
 against the app. The 10-10 rule still holds: no long side-by-side period.
 
+**Revised 2026-11-08 (operator: "only if we have room for twinkle app").** Shopping-cart is retired
+only if the node lacks room for the app. The v1.61.0 proofs still move to the app, but removing
+shopping-cart becomes a capacity decision: re-read the node's requests and in-use figures, read-only,
+with both apps running. If the app has its headroom, shopping-cart stays on Hostinger, the hub and ACG
+as a second reference app, and v2.0.0 is not needed. If the app does not fit, shopping-cart is removed
+from Hostinger at the end of v1.61.0 and v2.0.0 retires it from the hub and ACG, as planned.
+
 To watch while both run:
 - Monitoring is the largest consumer, at about 1.5 GB in use; its retention grows first.
 - CPU limits are already 203% of the cores, so loadtest runs against either app are scheduled, not
@@ -1062,9 +1069,9 @@ by editing lists, not code.
 |---|---|---|
 | App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
 | v1.60.0 | k3d-manager | Starts when app M1 is near done. Onboard the app on Hostinger beside shopping-cart (revised 2026-10-30: the 4 CPU / 16 GB node fits both). Before onboarding, re-read node requests read-only and confirm about 0.9 CPU / 3 GiB of headroom. Onboard: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
-| v1.61.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. Then, once they are green against the app, confirm read-only that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards); the operator removes shopping-cart from Hostinger (moved here from v1.60.0, 2026-10-30). |
+| v1.61.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. Then, once they are green against the app, re-read node capacity with both apps running (revised 2026-11-08). If the app has its headroom, shopping-cart stays. If not, confirm read-only that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards), and the operator removes shopping-cart from Hostinger (moved here from v1.60.0, 2026-10-30). |
 | v1.61.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
-| v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
+| v2.0.0 | k3d-manager | Conditional (2026-11-08): only if the v1.61.0 capacity check removes shopping-cart from Hostinger. Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 
 Release splits, new patches, and dropped milestones must update `docs/release-milestones.json` in the same commit as the roadmap change.
 
@@ -1589,6 +1596,15 @@ real bug cannot. Write our own problem statements and record source and rights m
 copy third-party question text or paywalled content.
 
 ## Forward themes (unversioned until scoped)
+
+### Ordered backlog of written plans (unnumbered; operator, 2026-11-08)
+
+Plans already written but not in the open or next release. Release grooming orders them and numbers the top ones
+when a release has room; a new idea may be groomed in ahead of them, displacing a not-started plan (5 plans per release).
+
+1. [`claude-cost-task-attribution`](plans/claude-cost-task-attribution.md), was v1.44.0 plan 5: [`claude-cost-task-attribution`](plans/claude-cost-task-attribution.md) (operator, 2026-11-01): Claude is 97.5% of 30d model spend ($1,097 vs $28.54 Codex dispatch), but its per-task cost is split evenly across every dispatch open at that moment, and spec writing and verification fall outside those intervals. This plan charges each Claude turn to the tasks its tool calls name, and reports attribution coverage by cost. It lands after plan 4. **v1.43.15 is at the 5-plan cap.** The outcome half of the same gap is a P2 bug carried in v1.43.13: `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md`. Moved from v1.43.15 by Claude on 2026-11-07 to make room for the hub deploy ref.
+2. [`prompts-by-model`](plans/prompts-by-model.md), was v1.44.0 plan 2: [`prompts-by-model`](plans/prompts-by-model.md) (operator, 2026-11-06, moved from P0 S1 by Claude on the review's advice): which model a continuation prompt was charged to, who wrote it, and whether the spec or the worker was the cause.
+
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
 milestone only when it gets a scope doc.

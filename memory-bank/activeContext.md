@@ -80,6 +80,14 @@
 
 The operator asked: "Could k3d-manager support the infrastructure operations of a simulated 30-person SaaS company for 30 consecutive days?" It is specced as v1.63.0 (harness and pilot, 4 plans) and v1.64.0 (the run and its report). It is placed after v1.61.0 (proofs re-pointed to the reference app) and v1.62.0 (end of the committed queue). Nothing has been dispatched; that waits for the release to be cut, and every chaos injector needs its own go. Decisions made 2026-11-07 (operator: "go for your recommendation"): the hub stays on the laptop, releases keep merging during the run (counted as change load), and Hostinger is probe-only.
 
+## 2026-11-08 release grooming (replaces weekly sprint plan)
+
+- Process (operator 2026-11-08): `/sprint-plan` became `/release-groom` (Sunday + each release cut). Releases stay at 5 plans; ideas join the next release only by displacing a not-started plan; only open + next release are numbered; ordered backlog of written plans in `docs/roadmap.md`. Records in `docs/grooming/`.
+- v1.44.0 swap: in `hub-deploy-one-command` (plan 2), `hermes-slack-config-sensors` (plan 5, manifest + unsigned probe; needs operator Slack config token + live captures). Out, unnumbered: `claude-cost-task-attribution` (#1), `prompts-by-model` (#2).
+- Abandon P3 LANDED `5df3a166`, pushed; marks offline_tested + live_verified. 23 stale rows closed; `open` 27 → 4. Kept: v1.43.13 machine-setup row (OPEN bug, uncommitted 67-line fix in its worktree) — needs land-or-redo decision.
+- Shopping-cart retirement now conditional on twinkle app capacity (roadmap).
+- Next: Hermes values_branch P2 (blocks v1.43.15); Gemini-ask back to worker with Luna finding; control-node round 3 vm-test; intents for the two v1.44.0 plans pending.
+
 ## HANDOFF 2026-11-07 (session end; v1.43.15, branch k3d-manager-v1.43.15)
 - **Objective:** verify and land the v1.43.15 dispatches, then close the two P2 hub bugs live.
 - **Evidence:** e2e F2 fixed live: run 1794086864-5662 PASSED 91/0/102 after the M5 token got read:packages (`fe14db0d`). The M5 `make machine-check ROLE=hub` is clean (keychain ok) as of 13:42 PT. Worktrees `~/.local/share/k3d-manager/worktrees/v1.43.15/`: workers EXITED with uncommitted changes for export (4 files), e2e-publish-back (4), tokens-chart (2), hub-deploy-ref (8), intent-verification (8). cost-attribution-coverage STILL RUNNING.

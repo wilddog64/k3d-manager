@@ -1,6 +1,6 @@
 # Prompts by model, sender and cause
 
-**Status:** PLANNED — not dispatched. Moved out of P0 S1 on 2026-11-06 on the second review's advice (`docs/issues/2026-11-06-s1-spec-second-review-findings.md`): it is a separate analytics contract and S1's gate replay should settle first. Starts after S1 lands, because both edit the same files.
+**Status:** PLANNED — not dispatched. Moved out of P0 S1 on 2026-11-06 on the second review's advice (`docs/issues/2026-11-06-s1-spec-second-review-findings.md`): it is a separate analytics contract and S1's gate replay should settle first. Starts after S1 lands, because both edit the same files. **Unnumbered 2026-11-08 by Claude (operator: release grooming, 5 plans per release):** replaced in v1.44.0 by the sprint picks `hub-deploy-one-command` and `hermes-slack-config-sensors`; now an ordered backlog item in `docs/roadmap.md`, numbered when groomed into the next release.
 **Approval:** explicit 2026-11-06 "go ahead" (operator, after asking "do we know which vendor/model need more human invervention?"). Dispatch still needs its go as a hub dashboard spec.
 **Priority:** P2
 **Branch:** `k3d-manager-v1.44.0`
