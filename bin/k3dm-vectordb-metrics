@@ -454,19 +454,22 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
                              else dep["plan"])
                     blockers.append(f"{label} not landed")
                     break
-            if p["dispatch"] == "unknown":
-                blockers.append("needs your dispatch decision")
-            elif p["dispatch"] == "needed":
-                blockers.append("needs your dispatch go")
             if p["wave_note"] != "-":
                 blockers.append("wave note")
         if not dispatchable:
             blocked = "-"
+        elif blockers:
+            blocked = "; ".join(blockers[:3])
+        elif p["dispatch"] in ("go", "not required"):
+            blocked = "ready to dispatch"
         else:
-            blocked = "; ".join(blockers[:3]) if blockers else "ready to dispatch"
+            blocked = "ready on your go"
         dispatch = p["dispatch"]
-        if not dispatchable and dispatch == "unknown":
-            dispatch = "n/a"
+        if not dispatchable:
+            if p["execution"] == "implemented" and dispatch == "unknown":
+                dispatch = "approved"
+            elif dispatch == "unknown":
+                dispatch = "n/a"
         lines.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{p["release"]}",release_order="{_release_order(p["release"])}",plan="{p["plan"]}",title="{p["title"]}",execution="{p["execution"]}",verification="{p["verification"]}",approval="{p["approval"]}",dispatch_approval="{dispatch}",order="{p["plan_order"]}",depends_on="{depends_on}",depends_on_path="{depends_on_path}",wave="{p["wave"]}",wave_note="{p["wave_note"]}",overlaps="{overlap}",blocked_by="{_plan_clean(blocked, 120)}"}} 1')
     lines.extend(f'k3dm_plan_undeclared_overlaps{{repo="{repo}",release="{release}"}} {count}'
                  for release, count in sorted(overlap_counts.items()))

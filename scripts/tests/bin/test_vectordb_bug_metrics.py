@@ -116,6 +116,7 @@ def test_plan_state_leading_status_only(metrics, status, expected):
 
 
 def test_plan_approval_and_plan_metrics(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
     assert metrics._plan_approval("**Approval:** explicit by operator", "v1.43.5") == "approved"
     assert metrics._plan_approval("**Approval:** pending — review", "v1.43.5") == "pending"
     assert metrics._plan_approval("", "v1.43.5") == "none"
@@ -137,6 +138,7 @@ def test_plan_approval_and_plan_metrics(metrics, tmp_path):
 
 
 def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
     docs = {
         "docs/plans/v1.50.0-a.md": "# A\n**Release:** v1.50.0 (plan 1 of 8)\n**Status:** IMPLEMENTED\n**Component:** `scripts/shared/`\n",
         "docs/plans/v1.50.0-b.md": "# B\n**Release:** v1.50.0 (plan 2 of 8)\n**Depends on:** `docs/plans/v1.50.0-a.md`\n**Component:** `scripts/shared/file.sh`\n",
@@ -161,12 +163,13 @@ def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_pat
     assert 'approval="approved",dispatch_approval="needed"' in rows["v1.50.0-g"]
     assert 'dispatch_approval="unknown"' in rows["v1.50.0-h"]
     assert 'approval="approved",dispatch_approval="unknown"' not in rows["v1.50.0-h"]
-    assert 'blocked_by="branch not cut; needs your dispatch go"' in rows["v1.50.0-g"]
+    assert 'blocked_by="branch not cut"' in rows["v1.50.0-g"]
     assert len(re.search(r'wave_note="([^"]*)"', rows["v1.50.0-c"]).group(1)) <= 80
     assert 'k3dm_plan_undeclared_overlaps{repo="k3d-manager",release="v1.50.0"} 1' in output
 
 
 def test_plan_status_and_dispatch_headers_remain_independent(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
     docs = {
         "docs/plans/v1.54.0-proposed.md": "# Proposed\n**Status:** PROPOSED\n**Dispatch:** go\n",
         "docs/plans/v1.54.0-ready.md": "# Ready\n**Status:** READY\n**Dispatch:** needed\n",
@@ -183,6 +186,31 @@ def test_plan_status_and_dispatch_headers_remain_independent(metrics, tmp_path):
     assert 'dispatch_approval="needed"' in rows["v1.54.0-ready"]
     assert 'dispatch_approval="not required"' in rows["v1.54.0-progress"]
     assert 'approval="approved",dispatch_approval="unknown"' in rows["v1.54.0-malformed"]
+
+
+def test_plan_operator_go_is_own_label_and_real_blockers_remain(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.55.0", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
+    (tmp_path / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
+    docs = {
+        "docs/plans/v1.55.0-waiting.md": "# Waiting\n**Status:** PROPOSED\n**Dispatch:** needed\n",
+        "docs/plans/v1.56.0-branch.md": "# Branch\n**Status:** PROPOSED\n",
+        "docs/plans/v1.55.0-dependency.md": (
+            "# Dependency\n**Status:** PROPOSED\n**Depends on:** `docs/plans/v1.55.0-dep.md`\n"),
+        "docs/plans/v1.55.0-dep.md": "# Dep\n**Status:** PROPOSED\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line
+            for line in output.splitlines() if line.startswith("k3dm_plan_info{")}
+    assert 'blocked_by="ready on your go"' in rows["v1.55.0-waiting"]
+    assert 'dispatch_approval="needed"' in rows["v1.55.0-waiting"]
+    assert 'blocked_by="branch not cut"' in rows["v1.56.0-branch"]
+    assert 'blocked_by="v1.55.0-dep not landed"' in rows["v1.55.0-dependency"]
+    assert all("needs your dispatch" not in row for row in rows.values())
 
 
 def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_path):
@@ -258,8 +286,8 @@ def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_pat
         assert 'verification="n/a"' in rows[f"v1.54.0-{slug}"]
     assert 'verification="unknown"' in rows["v1.54.0-implemented"]
     assert 'approval="pending",dispatch_approval="needed"' in rows["v1.54.0-proposed"]
-    assert 'blocked_by="branch not cut; needs your dispatch go"' in rows["v1.54.0-proposed"]
-    assert 'blocked_by="branch not cut; needs your dispatch decision"' in rows["v1.54.0-ready"]
+    assert 'blocked_by="branch not cut"' in rows["v1.54.0-proposed"]
+    assert 'blocked_by="branch not cut"' in rows["v1.54.0-ready"]
     assert 'blocked_by="-"' in rows["v1.54.0-progress"]
     assert 'blocked_by="-"' in rows["v1.54.0-implemented"]
     # A plan without a ledger series remains in the row inventory and keeps its own state.
@@ -275,14 +303,14 @@ def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode
                            .read_text().split("  k3dm-bugs.json: |\n", 1)[1])
     query = next(panel for panel in dashboard["panels"] if panel["id"] == 107)["targets"][0]["expr"]
     scenarios = [
-        ("landed-proposed", "proposed", "landed", "needs your dispatch decision", "landed; documentation stale"),
+        ("landed-proposed", "proposed", "landed", "ready on your go", "landed; documentation stale"),
         ("landed-ready", "ready", "landed", "dependency not landed", "landed; documentation stale"),
         ("landed-progress", "in_progress", "landed", "-", "landed; documentation stale"),
         ("landed-implemented", "implemented", "landed", "-", "-"),
-        ("awaiting", "proposed", "awaiting_land", "needs your dispatch go", "needs your dispatch go"),
+        ("awaiting", "proposed", "awaiting_land", "ready on your go", "ready on your go"),
         ("refused", "ready", "refused", "dependency not landed", "dependency not landed"),
-        ("failed", "proposed", "codex_failed", "needs your dispatch go", "needs your dispatch go"),
-        ("running", "proposed", "running", "needs your dispatch decision", "needs your dispatch decision"),
+        ("failed", "proposed", "codex_failed", "ready on your go", "ready on your go"),
+        ("running", "proposed", "running", "ready on your go", "ready on your go"),
         ("no-ledger", "implemented", None, "-", "-"),
         ("verified", "implemented", "landed", "-", "-"),
         ("live-verified", "implemented", "landed", "-", "-"),
@@ -332,6 +360,7 @@ def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode
 
 
 def test_plan_overlap_cap_and_blocker_branches(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
     docs = {}
     for number in range(1, 7):
         stem = f"v1.51.0-p{number}"
@@ -360,6 +389,7 @@ def test_plan_overlap_cap_and_blocker_branches(metrics, tmp_path):
 
 
 def test_plan_blocked_by_only_for_undispatched_and_cross_release_uses_stem(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
     docs = {
         "docs/plans/v1.52.0-dep.md": "# Dep\n**Release:** v1.52.0 (plan 2 of 2)\n**Status:** PROPOSED\n**Dispatch:** go\n",
         "docs/plans/v1.52.0-done.md": "# Done\n**Release:** v1.52.0 (plan 1 of 2)\n**Status:** IMPLEMENTED\n**Dispatch:** go\n",
@@ -1713,17 +1743,29 @@ def test_load_milestones_rejects_invalid_state_and_folded_target(metrics, tmp_pa
 
 
 def test_missing_dispatch_header_reads_as_a_pending_decision_only_before_dispatch(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.54.0", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
+    (tmp_path / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
     docs = {
         "docs/plans/v1.54.0-waiting.md": "# Waiting\n**Status:** PLANNED\n**Approval:** approved\n",
         "docs/plans/v1.54.0-gated.md": "# Gated\n**Status:** PLANNED\n**Dispatch:** needed\n",
         "docs/plans/v1.54.0-landed.md": "# Landed\n**Status:** LANDED\n**Approval:** approved\n",
+        "docs/plans/v1.54.0-dropped.md": "# Dropped\n**Status:** DROPPED\n",
+        "docs/plans/v1.54.0-superseded.md": "# Superseded\n**Status:** SUPERSEDED\n",
     }
     output = metrics._plan_metrics(tmp_path, texts=docs)
     rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
             if line.startswith("k3dm_plan_info{")}
     assert 'dispatch_approval="unknown"' in rows["v1.54.0-waiting"]
-    assert "needs your dispatch decision" in rows["v1.54.0-waiting"]
+    # agent-audit: allow assert-removed old blocked_by and n/a asserts rewritten for the new column split (spec 2026-11-08-plans-panel-blocked-by-repeats-dispatch-approval), not dropped
+    assert 'blocked_by="ready on your go"' in rows["v1.54.0-waiting"]
     assert 'dispatch_approval="needed"' in rows["v1.54.0-gated"]
-    assert "needs your dispatch go" in rows["v1.54.0-gated"]
-    assert 'dispatch_approval="n/a"' in rows["v1.54.0-landed"]
+    assert 'blocked_by="ready on your go"' in rows["v1.54.0-gated"]
+    assert 'dispatch_approval="approved"' in rows["v1.54.0-landed"]
     assert 'blocked_by="-"' in rows["v1.54.0-landed"]
+    assert 'dispatch_approval="n/a"' in rows["v1.54.0-dropped"]
+    assert 'dispatch_approval="n/a"' in rows["v1.54.0-superseded"]

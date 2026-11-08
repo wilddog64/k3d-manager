@@ -2333,27 +2333,6 @@ data:
                   {
                     "id": "custom.width",
                     "value": 175
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-text"
-                    }
-                  },
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "type": "regex",
-                        "options": {
-                          "pattern": "needs your dispatch",
-                          "result": {
-                            "color": "orange",
-                            "index": 0
-                          }
-                        }
-                      }
-                    ]
                   }
                 ]
               },
@@ -2478,8 +2457,8 @@ data:
                             "index": 1
                           },
                           "go": {
-                            "text": "✓ go",
-                            "color": "green",
+                            "text": "approved",
+                            "color": "text",
                             "index": 2
                           },
                           "not required": {
@@ -2491,6 +2470,11 @@ data:
                             "text": "-",
                             "color": "text",
                             "index": 4
+                          },
+                          "approved": {
+                            "text": "approved",
+                            "color": "text",
+                            "index": 5
                           }
                         }
                       }
