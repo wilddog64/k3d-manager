@@ -1,8 +1,10 @@
 # Bug: "Claude tokens per day" and "Claude tokens per day by kind" are crowded: value labels and dates collide at 20+ days
 
-**Status:** OPEN — run 2 implemented (Flash exited 2026-11-07; 2 files changed in its worktree, uncommitted); Claude verification and land next (panels 32 and 87, the rewritten 659-660 assertion and its mutation)
+**Status:** LANDED — `b76f5537` (Flash) and `ab21812f` (Claude: pre-split fixture exemption for panel 32's new options), 2026-11-07. Panels 32 and 87 use showValue never, a multi tooltip sorted desc, and dates tilted -45 with spacing 100; all four options exist in barchart panelcfg.gen.ts at grafana v11.4.0 (fetched by Claude with gh api, 2026-11-07). agent_dispatch_dashboard.bats 43/43
+**Fix commit:** `b76f5537`, `ab21812f`
 **Priority:** P3 (cosmetic: the numbers are right, the chart is hard to read)
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
+Live check (operator): make platform-ops from k3d-manager-v1.43.15, then Agent Cost → Claude tokens per day shows no stacked numbers and readable dates.
 **Severity:** low
 **Approval:** operator 2026-11-07: "yes, please go ahead with labe and tooltip changes + a P3 bug file and dispatch to Flash 3.8"
 **Filed:** 2026-11-07
