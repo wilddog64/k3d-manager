@@ -1,8 +1,8 @@
 # Bug: the pre-push fast gate runs tests with whatever python3 is first on PATH, not the managed venv
 
-**Status:** OPEN — dispatched 2026-11-08: Luna implements, Gemini 3.8 Flash verifies from the Acceptance block
+**Status:** LANDED — `99d6796b` on `k3d-manager-v1.43.15` (2026-11-08); Claude review; `fast_gate.bats` + `ci_workflow_no_stage2.bats` green at land; M4 managed venv given PyYAML 6.0.3 by the operator first (else the fix would have broken M4 pushes)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** live check — since 2026-11-08 (Flash verifier; then M5 `make machine-setup` and a push without K3DM_SKIP_FAST_GATE, E2)
 **Introduced by:** unknown (the fast gate always used bare `python3`; `ci_workflow_no_stage2.bats` added `import yaml` in `bd68d6ff`, v1.43.12)
 **Should have been caught by:** deploy step
 **Severity:** medium — any push from M5 fails the gate (`ModuleNotFoundError: No module named 'yaml'`), and from M4 unless PATH is changed by hand. Workaround: `K3DM_SKIP_FAST_GATE=1`, or `PATH=/opt/homebrew/bin:$PATH` on M4 only.
