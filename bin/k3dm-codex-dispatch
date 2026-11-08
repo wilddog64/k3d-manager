@@ -323,7 +323,7 @@ from pathlib import Path
 
 root, manager, command, *args = sys.argv[1:]
 ledger = Path(root) / 'ledger.jsonl'
-PARENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
+PARENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$')
 def die(msg): print('[codex-dispatch] ERROR: '+msg, file=sys.stderr); raise SystemExit(2)
 def parse(argv, boolean=()):
     d={}; i=0
@@ -854,7 +854,7 @@ _dispatch_start() {
     coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
   fi
   if [[ -n "$parent" || -n "$role" ]]; then
-    [[ "$parent" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ && "$role" =~ ^(build|review|verify)$ ]] || _dispatch_error "--parent and --role must be valid and used together"
+    [[ "$parent" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$ && "$role" =~ ^(build|review|verify)$ ]] || _dispatch_error "--parent and --role must be valid and used together"
   fi
   [[ -z "$parent" || -n "$role" ]] || _dispatch_error "--parent requires --role"
   [[ -z "$role" || -n "$parent" ]] || _dispatch_error "--role requires --parent"

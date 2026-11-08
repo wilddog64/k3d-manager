@@ -46,7 +46,7 @@ STATUSES = ("done", "pending", "unknown")
 ROLES = ("build", "review", "verify")
 GATE_EVENTS = ("attempt_assessed", "stall_gate", "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared")
 COMBINE_RESULTS = ("pass", "fail", "pending")
-PARENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+PARENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 NEW_S1_EVENTS = {
     "gate_coverage_start", "combine", "attempt_assessed", "stall_gate",
     "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared",

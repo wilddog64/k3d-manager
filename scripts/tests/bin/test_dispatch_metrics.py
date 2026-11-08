@@ -3500,3 +3500,8 @@ def test_cost_attribution_coverage_and_guardian_assignment(tmp_path, monkeypatch
     assert "parent_not_scanned" not in output
     assert str(worktree_root) not in output
     assert str(tmp_path) not in output
+
+
+def test_parent_limit_matches_dispatcher_slug_limit():
+    assert dispatch_metrics.PARENT_RE.fullmatch("p" * 120)
+    assert not dispatch_metrics.PARENT_RE.fullmatch("p" * 121)

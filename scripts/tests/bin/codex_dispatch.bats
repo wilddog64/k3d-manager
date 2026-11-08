@@ -1923,3 +1923,17 @@ LEDGER
   cmp "$BATS_TEST_TMPDIR/before" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ "$(find "$K3DM_WORKTREE_ROOT" -mindepth 1 | wc -l | tr -d ' ')" -eq 1 ]
 }
+
+@test "codex dispatch start accepts a long parent slug and refuses one over 120 characters" {
+  local long over
+  [ "$K3DM_WORKTREE_ROOT" != "$HOME/.local/share/k3d-manager/worktrees" ]
+  sed '/deliberately corrupt/d' "$BATS_TEST_DIRNAME/../fixtures/dispatch-gates/synthetic.jsonl" >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/long-parent.argv" STUB_ENV="$BATS_TEST_TMPDIR/long-parent.env"
+  long="$(printf 'p%.0s' {1..120})"
+  over="${long}p"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug over-parent --parent "$over" --role review
+  [ "$status" -eq 2 ]
+  [ "$(jq -s '[.[]|select(.slug=="over-parent" and .event=="start")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug long-parent --parent "$long" --role review >/dev/null
+  [ "$(jq -r -s '[.[]|select(.slug=="long-parent" and .event=="start")][-1] | .parent' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$long" ]
+}
