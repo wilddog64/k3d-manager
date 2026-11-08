@@ -82,5 +82,13 @@ The baseline is 2026-11-08: 5 of 5 lands needed rework, and every defect was cau
 
 ## Open points
 
-- WIP: a review child is an open dispatch, and CLAUDE.md caps open dispatches at 3. Until the operator decides
-  otherwise, a review child counts toward the cap.
+- WIP: decided by the operator on 2026-11-08 ("let make review as exampt"). A review child changes no files and does
+  not count toward the limit of 3 (CLAUDE.md, Dispatch WIP limit).
+
+## Trial 1 log
+
+- 2026-11-08, step 3 (spec review, Sonnet subagent, about 1 minute): 1 blocker and 4 should-fix findings, all
+  confirmed against the code. The draft named the wrong collector (`bin/cluster-status`; `hostinger-status` runs
+  `_smoke_test_services`). It missed that job output reaches `question` (an injection path into collector choice),
+  and that `_parse_gemini_observations` can file bug docs from fenced log text. It also had a vacuous N1, and an M3
+  and M4 that couldn't be asserted. A worker would have built the wrong thing on the first finding alone.

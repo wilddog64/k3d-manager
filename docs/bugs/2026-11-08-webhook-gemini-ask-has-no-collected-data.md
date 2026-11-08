@@ -6,12 +6,12 @@
 **Introduced by:** pre-existing (the no-tools guard in `_call_gemini` dates from `fd281c85`, v1.24.0; the Gemini ask
 branch has no collection step)
 **Should have been caught by:** unknown
-**Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/k3dm hostinger-status` (or
-`cluster-status`), or ask Claude, whose ask path has read-only kubectl
+**Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/k3dm hostinger-status`, or ask
+Claude, whose ask path has read-only kubectl
 **Approval:** operator, 2026-11-08 ("go ahead to file a P3 and put it on dispatch queue")
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 (screenshot: "gemini show me the current hostinger status")
-**Affected:** `scripts/lib/webhook/agent.py` (`_run_cluster_ask`, gemini branch; `_call_gemini`)
+**Affected:** `scripts/lib/webhook/agent.py` (`_run_cluster_ask`, gemini branch)
 **Branch:** `k3d-manager-v1.43.15`
 **Related:** `docs/bugs/2026-10-30-webhook-ai-analysis-trusts-log-text-prompt-injection.md` (FIXED `e9cb9129`: collected
 text reaches a model only through `webhook.untrusted.fence`, and its answer through `filter_suggestion`)
@@ -25,68 +25,100 @@ or ingress metrics) or Hostinger VPS status data to analyze."
 
 ## Root cause
 
-- `_run_cluster_ask` with `agent == "gemini"` (`scripts/lib/webhook/agent.py:429-461`) builds the prompt from the
-  system text, the Slack thread context and the question only. No command runs.
-- `_call_gemini` (`agent.py:117-121`) prefixes: "You are analyzing pre-collected data in a HEADLESS session … Do NOT
+- `_run_cluster_ask` with `agent == "gemini"` (`scripts/lib/webhook/agent.py:429-462`) builds the prompt from the
+  system text, the Slack thread context and the question only. No data is collected.
+- `_call_gemini` (`agent.py:117-122`) prefixes: "You are analyzing pre-collected data in a HEADLESS session … Do NOT
   run any commands or call any tools … if it is insufficient, say so briefly." Gemini did exactly that.
 - The Gemini system text still says to "run `kubectl describe pod …` first" (`agent.py:449-452`), which the guard
   forbids.
-- The Claude and Codex ask paths run with read-only kubectl tools; the status commands (`status.py`,
-  `_run_hostinger_status` → `bin/cluster-status`) collect first and pass the output through `fence(...)`. The Gemini
-  ask path does neither.
+- `/k3dm hostinger-status` (`_run_hostinger_status`, `scripts/lib/webhook/status.py:401`) does collect, in Python:
+  `_smoke_test_services(provider="k3s-hostinger")` (`status.py:428`), a payload, and
+  `_format_status_summary_slack(payload, "k3s-hostinger")` (`status.py:447`). It does not run `bin/cluster-status`;
+  the docstring at `status.py:402` saying so is stale.
 
 ## Fix
 
-Keep the no-tools guard (it is a safety property).
-- Before calling Gemini, the webhook picks a read-only collector from the question: a question naming Hostinger
-  (`hostinger`, `k3s-hostinger`, `app cluster`) runs the same read-only report `hostinger-status` runs
-  (`bin/cluster-status` for `k3s-hostinger`); a question naming the hub or cluster status runs the `cluster-status`
-  report. Its output, bounded in size and credential-scrubbed as the status path does, goes into the prompt only
-  through `fence(...)`, and the answer through `filter_suggestion`, as `status.py` does.
-- A question that matches no collector is not sent to Gemini as if data were there: the reply says which command
-  answers it (`/k3dm hostinger-status`, `/k3dm cluster-status`, or ask claude), or Gemini is told explicitly that no
-  data was collected and must name that command. No "please provide kubectl output".
-- Remove the "run `kubectl describe pod …` first" instruction from the Gemini system text.
-- A collector failure or timeout is reported in the reply; Gemini is not asked to analyse an empty block.
+Scope: Hostinger only (the reported case). Other live-state questions get a pointer, not a new collector.
+
+1. **Extract the collector.** In `status.py`, move the smoke-test-to-text part of `_run_hostinger_status`
+   (`status.py:428-447`) into `_hostinger_status_text()`, which returns the formatted summary.
+   `_run_hostinger_status` calls it, and its own behaviour and output stay unchanged. Fix the stale docstring.
+2. **Match on the user's own words only.** The Slack route (`bin/k3dm-webhook:1146-1170`) prepends up to 80 lines of
+   earlier job output to `question`. Add a keyword argument `user_question=None` to `_run_cluster_ask`. The Slack
+   route passes the user's original text; when it is `None`, `question` is used. A collector runs only when
+   `user_question` matches `\bhostinger\b` or `\bk3s-hostinger\b`, case-insensitive. Job output and thread context
+   are never matched.
+3. **Collect, then fence.** On a match, the gemini branch calls `status._hostinger_status_text()`, imported inside
+   the function to avoid the circular `status → agent` import. It runs synchronously in the ask thread with a hard
+   timeout of 120 s (a `concurrent.futures` worker joined with that timeout), with no extra retries. Its text is then
+   passed through `redact.scrub_credentials`, truncated as `status.py:414-417` does (over 3400 chars, keep the first
+   1600 and the last 1800), and put in the prompt only through `fence("hostinger status", text)`. Order: scrub,
+   truncate, fence.
+4. **Filter the answer, and file nothing.** When a collector fed the prompt, the answer passes through
+   `filter_suggestion`, and `_parse_gemini_observations` still strips `OBSERVATIONS:` lines but files no bug docs
+   (add `file_bugs=True` as a keyword argument; this path passes `False`). Collected log text must not be able to
+   file a bug.
+5. **Failure.** If the collector raises or times out, Gemini is not called. The reply is exactly:
+   `Hostinger status collection failed: <reason>. Run /k3dm hostinger-status.`, where `<reason>` is the exception's
+   class name or `timed out after 120s`.
+6. **No match.** Gemini is called as today, and the prompt gains this line before the question:
+   `No live data was collected for this question. If it asks about live cluster state, say that /k3dm hostinger-status or asking claude answers it; do not ask the user for kubectl output.`
+7. Remove the "run `kubectl describe pod …` first" instruction (`agent.py:449-452`) from the Gemini system text.
+8. All replies go through the existing `_finish` (`agent.py:355-366`). The job `output` file gets only the scrubbed
+   reply, never the raw collector text.
 
 ## Files
 
 - `scripts/lib/webhook/agent.py`
+- `scripts/lib/webhook/status.py`
+- `bin/k3dm-webhook` (pass `user_question` on the Slack ask route)
 - `scripts/tests/bin/test_webhook_ask_gemini_context.py` (new)
+
+## Do not
+
+- Change `_call_gemini`, its guard text or `_ai_candidates`.
+- Touch the claude or codex branches of `_run_cluster_ask`.
+- Pass the question, or any part of it, into a collector's arguments or environment.
+- Use `shell=True`, or call `bin/cluster-status`, `aws`, `kubectl` or `scripts/k3d-manager` from the ask path.
+- Add retries beyond those `_smoke_test_services` already has.
 
 ## Acceptance
 
 ```yaml
 must:
   - id: M1
-    text: "a gemini ask naming Hostinger runs the read-only k3s-hostinger status report once, and the prompt given to Gemini contains that report's output inside a fence block"
+    text: "a gemini ask whose user text names Hostinger runs the Hostinger status collector once, and the prompt given to Gemini contains that collector's text inside a fence block"
   - id: M2
-    text: "a gemini ask naming the hub or cluster status runs the cluster-status report, and its output reaches the prompt inside a fence block"
+    text: "a gemini ask with collected data gets an answer that has passed filter_suggestion, and files no docs/bugs file even when the answer carries an OBSERVATIONS line"
   - id: M3
-    text: "a gemini ask matching no collector gets a reply naming the command that answers it (hostinger-status, cluster-status, or ask claude)"
+    text: "a gemini ask whose user text does not name Hostinger runs no collector, and its prompt contains 'No live data was collected for this question' and '/k3dm hostinger-status'"
   - id: M4
-    text: "when the collector fails or times out, the reply says so and names the command"
+    text: "when the collector raises or exceeds 120 s, Gemini is not called and the reply is 'Hostinger status collection failed: <reason>. Run /k3dm hostinger-status.'"
+  - id: M5
+    text: "/k3dm hostinger-status output is unchanged (paired control for the collector extraction)"
 must_not:
   - id: N1
-    text: "the Gemini call gains tool or command permission (the no-tools guard text stays in the prompt)"
+    text: "a collector runs because earlier job output or thread context names Hostinger when the user's own text does not (paired with M1)"
   - id: N2
-    text: "collected output reaches the prompt outside a fence block, or unscrubbed of credentials (paired with M1: the fenced output is present)"
+    text: "collected text reaches the prompt outside a fence block, or with a credential still in it (a canary token in the stubbed collector text must be absent from the prompt; paired with M1)"
   - id: N3
-    text: "the Gemini system text tells it to run kubectl or any command"
+    text: "the Gemini system text or prompt tells it to run kubectl or any command"
   - id: N4
-    text: "a collector runs any command that changes state (only the read-only status reports are invoked)"
+    text: "the ask path starts a subprocess while serving a gemini ask (the collector stubbed; subprocess and spawn primitives faked and asserted uncalled)"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, M4, N1, N2, N3, N4]
+    proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
     kind: offline
-    intent: "tests call the Gemini ask path with a stub Gemini that records its prompt and stub status reports that record their arguments, for a Hostinger question, a cluster question, an unrelated question and a failing report, and read the recorded prompt, the commands run and the Slack reply"
+    intent: "tests run the Gemini ask with a stub Gemini that records its prompt and a stub Hostinger collector, for four cases: a Hostinger question, a question about something else, a Hostinger mention only in earlier job output, and a collector that fails or hangs. They read the recorded prompt, the reply, whether a bug file appeared, and whether anything was spawned. They also check that /k3dm hostinger-status prints the same report as before."
   - id: E2
     proves: [M1]
     kind: live
-    intent: "after the webhook restarts on the fixed code, the operator asks in Slack 'gemini show me the current hostinger status' and gets an answer that cites real Hostinger node and pod state"
+    intent: "after the webhook restarts on the fixed code, the operator asks in Slack 'gemini show me the current hostinger status' and gets an answer that cites real Hostinger service status"
 interface:
-  - "webhook.agent._run_cluster_ask(job_id, 'gemini', question, response_url, ...) with _call_gemini and the status report command stubbed"
-  - "bin/cluster-status (k3s-hostinger and hub) as the read-only collectors, invoked as the status commands invoke them"
+  - "webhook.agent._run_cluster_ask(job_id, 'gemini', question, response_url, thread_ts=None, user_question=None), with webhook.agent._call_gemini stubbed"
+  - "webhook.status._hostinger_status_text() — the collector, stubbed in tests"
+  - "webhook.status._run_hostinger_status(job_id, response_url) with webhook.status._smoke_test_services stubbed"
+  - "the Slack ask route in bin/k3dm-webhook, passing user_question"
 ```
 
 ## Definition of done (worker)
@@ -105,9 +137,13 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
-- First-pass trial dispatch 1 of 3 (`docs/howto/dispatch-first-pass-trial.md`): a spec review by a second agent runs
-  before intent approval, and a cross-vendor diff review runs before Claude's review.
-- Stubbed status-report output must be taken from a real read-only run of `bin/cluster-status` (host and date in a
-  comment), not imagined. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary is reachable on PATH.
+- First-pass trial dispatch 1 of 3 (`docs/howto/dispatch-first-pass-trial.md`). The spec review by a separate agent
+  (2026-11-08) found that the first draft named the wrong collector (`bin/cluster-status`) and missed the job-output
+  injection path and the bug-filing path; this version fixes all three.
+- Existing tests in `scripts/tests/bin/test_webhook_ask_delivery.py` ask gemini with no Hostinger mention and expect
+  the stubbed answer verbatim; under fix step 6 they stay green.
+- The stubbed collector text must be taken from a real `/k3dm hostinger-status` reply (host and date in a comment);
+  Claude attaches the capture before dispatch. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary
+  is reachable on PATH.
 - The webhook must be restarted after the fix lands for E2 (`feedback_restart_webhook_after_verify`).
 - Needs `**Intent approved:**` before dispatch.

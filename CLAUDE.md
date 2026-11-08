@@ -27,7 +27,8 @@ Uses a dispatcher pattern with lazy plugin loading.
 - **Dispatch WIP limit and P3 batching (operator, 2026-11-07).** At most 3 dispatches open at once
   (running, or exited and not yet landed), and at most one open dispatch per file. A spec touching a file
   that an open dispatch edits waits, or is folded into the next dispatch for that file. P0 and P1 may exceed
-  the limit. A P3 is filed with `**Waiting on:** dispatch` and dispatched in a batch with other P3s on
+  the limit. A review child (`start --parent P --role review`, which changes no files) does not count toward
+  the limit (operator, 2026-11-08). A P3 is filed with `**Waiting on:** dispatch` and dispatched in a batch with other P3s on
   the same files once there is room. Precedent: four concurrent dispatches on `bin/k3dm-dispatch-metrics`
   on 2026-11-07.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
