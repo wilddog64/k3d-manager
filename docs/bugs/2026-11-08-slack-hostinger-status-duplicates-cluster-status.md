@@ -8,6 +8,7 @@ covered the same checks)
 **Should have been caught by:** live check
 **Severity:** low — confusing duplicate command; workaround: `/cluster-status hostinger`
 **Approval:** operator, 2026-11-08 ("go ahead to do that, and I will remove hostinger-status")
+**Intent approved:** operator, 2026-11-08 (E1 re-approved after spec review: "E1 intent approved")
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 (screenshots: `/hostinger-status` → "failed because the app did not
 respond"; `/cluster-status hostinger` → HEALTHY, 21 ok / 0 warn / 0 fail)
@@ -126,5 +127,4 @@ Before your last message, do all of these and paste the evidence:
 - Order for E2: operator deletes the Slack command, then the relay is redeployed, then the live check.
 - Spec review (separate agent, 2026-11-08) added the architecture doc, the relay behaviour tests, the thread-command
   decision and a testable N2; E1's intent changed, so it needs approval again.
-- Needs `**Intent approved:**` before dispatch.
 - First-pass trial dispatch 2 of 3 (`docs/howto/dispatch-first-pass-trial.md`).

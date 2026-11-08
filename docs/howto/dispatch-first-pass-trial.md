@@ -103,3 +103,4 @@ The baseline is 2026-11-08: 5 of 5 lands needed rework, and every defect was cau
   behaviour test using the `relay.test.mjs` harness. N2 was not testable black-box; it is now a diff check. The
   `hostinger-status` job-thread command was undecided; it is now explicitly out of scope. E1's intent changed, so the
   operator is asked to approve again: the slip cost one extra approval round.
+- 2026-11-08: operator re-approved E1 ("E1 intent approved"). Ready for dispatch when a WIP slot frees.
