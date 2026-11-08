@@ -33,6 +33,8 @@ METRICS
   cat >"$FIXTURE/docs/plans/v9.9.9-demo.md" <<'EOF'
 # Test spec
 
+**Intent approved:** test, 2026-11-07
+
 ## Files
 
 | File |
