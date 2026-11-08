@@ -1,3 +1,4 @@
+- [x] 2026-11-08 retire-/hostinger-status intents approved; [ ] spec review result, dispatch
 - [x] 2026-11-08 filed P3 retire /hostinger-status; Gemini-ask replies → /cluster-status hostinger; [ ] intent approval, dispatch
 - [x] 2026-11-08 Gemini-ask P3 stub capture committed; [ ] dispatch (WIP), [ ] /hostinger-status Slack app check
 - [x] 2026-11-08 Gemini-ask P3 intents approved; [ ] /hostinger-status capture, dispatch

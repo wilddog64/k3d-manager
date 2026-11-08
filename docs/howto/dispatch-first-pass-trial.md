@@ -92,3 +92,9 @@ The baseline is 2026-11-08: 5 of 5 lands needed rework, and every defect was cau
   `_smoke_test_services`). It missed that job output reaches `question` (an injection path into collector choice),
   and that `_parse_gemini_observations` can file bug docs from fenced log text. It also had a vacuous N1, and an M3
   and M4 that couldn't be asserted. A worker would have built the wrong thing on the first finding alone.
+
+## Trial 2 log
+
+- 2026-11-08: `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md`. Process slip: Claude asked
+  for intent approval before the step-3 spec review. The review ran right after; if it changes any approved intent, the
+  operator re-approves before dispatch.
