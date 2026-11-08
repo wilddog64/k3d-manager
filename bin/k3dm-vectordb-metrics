@@ -308,6 +308,57 @@ def _plan_dispatch(text):
     return match.group(1).lower() if match else "unknown"
 
 
+def _plan_intent_approved(text):
+    return bool(re.search(r"(?m)^\*\*Intent approved:\*\*\s*[^,\n]+,\s*\d{4}-\d{2}-\d{2}\s*$", text))
+
+
+def _plan_files(text):
+    section = re.search(r"(?ms)^##\s+Files\s*\n(.*?)(?=^##\s|\Z)", text)
+    body = section.group(1) if section else _plan_header(text, "Component")
+    return list(dict.fromkeys(re.findall(r"`([^`]+)`", body)))
+
+
+def _dispatch_ledger_path():
+    """The dispatch ledger bin/k3dm-codex-dispatch writes (same default as bin/k3dm-dispatch-metrics)."""
+    worktree_root = os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")
+    return Path(worktree_root).expanduser() / "ledger.jsonl"
+
+
+def _open_plan_dispatches(root, ledger=None):
+    """Return plan stems for active ledger tasks and each task's declared files."""
+    if ledger is None:
+        return {}
+    ledger = Path(ledger)
+    try:
+        records = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except (OSError, ValueError):
+        return {}
+    tasks = defaultdict(list)
+    for record in records:
+        version, slug = record.get("version"), record.get("slug")
+        if isinstance(version, str) and isinstance(slug, str):
+            tasks[(version, slug)].append(record)
+    active = {}
+    for (_, _), events in tasks.items():
+        starts = [event for event in events if event.get("event") == "start" and isinstance(event.get("spec"), str)]
+        if not starts:
+            continue
+        latest = max(starts, key=lambda event: event.get("ts", 0))
+        plan = Path(latest["spec"]).stem
+        lifecycle = [event for event in events if event.get("event") in
+                     {"start", "resume", "codex_exit", "agent_exit", "land", "abandon"}]
+        ordered = sorted(enumerate(lifecycle), key=lambda item: (item[1].get("ts", 0), item[0]))
+        last = ordered[-1][1].get("event") if ordered else None
+        if last in {"land", "abandon"}:
+            continue
+        spec = Path(root) / latest["spec"]
+        try:
+            active[plan] = _plan_files(spec.read_text(encoding="utf-8"))
+        except OSError:
+            active[plan] = []
+    return active
+
+
 def _plan_has_branch(root, release):
     branch = f"k3d-manager-{release}"
     result = subprocess.run(["git", "-C", str(root), "branch", "-a", "--list", branch,
@@ -316,7 +367,7 @@ def _plan_has_branch(root, release):
                (branch, f"origin/{branch}") for line in result.stdout.splitlines())
 
 
-def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
+def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
     texts = _plan_texts(root, ref) if texts is None else texts
     counts, skipped = defaultdict(int), 0
     branch = _scan_branch(root, ref)
@@ -349,15 +400,18 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
                 if stem not in dependencies:
                     dependencies.append(stem)
         component_line = _plan_header(text, "Component")
-        files = list(dict.fromkeys(re.findall(r"`([^`]+)`", component_line)))
+        files = _plan_files(text)
         wave_header = _plan_header(text, "Wave")
         wave_match = re.match(r"(\d+)\s*[—–-]?\s*(.*)", wave_header)
         declared_wave = int(wave_match.group(1)) if wave_match else None
         wave_note = _plan_clean(wave_match.group(2), 80) if wave_match else "-"
+        filed = re.search(r"(?m)^\*\*Filed:\*\*\s*(\d{4}-\d{2}-\d{2})", text)
         parsed.append(dict(release=release, plan=plan, title=title, execution=execution,
                            verification=verification, approval=approval, plan_order=plan_order,
                            dependencies=dependencies, files=files, declared_wave=declared_wave,
-                           wave_note=wave_note, dispatch=_plan_dispatch(text)))
+                           wave_note=wave_note, dispatch=_plan_dispatch(text),
+                           intent_ok=_plan_intent_approved(text),
+                           intent_required=bool(filed and filed.group(1) >= "2026-11-08")))
         counts[(release, order_label, execution, verification)] += 1
     by_stem = {p["plan"]: p for p in parsed}
     for p in parsed:
@@ -428,6 +482,7 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
                 right["overlap_items"].append(f"plan {left['plan_order']}: {shared}")
                 overlap_counts[left["release"]] += 1
     lines = []
+    open_dispatches = _open_plan_dispatches(root, ledger)
     branch_cut = {}
     for p in parsed:
         deps = [by_stem[s] for s in p["dependencies"] if s in by_stem]
@@ -456,10 +511,20 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
                     break
             if p["wave_note"] != "-":
                 blockers.append("wave note")
+            if p["intent_required"] and not p["intent_ok"]:
+                blockers.append("intents need approval")
+            waits = next(((slug, a) for slug, files in open_dispatches.items() if slug != p["plan"]
+                          for a in p["files"] for b in files
+                          if a == b or (a.endswith("/") and b.startswith(a)) or
+                          (b.endswith("/") and a.startswith(b))), None)
+            if waits:
+                blockers.append(f"waits on {waits[0]} ({waits[1]})")
+            if p["plan"] in open_dispatches:
+                blockers = ["dispatched"]
         if not dispatchable:
             blocked = "-"
         elif blockers:
-            blocked = "; ".join(blockers[:3])
+            blocked = "; ".join(blockers)
         elif p["dispatch"] in ("go", "not required"):
             blocked = "ready to dispatch"
         else:
@@ -470,7 +535,7 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
                 dispatch = "approved"
             elif dispatch == "unknown":
                 dispatch = "n/a"
-        lines.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{p["release"]}",release_order="{_release_order(p["release"])}",plan="{p["plan"]}",title="{p["title"]}",execution="{p["execution"]}",verification="{p["verification"]}",approval="{p["approval"]}",dispatch_approval="{dispatch}",order="{p["plan_order"]}",depends_on="{depends_on}",depends_on_path="{depends_on_path}",wave="{p["wave"]}",wave_note="{p["wave_note"]}",overlaps="{overlap}",blocked_by="{_plan_clean(blocked, 120)}"}} 1')
+        lines.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{p["release"]}",release_order="{_release_order(p["release"])}",plan="{p["plan"]}",title="{p["title"]}",execution="{p["execution"]}",verification="{p["verification"]}",approval="{p["approval"]}",dispatch_approval="{dispatch}",order="{p["plan_order"]}",depends_on="{depends_on}",depends_on_path="{depends_on_path}",wave="{p["wave"]}",wave_note="{p["wave_note"]}",overlaps="{overlap}",blocked_by="{_plan_clean(blocked, 240)}"}} 1')
     lines.extend(f'k3dm_plan_undeclared_overlaps{{repo="{repo}",release="{release}"}} {count}'
                  for release, count in sorted(overlap_counts.items()))
     lines.extend(f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
@@ -974,7 +1039,7 @@ def publish_bug_metrics(root, ref=None):
         return False
     pushed = _push_bug_group("k3dm-bug-docs", payload)
     try:
-        _push_bug_group("k3dm-plan-docs", _plan_metrics(root, ref), method="PUT")
+        _push_bug_group("k3dm-plan-docs", _plan_metrics(root, ref, ledger=_dispatch_ledger_path()), method="PUT")
     except Exception as exc:
         print(f"plan metrics skipped (non-fatal): {exc}", file=sys.stderr)
     try:

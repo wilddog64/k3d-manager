@@ -213,6 +213,56 @@ def test_plan_operator_go_is_own_label_and_real_blockers_remain(metrics, tmp_pat
     assert all("needs your dispatch" not in row for row in rows.values())
 
 
+@pytest.mark.parametrize("exit_code", [None, 0, 1])
+def test_plan_blocked_by_dispatch_intent_and_file_wait(metrics, tmp_path, exit_code):
+    root = tmp_path / "scratch-repo"
+    assert root.resolve() != ROOT.resolve()
+    assert ".local/share/k3d-manager" not in str(root.resolve())
+    (root / "docs/plans").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.57.0", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"], check=True)
+    (root / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(root), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-qm", "seed"], check=True)
+    docs = {
+        "docs/plans/v1.57.0-active.md": (
+            "# Active\n**Status:** READY\n**Filed:** 2026-11-08\n"
+            "**Intent approved:** operator, 2026-11-08\n**Dispatch:** go\n"
+            "## Files\n- `Makefile`\n"),
+        "docs/plans/v1.57.0-held.md": (
+            "# Held\n**Status:** PROPOSED\n**Filed:** 2026-11-08\n**Dispatch:** go\n"
+            "## Files\n- `Makefile`\n"),
+        "docs/plans/v1.57.0-clear.md": (
+            "# Clear\n**Status:** PROPOSED\n**Filed:** 2026-11-08\n"
+            "**Intent approved:** operator, 2026-11-08\n**Dispatch:** go\n"
+            "## Files\n- `scripts/clear.py`\n"),
+    }
+    for path, content in docs.items():
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+    # Record shape captured from ~/.local/share/k3d-manager/worktrees/ledger.jsonl on the M5 (2026-11-08):
+    # start {"ts","event","version","slug","repo","spec",...}; codex_exit {"ts","event","version","slug","exit",...}.
+    record = {"ts": 1, "event": "start", "version": "v1.57.0", "slug": "active-worker",
+              "spec": "docs/plans/v1.57.0-active.md"}
+    records = [record]
+    if exit_code is not None:
+        records.append({"ts": 2, "event": "codex_exit", "version": "v1.57.0",
+                        "slug": "active-worker", "exit": exit_code})
+    ledger = root / "ledger.jsonl"
+    ledger.write_text("".join(json.dumps(item) + "\n" for item in records))
+    assert ledger.resolve() != (ROOT / "ledger.jsonl").resolve()
+    output = metrics._plan_metrics(root, texts=docs, ledger=ledger)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line
+            for line in output.splitlines() if line.startswith("k3dm_plan_info{")}
+    assert 'blocked_by="dispatched"' in rows["v1.57.0-active"]
+    assert "ready to dispatch" not in rows["v1.57.0-active"]
+    assert 'intents need approval' in rows["v1.57.0-held"]
+    assert 'waits on v1.57.0-active (Makefile)' in rows["v1.57.0-held"]
+    assert 'blocked_by="ready to dispatch"' in rows["v1.57.0-clear"]
+
+
 def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_path):
     dashboard_path = ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"
     dashboard = json.loads(dashboard_path.read_text().split("  k3dm-bugs.json: |\n", 1)[1])
@@ -1769,3 +1819,11 @@ def test_missing_dispatch_header_reads_as_a_pending_decision_only_before_dispatc
     assert 'blocked_by="-"' in rows["v1.54.0-landed"]
     assert 'dispatch_approval="n/a"' in rows["v1.54.0-dropped"]
     assert 'dispatch_approval="n/a"' in rows["v1.54.0-superseded"]
+
+
+def test_plan_dispatch_ledger_path_follows_worktree_root(metrics, tmp_path, monkeypatch):
+    assert tmp_path.resolve() != ROOT.resolve()
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path / "worktrees"))
+    assert metrics._dispatch_ledger_path() == tmp_path / "worktrees" / "ledger.jsonl"
+    monkeypatch.delenv("K3DM_WORKTREE_ROOT")
+    assert metrics._dispatch_ledger_path() == Path("~/.local/share/k3d-manager/worktrees/ledger.jsonl").expanduser()

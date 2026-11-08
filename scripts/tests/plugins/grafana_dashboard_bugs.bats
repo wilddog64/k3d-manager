@@ -1101,3 +1101,19 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
+
+@test "Plans Blocked by displays open dispatch state without changing landed override" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+expr=panel["targets"][0]["expr"]
+assert '"blocked_by", "dispatched", "dispatch_state", "(running|awaiting_land|refused|codex_failed)"' in expr
+assert '"blocked_by", "landed; documentation stale", "blocked_by", ".*"' in expr
+assert "Blocked by explains dispatch state" in panel["description"]
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *ok* ]]
+}
