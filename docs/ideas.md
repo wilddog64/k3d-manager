@@ -2,24 +2,24 @@
 
 New ideas land here first, as one line each. They are not plans, not bugs, and not dispatched.
 
-**Rules (operator, 2026-11-07):**
+**Rules (operator, 2026-11-07; weekly planning 2026-11-08):**
 - A new idea from the operator, an incident, a reading or an agent goes in the table below, not into `docs/plans/`
-  and not into a dispatch. Bugs still go to `docs/bugs/`; this inbox is for things we would like to build.
-- Ideas are promoted only at a release boundary: when a release branch is cut (`/post-merge`), Claude lists the
-  inbox and the operator picks what to promote. A promoted idea becomes a plan in the release it is assigned to,
-  within the 5-plan cap, and its row records the plan path.
+  and not into a dispatch. Bugs still go to `docs/bugs/`; this inbox is the feature backlog.
+- Ideas are promoted at the **weekly sprint planning, Sunday afternoon** (`/sprint-plan`), not at the release cut.
+  Claude lists the backlog and the operator picks **1–3 items** for the week. A picked idea becomes a plan in the open
+  or next release, within the 5-plan cap, and its row records the plan path.
 - Nothing here counts toward the dispatch WIP limit or the 5-plan cap.
 - Keep a row short: what, why, and where it came from. Detail belongs in the plan once promoted.
 
 **Triage rules (operator, 2026-11-08):**
-- **Every row gets a decision at every review.** Each `inbox` or `deferred` row leaves the review as `promoted`,
-  `dropped` or `deferred` to a named release. "Still thinking" is not an outcome.
-- **Age limit.** A row deferred twice is dropped at its next review unless the operator gives a new reason, written
-  into the row. A dropped row stays in the table with its reason and can come back as a new row.
-- **Size cap.** At most 8 rows open (`inbox` plus `deferred`). Adding a 9th triggers a review straight away, without
-  waiting for the release cut.
+- **Every row gets a decision at every planning.** Each `inbox` or `kept` row leaves the session as `promoted`,
+  `kept` (stays in the backlog for a named reason) or `dropped`. "Still thinking" is not an outcome.
+- **Age limit.** A row kept 4 weeks running without being picked is dropped at the next planning unless the operator
+  gives a new reason, written into the row. A dropped row stays in the table with its reason and can come back as a
+  new row.
+- No row cap: the weekly session is what forces the decisions.
 
-**Status words:** `inbox`, `promoted` (plan path), `deferred` (target release; count, e.g. `deferred (v1.45.0, 1×)`),
+**Status words:** `inbox`, `promoted` (plan path), `kept` (count of weeks and reason, e.g. `kept (2×, waits on D1)`),
 `dropped` (one-line reason).
 
 | Added | Idea | Source | Status |

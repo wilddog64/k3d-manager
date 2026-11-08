@@ -7,6 +7,11 @@
 > **Release ledger:** `docs/releases.md` holds the full per-version history. This file holds
 > the vision, the current milestone scope, and forward themes — not a per-release changelog.
 
+> **How we plan (operator, 2026-11-08).** Work is picked weekly, Sunday afternoon (`/sprint-plan`), 1–3 items from
+> `docs/ideas.md` and the bug queue. Only the open release and the next one have committed version numbers. Version
+> numbers further down this file are an ordering and a theme, not a commitment: they are reassigned when the work is
+> picked. v2.0.0 (retire shopping-cart) and v3.0.0 (multi-agent product team) stay as milestones.
+
 ---
 
 ## Vision — kops-for-k3s
