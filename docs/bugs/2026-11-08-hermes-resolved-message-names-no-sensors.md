@@ -35,19 +35,28 @@ incident's sensors, `state["incident_sensors"]`) and the current `records`:
 
 `Hermes correlated incident resolved (<notified joined by " + ">). Cleared: <A>. Still degraded: <B>. No data: <C>.`
 
-- A: sensors in `notified` whose current record is `healthy`.
-- B: every sensor whose current record is `degraded` (in `notified` or not).
-- C: sensors in `notified` whose current record is `unknown` or that have no record this cycle.
-- Each list is sorted and joined by `, `; an empty list reads `none`.
+- Every list is keyed on the **current** `records` only, never on `correlation_history`. With a window above 1 an
+  incident resolves while earlier cycles still hold degraded entries; a sensor degraded earlier but `healthy` now is
+  Cleared.
+- B: every sensor whose current record is `degraded`, in `notified` or not. A sensor in B is never in A or C.
+- A: sensors in `notified`, not in B, whose current record is `healthy`.
+- C: sensors in `notified`, not in A or B: current record `unknown`, any other status, or no record this cycle.
+- Several records for one sensor: it counts once; if any of them is `degraded` it is in B.
+- Each list is sorted, de-duplicated and joined by `, `; an empty list reads `none`. Every clause ends with `.`.
+- `notified` empty or missing: the header is `Hermes correlated incident resolved (sensors not recorded).`
+- Example, literal: `Hermes correlated incident resolved (ci + values_branch). Cleared: ci. Still degraded: values_branch. No data: none.`
 
 The event keeps `kind: "resolved"` and `sensors: []`, the state reset is unchanged, and the resolved text is not
-passed to LLM enrichment (as today).
+passed to LLM enrichment (as today). `bin/k3dm-hermes:239-241` may append an automatic Kine guard line to any event; that
+stays as it is.
 
 ## Files
 
 - `scripts/lib/hermes/correlator.py`
 - `scripts/tests/hermes/test_correlator_resolved_text.py` (new; do not edit `scripts/tests/hermes/test_hermes.py`,
-  which the Hermes values_branch P2 dispatch edits)
+  which the Hermes values_branch P2 dispatch edits; define your own record helper there, do not import from
+  `test_hermes.py`). Run with `python3 -m pytest scripts/tests/hermes/test_correlator_resolved_text.py
+  scripts/tests/hermes/test_hermes.py -q`.
 
 ## Do not
 
@@ -59,21 +68,21 @@ passed to LLM enrichment (as today).
 ```yaml
 must:
   - id: M1
-    text: "the resolved message names the incident's sensors, lists those now healthy under Cleared and those now degraded under Still degraded"
+    text: "the resolved message names the incident's sensors, lists those now healthy under Cleared and every sensor now degraded under Still degraded, including one not in the incident and with correlation_window 3"
   - id: M2
-    text: "an incident sensor that now reports unknown, or has no record, is listed under No data (paired with N1)"
+    text: "an incident sensor that now reports unknown, or has no record, is listed under No data; with no recorded incident sensors the header reads '(sensors not recorded)'"
   - id: M3
     text: "incident and escalation events, the resolved kind, sensors [] and the state reset are unchanged (control: green before and after)"
 must_not:
   - id: N1
-    text: "a sensor is listed under Cleared while its current record is degraded, unknown or missing"
+    text: "the Cleared list differs from exactly the incident sensors whose current record is healthy (a degraded, unknown or missing sensor under Cleared, or a healthy one left out; red on pre-fix code, which has no Cleared list; paired with M1)"
   - id: N2
     text: "the resolved message omits a sensor that is still degraded (today's bug: red on pre-fix code)"
 evidence:
   - id: E1
     proves: [M1, M2, M3, N1, N2]
     kind: offline
-    intent: "tests open an incident with two checks, then let it resolve three ways: both healthy, one still failing, and one whose source went silent. They read the resolved message for the incident's checks and the Cleared, Still degraded and No data lists, and check the incident and escalation messages are unchanged."
+    intent: "tests open an incident with two checks, then let it resolve several ways: both healthy, one still failing, one whose source went silent, a new check failing alone, a 3-run window, and an incident with no recorded checks. They read the resolved message for the incident's checks and the Cleared, Still degraded and No data lists, and check the incident and escalation messages are unchanged."
   - id: E2
     proves: [M1]
     kind: live
@@ -99,6 +108,9 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
-- Needs `**Intent approved:**` before dispatch. Spec review by a second agent runs first (first-pass trial step 3).
+- Needs `**Intent approved:**` before dispatch.
+- Spec review (Sonnet, 2026-11-08, first-pass trial step 3): no blockers; 4 should-fix and 3 nits, all applied: N1
+  rewritten so it is red on pre-fix code, window above 1 and current-record keying, empty incident header, de-dup and
+  ordering rules, literal example, test command and helper, E1 cases widened.
 - Files do not overlap the open dispatches or the Hermes values_branch P2 (`sensors.py`, `repairs.py`, `argocd.sh`,
   `test_hermes.py`). Dispatch when a WIP slot frees, after the P2 (a P2 that blocks the release goes first).
