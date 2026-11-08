@@ -85,6 +85,10 @@ Operator setup (run in Terminal.app):
    `ROTATE=1 make hermes-drain-token` rotates the drain token and syncs it to the relay.
 2. Commit `workers/slack-relay/wrangler.toml` if it changed, then run `make deploy-worker`.
 3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
+   It must be the app whose signing secret the relay holds (`SLACK_SIGNING_SECRET`, the slash-command app), and the
+   `k3dm-slack-webhook` Keychain item must be an incoming webhook of that same app. Slack sends a button click to the
+   app that posted the message: a card posted through another app's webhook (for example `k3dm-notices`) shows
+   "This app is not configured to handle interactive responses" (operator, 2026-11-08).
 4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
 
 `APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.
