@@ -139,6 +139,7 @@ SH
 }
 
 setup_machine_fixture() {
+  REAL_PYTHON3="$(command -v python3)"
   FIXROOT="$BATS_TEST_TMPDIR/project"
   FIXHOME="$BATS_TEST_TMPDIR/home"
   STUBS="$BATS_TEST_TMPDIR/stubs"
@@ -219,6 +220,7 @@ SH
   cat > "$STUBS/python3" <<'SH'
 #!/bin/sh
 printf 'python3 %s\n' "$*" >> "$CALL_LOG"
+if [ "$1" = - ]; then exec "$REAL_PYTHON3" "$@"; fi
 [ "$1" = -m ] && [ "$2" = venv ] || exit 1
 mkdir -p "$3/bin"
 cat > "$3/bin/python" <<'VENV'
@@ -265,11 +267,27 @@ printf '%s\n' 'PRIVATE-KEY-TEST-MATERIAL' > "$key"
 printf '%s\n' 'public-test-key' > "$key.pub"
 printf 'ssh-keygen called\n' >> "$CALL_LOG"
 SH
+  cat > "$STUBS/id" <<'SH'
+#!/bin/sh
+[ "$1" = -un ] && printf '%s\n' fixture-user
+SH
+  cat > "$STUBS/scutil" <<'SH'
+#!/bin/sh
+[ "$1" = --get ] && [ "$2" = LocalHostName ] && printf '%s\n' fixture-hub
+SH
+  cat > "$STUBS/ssh" <<'SH'
+#!/bin/sh
+printf 'ssh %s\n' "$*" >> "$CALL_LOG"
+exit 1
+SH
   chmod +x "$STUBS"/*
+  mkdir -p "$FIXHOME/.ssh" "$FIXHOME/.config/k3d-manager"
+  printf 'E2E_M2_PUBLISH_BACK_HOST=fixture-user@fixture-hub.local\n' > "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  printf 'from="192.168.39.0/24",command="%s/scripts/k3d-manager e2e_result_publish",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAA e2e-m2-publisher@m2-air-20260824\n' "$FIXROOT" > "$FIXHOME/.ssh/authorized_keys"
 }
 
 run_machine() {
-  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" REAL_PYTHON3="$REAL_PYTHON3" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
 }
 
 @test "N1: agents option rejects unsupported values" {
@@ -421,6 +439,97 @@ run_machine() {
   grep -Eq '^command-line-tools[[:space:]]+missing$' <<< "$output"
   grep -Eq '^brew:example[[:space:]]+ok$' <<< "$output"
   grep -Eq '^secret:fixture[[:space:]]+missing' <<< "$output"
+}
+
+publisher_fixture() {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  rm -f "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$FIXHOME/.ssh/authorized_keys"
+  ssh-keygen -q -t ed25519 -N '' -C e2e-m2-publisher@m2-air-20260824 -f "$BATS_TEST_TMPDIR/publisher"
+  local public
+  public="$(cat "$BATS_TEST_TMPDIR/publisher.pub")"
+  cat > "$STUBS/ssh" <<SH
+#!/bin/sh
+printf 'ssh %s\\n' "\$*" >> "\$CALL_LOG"
+# Captured authorized_keys format from m4-air.local, 2026-11-07; key generated for this test.
+printf '%s\\n' 'from="192.168.39.0/24",command="/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/k3d-manager e2e_result_publish",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding $public'
+SH
+  chmod +x "$STUBS/ssh"
+}
+
+@test "e2e publish-back: hub setup installs both items and second run is byte-identical" {
+  publisher_fixture
+  run_machine --role hub --from old-hub.local --secrets skip --agents skip
+  grep -Eq '^e2e-publish-back-conf +installed$' <<< "$output"
+  grep -Eq '^e2e-publish-back-key +installed$' <<< "$output"
+  grep -Fxq 'E2E_M2_PUBLISH_BACK_HOST=fixture-user@fixture-hub.local' "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  [ "$(ls -l "$FIXHOME/.config/k3d-manager/e2e-remote.env" | cut -c1-10)" = '-rw-------' ]
+  [ "$(grep -c 'e2e-m2-publisher' "$FIXHOME/.ssh/authorized_keys")" -eq 1 ]
+  grep -Fq "command=\"$FIXROOT/scripts/k3d-manager e2e_result_publish\"" "$FIXHOME/.ssh/authorized_keys"
+  cp "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$BATS_TEST_TMPDIR/conf.before"
+  cp "$FIXHOME/.ssh/authorized_keys" "$BATS_TEST_TMPDIR/keys.before"
+  run_machine --role hub --from old-hub.local --secrets skip --agents skip
+  grep -Eq '^e2e-publish-back-conf +ok$' <<< "$output"
+  grep -Eq '^e2e-publish-back-key +ok$' <<< "$output"
+  cmp "$BATS_TEST_TMPDIR/conf.before" "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  cmp "$BATS_TEST_TMPDIR/keys.before" "$FIXHOME/.ssh/authorized_keys"
+}
+
+@test "e2e publish-back: updates only its own lines and keeps unrelated authorized keys ordered" {
+  publisher_fixture
+  mkdir -p "$FIXHOME/.ssh" "$FIXHOME/.config/k3d-manager"
+  printf 'before\nE2E_M2_PUBLISH_BACK_HOST=cliang@m4-air.local\nafter\n' > "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  printf 'ssh-ed25519 AAAA unrelated-one\nfrom="192.0.2.1",no-pty ssh-ed25519 BBBB unrelated-two\nssh-rsa CCCC unrelated-three\nfrom="192.168.39.0/24",command="/old/k3d-manager e2e_result_publish" ssh-ed25519 DDDD e2e-m2-publisher@m2-air-old\n' > "$FIXHOME/.ssh/authorized_keys"
+  run_machine --role hub --from old-hub.local --secrets skip --agents skip
+  grep -Fxq before "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  grep -Fxq after "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  printf 'ssh-ed25519 AAAA unrelated-one\nfrom="192.0.2.1",no-pty ssh-ed25519 BBBB unrelated-two\nssh-rsa CCCC unrelated-three\n' > "$BATS_TEST_TMPDIR/unrelated.expected"
+  head -n 3 "$FIXHOME/.ssh/authorized_keys" > "$BATS_TEST_TMPDIR/unrelated.actual"
+  cmp "$BATS_TEST_TMPDIR/unrelated.expected" "$BATS_TEST_TMPDIR/unrelated.actual"
+  [ "$(grep -c 'e2e-m2-publisher' "$FIXHOME/.ssh/authorized_keys")" -eq 1 ]
+  grep -Fq "command=\"$FIXROOT/scripts/k3d-manager e2e_result_publish\"" "$FIXHOME/.ssh/authorized_keys"
+  [[ "$output" == *'updated (was cliang@m4-air.local)'* ]] || { printf '%s\n' "$output"; return 1; }
+}
+
+@test "e2e publish-back: check, dry-run, missing source, and other roles do not write publish files" {
+  publisher_fixture
+  rm -f "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$FIXHOME/.ssh/authorized_keys"
+  run_machine --role hub --check --from old-hub.local --secrets skip --agents skip
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  run_machine --role hub --dry-run --from old-hub.local --secrets skip --agents skip
+  [[ "$output" == *'would write'* ]]
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  : > "$CALL_LOG"
+  run_machine --role worker --from old-hub.local --secrets skip --agents skip
+  run ! grep -q '^ssh .*old-hub.local' "$CALL_LOG"
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  run_machine --role hub --secrets skip --agents skip
+  [[ "$output" == *'rerun with FROM=<old hub>'* ]]
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+}
+
+@test "e2e publish-back: malformed old-host key or subnet writes neither item" {
+  publisher_fixture
+  rm -f "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$FIXHOME/.ssh/authorized_keys"
+  local bad_line
+  for bad_line in \
+    'from="192.168.39.0/24",command="/old/k3d-manager e2e_result_publish" ssh-rsa AAAA e2e-m2-publisher@m2-air-old' \
+    'from="192.168.39.0/24;touch /tmp/nope",command="/old/k3d-manager e2e_result_publish" ssh-ed25519 AAAA e2e-m2-publisher@m2-air-old'; do
+    cat > "$STUBS/ssh" <<SH
+#!/bin/sh
+printf '%s\\n' '$bad_line'
+SH
+    chmod +x "$STUBS/ssh"
+    run_machine --role hub --from old-hub.local --secrets skip --agents skip
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'invalid old hub publisher entry'* ]]
+    [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+    [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  done
 }
 
 @test "machine setup: unprefixed brew packages accept either installation type" {

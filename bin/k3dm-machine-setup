@@ -54,6 +54,7 @@ fi
 case "$role" in hub|worker|console|control) ;; *) usage >&2; exit 2 ;; esac
 case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
 case "$agents_mode" in install|skip) ;; *) printf 'Invalid --agents value: %s (expected install or skip)\n' "$agents_mode" >&2; usage >&2; exit 2 ;; esac
+if [[ -n "$from_host" && ! "$from_host" =~ ^[A-Za-z0-9.-]+$ ]]; then printf 'Invalid --from host: %s\n' "$from_host" >&2; exit 2; fi
 manifest_dir="${REPO_ROOT}/scripts/etc/machine"
 sudoers_file="${K3DM_SUDOERS_FILE:-/etc/sudoers.d/k3d-manager}"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
@@ -455,6 +456,115 @@ copy_files() {
   done 3< "$list"
 }
 
+install_e2e_publish_back() {
+  [[ "$role" == hub ]] || return 0
+  local user host value conf="$HOME/.config/k3d-manager/e2e-remote.env" ssh_dir="$HOME/.ssh" auth="$HOME/.ssh/authorized_keys"
+  if ! user="$(id -un 2>/dev/null)" || ! host="$(scutil --get LocalHostName 2>/dev/null)"; then
+    record_failure e2e-publish-back 'missing (cannot determine local identity)'; return
+  fi
+  value="${user}@${host}.local"
+  if [[ ! "$value" =~ ^[A-Za-z0-9._@-]+$ ]]; then record_failure e2e-publish-back 'missing (invalid publish-back host)'; return; fi
+
+  local remote_line='' key_type='' key_blob='' comment='' from_value=''
+  if [[ -n "$from_host" ]]; then
+    remote_line="$(ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$from_host" 'grep e2e-m2-publisher "$HOME/.ssh/authorized_keys"' 2>/dev/null | head -n 1 || true)"
+    if [[ -z "$remote_line" ]]; then record_failure e2e-publish-back-key 'missing (old hub key unavailable)'; return; fi
+    if [[ "$remote_line" =~ (^|,)from=\"([0-9./,]+)\" ]]; then from_value="${BASH_REMATCH[2]}"; else record_failure e2e-publish-back-key 'invalid old hub publisher entry'; return; fi
+    if [[ "$remote_line" =~ (^|[[:space:]])(ssh-ed25519)[[:space:]]+([A-Za-z0-9+/]+=*)[[:space:]]+(e2e-m2-publisher@[A-Za-z0-9._-]+) ]]; then
+      key_type="${BASH_REMATCH[2]}"; key_blob="${BASH_REMATCH[3]}"; comment="${BASH_REMATCH[4]}"
+    else record_failure e2e-publish-back-key 'invalid old hub publisher entry'; return
+    fi
+  elif [[ -e "$auth" ]]; then
+    if [[ -r "$auth" ]] && grep -q 'e2e-m2-publisher' "$auth"; then
+      remote_line="$(grep -m1 'e2e-m2-publisher' "$auth")"
+    fi
+  fi
+  if [[ -n "$remote_line" && -z "$from_host" ]]; then
+    if [[ "$remote_line" =~ (^|[[:space:]])(ssh-ed25519)[[:space:]]+([A-Za-z0-9+/]+=*)[[:space:]]+(e2e-m2-publisher@[A-Za-z0-9._-]+) ]]; then
+      key_type="${BASH_REMATCH[2]}"; key_blob="${BASH_REMATCH[3]}"; comment="${BASH_REMATCH[4]}"
+      if [[ "$remote_line" =~ (^|,)from=\"([0-9./,]+)\" ]]; then from_value="${BASH_REMATCH[2]}"; else from_value=''; fi
+    else record_failure e2e-publish-back-key 'invalid local publisher entry'; return
+    fi
+  fi
+
+  local conf_status=missing
+  if [[ -f "$conf" ]]; then
+    if grep -Fqx "E2E_M2_PUBLISH_BACK_HOST=$value" "$conf"; then conf_status=ok
+    elif grep -q '^E2E_M2_PUBLISH_BACK_HOST=' "$conf"; then conf_status=wrong
+    else conf_status=missing; fi
+  fi
+  local auth_status=missing new_entry=''
+  if [[ -n "$key_blob" && -n "$from_value" ]]; then
+    new_entry="from=\"$from_value\",command=\"$REPO_ROOT/scripts/k3d-manager e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding $key_type $key_blob $comment"
+    if [[ -f "$auth" ]] && grep -Fqx "$new_entry" "$auth"; then auth_status=ok; else auth_status=wrong; fi
+  fi
+  if [[ "$auth_status" == missing && -z "$from_host" ]]; then
+    record_failure e2e-publish-back-key 'missing (rerun with FROM=<old hub> to copy the e2e publisher key)'
+    return
+  fi
+  if [[ "$mode" == check ]]; then
+    if [[ "$conf_status" == ok ]]; then report e2e-publish-back-conf ok; else record_failure e2e-publish-back-conf "$conf_status"; fi
+    if [[ "$auth_status" == ok ]]; then report e2e-publish-back-key ok; else record_failure e2e-publish-back-key "$auth_status"; fi
+    return
+  fi
+  if [[ "$mode" == dry-run ]]; then
+    if [[ "$conf_status" == ok ]]; then report e2e-publish-back-conf ok
+    elif [[ "$conf_status" == wrong ]]; then report e2e-publish-back-conf 'would update'
+    else report e2e-publish-back-conf 'would write'; fi
+    if [[ "$auth_status" == ok ]]; then report e2e-publish-back-key ok
+    elif [[ "$auth_status" == wrong ]]; then report e2e-publish-back-key 'would update'
+    else report e2e-publish-back-key 'would write'; fi
+    return
+  fi
+  if [[ "$conf_status" != ok ]]; then
+    local previous='' tmp
+    if [[ -f "$conf" ]]; then previous="$(sed -n 's/^E2E_M2_PUBLISH_BACK_HOST=//p' "$conf" | head -n1)"; fi
+    if ! mkdir -p "${conf%/*}" || ! chmod 700 "${conf%/*}"; then record_failure e2e-publish-back-conf missing; return; fi
+    tmp="$(mktemp "${conf%/*}/.e2e-remote.XXXXXX")" || { record_failure e2e-publish-back-conf missing; return; }
+    chmod 600 "$tmp"
+    if [[ -f "$conf" ]]; then
+      python3 - "$conf" "$tmp" "E2E_M2_PUBLISH_BACK_HOST=" "E2E_M2_PUBLISH_BACK_HOST=$value" <<'PYTHON'
+import os, sys
+source, target, prefix, replacement = sys.argv[1:]
+with open(source, 'rb') as stream: lines = stream.readlines()
+prefix = prefix.encode(); replacement = replacement.encode()
+found = False; output = []
+for line in lines:
+    if not found and line.startswith(prefix):
+        ending = b'\r\n' if line.endswith(b'\r\n') else b'\n' if line.endswith(b'\n') else b''
+        output.append(replacement + ending); found = True
+    else: output.append(line)
+if not found: output.append(replacement + (b'' if output and not output[-1].endswith(b'\n') else b'\n'))
+with open(target, 'wb') as stream: stream.write(b''.join(output))
+PYTHON
+    else printf 'E2E_M2_PUBLISH_BACK_HOST=%s\n' "$value" > "$tmp"; fi
+    if ! chmod 600 "$tmp" || ! mv "$tmp" "$conf"; then rm -f "$tmp"; record_failure e2e-publish-back-conf missing; return; fi
+    if [[ "$conf_status" == wrong ]]; then report e2e-publish-back-conf "updated (was $previous)"; else report e2e-publish-back-conf installed; fi
+  else report e2e-publish-back-conf ok; fi
+  if [[ "$auth_status" != ok ]]; then
+    if ! mkdir -p "$ssh_dir" || ! chmod 700 "$ssh_dir"; then record_failure e2e-publish-back-key missing; return; fi
+    local tmp_auth; tmp_auth="$(mktemp "$ssh_dir/.authorized_keys.XXXXXX")" || { record_failure e2e-publish-back-key missing; return; }
+    if [[ -f "$auth" ]]; then
+      python3 - "$auth" "$tmp_auth" "$new_entry" <<'PYTHON'
+import sys
+source, target, replacement = sys.argv[1:]
+with open(source, 'rb') as stream: lines = stream.readlines()
+replacement = replacement.encode(); marker = b'e2e-m2-publisher'
+found = False; output = []
+for line in lines:
+    if not found and marker in line:
+        ending = b'\r\n' if line.endswith(b'\r\n') else b'\n' if line.endswith(b'\n') else b''
+        output.append(replacement + ending); found = True
+    else: output.append(line)
+if not found: output.append(replacement + (b'' if output and not output[-1].endswith(b'\n') else b'\n'))
+with open(target, 'wb') as stream: stream.write(b''.join(output))
+PYTHON
+    else printf '%s\n' "$new_entry" > "$tmp_auth"; fi
+    if ! chmod 600 "$tmp_auth" || ! mv "$tmp_auth" "$auth"; then rm -f "$tmp_auth"; record_failure e2e-publish-back-key missing; return; fi
+    report e2e-publish-back-key installed
+  else report e2e-publish-back-key ok; fi
+}
+
 is_hub_agent() {
   case "$1" in install-token-rotator|install-cleanup|install-node-health-watch|install-sandbox-reaper|install-vault-port-forward|install-prometheus-port-forward|install-hub-pushgateway-port-forward|install-hub-loki-port-forward|install-alertmanager-port-forward|install-alertmanager-auth-proxy|install-cloud-bridge|bin/k3dm-webhook-setup|bin/k3dm-hermes-setup|bin/k3dm-heartbeat-setup) return 0 ;; *) return 1 ;; esac
 }
@@ -563,5 +673,6 @@ check_completion_dirs
 install_state_chain
 check_secrets
 copy_files
+install_e2e_publish_back
 run_agents
 exit "$failed"
