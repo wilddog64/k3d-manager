@@ -30,6 +30,63 @@ setup() {
   [[ "$output" != *'ok 1 '* && "$output" == *'SLOWEST scripts/tests/lib/'* ]]
 }
 
+@test "fast gate: managed venv python leads PATH and supplies suite modules" {
+  local scratch="$BATS_TEST_TMPDIR/scratch" caller_bin="$BATS_TEST_TMPDIR/caller-bin"
+  mkdir -p "$scratch/home" "$scratch/data/k3d-manager/venv/bin" "$caller_bin"
+  cat > "$caller_bin/python3" <<'PYTHON'
+#!/bin/sh
+echo caller-python >&2
+exit 1
+PYTHON
+  cat > "$scratch/data/k3d-manager/venv/bin/python3" <<'PYTHON'
+#!/bin/sh
+if [ "$1" = -c ] && [ "$2" = 'import yaml' ]; then exit 0; fi
+echo managed-python
+PYTHON
+  chmod +x "$caller_bin/python3" "$scratch/data/k3d-manager/venv/bin/python3"
+  cp "$scratch/data/k3d-manager/venv/bin/python3" "$scratch/python3.before"
+  cat > "$fixture/scripts/tests/lib/static.bats" <<'BATS'
+#!/usr/bin/env bats
+@test "fast gate uses managed python" {
+  [[ "$HOME" == "$EXPECTED_HOME" ]]
+  [[ "$XDG_DATA_HOME" == "$EXPECTED_DATA" ]]
+  [[ "$(command -v python3)" == "$XDG_DATA_HOME/k3d-manager/venv/bin/python3" ]]
+  python3 -c 'import yaml'
+}
+BATS
+  run bash -c 'cd "$1" && HOME="$2/home" XDG_DATA_HOME="$2/data" EXPECTED_HOME="$2/home" EXPECTED_DATA="$2/data" PATH="$3:$PATH" /bin/bash scripts/ci/fast_gate.sh "$4"' _ \
+    "$fixture" "$scratch" "$caller_bin" "$base"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS scripts/tests/lib/static.bats'* ]]
+  cmp "$scratch/python3.before" "$scratch/data/k3d-manager/venv/bin/python3"
+  [ ! -e "$scratch/data/k3d-manager/venv/pyvenv.cfg" ]
+}
+
+@test "fast gate: without managed venv leaves caller PATH unchanged and creates nothing" {
+  local scratch="$BATS_TEST_TMPDIR/scratch" caller_bin="$BATS_TEST_TMPDIR/caller-bin"
+  mkdir -p "$scratch/home" "$scratch/data" "$caller_bin"
+  cat > "$caller_bin/python3" <<'PYTHON'
+#!/bin/sh
+echo caller-python
+exit 0
+PYTHON
+  chmod +x "$caller_bin/python3"
+  cat > "$fixture/scripts/tests/lib/static.bats" <<'BATS'
+#!/usr/bin/env bats
+@test "fast gate preserves caller python" {
+  [[ "$HOME" == "$EXPECTED_HOME" ]]
+  [[ "$XDG_DATA_HOME" == "$EXPECTED_DATA" ]]
+  [[ "$(command -v python3)" == "$PATH_PREFIX/python3" ]]
+  [ ! -e "$XDG_DATA_HOME/k3d-manager/venv" ]
+}
+BATS
+  run bash -c 'cd "$1" && HOME="$2/home" XDG_DATA_HOME="$2/data" EXPECTED_HOME="$2/home" EXPECTED_DATA="$2/data" PATH_PREFIX="$3" PATH="$3:$PATH" /bin/bash scripts/ci/fast_gate.sh "$4"' _ \
+    "$fixture" "$scratch" "$caller_bin" "$base"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS scripts/tests/lib/static.bats'* ]]
+  [ ! -e "$scratch/data/k3d-manager/venv" ]
+}
+
 @test "fast gate: failing tests fail the gate" {
   printf '#!/usr/bin/env bats\n@test "failure" { false; }\n' > "$fixture/scripts/tests/lib/static.bats"
   git -C "$fixture" commit -qam change

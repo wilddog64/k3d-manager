@@ -98,6 +98,11 @@ tree=$(git rev-parse --show-toplevel)
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_PREFIX
 cd "$tree"
+managed_python_bin="${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv/bin"
+if [[ -x "$managed_python_bin/python3" ]]; then
+  PATH="$managed_python_bin:$PATH"
+  export PATH
+fi
 start=$SECONDS
 failed=0
 work=$(mktemp -d)
