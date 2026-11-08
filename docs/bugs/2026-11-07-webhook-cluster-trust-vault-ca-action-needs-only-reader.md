@@ -1,8 +1,9 @@
 # Bug: `POST /api/v1/cluster {"action": "trust-vault-ca"}` is authorized for a reader token
 
-**Status:** OPEN — confirmed offline 2026-11-07; dispatched to Luna 2026-11-07
+**Status:** LANDED `d4dbe1ac` 2026-11-07 (Luna; Claude review tightened the flag check to `bool()`, matching `do_POST`). Offline: 31/31 pass; 4 fail on pre-fix code, N1 included
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
+**Fix commit:** `d4dbe1ac`
 **Introduced by:** `ecae8a73` (v1.43.14)
 **Should have been caught by:** review
 **Severity:** medium — a token with the lowest role can start an admin-classed job on the hub (`bin/cluster-up --trust-vault-ca`, which can raise a SecurityAgent dialog on the hub's screen and pushes a deployment metric); no secret is exposed, because the Vault CA certificate is public
