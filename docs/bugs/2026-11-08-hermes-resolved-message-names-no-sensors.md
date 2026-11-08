@@ -2,11 +2,12 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08
+**Waiting on:** dispatch — since 2026-11-08
 **Introduced by:** `cd38a7e5` (v1.29.0, Hermes phase 1)
 **Should have been caught by:** spec
 **Severity:** low — misleading Slack message; workaround: read the earlier incident message and `bin/k3dm-hermes` status
 **Approval:** operator, 2026-11-08 ("go ahead to file P3 and dispatch task when time is right")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 10:12 PST (screenshot: "Hermes correlated incident resolved." — "what
 incident was resolved? not very clear")
@@ -108,7 +109,7 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
-- Needs `**Intent approved:**` before dispatch.
+- Intents approved by the operator on 2026-11-08 ("P3 approved"), after the spec review.
 - Spec review (Sonnet, 2026-11-08, first-pass trial step 3): no blockers; 4 should-fix and 3 nits, all applied: N1
   rewritten so it is red on pre-fix code, window above 1 and current-record keying, empty incident header, de-dup and
   ordering rules, literal example, test command and helper, E1 cases widened.
