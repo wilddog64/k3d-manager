@@ -1,13 +1,14 @@
 # Bug: Plans panel repeats the dispatch go in Blocked by (in green) and shows landed plans' approval as a blank
 
-**Status:** OPEN — spec filed; waiting for intent approval
+**Status:** OPEN — dispatched 2026-11-08: Luna implements, Gemini 3.8 Flash verifies from the Acceptance block
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08 (intent approval)
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** `d95afbfe` (v1.43.15, the fix for `docs/bugs/2026-11-08-plans-panel-hides-plans-waiting-on-operator-dispatch-go.md`)
 **Should have been caught by:** live check
 **Severity:** low — display only; the operator asked whether three landed plans still need an approval, and could not
 tell the two columns' purposes apart
 **Approval:** operator, 2026-11-08 ("go ahead"; "should value be approved instead of -?")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, M5 hub Grafana Plans panel screenshot after the Grafana restart
 **Affected:** `bin/k3dm-vectordb-metrics` (`_plan_metrics` blockers), Plans panel in
