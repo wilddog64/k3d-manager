@@ -32,7 +32,12 @@ remote_sha() {
 }
 
 resolve_on_origin() {
-  local ref="$1" sha branches
+  local ref="$1" sha branches local_sha origin_sha
+  if git_cmd show-ref --verify --quiet "refs/heads/$ref" && git_cmd show-ref --verify --quiet "refs/remotes/$REMOTE/$ref"; then
+    local_sha="$(git_cmd rev-parse --verify "refs/heads/$ref^{commit}")" || die "cannot resolve local branch '$ref'"
+    origin_sha="$(git_cmd rev-parse --verify "refs/remotes/$REMOTE/$ref^{commit}")" || die "cannot resolve origin branch '$ref'"
+    [[ "$local_sha" == "$origin_sha" ]] || die "branch '$ref' differs: local $local_sha; origin/$ref $origin_sha"
+  fi
   sha="$(git_cmd rev-parse --verify "${ref}^{commit}" 2>/dev/null)" || die "cannot resolve REF '$ref' to a commit"
   branches="$(git_cmd branch -r --contains "$sha" --format='%(refname:short)' | sed '/^origin\/HEAD -> /d')"
   [[ "$branches" == *"origin/"* ]] || die "commit $sha is not reachable from an origin branch"
@@ -67,7 +72,7 @@ show_and_confirm() {
 }
 
 record_move() {
-  local old="$1" new="$2" action="$3" ref="${4:-}" break_glass="${5:-0}" stamp tag message existing
+  local old="$1" new="$2" action="$3" ref="${4:-}" break_glass="${5:-0}" stamp tag message existing push_output push_log
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   tag="$TAG_PREFIX$stamp"
   existing="$(git_cmd ls-remote --tags "$REMOTE" "refs/tags/$tag")"
@@ -79,7 +84,16 @@ record_move() {
   if [[ "$action" == rollback ]]; then message+=$'\nrollback: yes'; fi
   local lease="refs/heads/$BRANCH:$old"
   [[ ! "$old" =~ ^0+$ ]] || lease="refs/heads/$BRANCH:"
-  git_cmd push "$REMOTE" "--force-with-lease=$lease" "$new:refs/heads/$BRANCH" || die 'deploy/hub changed after it was read; lease rejected the push'
+  push_log="$(mktemp)"
+  if ! git_cmd push "$REMOTE" "--force-with-lease=$lease" "$new:refs/heads/$BRANCH" 2>&1 | tee "$push_log" >&2; then
+    push_output="$(<"$push_log")"
+    rm -f "$push_log"
+    if [[ "$push_output" == *"stale info"* ]]; then
+      die 'deploy/hub changed after it was read; lease rejected the push'
+    fi
+    die "push to deploy/hub failed; see git's output above (a pre-push hook, the network or permissions)"
+  fi
+  rm -f "$push_log"
   git_cmd tag -a "$tag" "$new" -m "$message" || die "could not create annotated tag $tag"
   git_cmd push "$REMOTE" "refs/tags/$tag" || die "deploy/hub moved, but tag push failed ($tag)"
   printf '[hub-promote] moved deploy/hub to %s and recorded %s\n' "$new" "$tag"
@@ -112,7 +126,11 @@ rollback() {
     sha="$(sed -n 's/^new: //p' <<< "$tag_data" | head -1)"
     [[ "$sha" =~ ^[0-9a-f]{40,64}$ ]] || die "promotion tag $tag has no valid new SHA"
     case "$action" in
-      promote) stack+=("$sha") ;;
+      promote)
+        if (( ${#stack[@]} == 0 )) || [[ "${stack[${#stack[@]}-1]}" != "$sha" ]]; then
+          stack+=("$sha")
+        fi
+        ;;
       rollback)
         (( ${#stack[@]} >= 2 )) || die "rollback tag $tag has no earlier promotion to pop"
         top="${stack[${#stack[@]}-2]}"
@@ -141,6 +159,10 @@ main() {
       git_cmd fetch "$REMOTE" --prune
       new="$(resolve_on_origin "$ref")"
       old="$(remote_sha 1)"
+      if [[ "$new" == "$old" ]]; then
+        printf '[hub-promote] deploy/hub is already at %s; nothing to promote\n' "$new"
+        exit 0
+      fi
       if [[ "$break_glass" != 1 ]]; then check_runs "$new"; fi
       show_and_confirm "$old" "$new" promote "$ref"
       record_move "$old" "$new" promote "$ref" "$break_glass"

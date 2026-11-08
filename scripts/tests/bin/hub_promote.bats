@@ -23,6 +23,9 @@ setup() {
   git clone -q "$ORIGIN" "$WORK"
   WORK="$(cd "$WORK" && pwd -P)"
   ORIGIN="$(cd "$ORIGIN" && pwd -P)"
+  origin_url="$(git -C "$WORK" remote get-url origin)"
+  origin_url="$(cd "$origin_url" && pwd -P)"
+  [ "$origin_url" = "$ORIGIN" ]
   git -C "$WORK" config user.name 'Hub promote tests'
   git -C "$WORK" config user.email 'hub-promote-tests@example.invalid'
   mkdir -p "$WORK/bin" "$WORK/scripts" "$WORK/scripts/etc/argocd/platform-ops"
@@ -53,7 +56,7 @@ EOF
 # Git operations are constrained to the named scratch clone or its bare origin.
 allowed=0
 for arg in "$@"; do
-  [[ "$arg" == "$SCRATCH_REPO" || "$arg" == "--git-dir=$TEST_ORIGIN" ]] && allowed=1
+  [[ "$arg" == "$SCRATCH_REPO" || "$arg" == "$TEST_ORIGIN" || "$arg" == "--git-dir=$TEST_ORIGIN" ]] && allowed=1
 done
 [[ "$allowed" == 1 ]] || { echo "git stub refused a non-fixture target: $*" >&2; exit 97; }
 exec "$REAL_GIT_PATH" "$@"
@@ -178,6 +181,14 @@ _prepare_promotion_history() {
   git -C "$WORK" push -q origin "$D_SHA:refs/heads/k3d-manager-v1.43.15"
 }
 
+_make_candidate() {
+  git -C "$WORK" checkout -q k3d-manager-v1.43.15
+  printf 'candidate\n' > "$WORK/candidate.txt"
+  git -C "$WORK" add candidate.txt
+  git -C "$WORK" commit -qm candidate
+  git -C "$WORK" push -q origin HEAD:refs/heads/k3d-manager-v1.43.15
+}
+
 _promote_sha() {
   _run_promoter_tty promote success promote "$1" 0
   [ "$status" -eq 0 ]
@@ -233,8 +244,9 @@ rollback: yes"
 }
 
 @test "N2: promote refuses missing checks without changing refs or tags" {
+  _make_candidate
   [ -n "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub)" ]
-  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" "$WORK/bin/k3dm-hub-promote" promote HEAD
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" "$WORK/bin/k3dm-hub-promote" promote k3d-manager-v1.43.15
   [ "$status" -ne 0 ]
   [[ "$output" == *"check runs"* || "$output" == *"checks"* ]]
   [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$(git -C "$WORK" rev-parse deploy/hub)" ]
@@ -254,9 +266,10 @@ rollback: yes"
 }
 
 @test "N2: pending and failed check runs refuse without moving deploy/hub" {
+  _make_candidate
   old="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
   for mode in pending failed; do
-    run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE="$mode" "$WORK/bin/k3dm-hub-promote" promote HEAD
+    run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE="$mode" "$WORK/bin/k3dm-hub-promote" promote k3d-manager-v1.43.15
     [ "$status" -ne 0 ]
     [[ "$output" == *"pending or failed"* ]]
     [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$old" ]
@@ -265,8 +278,9 @@ rollback: yes"
 }
 
 @test "N2: a failure on the second check-runs page refuses promotion" {
+  _make_candidate
   old="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
-  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=page31 "$WORK/bin/k3dm-hub-promote" promote HEAD
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=page31 "$WORK/bin/k3dm-hub-promote" promote k3d-manager-v1.43.15
   [ "$status" -ne 0 ]
   [[ "$output" == *"pending or failed"* ]]
   [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$old" ]
@@ -286,11 +300,12 @@ rollback: yes"
 }
 
 @test "N2: non-TTY and wrong confirmation refuse without changing refs or tags" {
+  _make_candidate
   old="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
-  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=success "$WORK/bin/k3dm-hub-promote" promote HEAD
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=success "$WORK/bin/k3dm-hub-promote" promote k3d-manager-v1.43.15
   [ "$status" -ne 0 ]
   [[ "$output" == *"requires a TTY"* ]]
-  _run_promoter_tty nope success promote HEAD 0
+  _run_promoter_tty nope success promote k3d-manager-v1.43.15 0
   [ "$status" -ne 0 ]
   [[ "$output" == *"did not match promote"* ]]
   [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$old" ]
@@ -321,8 +336,65 @@ rollback: yes"
   [ -n "$tag_name" ]
 }
 
+@test "M1: promoting current deploy/hub is a no-op" {
+  old="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" "$WORK/bin/k3dm-hub-promote" promote "$old" 1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already at $old"* ]]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$old" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
+@test "M2: rollback skips duplicate consecutive promotions and returns to prior distinct commit" {
+  _prepare_promotion_history
+  initial="$(git -C "$WORK" rev-parse "$A_SHA^" )"
+  for spec in "20261107T210011Z $initial $A_SHA" "20261107T210012Z $A_SHA $B_SHA" "20261107T210013Z $B_SHA $B_SHA"; do
+    read -r stamp prior promoted <<< "$spec"
+    git -C "$WORK" tag -a "hub-promote/$stamp" "$promoted" -m "action: promote
+old: $prior
+new: $promoted
+REF: $promoted"
+  done
+  git -C "$WORK" push -q origin refs/tags/hub-promote/20261107T210011Z refs/tags/hub-promote/20261107T210012Z refs/tags/hub-promote/20261107T210013Z
+  git --git-dir="$ORIGIN" update-ref refs/heads/deploy/hub "$B_SHA"
+  printf '13\n' > "$DATE_COUNTER"
+  [ "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {n++} END {print n+0}')" -eq 3 ]
+  _rollback_to "$A_SHA"
+}
+
+@test "M3: non-lease push failure reports git reason without lease rejection" {
+  git -C "$WORK" checkout -q k3d-manager-v1.43.15
+  printf 'hook failure control\n' > "$WORK/hook-failure.txt"
+  git -C "$WORK" add hook-failure.txt
+  git -C "$WORK" commit -qm hook-failure
+  git -C "$WORK" push -q origin HEAD:refs/heads/k3d-manager-v1.43.15
+  mkdir -p "$WORK/.git/hooks"
+  printf '#!/bin/sh\necho pre-push-blocked >&2\nexit 1\n' > "$WORK/.git/hooks/pre-push"
+  chmod +x "$WORK/.git/hooks/pre-push"
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"pre-push"* || "$output" == *"hook"* ]]
+  [[ "$output" == *"pre-push-blocked"* ]]
+  [[ "$output" != *"lease rejected"* ]]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
+@test "M4: divergent local and origin branch is rejected with both SHAs" {
+  _prepare_promotion_history
+  git -C "$WORK" checkout -q k3d-manager-v1.43.15
+  git -C "$WORK" reset --hard -q "$A_SHA"
+  old="$(git -C "$ORIGIN" rev-parse refs/heads/k3d-manager-v1.43.15)"
+  local_sha="$(git -C "$WORK" rev-parse HEAD)"
+  [ "$old" != "$local_sha" ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" "$WORK/bin/k3dm-hub-promote" promote k3d-manager-v1.43.15 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"$local_sha"* && "$output" == *"$old"* ]]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
 @test "H4: break glass skips only checks and still needs confirmation and records mode" {
-  _run_promoter_tty promote empty promote HEAD 1
+  _make_candidate
+  _run_promoter_tty promote empty promote k3d-manager-v1.43.15 1
   [ "$status" -eq 0 ]
   [[ "$output" == *"moved deploy/hub"* ]]
   tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}')"
@@ -397,6 +469,7 @@ rollback: yes"
 }
 
 @test "Makefile hub-promote passes REF and break-glass to the command" {
+  _make_candidate
   run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=empty make -C "$WORK" --no-print-directory hub-promote REF=HEAD BREAK_GLASS=1
   [ "$status" -ne 0 ]
   [[ "$output" == *"action: promote"* ]]
