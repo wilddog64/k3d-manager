@@ -19,6 +19,36 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 
 On a `control` Mac, run git, tests (`make test`, bats and pytest), shellcheck, documentation work, bug filing, `make find-similar-docs`, Codex dispatch and cloud requests locally. Run cluster and hub work such as `make up`, `make platform-ops`, `make appsets-reapply` and kubectl commands over SSH on the hub. Hub work requires a network path to the hub; `m5-air.local` resolves only on the home LAN, and this setup does not provide a remote path.
 
+## Linux control node
+
+Linux supports only `ROLE=control`, on Ubuntu 24.04 (`x86_64` or `aarch64`). Create a dedicated `k3dm-control` account without sudo membership. As the administrator account, run the Debian `provision-homebrew` role with `provision_homebrew_scope: prereqs`; it installs `build-essential procps curl file git zsh` and creates `/home/linuxbrew/.linuxbrew` owned by `k3dm-control`, mode 0755. Setup itself never runs sudo. If prerequisites or the writable prefix are missing, it prints the exact administrator commands and exits before changing the account.
+
+Run setup as `k3dm-control`:
+
+```sh
+make machine-setup ROLE=control
+make test
+```
+
+The Linux installer pin is in `scripts/etc/machine/homebrew-install.linux.pin`. To move it, choose a reviewed Homebrew/install commit, fetch that commit's `install.sh`, calculate its SHA-256 with `sha256sum`, then update both `commit=` and `sha256=`. Linux setup verifies the digest before running the installer. Add this line to the dedicated user's shell startup file if interactive shells should find Homebrew (setup does not edit startup files):
+
+```sh
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+```
+
+The M4 VM test uses Vagrant and VirtualBox from `scripts/etc/machine/vagrant/control-linux`. Keep the `provision-homebrew` checkout on its `k3dm-control-prereqs` branch beside this repository, then run:
+
+```sh
+cd scripts/etc/machine/vagrant/control-linux
+vagrant up
+vagrant ssh -c 'sudo -iu k3dm-control bash -lc "cd /vagrant/k3d-manager && make machine-setup ROLE=control && make test"'
+vagrant destroy -f
+```
+
+The VM uses arm64 Ubuntu 24.04; the Hostinger run separately covers x86_64. The role's `prereqs` scope is idempotent and does not install Homebrew or edit sudoers or system profiles.
+
+Linux skips the macOS Homebrew package and notarization check, Keychain and `secrets.*.list`, LaunchAgents and `agents.*.list`, `FROM=` file copy, operator SSH include, shell links and agent-settings repositories, and smartcd. These skips keep credentials and SSH keys off the internet-facing control node. `make test` labels its OS-only skips `macOS-only`; the current skipped BATS cases are `machine secrets: real throwaway keychain round trip is macOS only` and `M6: stream unlock round trip uses throwaway keychains on macOS`.
+
 ## M5 hub cut-over
 
 For the staged one-command build and safe agent cut-over, follow the [M5 hub migration guide](m5-hub-migration.md).

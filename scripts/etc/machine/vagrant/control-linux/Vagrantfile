@@ -1,0 +1,21 @@
+Vagrant.configure("2") do |config|
+  repo_root = File.expand_path("../../../../..", __dir__)
+  role_dir = File.expand_path("../../../../../../provision-homebrew/provision-homebrew", __dir__)
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.synced_folder repo_root, "/vagrant/k3d-manager"
+  config.vm.synced_folder role_dir, "/vagrant/provision-homebrew"
+  config.vm.box = "bento/ubuntu-24.04"
+  config.vm.box_version = "202502.21.0"
+  config.vm.provider "virtualbox" do |vb|
+    vb.cpus = 4
+    vb.memory = 8192
+  end
+  config.vm.provision "ansible_local" do |ansible|
+    ansible.install = true
+    ansible.install_mode = "pip"
+    ansible.provisioning_path = "/vagrant/provision-homebrew"
+    ansible.playbook = "tests/playbook-prereqs.yml"
+    ansible.inventory_path = "tests/inventory"
+    ansible.extra_vars = { "homebrew_user" => "k3dm-control", "provision_homebrew_scope" => "prereqs" }
+  end
+end

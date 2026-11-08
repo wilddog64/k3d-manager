@@ -8,6 +8,8 @@
 
 ### Added
 
+- Add an Ubuntu Linux control-node setup path with pinned Homebrew installer verification and no secret or sudo setup.
+
 - Add the `deploy/hub` promotion and rollback flow, status reporting, and platform-ops deployment from the promoted tree.
 - Attribute Codex spend into mutually exclusive categories (`dispatch`, `dispatch_unrecorded`, `interactive`, `exec_untracked`, `other`), assign guardian review tokens and cost to parent sessions, export unpriced model tokens (`k3dm_codex_unpriced_tokens`), and replace Ledger coverage with Dispatch coverage (by cost), Codex spend by category, Ledger gaps, and Spend outside dispatch on the Agent Cost dashboard.
 

@@ -23,6 +23,111 @@ manifest_disjoint() {
   done
 }
 
+@test "Linux rejects macOS roles and root before setup side effects" {
+  setup_machine_fixture
+  printf '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n' > "$STUBS/uname"
+  printf '#!/bin/sh\n[ "$1" = -u ] && echo "${FIXTURE_UID:-1001}" || echo k3dm-control\n' > "$STUBS/id"
+  printf '#!/bin/sh\necho called >> "$CALL_LOG.sudo"\nexit 99\n' > "$STUBS/sudo"
+  chmod +x "$STUBS/uname" "$STUBS/id" "$STUBS/sudo"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  run env HOME="$FIXHOME" FIXTURE_UID=1001 CALL_LOG="$CALL_LOG" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role hub
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'role hub is macOS-only; use --role control on Linux'* ]]
+  run env HOME="$FIXHOME" FIXTURE_UID=0 CALL_LOG="$CALL_LOG" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'must not run as root'* ]]
+  [ ! -e "$CALL_LOG.sudo" ]
+  [ ! -e "$FIXHOME/.config/k3d-manager/machine-role" ]
+}
+
+@test "Linux reports root prerequisite commands without setup mutations" {
+  setup_machine_fixture
+  : > "$FIXROOT/scripts/etc/machine/brew.control.list"
+  : > "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  : > "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/brew.control.linux-skip.list"
+  : > "$FIXROOT/scripts/etc/machine/repos.list"
+  printf '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n' > "$STUBS/uname"
+  printf '#!/bin/sh\n[ "$1" = -u ] && echo 1001 || echo k3dm-control\n' > "$STUBS/id"
+  chmod +x "$STUBS/uname" "$STUBS/id"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  FIX_PREFIX="$BATS_TEST_TMPDIR/missing-linuxbrew"
+  "$REAL_PYTHON3" - "$FIXROOT/bin/k3dm-machine-setup" "$FIX_PREFIX" <<'PY'
+import sys
+source, prefix = sys.argv[1:]
+text = open(source, encoding="utf-8").read()
+text = text.replace("local prefix=/home/linuxbrew/.linuxbrew", f"local prefix={prefix}")
+open(source, "w", encoding="utf-8").write(text)
+PY
+  run env HOME="$FIXHOME" CALL_LOG="$CALL_LOG" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'sudo apt-get update'* ]]
+  [[ "$output" == *'sudo apt-get install -y build-essential procps curl file git'* ]]
+  [[ "$output" == *'/home/linuxbrew/.linuxbrew'* ]]
+  [ ! -e "$FIX_PREFIX" ]
+  [ ! -e "$FIXHOME/.config/k3d-manager/machine-role" ]
+}
+
+@test "Linux runs only the checksum-pinned installer and records its environment" {
+  setup_linux_brew_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  [[ "$FIX_PREFIX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  : > "$CALL_LOG.installer"
+  : > "$CALL_LOG.curl"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  [ "$(cat "$CALL_LOG.installer")" = '1|1' ]
+  [ ! -e "$CALL_LOG.sudo" ]
+  grep -Fq 'https://raw.githubusercontent.com/Homebrew/install/7986efac25016e41eed7e471666140c06f9d97cf/install.sh' "$CALL_LOG.curl"
+  [ -d "$FIXHOME/src/gitrepo/personal/k3d-manager/.git" ]
+  [ -d "$FIXHOME/src/gitrepo/personal/lib-foundation/.git" ]
+  grep -Fq 'https://github.com/wilddog64/k3d-manager.git' "$CALL_LOG.git"
+  if grep -Fq 'worker-only' "$CALL_LOG.git"; then return 1; fi
+  for item in 'macOS Homebrew package' 'Keychain and secrets' 'LaunchAgents' 'FROM= file copy' 'operator include' 'shell links and agent-settings repos' 'smartcd'; do
+    printf '%s\n' "$output" | grep -Eq "^${item}[[:space:]]+skipped \(linux\)$"
+  done
+  while IFS= read -r item; do
+    item="${item%%#*}"; item="${item//[$'\t\r ']/}"; [[ -n "$item" ]] || continue
+    case "$item" in
+      cask:*) [[ "$output" == *"cask:${item#cask:}"*'skipped (linux)'* ]] ;;
+      formula:*) grep -Fq "brew install ${item#formula:}" "$CALL_LOG.brew" ;;
+      *) grep -Fq "brew install $item" "$CALL_LOG.brew" ;;
+    esac
+  done < "$MACHINE_DIR/brew.control.list"
+
+  rm -rf "$FIX_PREFIX/bin"
+  cp "$CALL_LOG.installer" "$CALL_LOG.installer.before"
+  printf 'commit=7986efac25016e41eed7e471666140c06f9d97cf\nsha256=0000000000000000000000000000000000000000000000000000000000000000\n' > "$FIXROOT/scripts/etc/machine/homebrew-install.linux.pin"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'installer checksum mismatch'* ]]
+  grep -Fq 'https://raw.githubusercontent.com/Homebrew/install/7986efac25016e41eed7e471666140c06f9d97cf/install.sh' "$CALL_LOG.curl"
+  [ ! -d "$FIX_PREFIX/bin" ]
+  [ "$(cat "$FIX_PREFIX/operator-marker")" = 'pre-existing prefix marker' ]
+  [ "$(cat "$CALL_LOG.installer")" = "$(cat "$CALL_LOG.installer.before")" ]
+
+  rm -rf "$FIX_PREFIX/bin"
+  printf 'CURL_RC=22\n' > "$CALL_LOG.curl-fail"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" CURL_RC=22 PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [ ! -d "$FIX_PREFIX/bin" ]
+  [ "$(cat "$FIX_PREFIX/operator-marker")" = 'pre-existing prefix marker' ]
+  [ "$(cat "$CALL_LOG.installer")" = "$(cat "$CALL_LOG.installer.before")" ]
+}
+
+@test "Linux check and dry-run do not download a missing Homebrew installer" {
+  setup_linux_brew_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  [[ "$FIX_PREFIX" == "$BATS_TEST_TMPDIR/"* ]]
+  for mode in --check --dry-run; do
+    run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control "$mode"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'homebrew                         missing'* ]]
+    [ ! -e "$FIX_PREFIX/bin/brew" ]
+    [ ! -s "$CALL_LOG.curl" ]
+  done
+}
+
 @test "control role manifests stay limited to development tools and smartcd" {
   [ -r "$MACHINE_DIR/brew.control.list" ]
   [ -r "$MACHINE_DIR/secrets.control.list" ]
@@ -155,7 +260,7 @@ printf 'secrets %s\n' "$*" >> "$CALL_LOG"
 exit "${SECRETS_STUB_RC:-0}"
 SH
   chmod +x "$FIXROOT/bin/k3dm-machine-secrets"
-  printf '%s\n' '_run_command() { return 1; }' > "$FIXROOT/scripts/lib/system.sh"
+  printf '%s\n' '_run_command() { [[ "${LINUX_SETUP_FIXTURE:-0}" == 1 ]] || return 1; while [[ "$#" -gt 0 ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }' > "$FIXROOT/scripts/lib/system.sh"
   : > "$FIXROOT/scripts/lib/core.sh"
   for role in hub worker console; do
     : > "$FIXROOT/scripts/etc/machine/brew.$role.list"
@@ -288,6 +393,75 @@ SH
 
 run_machine() {
   run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" REAL_PYTHON3="$REAL_PYTHON3" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@" </dev/null
+}
+
+setup_linux_brew_fixture() {
+  setup_machine_fixture
+  FIX_PREFIX="$BATS_TEST_TMPDIR/linuxbrew"
+  mkdir -p "$FIX_PREFIX" "$FIXROOT/scripts/etc/machine"
+  printf 'pre-existing prefix marker\n' > "$FIX_PREFIX/operator-marker"
+  cp "$MACHINE_DIR/brew.control.list" "$FIXROOT/scripts/etc/machine/brew.control.list"
+  cp "$MACHINE_DIR/secrets.control.list" "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  cp "$MACHINE_DIR/agents.control.list" "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/brew.control.linux-skip.list"
+  printf '%s\n' \
+    'gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|control' \
+    'gitrepo/personal/lib-foundation|https://github.com/wilddog64/lib-foundation.git|main|control' \
+    'fixture/worker-only|https://github.com/example/worker-only.git|main|worker' > "$FIXROOT/scripts/etc/machine/repos.list"
+  printf '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n' > "$STUBS/uname"
+  printf '#!/bin/sh\n[ "$1" = -u ] && echo 1001 || echo k3dm-control\n' > "$STUBS/id"
+  printf '#!/bin/sh\necho called >> "$CALL_LOG.sudo"\nexit 99\n' > "$STUBS/sudo"
+  cat > "$STUBS/curl" <<'SH'
+#!/bin/sh
+printf 'curl %s\n' "$*" >> "$CALL_LOG.curl"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -o ]; then destination="$2"; shift 2; else shift; fi
+done
+[ "${CURL_RC:-0}" = 0 ] || exit "$CURL_RC"
+cp "$FAKE_INSTALLER" "$destination"
+SH
+  cat > "$STUBS/fake-brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG.brew"
+case "$1" in shellenv) exit 0 ;; list) exit 1 ;; install) exit 0 ;; esac
+exit 0
+SH
+  cat > "$STUBS/git" <<'SH'
+#!/bin/sh
+printf 'git %s\n' "$*" >> "$CALL_LOG.git"
+if [ "$1" = clone ]; then
+  target=''
+  for arg do target="$arg"; done
+  mkdir -p "$target/.git"
+  exit 0
+fi
+exit 0
+SH
+  cat > "$STUBS/fake-installer" <<'SH'
+#!/bin/bash
+printf '%s|%s\n' "$NONINTERACTIVE" "$HOMEBREW_NO_SUDO" > "$INSTALL_LOG"
+mkdir -p "$FIX_PREFIX/bin"
+cp "$FAKE_BREW" "$FIX_PREFIX/bin/brew"
+chmod +x "$FIX_PREFIX/bin/brew"
+SH
+  cat > "$STUBS/python3" <<'SH'
+#!/bin/sh
+[ "$1" = -m ] && [ "$2" = venv ] || exit 1
+mkdir -p "$3/bin"
+printf '#!/bin/sh\nexit 0\n' > "$3/bin/python"
+chmod +x "$3/bin/python"
+SH
+  chmod +x "$STUBS/uname" "$STUBS/id" "$STUBS/sudo" "$STUBS/curl" "$STUBS/fake-brew" "$STUBS/git" "$STUBS/fake-installer" "$STUBS/python3"
+  REAL_PYTHON3="$(command -v python3)"
+  "$REAL_PYTHON3" - "$FIXROOT/bin/k3dm-machine-setup" "$FIX_PREFIX" <<'PY'
+import sys
+source, prefix = sys.argv[1:]
+text = open(source, encoding="utf-8").read()
+text = text.replace("/home/linuxbrew/.linuxbrew", prefix)
+open(source, "w", encoding="utf-8").write(text)
+PY
+  sha="$(shasum -a 256 "$STUBS/fake-installer" | awk '{print $1}')"
+  printf 'commit=7986efac25016e41eed7e471666140c06f9d97cf\nsha256=%s\n' "$sha" > "$FIXROOT/scripts/etc/machine/homebrew-install.linux.pin"
 }
 
 @test "N1: agents option rejects unsupported values" {

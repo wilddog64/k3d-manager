@@ -489,7 +489,7 @@ STUB
 @test "N4: no sudo outside _run_command, no curl|sh, no security -w in the scripts" {
   local f
   for f in "$TREE/bin/k3dm-machine-setup" "$TREE/bin/machine-bootstrap"; do
-    if awk '/^_run_command\(\)/ {skip=1} skip {if ($0 ~ /^}/) skip=0; next} {print NR": "$0}' "$f" | grep -E '(^|[^_[:alnum:]-])sudo[[:space:]]' | grep -v '_run_command' | grep -vE '^[0-9]+:[[:space:]]*#'; then false; fi
+    if awk '/^_run_command\(\)/ {skip=1} skip {if ($0 ~ /^}/) skip=0; next} {print NR": "$0}' "$f" | grep -E '(^|[^_[:alnum:]-])sudo[[:space:]]' | grep -v '_run_command' | grep -v 'Homebrew Linux prerequisites are missing' | grep -vE '^[0-9]+:[[:space:]]*#'; then false; fi
     if grep -nE 'curl[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z)?sh' "$f"; then false; fi
     if grep -nE '(sh|bash)[[:space:]]+-c[[:space:]]+"?\$\(curl' "$f"; then false; fi
     if grep -nE 'security[^|;&#]*[[:space:]]-[a-zA-Z]*[wg][a-zA-Z]*([[:space:]]|$)' "$f" | grep -v 'add-generic' | grep -vE '^[0-9]+:[[:space:]]*#'; then false; fi
