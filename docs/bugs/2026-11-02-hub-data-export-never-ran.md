@@ -1,8 +1,9 @@
 # Bug: HubDataExportNeverRan on hub
 
-**Status:** OPEN — fix implemented 2026-11-07 (Flash run exited; 4 files changed in its worktree, uncommitted); Claude verification and land next. Gap explained: the M5 hub build never ran `hub_data_export_setup`. A restore is untested.
+**Status:** LANDED — `648b3f51` (Flash) plus N3 test correction `c71de2a1` (Claude), 2026-11-07. Gap explained: the M5 hub build never ran `hub_data_export_setup`. A restore is untested.
+**Fix commit:** `648b3f51`, `c71de2a1`
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Approval:** operator 2026-11-07: "fix to for spec and dispatch to Flash 3.8"
 **Assigned:** Gemini Flash 3.8 (`AGENT=agy MODEL=gemini-3.8-flash-medium`)
 **Filed:** 2026-11-02
