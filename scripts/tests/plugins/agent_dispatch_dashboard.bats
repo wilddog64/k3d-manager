@@ -308,7 +308,7 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
       if field=="fieldConfig" and panel["id"] in (29,31):
         new=json.loads(json.dumps(new)); new["defaults"].pop("noValue",None)
       if field=="options" and panel["id"]==32:
-        new={k:v for k,v in new.items() if k!="text"}
+        new={k:v for k,v in new.items() if k not in ("text","showValue","tooltip","xTickLabelRotation","xTickLabelSpacing")}
       if field=="fieldConfig" and panel["id"] in (56,71) and new["defaults"].get("unit")=="short":
         new=json.loads(json.dumps(new)); new["defaults"]["unit"]=old_field["defaults"]["unit"]
       assert new==old_field,(panel["id"],field)
