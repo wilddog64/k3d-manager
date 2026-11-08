@@ -8,6 +8,7 @@ covered the same checks)
 **Should have been caught by:** live check
 **Severity:** low — confusing duplicate command; workaround: `/cluster-status hostinger`
 **Approval:** operator, 2026-11-08 ("go ahead to do that, and I will remove hostinger-status")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 (screenshots: `/hostinger-status` → "failed because the app did not
 respond"; `/cluster-status hostinger` → HEALTHY, 21 ok / 0 warn / 0 fail)
@@ -88,6 +89,21 @@ interface:
   - "bin/k3dm-webhook route table entry /api/v1/hostinger-status"
 ```
 
+## Definition of done (worker)
+
+Before your last message, do all of these and paste the evidence:
+1. Run every test suite that covers a file you changed, not only the new tests. For each, give the command, the exit
+   code and every error line. An error you can't explain is a failure, not a pass. If the sandbox blocks a test, say
+   so and name it; don't skip it silently.
+2. For each `must_not` item: break the guard that enforces it (comment out the check, invert the condition), run its
+   test, show it red, then restore the guard and show it green. List any `must_not` whose test stayed green with the
+   guard broken.
+3. Where the spec allows a read-only run against real data (a real file, a real ledger, a real container image), run
+   the changed code once that way and paste what it printed. Otherwise say "no read-only real-data run possible" and
+   why.
+4. List every place where you chose something the spec did not decide (a default, a path, a mode, an edge case).
+
+
 ## Notes
 
 - Operator step, not part of the dispatch: delete `/hostinger-status` under api.slack.com → the app → Slash Commands.
@@ -96,4 +112,4 @@ interface:
   `reference_deploy_worker_workflow_overwrites_relay_secrets` before any redeploy.
 - No file overlap with the open dispatches or with the Gemini-ask P3 (which touches `agent.py`, `status.py` and
   `bin/k3dm-webhook`), so it can go out on its own or batched with another P3 on the relay or the howto.
-- Needs `**Intent approved:**` before dispatch.
+- First-pass trial dispatch 2 of 3 (`docs/howto/dispatch-first-pass-trial.md`).
