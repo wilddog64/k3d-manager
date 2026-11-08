@@ -130,7 +130,10 @@ PY
     ! label_loaded "$label" || fail "singleton ${label} loaded during preparation" 'unload it and inspect its installer'
   done < "$SINGLETONS"
 }
-data_recover() { make hub-data-recover; }
+data_recover() {
+  make hub-data-recover || return 1
+  make hub-data-export-setup || fail 'make hub-data-export-setup failed' 'make hub-data-export-setup, then HUB_NEW_FROM=data make hub-new'
+}
 reconcile() { KEYCLOAK_BASE_URL="${HUB_NEW_KEYCLOAK_URL:-http://localhost:8880}" HUB_RECOVERY_ARGOCD_URL="${HUB_NEW_ARGOCD_URL:-http://localhost:8080}" K3DM_AGENT_LOAD=0 scripts/k3d-manager hub_recovery_reconcile --confirm; }
 platform() { make appsets-reapply && make appsets-check && make platform-ops && make observability; }
 verify_hub() {
@@ -145,6 +148,7 @@ verify_hub() {
   kubectl --context "$context" get clustersecretstore vault-backend -o json 2>/dev/null | jq -e '.status.conditions | any(.type == "Ready" and .status == "True")' >/dev/null || fail 'ESO ClusterSecretStore is not Ready' 'repair the store and rerun'
   kubectl --context "$context" -n cicd get application shopping-cart-identity -o json 2>/dev/null | jq -e '.status.health.status == "Healthy"' >/dev/null || fail 'shopping-cart-identity Application is missing or unhealthy' 'repair shopping-cart-identity and rerun'
   kubectl --context "$context" -n platform-ops describe secret platform-ops-notifications 2>/dev/null | grep -F 'slack-incoming-webhook-url' >/dev/null || fail 'platform-ops-notifications Slack URL key is absent' 'restore its key through the approved secret workflow'
+  kubectl --context "$context" -n secrets get serviceaccount hub-data-export >/dev/null 2>&1 || fail 'hub-data-export ServiceAccount secrets/hub-data-export is missing' 'make hub-data-export-setup'
   kine="$(docker logs --since 2h "${server}" 2>&1)" || fail "cannot read Kine logs from ${server}" 'inspect the k3d server container and rerun'
   ! printf '%s\n' "$kine" | grep -E 'Compact failed|transaction has already been' >/dev/null || fail 'Kine compaction error found' 'resolve the datastore error and rerun'
   read -r count elapsed < <(printf '%s\n' "$kine" | python3 -c 'import datetime,re,sys; events=[]; pat=re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)");
@@ -162,7 +166,7 @@ print(len(events), int((events[-1]-events[0]).total_seconds()) if len(events)>=6
   while IFS='|' read -r label _installer _note; do [[ -z "$label" || "$label" == \#* ]] || ! label_loaded "$label" || fail "singleton ${label} is loaded" 'unload it before cutover'; done < "$SINGLETONS"
   kine_bytes="$(docker exec "${server}" stat -c %s /var/lib/rancher/k3s/server/db/state.db 2>/dev/null || printf unknown)"
   wal_bytes="$(docker exec "${server}" stat -c %s /var/lib/rancher/k3s/server/db/state.db-wal 2>/dev/null || printf unknown)"
-  printf '{"apps":"pass","externalsecrets":"pass","vault":"pass","clustersecretstore":"pass","shopping_cart_identity":"pass","system_notice_slack_key":"pass","kine_compaction_cycles":%s,"singletons_loaded":"none","kine_datastore_bytes":"%s","kine_wal_bytes":"%s"}\n' "$count" "$kine_bytes" "$wal_bytes" > "$checks"
+  printf '{"apps":"pass","externalsecrets":"pass","vault":"pass","clustersecretstore":"pass","shopping_cart_identity":"pass","system_notice_slack_key":"pass","hub_data_export_sa":"pass","kine_compaction_cycles":%s,"singletons_loaded":"none","kine_datastore_bytes":"%s","kine_wal_bytes":"%s"}\n' "$count" "$kine_bytes" "$wal_bytes" > "$checks"
   printf '\n%-32s %s\n' 'Check' 'Result'
   printf '%-32s %s\n' '-----' '------'
   while IFS=$'\t' read -r _check _result; do printf '%-32s %s\n' "$_check" "$_result"; done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$checks")
