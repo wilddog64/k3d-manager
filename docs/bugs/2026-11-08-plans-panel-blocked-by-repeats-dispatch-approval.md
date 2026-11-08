@@ -1,8 +1,8 @@
 # Bug: Plans panel repeats the dispatch go in Blocked by (in green) and shows landed plans' approval as a blank
 
-**Status:** OPEN — dispatched 2026-11-08: Luna implements, Gemini 3.8 Flash verifies from the Acceptance block
+**Status:** LANDED — `ed56bb6a` on `k3d-manager-v1.43.15` (2026-11-08); Claude review; Claude also maps a recorded `go` to `approved` (operator: the column records the approval state, Dispatch task records landing); 47/47 dashboard bats, 119 pytest outside the sandbox
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** live check — since 2026-11-08 (Flash verifier; then promote + Grafana restart, E2)
 **Introduced by:** `d95afbfe` (v1.43.15, the fix for `docs/bugs/2026-11-08-plans-panel-hides-plans-waiting-on-operator-dispatch-go.md`)
 **Should have been caught by:** live check
 **Severity:** low — display only; the operator asked whether three landed plans still need an approval, and could not

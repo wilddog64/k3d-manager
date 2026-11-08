@@ -73,3 +73,9 @@ interface:
 
 - Fixtures assert first that `XDG_DATA_HOME` and `HOME` point at scratch directories, never the real
   `~/.local/share/k3d-manager` (CLAUDE.md test controls).
+
+## Early live evidence — M4, 2026-11-08
+
+Push `d2e94f69..c75072d0` from the M4 with the default PATH, whose first `python3` was the direnv Python 3.13
+venv (no PyYAML): the gate printed `PASS scripts/tests/lib/ci_workflow_no_stage2.bats`, so the suites ran with
+the managed venv (PyYAML 6.0.3) first. E2 on the M5 is still due.
