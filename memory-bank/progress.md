@@ -1,3 +1,4 @@
+- [x] 2026-11-08 v1.45.0 plan A4 (retire /argocd-upgrade); operator deleted the Slack command
 - [x] 2026-11-08 trial 2 spec review applied; [ ] E1 re-approval
 - [x] 2026-11-08 retire-/hostinger-status intents approved; [ ] spec review result, dispatch
 - [x] 2026-11-08 filed P3 retire /hostinger-status; Gemini-ask replies → /cluster-status hostinger; [ ] intent approval, dispatch

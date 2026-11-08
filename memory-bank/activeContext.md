@@ -1,3 +1,4 @@
+**2026-11-08 — v1.45.0 ArgoCD HA plan gains A4**: retire Slack /argocd-upgrade + webhook /api/v1/argocd-upgrade + thread command (never run; no rehearsal gate). Operator deleted /argocd-upgrade from the Slack app 2026-11-08. N5 added; argocd_upgrade plugin kept.
 **2026-11-08 — trial 2 spec review applied** (retire /hostinger-status): +architecture doc, relay behaviour tests, thread command out of scope, N2 as diff check. Intent header removed; E1 needs re-approval.
 **2026-11-08 — retire-/hostinger-status P3 intents approved** (trial 2); spec review running after the fact (slip logged in trial doc). Both trial P3s wait on a WIP slot.
 **2026-11-08 — filed P3** `2026-11-08-slack-hostinger-status-duplicates-cluster-status` (retire Slack /hostinger-status; keep API route). Waiting on: dispatch + intent approval. Operator deletes the command in the Slack app. Gemini-ask P3 replies re-pointed to /cluster-status hostinger (intents unchanged).
