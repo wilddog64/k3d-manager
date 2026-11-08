@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add the `deploy/hub` promotion and rollback flow, status reporting, and platform-ops deployment from the promoted tree.
+
 ## [1.43.14] - 2026-11-07
 
 - Export Claude context per turn, post-compaction floor and observed ceiling, active-day turn rates, and cache rebuild counts and cost; add the matching Agent Cost dashboard row and guide.

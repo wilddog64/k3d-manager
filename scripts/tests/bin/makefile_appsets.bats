@@ -15,7 +15,7 @@ setup() {
   cat > "${WORK}/scripts/k3d-manager" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'BRANCH:%s ARGS:' "${K3D_MANAGER_BRANCH:-}" >> "${CALL_LOG}"
+printf 'BRANCH:%s STAGE:%s ARGS:' "${K3D_MANAGER_BRANCH:-}" "${K3DM_APPSETS_STAGE:-}" >> "${CALL_LOG}"
 printf ' <%s>' "$@" >> "${CALL_LOG}"
 printf '\n' >> "${CALL_LOG}"
 EOF
@@ -27,26 +27,25 @@ _run_make() {
     make --no-print-directory -C "${WORK}" "$@"
 }
 
-@test "appsets-reapply validates and passes the release branch" {
-  _run_make appsets-reapply BRANCH=k3d-manager-v1.42.0
+@test "appsets-reapply always passes deploy/hub" {
+  APPSETS_STAGE=hub _run_make appsets-reapply BRANCH=k3d-manager-v1.42.0
   [ "${status}" -eq 0 ]
-  grep -Fx 'BRANCH:k3d-manager-v1.42.0 ARGS: <deploy_argocd_applicationsets> <--confirm>' "${CALL_LOG}"
+  grep -Fx 'BRANCH:deploy/hub STAGE:hub ARGS: <deploy_argocd_applicationsets> <--confirm>' "${CALL_LOG}"
 }
 
-@test "appsets-reapply refuses non-release branches" {
+@test "appsets-reapply ignores BRANCH for release and feature refs" {
   for branch in main HEAD k3d-manager-v1.42 feat/k3d-manager-v1.42.0 k3d-manager-v1.42.0-x; do
     : > "${CALL_LOG}"
     _run_make appsets-reapply "BRANCH=${branch}"
-    [ "${status}" -ne 0 ]
-    [[ "${output}" == *"not a release branch"* ]]
-    [ ! -s "${CALL_LOG}" ]
+    [ "${status}" -eq 0 ]
+    grep -Fx 'BRANCH:deploy/hub STAGE:all ARGS: <deploy_argocd_applicationsets> <--confirm>' "${CALL_LOG}"
   done
 }
 
 @test "appsets-check passes the branch and infra context" {
   INFRA_CONTEXT=k3d-cluster-context _run_make appsets-check BRANCH=k3d-manager-v1.42.0
   [ "${status}" -eq 0 ]
-  grep -Fx 'BRANCH: ARGS: <argocd_check_values_branch> <k3d-manager-v1.42.0> <k3d-cluster-context>' "${CALL_LOG}"
+  grep -Fx 'BRANCH: STAGE: ARGS: <argocd_check_values_branch> <deploy/hub> <k3d-cluster-context>' "${CALL_LOG}"
 }
 
 @test "appsets targets are phony and listed in help" {
@@ -56,4 +55,7 @@ _run_make() {
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"make appsets-reapply"* ]]
   [[ "${output}" == *"make appsets-check"* ]]
+  [[ "${output}" == *"make hub-promote REF=..."* ]]
+  [[ "${output}" == *"make hub-rollback"* ]]
+  [[ "${output}" == *"make hub-promote-status"* ]]
 }

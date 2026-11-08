@@ -36,6 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
+.PHONY: hub-promote hub-rollback hub-promote-status
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -429,20 +430,26 @@ sync-main:
 	done
 	@echo "[make] Refresh triggered — run 'make status' to confirm"
 
-## Reapply every ApplicationSet pinned to a release branch (BRANCH=, default: current branch)
+## Reapply every ApplicationSet pinned to deploy/hub (APPSETS_STAGE=hub|all)
 appsets-reapply:
 	@bin/k3dm-require-role hub
-	@_b='$(BRANCH)'; \
-	if ! printf '%s\n' "$$_b" | grep -Eq '^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
-	  echo "[appsets-reapply] ERROR: '$$_b' is not a release branch (k3d-manager-vX.Y.Z)." >&2; \
-	  echo "[appsets-reapply] Check out the release branch or pass BRANCH=k3d-manager-vX.Y.Z." >&2; \
-	  exit 1; \
-	fi; \
-	K3D_MANAGER_BRANCH="$$_b" K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+	@K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 
-## Report Applications whose k3d-manager values source is not on BRANCH (read-only)
+## Report Applications whose k3d-manager values source is not on deploy/hub (read-only)
 appsets-check:
-	@./scripts/k3d-manager argocd_check_values_branch '$(BRANCH)' '$(INFRA_CONTEXT)'
+	@./scripts/k3d-manager argocd_check_values_branch deploy/hub '$(INFRA_CONTEXT)'
+
+## Promote an origin commit to the live hub after checks and typed confirmation
+hub-promote:
+	@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}"
+
+## Roll back deploy/hub to the previous recorded promotion
+hub-rollback:
+	@bin/k3dm-hub-promote rollback
+
+## Show the current hub ref and promotion history (read-only)
+hub-promote-status:
+	@bin/k3dm-hub-promote status
 
 ## Count bug docs per release by status and priority (RELEASE=vX.Y.Z, JSON=1)
 bug-tally:
@@ -1289,7 +1296,16 @@ observability:
 ## Reconcile Hub platform-ops resources (CVE scanner, retry limits, and dashboards)
 platform-ops:
 	@bin/k3dm-require-role hub
-	./scripts/k3d-manager deploy_argocd_platform_ops --confirm
+	@set -eo pipefail; \
+	 source "$(CURDIR)/scripts/lib/foundation/scripts/lib/system.sh"; \
+	 _tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/k3dm-platform-ops.XXXXXX"); \
+	 _cleanup() { _run_command --soft -- rm -rf -- "$$_tmp" || true; }; \
+	 trap _cleanup EXIT; \
+	 _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
+	 _sha=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
+	 _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
+	 (cd "$$_tmp" && _run_command --soft -- ./scripts/k3d-manager deploy_argocd_platform_ops --confirm); \
+	 echo "[platform-ops] applied deploy/hub $$_sha"
 
 ## Apply hub PrometheusRules only (scripts/etc/prometheus/rules) — no full observability redeploy
 prometheus-rules:
@@ -1713,8 +1729,11 @@ help:
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
 	@echo "    make sync-main             Revert services-git to main and refresh"
-	@echo "    make appsets-reapply       Reapply all ApplicationSets on the release branch (BRANCH= optional; required each release)"
-	@echo "    make appsets-check         Report Applications not reading BRANCH's values (read-only)"
+	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
+	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
+	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 optional)"
+	@echo "    make hub-rollback          Roll back deploy/hub to the previous recorded promotion"
+	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo "    make fleet-render          Render count-driven ACG fleet (offline)"

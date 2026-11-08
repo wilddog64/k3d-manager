@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -f "$REPO_ROOT/scripts/lib/foundation/scripts/lib/system.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/scripts/lib/foundation/scripts/lib/system.sh"
+else
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/scripts/lib/system.sh"
+fi
+
+readonly REMOTE=origin
+readonly BRANCH=deploy/hub
+readonly TAG_PREFIX=hub-promote/
+GH_REPO="${GH_REPO:-wilddog64/k3d-manager}"
+
+die() { printf '[hub-promote] ERROR: %s\n' "$*" >&2; exit 1; }
+git_cmd() { _run_command --soft -- git -C "$REPO_ROOT" "$@"; }
+
+remote_sha() {
+  local allow_missing="${1:-0}"
+  local rows sha
+  rows="$(git_cmd ls-remote "$REMOTE" "refs/heads/$BRANCH")" || die "cannot read $REMOTE $BRANCH"
+  sha="${rows%%$'\t'*}"
+  if [[ -z "$sha" && "$allow_missing" == 1 ]]; then
+    printf '%040d' 0
+    return
+  fi
+  [[ "$sha" =~ ^[0-9a-f]{40,64}$ ]] || die "$REMOTE/$BRANCH does not exist; bootstrap it before promoting"
+  printf '%s' "$sha"
+}
+
+resolve_on_origin() {
+  local ref="$1" sha branches
+  sha="$(git_cmd rev-parse --verify "${ref}^{commit}" 2>/dev/null)" || die "cannot resolve REF '$ref' to a commit"
+  branches="$(git_cmd branch -r --contains "$sha" --format='%(refname:short)' | sed '/^origin\/HEAD -> /d')"
+  [[ "$branches" == *"origin/"* ]] || die "commit $sha is not reachable from an origin branch"
+  printf '%s' "$sha"
+}
+
+check_runs() {
+  local sha="$1" data count pending failed
+  data="$(_run_command --soft -- gh api --paginate "repos/$GH_REPO/commits/$sha/check-runs" --jq '.check_runs[]')" || die "GitHub check-runs lookup failed"
+  count="$(jq -s 'length' <<< "$data")"
+  (( count > 0 )) || die "no GitHub check runs exist for $sha"
+  pending="$(jq -s '[.[] | select(.status != "completed")] | length' <<< "$data")"
+  failed="$(jq -s '[.[] | select(.conclusion != "success" and .conclusion != "neutral" and .conclusion != "skipped")] | length' <<< "$data")"
+  (( pending == 0 && failed == 0 )) || die "GitHub check runs are pending or failed for $sha"
+}
+
+show_and_confirm() {
+  local old="$1" new="$2" action="$3" ref="${4:-}" subjects
+  printf '[hub-promote] action: %s\n[hub-promote] old deploy/hub: %s\n[hub-promote] new deploy/hub: %s\n' "$action" "$old" "$new"
+  if [[ "$old" =~ ^0+$ ]]; then
+    printf '[hub-promote] bootstrap: deploy/hub does not exist yet\n'
+  else
+    subjects="$(git_cmd log --format='%h %s' -30 "$old..$new" 2>/dev/null || true)"
+    if [[ -n "$subjects" ]]; then printf '%s\n' "$subjects"; else printf '[hub-promote] no commits between refs\n'; fi
+  fi
+  [[ -z "$ref" ]] || printf '[hub-promote] REF: %s\n' "$ref"
+  [[ -t 0 ]] || die 'confirmation requires a TTY'
+  printf "Type 'promote' to continue: " >&2
+  local answer
+  IFS= read -r answer || die 'could not read confirmation'
+  [[ "$answer" == promote ]] || die 'confirmation did not match promote'
+}
+
+record_move() {
+  local old="$1" new="$2" action="$3" ref="${4:-}" break_glass="${5:-0}" stamp tag message existing
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  tag="$TAG_PREFIX$stamp"
+  existing="$(git_cmd ls-remote --tags "$REMOTE" "refs/tags/$tag")"
+  [[ -z "$existing" ]] || die "promotion tag $tag already exists; retry after the next UTC second"
+  existing="$(git_cmd show-ref --verify "refs/tags/$tag" 2>/dev/null || true)"
+  [[ -z "$existing" ]] || die "local promotion tag $tag already exists; retry after the next UTC second"
+  printf -v message 'action: %s\nold: %s\nnew: %s\nREF: %s' "$action" "$old" "$new" "${ref:-$new}"
+  [[ "$break_glass" != 1 ]] || message+=$'\nmode: break-glass'
+  if [[ "$action" == rollback ]]; then message+=$'\nrollback: yes'; fi
+  local lease="refs/heads/$BRANCH:$old"
+  [[ ! "$old" =~ ^0+$ ]] || lease="refs/heads/$BRANCH:"
+  git_cmd push "$REMOTE" "--force-with-lease=$lease" "$new:refs/heads/$BRANCH" || die 'deploy/hub changed after it was read; lease rejected the push'
+  git_cmd tag -a "$tag" "$new" -m "$message" || die "could not create annotated tag $tag"
+  git_cmd push "$REMOTE" "refs/tags/$tag" || die "deploy/hub moved, but tag push failed ($tag)"
+  printf '[hub-promote] moved deploy/hub to %s and recorded %s\n' "$new" "$tag"
+}
+
+status() {
+  local sha tags release ahead
+  sha="$(remote_sha)"
+  printf '[hub-promote] deploy/hub: %s\n' "$sha"
+  tags="$(git_cmd ls-remote --tags "$REMOTE" "refs/tags/${TAG_PREFIX}*" | awk '$2 !~ /\^\{\}$/ {print}' | sort -k2 -r | head -3 || true)"
+  printf '[hub-promote] last three hub-promote tags:\n%s\n' "${tags:-  (none)}"
+  release="${RELEASE_BRANCH:-$(git_cmd branch --show-current)}"
+  if [[ ! "$release" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    release="$(git_cmd for-each-ref --sort=-committerdate --format='%(refname:short)' 'refs/remotes/origin/k3d-manager-v*' | head -1)"
+  fi
+  if [[ -z "$release" ]]; then release=main; fi
+  ahead="$(git_cmd rev-list --count "$sha..$release" 2>/dev/null || printf '?')"
+  printf '[hub-promote] %s ahead of deploy/hub: %s\n' "$release" "$ahead"
+}
+
+rollback() {
+  local old target tag tag_data action sha top
+  local -a tags=()
+  local -a stack=()
+  old="$(remote_sha)"
+  mapfile -t tags < <(git_cmd ls-remote --tags "$REMOTE" "refs/tags/${TAG_PREFIX}*" | awk '$2 !~ /\^\{\}$/ {print $2}' | sort -k1,1)
+  for tag in "${tags[@]}"; do
+    tag_data="$(git_cmd fetch --no-tags "$REMOTE" "$tag" >/dev/null && git_cmd cat-file -p FETCH_HEAD)" || die "promotion tag $tag is not available"
+    action="$(sed -n 's/^action: //p' <<< "$tag_data" | head -1)"
+    sha="$(sed -n 's/^new: //p' <<< "$tag_data" | head -1)"
+    [[ "$sha" =~ ^[0-9a-f]{40,64}$ ]] || die "promotion tag $tag has no valid new SHA"
+    case "$action" in
+      promote) stack+=("$sha") ;;
+      rollback)
+        (( ${#stack[@]} >= 2 )) || die "rollback tag $tag has no earlier promotion to pop"
+        top="${stack[${#stack[@]}-2]}"
+        [[ "$sha" == "$top" ]] || die "rollback tag $tag does not match the promotion stack"
+        unset 'stack[${#stack[@]}-1]'
+        ;;
+      *) die "promotion tag $tag has an unknown action" ;;
+    esac
+  done
+  (( ${#stack[@]} >= 2 )) || die 'there is no earlier promotion to return to'
+  [[ "${stack[${#stack[@]}-1]}" == "$old" ]] || die 'deploy/hub does not match the promotion stack top'
+  target="${stack[${#stack[@]}-2]}"
+  show_and_confirm "$old" "$target" rollback
+  record_move "$old" "$target" rollback
+}
+
+main() {
+  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] | rollback | status'
+  case "$1" in
+    status) [[ $# == 1 ]] || die 'status takes no arguments'; status ;;
+    rollback) [[ $# == 1 ]] || die 'rollback takes no arguments'; rollback ;;
+    promote)
+      [[ $# -ge 2 && $# -le 3 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1]'
+      local ref="$2" break_glass="${3:-${BREAK_GLASS:-0}}" old new
+      [[ "$break_glass" == 0 || "$break_glass" == 1 ]] || die 'BREAK_GLASS must be 0 or 1'
+      git_cmd fetch "$REMOTE" --prune
+      new="$(resolve_on_origin "$ref")"
+      old="$(remote_sha 1)"
+      if [[ "$break_glass" != 1 ]]; then check_runs "$new"; fi
+      show_and_confirm "$old" "$new" promote "$ref"
+      record_move "$old" "$new" promote "$ref" "$break_glass"
+      printf '[hub-promote] next: make appsets-check, then make platform-ops\n'
+      ;;
+    *) die "unknown action '$1'" ;;
+  esac
+}
+
+main "$@"
