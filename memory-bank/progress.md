@@ -1,3 +1,4 @@
+**2026-11-08 — Hermes r9 false alarm; CI lint fixed.** Hermes incident 17:51Z: values_branch flagged 20 apps on deploy/hub as not on k3d-manager-v1.43.15 and proposed r9 (reapply appsets with K3D_MANAGER_BRANCH=release branch → would bypass hub-promote). Operator told to Deny. Filed P2 `2026-11-08-hermes-values-branch-flags-deploy-hub-and-r9-retargets-release-branch` (introduced by 897cfe72; blocks v1.43.15 PR; waiting on intent approval; WIP 3/3). CI lint red was a stale promtool fixture from 9a8fb88a (test skips locally without promtool) → fixed `e8ca9af3` (docker promtool: red on old, green on new; 125 passed).
 - [x] 2026-11-08 dispatched Gemini-ask P3 to Flash (trial 1)
 - [x] 2026-11-08 landed control-node-linux-setup `4bd764b9` (Claude fixes: M1 assertion, Vagrantfile); E3/E4 live pending
 - [x] 2026-11-08 operator deleted /hostinger-status and /argocd-upgrade from the Slack app
