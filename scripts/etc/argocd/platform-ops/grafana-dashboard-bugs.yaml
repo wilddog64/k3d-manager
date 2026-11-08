@@ -2177,7 +2177,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
-          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; Dispatch task comes from the dispatch ledger. Execution, Verified, and Live verified are status indicators from plan Status only; they do not identify a verifier or evidence record. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
+          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; orange means the plan waits on the operator's dispatch go or decision; Dispatch task comes from the dispatch ledger. Execution, Verified, and Live verified are status indicators from plan Status only; they do not identify a verifier or evidence record. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -2332,7 +2332,28 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
+                    "value": 175
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "regex",
+                        "options": {
+                          "pattern": "needs your dispatch",
+                          "result": {
+                            "color": "orange",
+                            "index": 0
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -2432,7 +2453,13 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 125
+                    "value": 155
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
                   },
                   {
                     "id": "mappings",
@@ -2441,8 +2468,29 @@ data:
                         "type": "value",
                         "options": {
                           "unknown": {
-                            "text": "not recorded",
-                            "color": "gray"
+                            "text": "⚠ needs your decision",
+                            "color": "orange",
+                            "index": 0
+                          },
+                          "needed": {
+                            "text": "⚠ needs your go",
+                            "color": "orange",
+                            "index": 1
+                          },
+                          "go": {
+                            "text": "✓ go",
+                            "color": "green",
+                            "index": 2
+                          },
+                          "not required": {
+                            "text": "not gated",
+                            "color": "text",
+                            "index": 3
+                          },
+                          "n/a": {
+                            "text": "-",
+                            "color": "text",
+                            "index": 4
                           }
                         }
                       }

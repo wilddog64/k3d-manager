@@ -1061,3 +1061,48 @@ assert '"unchecked"' in expr, "missing unchecked expression"
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "Plans table shows plans waiting on the operator's dispatch go in orange" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+def props(name):
+    found=[o["properties"] for o in panel["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":name}]
+    return {p["id"]:p["value"] for group in found for p in group}
+approval=props("Dispatch approval")
+assert approval["custom.cellOptions"]=={"type":"color-text"}
+values=approval["mappings"][0]["options"]
+assert values["unknown"]["text"]=="⚠ needs your decision" and values["unknown"]["color"]=="orange"
+assert values["needed"]["text"]=="⚠ needs your go" and values["needed"]["color"]=="orange"
+assert values["go"]["color"]=="green" and values["n/a"]["text"]=="-"
+assert all(v["text"]!="not recorded" for v in values.values())
+blocked=props("Blocked by")
+assert blocked["custom.cellOptions"]=={"type":"color-text"}
+regex=blocked["mappings"][0]
+assert regex["type"]=="regex" and regex["options"]["pattern"]=="needs your dispatch"
+assert regex["options"]["result"]["color"]=="orange" and "text" not in regex["options"]["result"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "Plans exporter blocker text matches the dashboard's orange highlight" {
+  run python3 - "${metrics}" "${dashboard}" <<'PY'
+import json, re, sys
+from pathlib import Path
+source=Path(sys.argv[1]).read_text()
+data=json.loads(Path(sys.argv[2]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+pattern=next(p["value"][0]["options"]["pattern"] for o in panel["fieldConfig"]["overrides"]
+             if o["matcher"].get("options")=="Blocked by" for p in o["properties"] if p["id"]=="mappings")
+texts=re.findall(r'blockers\.append\("([^"]*dispatch[^"]*)"\)', source)
+assert len(texts)==2, texts
+assert all(re.search(pattern, t) for t in texts), texts
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}

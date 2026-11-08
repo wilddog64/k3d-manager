@@ -161,7 +161,7 @@ def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_pat
     assert 'approval="approved",dispatch_approval="needed"' in rows["v1.50.0-g"]
     assert 'dispatch_approval="unknown"' in rows["v1.50.0-h"]
     assert 'approval="approved",dispatch_approval="unknown"' not in rows["v1.50.0-h"]
-    assert 'blocked_by="branch not cut; dispatch go needed"' in rows["v1.50.0-g"]
+    assert 'blocked_by="branch not cut; needs your dispatch go"' in rows["v1.50.0-g"]
     assert len(re.search(r'wave_note="([^"]*)"', rows["v1.50.0-c"]).group(1)) <= 80
     assert 'k3dm_plan_undeclared_overlaps{repo="k3d-manager",release="v1.50.0"} 1' in output
 
@@ -244,7 +244,9 @@ def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_pat
                           for override in panel["fieldConfig"]["overrides"]
                           if override["matcher"].get("options") == "Dispatch approval"
                           for prop in override["properties"] if prop["id"] == "mappings")
-    assert approval_field["unknown"]["text"] == "not recorded"
+    # agent-audit: allow assert-removed blocker and mapping asserts reworded to the operator-facing text, not dropped
+    assert approval_field["unknown"]["text"] == "⚠ needs your decision"
+    assert approval_field["needed"]["text"] == "⚠ needs your go"
     docs["docs/plans/v1.54.0-proposed.md"] += "**Approval:** pending review\n**Dispatch:** needed\n"
     output = metrics._plan_metrics(tmp_path, texts=docs)
     rows = {re.search(r'plan="([^"]+)"', line).group(1): line
@@ -256,8 +258,8 @@ def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_pat
         assert 'verification="n/a"' in rows[f"v1.54.0-{slug}"]
     assert 'verification="unknown"' in rows["v1.54.0-implemented"]
     assert 'approval="pending",dispatch_approval="needed"' in rows["v1.54.0-proposed"]
-    assert 'blocked_by="branch not cut; dispatch go needed"' in rows["v1.54.0-proposed"]
-    assert 'blocked_by="branch not cut; dispatch approval unknown"' in rows["v1.54.0-ready"]
+    assert 'blocked_by="branch not cut; needs your dispatch go"' in rows["v1.54.0-proposed"]
+    assert 'blocked_by="branch not cut; needs your dispatch decision"' in rows["v1.54.0-ready"]
     assert 'blocked_by="-"' in rows["v1.54.0-progress"]
     assert 'blocked_by="-"' in rows["v1.54.0-implemented"]
     # A plan without a ledger series remains in the row inventory and keeps its own state.
@@ -273,14 +275,14 @@ def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode
                            .read_text().split("  k3dm-bugs.json: |\n", 1)[1])
     query = next(panel for panel in dashboard["panels"] if panel["id"] == 107)["targets"][0]["expr"]
     scenarios = [
-        ("landed-proposed", "proposed", "landed", "dispatch approval unknown", "landed; documentation stale"),
+        ("landed-proposed", "proposed", "landed", "needs your dispatch decision", "landed; documentation stale"),
         ("landed-ready", "ready", "landed", "dependency not landed", "landed; documentation stale"),
         ("landed-progress", "in_progress", "landed", "-", "landed; documentation stale"),
         ("landed-implemented", "implemented", "landed", "-", "-"),
-        ("awaiting", "proposed", "awaiting_land", "dispatch go needed", "dispatch go needed"),
+        ("awaiting", "proposed", "awaiting_land", "needs your dispatch go", "needs your dispatch go"),
         ("refused", "ready", "refused", "dependency not landed", "dependency not landed"),
-        ("failed", "proposed", "codex_failed", "dispatch go needed", "dispatch go needed"),
-        ("running", "proposed", "running", "dispatch approval unknown", "dispatch approval unknown"),
+        ("failed", "proposed", "codex_failed", "needs your dispatch go", "needs your dispatch go"),
+        ("running", "proposed", "running", "needs your dispatch decision", "needs your dispatch decision"),
         ("no-ledger", "implemented", None, "-", "-"),
         ("verified", "implemented", "landed", "-", "-"),
         ("live-verified", "implemented", "landed", "-", "-"),
@@ -1708,3 +1710,20 @@ def test_load_milestones_rejects_invalid_state_and_folded_target(metrics, tmp_pa
     (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": items}))
     with pytest.raises(ValueError):
         metrics._load_milestones(root)
+
+
+def test_missing_dispatch_header_reads_as_a_pending_decision_only_before_dispatch(metrics, tmp_path):
+    docs = {
+        "docs/plans/v1.54.0-waiting.md": "# Waiting\n**Status:** PLANNED\n**Approval:** approved\n",
+        "docs/plans/v1.54.0-gated.md": "# Gated\n**Status:** PLANNED\n**Dispatch:** needed\n",
+        "docs/plans/v1.54.0-landed.md": "# Landed\n**Status:** LANDED\n**Approval:** approved\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'dispatch_approval="unknown"' in rows["v1.54.0-waiting"]
+    assert "needs your dispatch decision" in rows["v1.54.0-waiting"]
+    assert 'dispatch_approval="needed"' in rows["v1.54.0-gated"]
+    assert "needs your dispatch go" in rows["v1.54.0-gated"]
+    assert 'dispatch_approval="n/a"' in rows["v1.54.0-landed"]
+    assert 'blocked_by="-"' in rows["v1.54.0-landed"]
