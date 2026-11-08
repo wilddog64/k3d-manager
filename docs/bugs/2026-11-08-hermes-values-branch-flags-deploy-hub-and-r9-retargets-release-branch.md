@@ -94,6 +94,20 @@ interface:
   - "./scripts/k3d-manager argocd_check_values_branch '' <context>"
 ```
 
+## Definition of done (worker)
+
+Before your last message, do all of these and paste the evidence:
+1. Run every test suite that covers a file you changed, not only the new tests. For each, give the command, the exit
+   code and every error line. An error you can't explain is a failure, not a pass. If the sandbox blocks a test, say
+   so and name it; don't skip it silently.
+2. For each `must_not` item: break the guard that enforces it (comment out the check, invert the condition), run its
+   test, show it red, then restore the guard and show it green. List any `must_not` whose test stayed green with the
+   guard broken.
+3. Where the spec allows a read-only run against real data (a real file, a real ledger, a real container image), run
+   the changed code once that way and paste what it printed. Otherwise say "no read-only real-data run possible" and
+   why.
+4. List every place where you chose something the spec did not decide (a default, a path, a mode, an edge case).
+
 ## Notes
 
 - Intents approved by the operator on 2026-11-08 ("approved the intent"). The operator pressed Deny on `r9-d9add2e2` the same day.
@@ -101,3 +115,4 @@ interface:
 - No overlap with open dispatches (abandon P3: `bin/k3dm-codex-dispatch`; Gemini-ask: `agent.py`, `status.py`,
   `bin/k3dm-webhook`; control-node role: provision-homebrew). WIP is 3/3, so it waits for a slot.
 - A P2 introduced in the open release: it blocks the v1.43.15 release PR.
+- First-pass trial dispatch (`docs/howto/dispatch-first-pass-trial.md`): DoD added 2026-11-08; spec review by a second agent runs after the intent approval, so an intent it changes goes back to the operator.
