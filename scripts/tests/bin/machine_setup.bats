@@ -287,7 +287,7 @@ SH
 }
 
 run_machine() {
-  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" REAL_PYTHON3="$REAL_PYTHON3" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" REAL_PYTHON3="$REAL_PYTHON3" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@" </dev/null
 }
 
 @test "N1: agents option rejects unsupported values" {
@@ -1295,18 +1295,18 @@ SH
   chmod +x "$STUBS/ssh"
   local message
   for message in "Username for 'https://github.com': " 'zsh compinit: insecure directories, run compaudit for list.' 'compdef: command not found' '_main_complete:412: _lastcomp: assignment to invalid subscript range'; do
-    run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="$message" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="$message" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
     [ "$status" -eq 1 ]
     [[ "$output" == *"$message"* || "$output" == *"${message% }"* ]]
     grep -Fxq -- '-tt -o BatchMode=yes fixture $SHELL -lic exit' "$CALL_LOG"
   done
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" HOME="$FIXHOME" SHELL_FIXTURE="command not found $FIXHOME/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" HOME="$FIXHOME" SHELL_FIXTURE="command not found $FIXHOME/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 1 ]
   [[ "$output" == *'~/secret'* && "$output" != *"$FIXHOME"* && "$output" != *'ghp_abc'* ]]
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 0 ]
   # zplug banner on a clean login, captured on m5-air.local and m2-air.local, 2026-10-31.
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE=$'[zplug] \e[33mRun compinit\e[00m' "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE=$'[zplug] \e[33mRun compinit\e[00m' "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 0 ]
   run env SSH_CALL="$CALL_LOG" "$STUBS/ssh" -tt -o BatchMode=yes fixture exit
   [ "$status" -eq 42 ]
@@ -1317,11 +1317,11 @@ SH
   rm "$STUBS/python3"
   printf '#!/bin/sh\nexec sleep 5\n' > "$STUBS/ssh"
   chmod +x "$STUBS/ssh"
-  run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT=2 "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT=2 "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 1 ]
   [[ "$output" == *'timed out'* ]]
   for value in 0 -1 abc 1.5 ''; do
-    run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT="$value" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT="$value" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
     [ "$status" -eq 2 ]
   done
 }
