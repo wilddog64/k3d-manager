@@ -988,9 +988,9 @@ harness ships and is piloted before 30 days of hub time are committed.
 | v1.63.0 (4 of 5) | [`workload-and-tenant-model`](plans/v1.63.0-saas-sim-workload-and-tenant-model.md), [`slo-scorecard-and-cost-ledger`](plans/v1.63.0-saas-sim-slo-scorecard-and-cost-ledger.md), [`sealed-chaos-scheduler`](plans/v1.63.0-saas-sim-sealed-chaos-scheduler.md), [`pilot-5-day-run`](plans/v1.63.0-saas-sim-pilot-5-day-run.md) |
 | v1.64.0 (1 of 5) | [`30-day-run-and-report`](plans/v1.64.0-saas-sim-30-day-run-and-report.md); the branch stays open for the run, and fixes found during it land here |
 
-Operator decisions due before the pilot: where the hub runs (laptop as today is recommended, since its
-fragility is part of the question); whether platform releases keep merging during the run (recommended
-yes, counted as change load); and whether Hostinger is in scope (recommended probe-only, never chaos).
+Operator decisions, made 2026-11-07 ("go for your recommendation"): the hub stays on the laptop, since its
+fragility is part of the question; platform releases keep merging during the run, counted as change load;
+Hostinger is probe-only and never receives chaos.
 Every chaos injector needs its own dispatch go.
 
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
