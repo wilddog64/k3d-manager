@@ -67,8 +67,8 @@ includes the full dispatch-to-land interval; the latter is not proof of human wa
 verification happens after land. **Human continuation prompts** counts explicit operator records
 by reason and displays the tracked-task coverage denominator; older history is unknown and is not
 backfilled. Codex tokens uses the cumulative session total from the last
-exit after a resume; summing those exits would double count. API equiv. counts each session's
-recorded cumulative usage once.
+exit after a resume; summing those exits would double count. API equiv. counts each Codex session's
+recorded cumulative usage once and each agy run's usage once.
 
 **Delivered** means the latest independent verification recorded `pass`. If the spec's Acceptance
 requires live evidence, its document must also have `**Status:** LIVE-VERIFIED` and a well-formed
@@ -98,12 +98,12 @@ bars are horizontal, so each outcome name reads in full left of its bar. **First
 verification** sits left of the table, the way Last update sits beside Per spec: horizontal pass
 and fail bars with fixed-size names.
 
-The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
+The **Cost (API-equivalent)** row estimates what recorded Codex and agy session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
 Rates live in `scripts/etc/agent/codex-model-prices.json`; update a model's input, cached-input and
 output rates there when pricing changes. Models without an explicit entry remain unpriced.
 
-- **API equiv.** in Per spec is the sum for that landed task's priced Codex sessions. An empty cell
+- **API equiv.** in Per spec is the sum for that landed task's priced Codex and agy sessions. An empty cell
   means at least one session is unpriced or no session usage was recorded.
 - **Codex at API prices** totals all priced usage in scope, including refused and abandoned attempts.
 - **Per landed spec** divides that same total by landed tasks. Landed means the tests and scope gate
@@ -126,6 +126,12 @@ output rates there when pricing changes. Models without an explicit entry remain
   `input` and `output`; cache reads are billed at a fraction of the input rate.
 - **Claude cost by kind** splits Claude API-equivalent cost in the selected window or release into
   `cache_read`, `cache_write`, `input` and `output`, using the price for each cache write duration.
+
+For agy runs, the model comes from the run's `start` event; a trailing `-low`, `-medium` or `-high`
+thinking-level suffix is removed before looking up the Gemini rate. Cost is
+`(input_tokens × input + cache_read_tokens × cached_input + (output_tokens + thinking_tokens) × output) / 1,000,000`;
+input excludes cache reads, and thinking tokens use the output rate. The configured Standard Paid Tier
+Gemini rates for `gemini-3.8-flash` change on 2027-01-01, and `gemini-4-argon` rates change on 2026-12-01.
 
 `bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`

@@ -702,6 +702,58 @@ def _cost(event, prices):
         return None
 
 
+def _agy_run_usage(events):
+    """Return one validated agy usage record per dispatch run."""
+    starts = {}
+    usage_events = defaultdict(list)
+    for index, event in enumerate(events):
+        if event.get("event") not in {"start", "agent_exit", "agent_usage"}:
+            continue
+        key = (event.get("version"), event.get("slug"), event.get("run"))
+        if not isinstance(key[0], str) or not isinstance(key[1], str) or type(key[2]) is not int:
+            continue
+        if event.get("event") == "start":
+            starts[key] = event
+        elif event.get("event") in {"agent_exit", "agent_usage"}:
+            usage = event.get("usage")
+            if isinstance(usage, dict):
+                usage_events[key].append((index, usage))
+    records = []
+    for key, start in starts.items():
+        if start.get("agent") != "agy":
+            continue
+        model = start.get("model")
+        if isinstance(model, str):
+            model = re.sub(r"-(?:low|medium|high)$", "", model)
+        candidates = usage_events.get(key, [])
+        # agent_exit and agent_usage carry the same per-run totals. Keep one copy.
+        usage = candidates[0][1] if candidates else {}
+        fields = ("input_tokens", "cache_read_tokens", "output_tokens", "thinking_tokens")
+        valid = all(type(usage.get(field)) is int and usage[field] >= 0 for field in fields)
+        records.append({"session": f"agy:{key[0]}:{key[1]}:{key[2]}", "version": key[0],
+                        "slug": key[1], "run": key[2], "ts": start.get("ts"), "model": model,
+                        "agy_usage": True,
+                        "input": usage.get("input_tokens") if valid else None,
+                        "cached_input": usage.get("cache_read_tokens") if valid else None,
+                        "output": (usage["output_tokens"] + usage["thinking_tokens"]) if valid else None})
+    return records
+
+
+def _agy_cost(event, prices):
+    rates = prices.get(event.get("model"))
+    if not isinstance(rates, dict):
+        return None
+    try:
+        if any(type(event.get(field)) is not int or event[field] < 0
+               for field in ("input", "cached_input", "output")):
+            return None
+        return (event["input"] * float(rates["input"])
+                + event["cached_input"] * float(rates["cached_input"])
+                + event["output"] * float(rates["output"])) / 1_000_000
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _root():
     return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
 
@@ -921,6 +973,7 @@ def _task_metrics(task_events, land_event, prices=None):
     post_exit_land = max(0, land_ts - max(qualifying_exits)) if qualifying_exits else None
     usage = _session_records(task_events)
     session_costs = [_cost(item, prices or {}) for records in usage.values() for item in records]
+    session_costs.extend(_agy_cost(item, prices or {}) for item in _agy_run_usage(task_events))
     return {
         "tokens": token_events[-1]["tokens"] if token_events else None,
         "codex_seconds": codex_seconds,
@@ -1646,6 +1699,14 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     else:
         usage = {key: selected for key, records in usage.items()
                  if (selected := [item for item in records if item.get("version") == window])}
+    agy_records = _agy_run_usage(events or [])
+    if time_scope:
+        agy_records = [item for item in agy_records
+                       if _timestamp(item.get("ts")) >= now - WINDOWS[window]]
+    else:
+        agy_records = [item for item in agy_records if item.get("version") == window]
+    for item in agy_records:
+        usage[item["session"]] = [item]
     _render_cost(lines, window, usage, metrics["landed"], prices or {})
     if time_scope and coverage is not None:
         in_window = [item for item in coverage if _timestamp(item["start"]) >= now - WINDOWS[window]]
@@ -1711,12 +1772,13 @@ def _render_cost(lines, window, usage, landed, prices):
     for item in (record for records in usage.values() for record in records):
         model = item.get("model") or "unknown"
         inp, cache, output = (int(item.get(k, 0) or 0) for k in ("input", "cached_input", "output"))
-        total += inp
-        cached += cache
-        tokens_by_model[model]["uncached_input"] += inp - cache
-        tokens_by_model[model]["cached_input"] += cache
-        tokens_by_model[model]["output"] += output
-        amount = _cost(item, prices)
+        if not item.get("agy_usage"):
+            total += inp
+            cached += cache
+            tokens_by_model[model]["uncached_input"] += inp - cache
+            tokens_by_model[model]["cached_input"] += cache
+            tokens_by_model[model]["output"] += output
+        amount = _agy_cost(item, prices) if item.get("agy_usage") else _cost(item, prices)
         if amount is None:
             unpriced_sessions.add(item.get("session"))
         else:

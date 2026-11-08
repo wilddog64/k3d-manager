@@ -1091,6 +1091,47 @@ def test_api_cost_uses_last_session_event_and_counts_all_attempts(tmp_path):
     assert 'k3dm_dispatch_api_cost_per_landed_usd{window="1d"} 1.22827696' in output
 
 
+def test_agy_run_api_cost_uses_start_model_and_deduplicates_usage():
+    prices = {
+        "gemini-3.8-flash": {"input": 0.75, "cached_input": 0.075, "output": 3.75},
+        "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
+    }
+    captured = {"input_tokens": 951876, "output_tokens": 54141, "thinking_tokens": 23889,
+                "cache_read_tokens": 51703491, "total_tokens": 1006017}
+    rows = [
+        event(10, "start", "agy-priced", run=1, agent="agy", model="gemini-3.8-flash-medium"),
+        event(11, "agent_exit", "agy-priced", run=1, exit=0, usage=captured),
+        event(11, "agent_usage", "agy-priced", run=1, usage=dict(captured)),
+        event(12, "land", "agy-priced"),
+        event(20, "start", "agy-unpriced", run=1, agent="agy", model="gemini-9-unknown-medium"),
+        event(21, "agent_exit", "agy-unpriced", run=1, exit=0, usage=captured),
+        event(21, "agent_usage", "agy-unpriced", run=1, usage=dict(captured)),
+        event(22, "land", "agy-unpriced"),
+        event(23, "start", "agy-malformed", run=1, agent="agy", model="gemini-3.8-flash-low"),
+        event(24, "agent_exit", "agy-malformed", run=1,
+              usage={"input_tokens": 10, "cache_read_tokens": 0, "output_tokens": 2}),
+        event(25, "land", "agy-malformed"),
+        event(30, "start", "codex-control", run=1, agent="codex"),
+        event(31, "codex_usage", "codex-control", session="codex-s", model="gpt-5.6-luna",
+              input=1_000_000, cached_input=0, output=0),
+        event(32, "land", "codex-control"),
+    ]
+    expected = (951876 * 0.75 + 51703491 * 0.075 + (54141 + 23889) * 3.75) / 1_000_000
+    priced_task = dispatch_metrics._task_metrics(rows[:4], rows[3], prices)
+    unpriced_task = dispatch_metrics._task_metrics(rows[4:8], rows[7], prices)
+    malformed_task = dispatch_metrics._task_metrics(rows[8:11], rows[10], prices)
+    assert priced_task["api_cost_usd"] == pytest.approx(expected)
+    assert unpriced_task["api_cost_usd"] is None
+    assert malformed_task["api_cost_usd"] is None
+    assert dispatch_metrics._cost(rows[12], prices) == pytest.approx(0.2)
+
+    output = dispatch_metrics.render(rows, 0, 40, prices=prices)
+    assert f'k3dm_dispatch_task_api_cost_usd{{window="1d",version="9.9.9",slug="agy-priced",agent="agy",repo="k3d-manager"}} {expected}' in output
+    assert 'k3dm_dispatch_task_api_cost_usd{window="1d",version="9.9.9",slug="agy-unpriced"' not in output
+    assert f'k3dm_dispatch_api_cost_usd{{window="1d"}} {expected}' in output
+    assert f'k3dm_dispatch_api_cost_per_landed_usd{{window="1d"}} {expected / 4}' in output
+
+
 def test_session_usage_splits_cumulative_totals_by_run_model_and_keeps_session_count(tmp_path):
     # Real ledger sequence read on m4-air, 2026-11-06; cached_input values exercise the same cumulative-counter split.
     rows = [
