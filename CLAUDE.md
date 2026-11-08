@@ -148,6 +148,11 @@ must pass; live evidence is run by the operator or Claude, never Gemini. Example
 Every evidence item carries an operator-facing `intent`, and the spec carries `**Intent approved:**` before dispatch.
 <!-- shared:end intent-approval -->
 
+**Contract readers (operator, 2026-11-08).** A spec that changes a shared contract (a git ref, a Keychain item, a
+Slack app or webhook, a port, an env var, a file path another component reads) lists every reader under
+`## Contract readers`, found by grep, with file:line, and says for each whether it changes or why it doesn't. A reader
+found after dispatch is a spec defect. Precedent: the hub deploy-ref change moved the expected ref to `deploy/hub`
+without listing `sensors.py:114`, so Hermes paged on it and offered a harmful repair.
 **Test controls (operator, 2026-10-30; from "Four ways a test can lie").** Three more rules for
 dispatched tests:
 - **Paired positive control.** A test that asserts "X has no effect" (nothing loaded, nothing
