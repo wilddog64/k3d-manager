@@ -3,6 +3,8 @@
 - [ ] **P3 — GitHub Actions major bumps (Dependabot #157–#159)** (`docs/bugs/2026-11-08-github-actions-major-bumps-held-by-dependabot.md`): intents approved 2026-11-08; waiting on batched dispatch.
 - [x] **P2 — dashboard query test rejects label_replace-built column** (`docs/bugs/2026-11-08-dashboard-query-test-rejects-label-replace-built-columns.md`): test fix pushed 2026-11-08; awaiting green CI.
 - [ ] **P3 — Plans panel hides plans waiting on the operator's dispatch go** (`docs/bugs/2026-11-08-plans-panel-hides-plans-waiting-on-operator-dispatch-go.md`): fix written, offline green, uncommitted; live check after promote.
+- [x] **Blocked-by P3 LANDED** `9a8fb88a`+`ff967494` (2026-11-08); live E2 after promote and after stale ledger rows are abandoned (operator go).
+- [ ] **control-node-linux:** setup half under Claude review; role half (provision-homebrew) needs fixes before its PR.
 - [ ] **v1.43.15 plans amended:** checkout-auto-sync follows `deploy/hub` (intents need re-approval); both auto-sync and control-node-linux await the operator's dispatch go.
 - [x] **2026-11-08 host-disk live check:** 10-30 labels bug VERIFIED; scutil bug live M1 met, verifier pending.
 - [ ] **P2 (open release) — Codex spend panels double-count + tokens as dollars** (`docs/bugs/2026-11-08-codex-spend-panels-double-count-mode-and-category-series.md`): fix written, uncommitted, push after the hub bootstrap; then live check after a second promote.

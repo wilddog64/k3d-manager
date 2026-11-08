@@ -1,8 +1,8 @@
 # Bug: Plans panel Blocked by says "ready to dispatch" for a plan already dispatched or held by the dispatch rules
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** LANDED — `9a8fb88a` + `ff967494` on `k3d-manager-v1.43.15` (2026-11-08); Claude review fixed the ledger path (repo root → `K3DM_WORKTREE_ROOT`), added the file to `waits on`, and replaced a path-substring target guard that land's TMPDIR tripped; 123 pytest + 48/48 dashboard bats in land
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** live check — since 2026-11-08 (Flash verifier; then promote, E2)
 **Introduced by:** pre-existing (Blocked by has always been computed from the plan doc alone; `ready to dispatch` dates from `d95afbfe`)
 **Should have been caught by:** spec
 **Severity:** low — display only; the operator read `ready to dispatch` on a plan Luna had already run, and on a plan the
@@ -92,3 +92,14 @@ interface:
 - The ledger stub must be captured from a real `bin/k3dm-dispatch-metrics` output (host, date beside it), not imagined.
 - Same files as the landed Plans P3 and the open control-node work does not touch them, so it can be batched with any
   other Plans-panel P3 at Sunday planning.
+
+## Review notes — 2026-11-08
+
+- Luna read `ledger.jsonl` from the repo root; the dispatcher writes it under `K3DM_WORKTREE_ROOT`
+  (default `~/.local/share/k3d-manager/worktrees`), so on the hub no plan would ever have read `dispatched`. Claude
+  added `_dispatch_ledger_path()` and a test for it.
+- A read-only run of the fixed exporter on the real repo and ledger (M5, 2026-11-08): `v1.43.15-control-node-linux`
+  reads `dispatched`; `v1.43.15-checkout-auto-sync` and about 40 other plans read `waits on
+  2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery (CHANGELOG.md)`. That is true to the ledger: 24 tasks
+  from v1.43.2, v1.43.9, v1.43.13 and v1.43.14 were started and never landed or abandoned (superseded runs). E2 is
+  only meaningful once those rows are closed; that needs the operator's go (`abandon`).
