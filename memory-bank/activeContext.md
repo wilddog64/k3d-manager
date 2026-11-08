@@ -85,6 +85,7 @@ The operator asked: "Could k3d-manager support the infrastructure operations of 
 - Process (operator 2026-11-08): `/sprint-plan` became `/release-groom` (Sunday + each release cut). Releases stay at 5 plans; ideas join the next release only by displacing a not-started plan; only open + next release are numbered; ordered backlog of written plans in `docs/roadmap.md`. Records in `docs/grooming/`.
 - v1.44.0 swap: in `hub-deploy-one-command` (plan 2), `hermes-slack-config-sensors` (plan 5, manifest + unsigned probe; needs operator Slack config token + live captures). Out, unnumbered: `claude-cost-task-attribution` (#1), `prompts-by-model` (#2).
 - Abandon P3 LANDED `5df3a166`, pushed; marks offline_tested + live_verified. 23 stale rows closed; `open` 27 → 4. Kept: v1.43.13 machine-setup row (OPEN bug, uncommitted 67-line fix in its worktree) — needs land-or-redo decision.
+- Machine-setup P3: old v1.43.13 row abandoned for redo on v1.43.15 (operator 2026-11-08); prior function kept in bug doc; waits on intent approval. Open dispatches now 2 counted (Gemini ask, control node) + review child.
 - Shopping-cart retirement now conditional on twinkle app capacity (roadmap).
 - Next: Hermes values_branch P2 (blocks v1.43.15); Gemini-ask back to worker with Luna finding; control-node round 3 vm-test; intents for the two v1.44.0 plans pending.
 
