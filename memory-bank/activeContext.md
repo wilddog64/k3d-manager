@@ -1,3 +1,4 @@
+**2026-11-08 — verified offline** hub-promote P2 (Flash 9/9 on fix, M1–M4+E3 red pre-fix; Claude rerun 9/9; ledger pass). E2 live 'already at' promote still due.
 **2026-11-08 — dispatched** `v1.43.15-control-node-linux` to Luna (operator go). checkout-auto-sync waits (same Makefile; E5/E6 intent approval pending). Flash hub-promote verifier still running.
 **2026-11-08 — landed `ed56bb6a`** Plans P3. Fast gate proven on M4: default-PATH push passed ci_workflow_no_stage2 with direnv py3.13 (no yaml) first. All three dispatches landed; next: control-node-linux (go given).
 **2026-11-08 — landed `99d6796b`** fast-gate P2 (after operator pip-installed PyYAML 6.0.3 into M4's managed venv). Plans P3 committed in worktree `7d314992` (audit allow line: asserts rewritten, not dropped); lands after this push. Flash verifier for hub-promote running from the operator's shell (`sh -c 'cd … && exec agy …'`: the `!` shell refuses cd outside the repo).

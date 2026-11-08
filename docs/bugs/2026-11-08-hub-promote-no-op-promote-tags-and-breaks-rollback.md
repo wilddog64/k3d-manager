@@ -2,7 +2,7 @@
 
 **Status:** LANDED — `98942bdb` on `k3d-manager-v1.43.15` (2026-11-08); Claude review: added streaming of the push output through `tee` (Luna's version captured it, hiding the minutes-long pre-push gate); 25/25 `hub_promote.bats` outside the sandbox
 **Priority:** P2
-**Waiting on:** investigation — since 2026-11-08 (independent Flash verifier; launch needs operator permission)
+**Waiting on:** live check — since 2026-11-08 (offline verifier passed; E2 'already at' promote on M5)
 **Introduced by:** `897cfe72` (v1.43.15, deploy/hub ref with make hub-promote, hub-rollback and hub-promote-status)
 **Should have been caught by:** spec
 **Severity:** medium — `make hub-rollback`, the recovery lever, currently returns `deploy/hub` to the commit it is already on; the operator must roll back twice and may not notice. Workaround: run it twice.
@@ -88,3 +88,9 @@ interface:
 - Test fixtures must assert first that the clone's `origin` is the scratch bare repo, not GitHub (CLAUDE.md test
   controls: verify the target before the result).
 - The two duplicate tags on origin stay as they are (N4); M2 makes rollback read them correctly.
+
+## Independent verification — 2026-11-08
+
+Gemini 3.8 Flash (`gemini-3.8-flash-medium`) wrote 9 tests from the Acceptance block only (fix spec removed from its
+clone): against `98942bdb` 9/9 pass (rc 0); against pre-fix `4cf0b01c` rc 1, red on M1, M2, M3, M4 and E3, green on
+N1–N4 as expected. Claude reran the suite against `98942bdb`: 9/9. Recorded with `k3dm-codex-dispatch verify` (pass).
