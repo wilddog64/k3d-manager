@@ -1,3 +1,4 @@
+- [x] 2026-11-08 Gemini-ask P3 intents approved; [ ] /hostinger-status capture, dispatch
 - [x] 2026-11-08 trial 1 spec review + rewrite; review children exempt from WIP; [ ] hostinger-status capture, intent approval
 - [x] 2026-11-08 first-pass quality trial doc + trial 1 DoD (Gemini-ask P3); [ ] spec review, intent approval, dispatch when WIP frees; record results in trial table
 - [x] **2026-11-08 deploy/hub bootstrap:** promote 86585e4c, appsets on deploy/hub, platform-ops applied, exporter rolled out; hub-promote P2 VERIFIED.

@@ -9,6 +9,7 @@ branch has no collection step)
 **Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/hostinger-status`, or ask
 Claude, whose ask path has read-only kubectl
 **Approval:** operator, 2026-11-08 ("go ahead to file a P3 and put it on dispatch queue")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 (screenshot: "gemini show me the current hostinger status")
 **Affected:** `scripts/lib/webhook/agent.py` (`_run_cluster_ask`, gemini branch)
@@ -147,4 +148,3 @@ Before your last message, do all of these and paste the evidence:
   Claude attaches the capture before dispatch. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary
   is reachable on PATH.
 - The webhook must be restarted after the fix lands for E2 (`feedback_restart_webhook_after_verify`).
-- Needs `**Intent approved:**` before dispatch.
