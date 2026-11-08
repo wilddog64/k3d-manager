@@ -309,6 +309,11 @@ port-forward agents.
       ```
 - [ ] Stale generated ACG Applications (`istio-{base,cni}-ubuntu-k3s`, `istiod-ubuntu-k3s`) have no
       `ubuntu-k3s` context. Delete the registration Secret **before** the Applications.
+- [ ] **Next rebuild only (operator, 2026-11-07):** rotate the Slack bot token. A copy sat in plaintext in a
+      gitignored `.claude/settings.local.json` allow rule until 2026-11-07 (never committed; removed). In the
+      Slack app's OAuth & Permissions page, revoke the tokens and reinstall the app; store the new `xoxb-` token
+      in the Keychain item `k3d-manager-slack-bot-token-bot` (stdin, never argv); run `make update-webhook-slack`
+      in a local terminal; confirm a `/k3dm status` reply. Then delete this item.
 - [ ] Update `memory-bank/activeContext.md` with the outcome.
 
 ## Data is not restored — DR drill (planned, v1.43.0)
