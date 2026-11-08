@@ -1,8 +1,8 @@
 # Bug: machine_setup.bats "without a TTY" tests hang when the caller has a terminal
 
-**Status:** OPEN — fix specced and dispatched 2026-11-07
+**Status:** VERIFIED — `ae01d46b` (Luna; Claude fixed the run_machine indent and resolved the rebase onto F1's REAL_PYTHON3 change), 2026-11-07. Test-only fix: E1 red pre-fix (prompted, killed at 90 s, rc 142) and green after; E2 89/89 with </dev/null and 89/89 inside script(1), run by Claude outside any agent sandbox
+**Fix commit:** `ae01d46b`
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-07
 **Severity:** low — test-only; a gate run under an agent that allocates a terminal hangs with no output and no limit
 **Approval:** operator, 2026-11-07 ("go ahead to kill the hung test process, file P3 bug and dispatch to Luna")
 **Assigned:** Luna
