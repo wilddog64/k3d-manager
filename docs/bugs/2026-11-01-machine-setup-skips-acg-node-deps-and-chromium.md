@@ -2,8 +2,8 @@
 
 **Status:** OPEN — redo on v1.43.15 (operator, 2026-11-08). The 2026-11-01 Codex run exited 0 but was never landed; its base fell ~200 changed lines behind `bin/k3dm-machine-setup`, so the task was abandoned and the fix is to be redispatched fresh. The old function is kept below as a reference.
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08
-**Intent approved:** pending
+**Waiting on:** dispatch — since 2026-11-08
+**Intent approved:** operator, 2026-11-08 ("approve machine-setup intents")
 **Severity:** low — one manual `npm install` per checkout clears it; found on the M5 hub
 **Approval:** operator, 2026-11-01 (hub migration gap, filed as found)
 **Filed:** 2026-11-01

@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** `897cfe72` (v1.43.15, hub deploy ref: ApplicationSets pin `deploy/hub`)
 **Should have been caught by:** spec
 **Severity:** high — one Approve click puts unpromoted release-branch code on the hub, and r9 is marked not reversible;
