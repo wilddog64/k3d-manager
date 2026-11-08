@@ -6,7 +6,7 @@
 **Introduced by:** pre-existing (the no-tools guard in `_call_gemini` dates from `fd281c85`, v1.24.0; the Gemini ask
 branch has no collection step)
 **Should have been caught by:** unknown
-**Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/hostinger-status`, or ask
+**Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/cluster-status hostinger`, or ask
 Claude, whose ask path has read-only kubectl
 **Approval:** operator, 2026-11-08 ("go ahead to file a P3 and put it on dispatch queue")
 **Intent approved:** operator, 2026-11-08
@@ -60,10 +60,10 @@ Scope: Hostinger only (the reported case). Other live-state questions get a poin
    (add `file_bugs=True` as a keyword argument; this path passes `False`). Collected log text must not be able to
    file a bug.
 5. **Failure.** If the collector raises or times out, Gemini is not called. The reply is exactly:
-   `Hostinger status collection failed: <reason>. Run /hostinger-status.`, where `<reason>` is the exception's
+   `Hostinger status collection failed: <reason>. Run /cluster-status hostinger.`, where `<reason>` is the exception's
    class name or `timed out after 120s`.
 6. **No match.** Gemini is called as today, and the prompt gains this line before the question:
-   `No live data was collected for this question. If it asks about live cluster state, say that /hostinger-status or asking claude answers it; do not ask the user for kubectl output.`
+   `No live data was collected for this question. If it asks about live cluster state, say that /cluster-status hostinger or asking claude answers it; do not ask the user for kubectl output.`
 7. Remove the "run `kubectl describe pod …` first" instruction (`agent.py:449-452`) from the Gemini system text.
 8. All replies go through the existing `_finish` (`agent.py:355-366`). The job `output` file gets only the scrubbed
    reply, never the raw collector text.
@@ -93,11 +93,11 @@ must:
   - id: M2
     text: "a gemini ask with collected data gets an answer that has passed filter_suggestion, and files no docs/bugs file even when the answer carries an OBSERVATIONS line"
   - id: M3
-    text: "a gemini ask whose user text does not name Hostinger runs no collector, and its prompt contains 'No live data was collected for this question' and '/hostinger-status'"
+    text: "a gemini ask whose user text does not name Hostinger runs no collector, and its prompt contains 'No live data was collected for this question' and '/cluster-status hostinger'"
   - id: M4
-    text: "when the collector raises or exceeds 120 s, Gemini is not called and the reply is 'Hostinger status collection failed: <reason>. Run /hostinger-status.'"
+    text: "when the collector raises or exceeds 120 s, Gemini is not called and the reply is 'Hostinger status collection failed: <reason>. Run /cluster-status hostinger.'"
   - id: M5
-    text: "/hostinger-status output is unchanged (paired control for the collector extraction)"
+    text: "the report _run_hostinger_status posts (webhook route /api/v1/hostinger-status) is unchanged (paired control for the collector extraction)"
 must_not:
   - id: N1
     text: "a collector runs because earlier job output or thread context names Hostinger when the user's own text does not (paired with M1)"
@@ -111,7 +111,7 @@ evidence:
   - id: E1
     proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
     kind: offline
-    intent: "tests run the Gemini ask with a stub Gemini that records its prompt and a stub Hostinger collector, for four cases: a Hostinger question, a question about something else, a Hostinger mention only in earlier job output, and a collector that fails or hangs. They read the recorded prompt, the reply, whether a bug file appeared, and whether anything was spawned. They also check that /hostinger-status prints the same report as before."
+    intent: "tests run the Gemini ask with a stub Gemini that records its prompt and a stub Hostinger collector, for four cases: a Hostinger question, a question about something else, a Hostinger mention only in earlier job output, and a collector that fails or hangs. They read the recorded prompt, the reply, whether a bug file appeared, and whether anything was spawned. They also check that the webhook's hostinger-status report is the same as before."
   - id: E2
     proves: [M1]
     kind: live
@@ -139,6 +139,9 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
+- Replies name `/cluster-status hostinger`: the `/hostinger-status` Slack command is being retired
+  (`docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md`). The webhook route and
+  `_run_hostinger_status` stay. Operator, 2026-11-08: the command named in M3/M4 changed; the E1 and E2 intents did not.
 - The Slack command is `/hostinger-status`, a slash command of its own (`workers/slack-relay/index.js:1,460`). `/k3dm hostinger-status` is parsed as a make target and fails with `unknown target` (operator screenshot, 2026-11-08).
 - First-pass trial dispatch 1 of 3 (`docs/howto/dispatch-first-pass-trial.md`). The spec review by a separate agent
   (2026-11-08) found that the first draft named the wrong collector (`bin/cluster-status`) and missed the job-output
