@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- `scripts/lib/webhook/policy.py`: require admin for `/api/v1/cluster` Vault CA trust requests, whether expressed as an action or an `up` flag, with a distinct audit policy name
 - `scripts/lib/acg/playwright/acg_extend.js`: replace broad `isPluralsight` hostname check with `isOnSandboxPage` path check — navigation to the sandbox URL is now attempted unless the browser is already on the exact sandbox management page, fixing silent failures when CDP session is on a Pluralsight library page
 
 ---
