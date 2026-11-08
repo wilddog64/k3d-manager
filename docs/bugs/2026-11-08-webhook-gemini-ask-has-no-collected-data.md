@@ -6,7 +6,7 @@
 **Introduced by:** pre-existing (the no-tools guard in `_call_gemini` dates from `fd281c85`, v1.24.0; the Gemini ask
 branch has no collection step)
 **Should have been caught by:** unknown
-**Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/k3dm hostinger-status`, or ask
+**Severity:** low — a Gemini ask about live state never gets an answer; workarounds: `/hostinger-status`, or ask
 Claude, whose ask path has read-only kubectl
 **Approval:** operator, 2026-11-08 ("go ahead to file a P3 and put it on dispatch queue")
 **Filed:** 2026-11-08
@@ -31,7 +31,7 @@ or ingress metrics) or Hostinger VPS status data to analyze."
   run any commands or call any tools … if it is insufficient, say so briefly." Gemini did exactly that.
 - The Gemini system text still says to "run `kubectl describe pod …` first" (`agent.py:449-452`), which the guard
   forbids.
-- `/k3dm hostinger-status` (`_run_hostinger_status`, `scripts/lib/webhook/status.py:401`) does collect, in Python:
+- `/hostinger-status` (`_run_hostinger_status`, `scripts/lib/webhook/status.py:401`) does collect, in Python:
   `_smoke_test_services(provider="k3s-hostinger")` (`status.py:428`), a payload, and
   `_format_status_summary_slack(payload, "k3s-hostinger")` (`status.py:447`). It does not run `bin/cluster-status`;
   the docstring at `status.py:402` saying so is stale.
@@ -59,10 +59,10 @@ Scope: Hostinger only (the reported case). Other live-state questions get a poin
    (add `file_bugs=True` as a keyword argument; this path passes `False`). Collected log text must not be able to
    file a bug.
 5. **Failure.** If the collector raises or times out, Gemini is not called. The reply is exactly:
-   `Hostinger status collection failed: <reason>. Run /k3dm hostinger-status.`, where `<reason>` is the exception's
+   `Hostinger status collection failed: <reason>. Run /hostinger-status.`, where `<reason>` is the exception's
    class name or `timed out after 120s`.
 6. **No match.** Gemini is called as today, and the prompt gains this line before the question:
-   `No live data was collected for this question. If it asks about live cluster state, say that /k3dm hostinger-status or asking claude answers it; do not ask the user for kubectl output.`
+   `No live data was collected for this question. If it asks about live cluster state, say that /hostinger-status or asking claude answers it; do not ask the user for kubectl output.`
 7. Remove the "run `kubectl describe pod …` first" instruction (`agent.py:449-452`) from the Gemini system text.
 8. All replies go through the existing `_finish` (`agent.py:355-366`). The job `output` file gets only the scrubbed
    reply, never the raw collector text.
@@ -91,11 +91,11 @@ must:
   - id: M2
     text: "a gemini ask with collected data gets an answer that has passed filter_suggestion, and files no docs/bugs file even when the answer carries an OBSERVATIONS line"
   - id: M3
-    text: "a gemini ask whose user text does not name Hostinger runs no collector, and its prompt contains 'No live data was collected for this question' and '/k3dm hostinger-status'"
+    text: "a gemini ask whose user text does not name Hostinger runs no collector, and its prompt contains 'No live data was collected for this question' and '/hostinger-status'"
   - id: M4
-    text: "when the collector raises or exceeds 120 s, Gemini is not called and the reply is 'Hostinger status collection failed: <reason>. Run /k3dm hostinger-status.'"
+    text: "when the collector raises or exceeds 120 s, Gemini is not called and the reply is 'Hostinger status collection failed: <reason>. Run /hostinger-status.'"
   - id: M5
-    text: "/k3dm hostinger-status output is unchanged (paired control for the collector extraction)"
+    text: "/hostinger-status output is unchanged (paired control for the collector extraction)"
 must_not:
   - id: N1
     text: "a collector runs because earlier job output or thread context names Hostinger when the user's own text does not (paired with M1)"
@@ -109,7 +109,7 @@ evidence:
   - id: E1
     proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
     kind: offline
-    intent: "tests run the Gemini ask with a stub Gemini that records its prompt and a stub Hostinger collector, for four cases: a Hostinger question, a question about something else, a Hostinger mention only in earlier job output, and a collector that fails or hangs. They read the recorded prompt, the reply, whether a bug file appeared, and whether anything was spawned. They also check that /k3dm hostinger-status prints the same report as before."
+    intent: "tests run the Gemini ask with a stub Gemini that records its prompt and a stub Hostinger collector, for four cases: a Hostinger question, a question about something else, a Hostinger mention only in earlier job output, and a collector that fails or hangs. They read the recorded prompt, the reply, whether a bug file appeared, and whether anything was spawned. They also check that /hostinger-status prints the same report as before."
   - id: E2
     proves: [M1]
     kind: live
@@ -137,12 +137,13 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
+- The Slack command is `/hostinger-status`, a slash command of its own (`workers/slack-relay/index.js:1,460`). `/k3dm hostinger-status` is parsed as a make target and fails with `unknown target` (operator screenshot, 2026-11-08).
 - First-pass trial dispatch 1 of 3 (`docs/howto/dispatch-first-pass-trial.md`). The spec review by a separate agent
   (2026-11-08) found that the first draft named the wrong collector (`bin/cluster-status`) and missed the job-output
   injection path and the bug-filing path; this version fixes all three.
 - Existing tests in `scripts/tests/bin/test_webhook_ask_delivery.py` ask gemini with no Hostinger mention and expect
   the stubbed answer verbatim; under fix step 6 they stay green.
-- The stubbed collector text must be taken from a real `/k3dm hostinger-status` reply (host and date in a comment);
+- The stubbed collector text must be taken from a real `/hostinger-status` reply (host and date in a comment);
   Claude attaches the capture before dispatch. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary
   is reachable on PATH.
 - The webhook must be restarted after the fix lands for E2 (`feedback_restart_webhook_after_verify`).
