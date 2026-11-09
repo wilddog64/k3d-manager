@@ -1,14 +1,14 @@
 # Bug: ask-bash runs an interpreter when its name is respelled
 
-**Status:** OPEN — filed 2026-11-09, intent approval pending
+**Status:** OPEN — dispatched to Flash 2026-11-09
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** f68bdee1 (2026-08-03, the interpreter deny line)
 **Should have been caught by:** unknown
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-09); exact-slug glob found nothing; read `docs/bugs/2026-10-08-ask-bash-shell-string-bypasses-path-scope.md` and `docs/bugs/2026-11-08-ask-bash-interpreter-deny-matches-repository-path.md`, different defects in the same file
 **Severity:** medium — an `/ask` agent can run an interpreter it is meant to be denied; the macOS sandbox still refused a HOME read
 **Approval:** operator, 2026-11-09 ("go ahead to file a P2 bug then dispatch to Flash")
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-09
 **Filed:** 2026-11-09
 **Detected by:** independent verifier's break-it pass on `b98cff7e`, 2026-11-09
 **Affected:** `bin/k3dm-ask-bash`
