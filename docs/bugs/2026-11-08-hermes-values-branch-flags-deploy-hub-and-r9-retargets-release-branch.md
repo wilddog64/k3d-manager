@@ -1,8 +1,7 @@
 # Bug: Hermes flags apps on `deploy/hub` as stale, and its repair r9 would re-target them to the release branch
 
-**Status:** LANDED — `9c63f684` on `k3d-manager-v1.43.15`, 2026-11-08; not yet promoted to `deploy/hub`, E2 live check due after promote
+**Status:** VERIFIED — landed `9c63f684` on `k3d-manager-v1.43.15`; E2 live on the M5, 2026-11-08
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-08
 **Introduced by:** `897cfe72` (v1.43.15, hub deploy ref: ApplicationSets pin `deploy/hub`)
 **Should have been caught by:** spec
 **Severity:** high — one Approve click puts unpromoted release-branch code on the hub, and r9 is marked not reversible;
@@ -137,3 +136,12 @@ Before your last message, do all of these and paste the evidence:
   or convert, `test_repairs.py` and the real bats suite, the guide's R9 row, `run` kept as an unused positional,
   `RELEASE_BRANCH` removed, the `expected` argument as a test hook, the exact r9 name, and a zero-calls control on N2.
   The E1 and E2 intents are unchanged, so the operator's approval stands.
+
+## Live verification (E2, m5-air.local, 2026-11-08, operator-run)
+
+- Checkout reached `124799b6` at 17:09:48 PST by `git pull` (`git reflog`). It contains `9c63f684`; `sensors.py` has the `deploy/hub` default (grep count 1).
+- Last Hermes log record, first poll seen after that: `values_branch` `healthy`, `expected: deploy/hub`, `21 references on deploy/hub`, sampled 2026-11-09T01:13:48Z. launchd runs `bin/k3dm-hermes` from this repo, last exit 0.
+- Hermes Status dashboard, after reload: Degraded sensors 0.
+- `k3dm-notices`: no r9 card since the fix reached the M5; last post is 12:02 PST (operator screenshot).
+- Not part of this fix: `alert_delivery` reads `unknown` ("alert delivery probe unavailable"), cause not investigated.
+- Delivery correction: this fix reaches Hermes through the M5 checkout, not `make hub-promote`.
