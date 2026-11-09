@@ -7,7 +7,7 @@
 **Should have been caught by:** unknown
 **Severity:** medium — Hermes cannot check whether Alertmanager can deliver alerts; workaround: run the probe by hand with the venv first on PATH
 **Approval:** operator, 2026-11-08 ("sounds good, go ahead", on fixing this in v1.43.15)
-**Intent approved:** operator, 2026-11-08 ("approve both E1 and E2")
+**Intent approved:** operator, 2026-11-08
 **Prior art:** `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (score not available: `make find-similar-docs` store unreachable from the M4) — read; same symptom, this spec fixes the cause proven on the M5; `docs/bugs/2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md` — read, created the venv reused here
 **Filed:** 2026-11-08
 **Detected by:** operator, Hermes Status dashboard, 2026-11-08
@@ -105,6 +105,7 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
+- E1 and E2 intents approved by the operator on 2026-11-08 ("approve both E1 and E2").
 - Test stubs: the `kubectl` stub lists context `k3d-k3d-cluster` and returns an Alertmanager item named as in the live capture above (m5-air.local, 2026-11-08). Each fixture first asserts that HOME is the scratch directory.
 - Delivery: this reaches Hermes through the M5 checkout (`make hub-sync`), not `make hub-promote`. No restart needed: Hermes starts a new process each poll.
 - The other 2026-10-13 requirements (reason codes, dashboard text) stay open there.
