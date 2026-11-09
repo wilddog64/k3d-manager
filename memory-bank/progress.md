@@ -70,6 +70,7 @@
 - ideas.md: added inbox row "record find-similar-docs prior art per bug" (audit: runs ~1/bug in most sessions, 0/10 and 3/10 in two; outcome never recorded). Operator go 2026-11-08.
 - `**Prior art:**` header line on every new bug doc, started 2026-11-08 (CLAUDE.md dedup rule; operator). Review at first grooming after 2026-12-08.
 - New P3 filed 2026-11-08: docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md (land refuses instruction/hook file changes unless --allow-instruction-files; from dev.to AGENTS.md article). Intents approved 2026-11-08; waits on a free slot (WIP 3/3), after the machine-setup P3.
+- 2026-11-08: alert_delivery PyYAML fix dispatched to Luna (intents approved).
 - 2026-11-08: alert_delivery PyYAML fix specced for v1.43.15; intents pending.
 - 2026-11-08: alert_delivery unknown traced on M5 to missing PyYAML for the probe's python3; fix awaits operator decision.
 - 2026-11-08: Hermes values_branch P2 VERIFIED live on M5 (healthy on deploy/hub, Degraded 0, no r9 card).

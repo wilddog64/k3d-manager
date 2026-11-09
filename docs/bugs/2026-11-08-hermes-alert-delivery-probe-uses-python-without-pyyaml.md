@@ -1,8 +1,8 @@
 # Bug: Hermes alert_delivery probe runs a python3 without PyYAML on the M5
 
-**Status:** OPEN — specced 2026-11-08, intents approved, dispatch to Luna
+**Status:** OPEN — specced 2026-11-08, intents approved, dispatched to Luna
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Severity:** medium — Hermes cannot check whether Alertmanager can deliver alerts; workaround: run the probe by hand with the venv first on PATH
