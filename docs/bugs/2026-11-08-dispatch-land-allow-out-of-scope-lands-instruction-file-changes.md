@@ -8,7 +8,7 @@
 **Severity:** medium — no known exploit, but one landed edit to an instruction or hook file steers every later agent
 session, and the override that lets it through is used routinely for unrelated reasons
 **Approval:** operator, 2026-11-08 ("got file P3 to make land refuse change")
-**Intent approved:** operator, 2026-11-08 ("approve both": E1 and E2)
+**Intent approved:** operator, 2026-11-08
 **Prior art:** `docs/bugs/2026-10-09-codex-dispatch-task-can-widen-its-own-scope.md` (found by grep, not scored) —
 read, different root cause: that fix stopped a task from editing its own spec's file list; this is the operator
 override. `find-similar-docs` not run: the embeddings key now reads on m4-air, but the store is reached through kube
@@ -148,6 +148,7 @@ Before your last message, do all of these and paste the evidence:
 
 ## Notes
 
+- Intent approval words, operator, 2026-11-08: "approve both": E1 and E2.
 - `case` globs in bash match `/` with `*`, so `*/.claude/*` and `.claude/*` together cover every depth; a test for
   each form in M3 guards against a pattern that only matches the root.
 - This does not stop the operator or Claude from editing instruction files directly on the release branch; that path
