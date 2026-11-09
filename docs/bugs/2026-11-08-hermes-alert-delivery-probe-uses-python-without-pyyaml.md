@@ -1,8 +1,7 @@
 # Bug: Hermes alert_delivery probe runs a python3 without PyYAML on the M5
 
-**Status:** LANDED — `4f88391d` on `k3d-manager-v1.43.15`; independent verifier and live check after `make hub-sync` on the M5 pending
+**Status:** VERIFIED — `4f88391d`; offline by an independent verifier, live on m5-air.local 2026-11-08 19:15 PST: `hermes-status` shows alert_delivery healthy, 2 route trees, 13 healthy, 0 unknown
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-08
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Severity:** medium — Hermes cannot check whether Alertmanager can deliver alerts; workaround: run the probe by hand with the venv first on PATH
