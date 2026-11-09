@@ -1,8 +1,8 @@
 # Bug: ask-bash refuses a read when the repository path contains an interpreter name
 
-**Status:** OPEN — dispatched to Luna
+**Status:** LANDED — `b98cff7e`, independent verification pending
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** investigation — since 2026-11-09
 **Introduced by:** f68bdee1 (2026-08-03, the interpreter deny line)
 **Should have been caught by:** offline test
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-08); exact-slug glob found nothing; read `docs/bugs/2026-10-08-ask-bash-shell-string-bypasses-path-scope.md`, a different defect in the same file
