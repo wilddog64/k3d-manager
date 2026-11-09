@@ -1,8 +1,8 @@
 # Bug: ask-bash runs an interpreter when its name is respelled
 
-**Status:** OPEN — dispatched to Flash 2026-11-09
+**Status:** LANDED — `92b51ee2` (Flash; Claude review), 2026-11-09. `ask_bash_scope.bats` 14/14 outside any agent sandbox; with the rule removed N1–N4 red, M1–M2 green; restored 14/14. Independent verifier not yet run
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-09
+**Waiting on:** dispatch — since 2026-11-09 (independent verifier)
 **Introduced by:** f68bdee1 (2026-08-03, the interpreter deny line)
 **Should have been caught by:** unknown
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-09); exact-slug glob found nothing; read `docs/bugs/2026-10-08-ask-bash-shell-string-bypasses-path-scope.md` and `docs/bugs/2026-11-08-ask-bash-interpreter-deny-matches-repository-path.md`, different defects in the same file

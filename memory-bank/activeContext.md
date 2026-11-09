@@ -1,4 +1,5 @@
 **2026-11-08 — reauth-reply P3 approved + intents approved** (operator "approved those two requests"); Waiting on: dispatch, batched with retire-/hostinger-status P3 (both edit workers/slack-relay/index.js). Commit held locally until CI run 42517237027 (lint fix) completes.
+**2026-11-09 — ask-bash respelled interpreter P2 LANDED** `92b51ee2`; ledger offline_tested; independent verifier next. Dependabot #16 (deepmerge, low, dev, no patched version) in lib-foundation acg lock noted.
 **2026-11-09 — deploy/hub promoted to `249c30e6`** (tag `hub-promote/20261109T141607Z`) after M5 checkout pull; Open PRs column order now deployable; Grafana restart only if the old order persists.
 **2026-11-09 — CI lint red on c99043cd** five unused job_dir assignments in the Gemini ask test removed; pushing with the held P3 docs commit, then CI must go green before promote.
 **2026-11-09 — P3 triage** v1.43.16 is a bug-only patch holding 10 P3s (`docs/roadmap.md`); P3 limit defined in `docs/ideas.md`; `abandon` and `--parent` bugs VERIFIED. Docs commit held locally until CI on `c99043cd` finishes.
