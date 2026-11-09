@@ -1,14 +1,14 @@
 # Bug: ask-bash refuses a read when the repository path contains an interpreter name
 
-**Status:** OPEN — spec written; waiting for intent approval
+**Status:** OPEN — dispatched to Luna
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** f68bdee1 (2026-08-03, the interpreter deny line)
 **Should have been caught by:** offline test
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-08); exact-slug glob found nothing; read `docs/bugs/2026-10-08-ask-bash-shell-string-bypasses-path-scope.md`, a different defect in the same file
 **Severity:** low — tests only in practice; `/ask` runs from the main checkout, whose path has no such word
 **Approval:** operator, 2026-11-08 ("go ahead to file a P3 bug and dispatch to Luna")
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** Claude, comparing wide test suites for the alert_delivery fix, 2026-11-08
 **Affected:** `bin/k3dm-ask-bash`
