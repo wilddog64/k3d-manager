@@ -1,8 +1,8 @@
 # Bug: a Slack "gemini …" status question gets "please provide kubectl output": the ask path collects nothing
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** LANDED — `94eb3a06`, independent verification and live check pending
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** live check — since 2026-11-09
 **Introduced by:** pre-existing (the no-tools guard in `_call_gemini` dates from `fd281c85`, v1.24.0; the Gemini ask
 branch has no collection step)
 **Should have been caught by:** unknown
