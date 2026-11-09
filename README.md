@@ -240,11 +240,6 @@ docs/
 - **[Vector Store](docs/guides/vector-store.md)** — The pgvector prior-art store: what is embedded and why it is ~3% of each file, the content-hash keying that makes a re-run free, the two Gemini quotas and why only one can be paced around, the rebuildable-cache stance, and credential resolution across env / keychain / hub Vault
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
-- **[Fast local gate](docs/howto/fast-gate.md)** — Check changed files before push and landing
-- **[One-command machine setup](docs/howto/machine-setup.md)** — Prepare hub, worker and console Macs from role manifests
-- **[M5 hub migration](docs/howto/m5-hub-migration.md)** — Build, cut over and roll back the single-instance hub agents
-- **[Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)** — `make snapshot` before a planned rebuild: copy cold hub state to the M2 store
-- **[Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)** — The two webhook values to replace when rotating it
 - **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
 
 ### Providers
@@ -267,6 +262,11 @@ docs/
 
 ### How-To
 
+**Workstations & dev workflow**
+- **[One-command machine setup](docs/howto/machine-setup.md)** — Prepare hub, worker and console Macs from role manifests
+- **[M5 hub migration](docs/howto/m5-hub-migration.md)** — Build, cut over and roll back the single-instance hub agents
+- **[Fast local gate](docs/howto/fast-gate.md)** — Check changed files before push and landing
+
 **Secrets & Identity**
 - **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
 - **[ESO](docs/howto/eso.md)** — Deploy, connect a secret store, troubleshoot sync failures
@@ -287,6 +287,7 @@ docs/
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
 - **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/ask-docs`, `/claude` / `/gemini` / `/codex`, `/cluster-up` / `/cluster-down` / `/cluster-status` / `/cluster-refresh` / `/cluster-resume`, and `/argocd-upgrade`
 - **[Webhook Operations](docs/howto/webhook-operations.md)** — Log levels, job logs, retention, and failed-job notes
+- **[Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)** — The two webhook values to replace when rotating it
 - **[Webhook Doctor](docs/howto/webhook-doctor.md)** — `make webhook-doctor`: read-only webhook diagnosis that tells a locked Keychain apart from missing credentials
 - **[Cloud Session Requests](docs/howto/cloud-session-requests.md)** — How an agent with only repo access asks the local webhook for read-only cluster state via the `cloud-requests` branch, the action allowlist, and the two-token (admin / reader) model
 - **[Codex dispatch](docs/howto/codex-dispatch.md)** — Run specs in isolated worktrees and land verified changes
@@ -295,6 +296,7 @@ docs/
 
 - **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
 - **[Hub Rebuild & Recovery](docs/howto/hub-rebuild-from-gitops-vault.md)** — Rebuild the hub, `make hub-recover`, unstick the identity sync, and what is not restored; use `make argocd-admin-resync` to revalidate and repair the Vault ArgoCD admin password without running full recovery; the weekly DR drill proves an export restores ([how-to](docs/howto/hub-dr-drill.md))
+- **[Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)** — `make snapshot` before a planned rebuild: copy cold hub state to the M2 store
 - **[Weekly Hub DR Drill](docs/howto/hub-dr-drill.md)** — Export encrypted hub data, restore it on the M2, and publish the verification result; `make hub-data-recover` / `make hub-recover-all` restore a real hub from the same export
 - **[Coordinated OrbStack Upgrade](docs/howto/orbstack-upgrade.md)** — Upgrade OrbStack in a planned window with hub preflight, Vault and network recovery, and health checks
 - **[Independent Heartbeats](docs/howto/independent-heartbeats.md)** — Optional outbound heartbeat probes for the M4 services and Hostinger, disabled by default
@@ -316,8 +318,6 @@ docs/
 
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
-- **[vCluster E2E Harness — Tier 1](docs/guides/vcluster-e2e-harness.md#tier-1-per-candidate-vcluster-gate)** — `e2e_verify_vcluster`: throwaway-vCluster substrate + in-cluster Playwright Job + JSON pass/fail contract; blocking, per-candidate
-- **[vCluster E2E Harness — Tier 2](docs/guides/vcluster-e2e-harness.md#tier-2-acg-sandbox-stripe-verification)** — `e2e_verify_sandbox`: opt-in ACG sandbox Stripe flow with in-sandbox ArgoCD and non-blocking JSON reporting
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
