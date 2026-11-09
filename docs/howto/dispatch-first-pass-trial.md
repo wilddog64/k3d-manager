@@ -84,7 +84,7 @@ The baseline is 2026-11-08: 5 of 5 lands needed rework, and every defect was cau
 
 | Dispatch | Worker | Reviewer | Rework rounds | Caught by (defect → step) | Noise | Tokens (worker + reviews + rework) | Notes |
 |---|---|---|---|---|---|---|---|
-| | | | | | | | |
+| `2026-11-08-hermes-values-branch-flags-deploy-hub-and-r9-retargets-release-branch` | Luna | Flash | 1 (Claude: one added test and two allow markers) | Spec-mandated test deletions tripped the no-marker test-count audit → pre-commit at Claude's commit. Flash's audit "clean" ran with nothing staged | 0 findings | 363,160 (worker 123,031 + review 240,129; Claude's rework not counted) | Three land refusals were Claude's process, not the fix: uncommitted worktree, unpushed local commits, PyYAML missing from direnv `python3` |
 
 ## Open points
 

@@ -1,8 +1,8 @@
 # Bug: Hermes flags apps on `deploy/hub` as stale, and its repair r9 would re-target them to the release branch
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** LANDED — `9c63f684` on `k3d-manager-v1.43.15`, 2026-11-08; not yet promoted to `deploy/hub`, E2 live check due after promote
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** live check — since 2026-11-08
 **Introduced by:** `897cfe72` (v1.43.15, hub deploy ref: ApplicationSets pin `deploy/hub`)
 **Should have been caught by:** spec
 **Severity:** high — one Approve click puts unpromoted release-branch code on the hub, and r9 is marked not reversible;
