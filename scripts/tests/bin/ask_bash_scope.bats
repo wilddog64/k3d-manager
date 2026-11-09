@@ -33,6 +33,13 @@ ask_bash() {
     "$BATS_TEST_DIRNAME/../../../bin/k3dm-ask-bash" "$@"
 }
 
+ask_bash_sandboxed() {
+  run env -i HOME="$TEST_HOME" PATH="$PATH" \
+    K3DM_REPO_ROOT="$K3DM_REPO_ROOT" \
+    K3DM_SHOPPING_CARTS_ROOT="$K3DM_SHOPPING_CARTS_ROOT" \
+    "$BATS_TEST_DIRNAME/../../../bin/k3dm-ask-bash" "$@"
+}
+
 assert_denied_without_canary() {
   [ "$status" -ne 0 ]
   [[ "$output" != *HARMLESS_CANARY* ]]
@@ -155,4 +162,130 @@ assert_denied_without_canary() {
   ask_bash -c "bash $TEST_REPO/reader.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *HARMLESS_CANARY* ]]
+}
+
+@test "M1: with the OS sandbox on, reading a file inside the repository root through ask-bash exits 0 and prints the file" {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "sandbox-exec is Darwin-only"
+  fi
+  [ -d "$TEST_ROOT" ]
+  [ "$TEST_HOME" = "$TEST_ROOT/home" ]
+  [ -d "$TEST_HOME" ]
+  [ "$K3DM_REPO_ROOT" = "$TEST_REPO" ]
+  [ -d "$K3DM_REPO_ROOT" ]
+
+  ask_bash_sandboxed -c "cat $TEST_REPO/README.md"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *SAFE_REPO_CONTENT* ]]
+}
+
+@test "M2: with the OS sandbox on, a non-interpreter program in the repository root runs, exits 0 and prints its output, including when its name is written with quotes" {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "sandbox-exec is Darwin-only"
+  fi
+  [ -d "$TEST_ROOT" ]
+  [ "$TEST_HOME" = "$TEST_ROOT/home" ]
+  [ -d "$TEST_HOME" ]
+  [ "$K3DM_REPO_ROOT" = "$TEST_REPO" ]
+  [ -d "$K3DM_REPO_ROOT" ]
+
+  printf '#!/bin/sh\nprintf HELPER_PROGRAM_RAN\\n\n' > "$TEST_REPO/helper"
+  chmod +x "$TEST_REPO/helper"
+  [ -x "$TEST_REPO/helper" ]
+
+  ask_bash_sandboxed -c "$TEST_REPO/helper"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *HELPER_PROGRAM_RAN* ]]
+
+  ask_bash_sandboxed -c "$TEST_REPO/hel''per"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *HELPER_PROGRAM_RAN* ]]
+}
+
+@test "N1: with the OS sandbox on, an interpreter named with quotes inside the name runs (py''thon3, pe''rl, no''de)" {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "sandbox-exec is Darwin-only"
+  fi
+  [ -d "$TEST_ROOT" ]
+  [ "$TEST_HOME" = "$TEST_ROOT/home" ]
+  [ -d "$TEST_HOME" ]
+  [ "$K3DM_REPO_ROOT" = "$TEST_REPO" ]
+  [ -d "$K3DM_REPO_ROOT" ]
+
+  for cmd in \
+    "py''thon3 -c \"print('LEAKED_N1')\"" \
+    "pe''rl -e \"print 'LEAKED_N1'\"" \
+    "no''de -e \"console.log('LEAKED_N1')\""; do
+    if [[ "$cmd" == *"no''de"* ]] && ! command -v node >/dev/null 2>&1; then
+      continue
+    fi
+    ask_bash_sandboxed -c "$cmd"
+    [ "$status" -ne 0 ]
+    [[ "$output" != *LEAKED_N1* ]]
+  done
+}
+
+@test "N2: with the OS sandbox on, an interpreter named with a backslash inside the name runs (pyth\\on3)" {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "sandbox-exec is Darwin-only"
+  fi
+  [ -d "$TEST_ROOT" ]
+  [ "$TEST_HOME" = "$TEST_ROOT/home" ]
+  [ -d "$TEST_HOME" ]
+  [ "$K3DM_REPO_ROOT" = "$TEST_REPO" ]
+  [ -d "$K3DM_REPO_ROOT" ]
+
+  ask_bash_sandboxed -c "pyth\\on3 -c \"print('LEAKED_N2')\""
+  [ "$status" -ne 0 ]
+  [[ "$output" != *LEAKED_N2* ]]
+}
+
+@test "N3: with the OS sandbox on, an interpreter reached by a glob runs (/usr/bin/pyth?n3, or a glob matching a program named python3 inside the root)" {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "sandbox-exec is Darwin-only"
+  fi
+  [ -d "$TEST_ROOT" ]
+  [ "$TEST_HOME" = "$TEST_ROOT/home" ]
+  [ -d "$TEST_HOME" ]
+  [ "$K3DM_REPO_ROOT" = "$TEST_REPO" ]
+  [ -d "$K3DM_REPO_ROOT" ]
+
+  ask_bash_sandboxed -c "/usr/bin/pyth?n3 -c \"print('LEAKED_N3_GLOB')\""
+  [ "$status" -ne 0 ]
+  [[ "$output" != *LEAKED_N3_GLOB* ]]
+
+  printf '#!/bin/sh\nprintf LEAKED_N3_ROOT\\n\n' > "$TEST_REPO/python3"
+  chmod +x "$TEST_REPO/python3"
+  [ -x "$TEST_REPO/python3" ]
+
+  ask_bash_sandboxed -c "$TEST_REPO/pyth*"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *LEAKED_N3_ROOT* ]]
+}
+
+@test "N4: with the OS sandbox on, a script whose shebang names an interpreter runs" {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "sandbox-exec is Darwin-only"
+  fi
+  [ -d "$TEST_ROOT" ]
+  [ "$TEST_HOME" = "$TEST_ROOT/home" ]
+  [ -d "$TEST_HOME" ]
+  [ "$K3DM_REPO_ROOT" = "$TEST_REPO" ]
+  [ -d "$K3DM_REPO_ROOT" ]
+
+  printf '#!/usr/bin/perl\nprint "LEAKED_N4_PERL\\n";\n' > "$TEST_REPO/script.pl"
+  chmod +x "$TEST_REPO/script.pl"
+  [ -x "$TEST_REPO/script.pl" ]
+
+  ask_bash_sandboxed -c "$TEST_REPO/script.pl"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *LEAKED_N4_PERL* ]]
+
+  printf '#!/usr/bin/env python3\nprint("LEAKED_N4_PYTHON")\n' > "$TEST_REPO/script.py"
+  chmod +x "$TEST_REPO/script.py"
+  [ -x "$TEST_REPO/script.py" ]
+
+  ask_bash_sandboxed -c "$TEST_REPO/script.py"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *LEAKED_N4_PYTHON* ]]
 }
