@@ -62,15 +62,6 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 
 ---
 
-## How-To guides
-
-- [Fast local gate](docs/howto/fast-gate.md) — check changed files before push and landing.
-
-- [One-command machine setup](docs/howto/machine-setup.md) — prepare hub, worker and console Macs from role manifests.
-- [M5 hub migration](docs/howto/m5-hub-migration.md) — build, cut over and roll back the single-instance hub agents.
-- [Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)
-- [Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)
-
 ## Usage
 
 ```bash
@@ -249,6 +240,11 @@ docs/
 - **[Vector Store](docs/guides/vector-store.md)** — The pgvector prior-art store: what is embedded and why it is ~3% of each file, the content-hash keying that makes a re-run free, the two Gemini quotas and why only one can be paced around, the rebuildable-cache stance, and credential resolution across env / keychain / hub Vault
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
+- **[Fast local gate](docs/howto/fast-gate.md)** — Check changed files before push and landing
+- **[One-command machine setup](docs/howto/machine-setup.md)** — Prepare hub, worker and console Macs from role manifests
+- **[M5 hub migration](docs/howto/m5-hub-migration.md)** — Build, cut over and roll back the single-instance hub agents
+- **[Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)** — `make snapshot` before a planned rebuild: copy cold hub state to the M2 store
+- **[Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)** — The two webhook values to replace when rotating it
 - **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
 
 ### Providers
@@ -270,9 +266,6 @@ docs/
 - **[Vector Store](docs/architecture/vector-store.md)** — pgvector prior-art index: components, index-run sequence, credential resolution, failure modes
 
 ### How-To
-
-**Workstations**
-- **[One-command machine setup](docs/howto/machine-setup.md)** — bootstrap and check hub, worker and console Macs.
 
 **Secrets & Identity**
 - **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
