@@ -1,8 +1,8 @@
 # `land --allow-out-of-scope` lands a worker's changes to agent instruction and hook files
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** OPEN — dispatched to Luna 2026-11-09
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Severity:** medium — no known exploit, but one landed edit to an instruction or hook file steers every later agent
