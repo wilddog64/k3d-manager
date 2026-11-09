@@ -87,6 +87,6 @@ The script's route-shape step (`bin/k3dm-alert-delivery-status:50`) does `import
 - A hand run inside the repo fails the same way, but through the direnv Python 3.15 environment, which is a different interpreter.
 - Ruled out: `mapfile: command not found` (rc 127) came once, from an `env -i` command that built its variables with a zsh expansion. The literal-`PATH` run got past line 8, so it was most likely that command's fault, not Hermes's.
 - Not established: why October's M4 failed. This cause is proven on the M5 only.
-- `bin/k3dm-machine-setup:109,264` installs PyYAML only into a dev virtualenv, which this probe does not use. Claude's recommendation, awaiting the operator: `make machine-setup` installs Homebrew `pyyaml`, after proving it lands in the interpreter `python3` resolves to. Alternative: a dedicated virtualenv for the probe.
+- `bin/k3dm-machine-setup:109,264` installs PyYAML only into a virtualenv this probe does not use. Homebrew has no `pyyaml` formula. Fix specced in `docs/bugs/2026-11-08-hermes-alert-delivery-probe-uses-python-without-pyyaml.md`: the probe puts that virtualenv first on its own PATH.
 - Not an observed delivery failure: the probe never reached its route check, so delivery is unknown, not broken.
 - The reason-code work under Required behavior is still open and separate.
