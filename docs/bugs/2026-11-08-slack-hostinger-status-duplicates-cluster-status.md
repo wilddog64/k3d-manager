@@ -13,7 +13,7 @@ covered the same checks)
 **Detected by:** operator, Slack, 2026-11-08 (screenshots: `/hostinger-status` → "failed because the app did not
 respond"; `/cluster-status hostinger` → HEALTHY, 21 ok / 0 warn / 0 fail)
 **Affected:** `workers/slack-relay/index.js`, `scripts/lib/webhook/make_targets.py`, `docs/howto/slack-slash-commands.md`
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 **Related:** `docs/bugs/2026-07-01-slack-manifest-drift.md` (CLOSED; same class: live Slack app settings drifted from the
 documented manifest); `docs/bugs/2026-11-08-webhook-gemini-ask-has-no-collected-data.md` (reuses the Hostinger
 collector behind `/api/v1/hostinger-status`)

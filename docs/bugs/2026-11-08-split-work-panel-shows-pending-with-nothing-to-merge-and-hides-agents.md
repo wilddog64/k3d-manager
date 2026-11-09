@@ -1,6 +1,6 @@
 # Bug: Split work panel says `pending` when there is nothing to merge, and does not name the agents
 
-**Status:** OPEN — spec written; waiting for intent approval and the `k3d-manager-v1.44.0` branch
+**Status:** OPEN — spec written; waiting for intent approval and the `k3d-manager-v1.43.16` branch
 **Priority:** P3
 **Waiting on:** operator decision — since 2026-11-08
 **Introduced by:** v1.43.14 (`docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md:299` defines the `pending` value)
@@ -12,7 +12,7 @@
 **Filed:** 2026-11-08
 **Detected by:** operator, reading the Agent Dispatch dashboard, 2026-11-08
 **Affected:** `bin/k3dm-dispatch-metrics`, `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
-**Branch:** `k3d-manager-v1.44.0` (first dispatch of the release; a bug spec, so outside the 5-plan cap)
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 **Related:** `docs/ideas.md` (row of 2026-11-08, "Make the Agent Dispatch Split work panel readable")
 
 ## Symptom

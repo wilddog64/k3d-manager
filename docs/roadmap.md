@@ -550,6 +550,21 @@ Bugs moved from v1.43.14 on 2026-11-07 (bugs do not count toward the plan cap): 
 
 **v1.43.15 plan 5:** [`hub-deploy-ref-and-live-write-guard`](plans/v1.43.15-hub-deploy-ref-and-live-write-guard.md) (operator, 2026-11-07: "how we prevent working on live system directly"; chose "a separate ref so we are at least to make hub stable"). The hub's ApplicationSets read only `deploy/hub`. It moves only through `make hub-promote` (commit on origin, CI green, typed confirmation, `hub-promote/<UTC>` tag) or `make hub-rollback`. `make platform-ops` applies a `git archive` of `deploy/hub`, never the working tree. **Supersedes the 2026-07-24 decision** that ApplicationSets track the release branch; CLAUDE.md's reapply and platform-ops release rules change once it lands. Hub spec: dispatch waits for the operator's go. Follow-up candidate (v1.45.0): preview Grafana in `platform-ops-preview` for branch live checks, and read-only hub credentials for agents. Moved from v1.44.0 by Claude on 2026-11-07 after the operator's dispatch go, so the P1 goes out first.
 
+### Patch release — v1.43.16
+
+Bug-fix only (operator, 2026-11-09). Cut from `main` after v1.43.15 merges. This is not the old v1.43.16, which became v1.44.0 in the 2026-11-07 renumbering. Holds 10 P3s, the limit:
+
+- [`2026-11-01-machine-setup-skips-acg-node-deps-and-chromium`](bugs/2026-11-01-machine-setup-skips-acg-node-deps-and-chromium.md)
+- [`2026-11-07-precommit-does-not-require-escape-origin-lines`](bugs/2026-11-07-precommit-does-not-require-escape-origin-lines.md)
+- [`2026-11-08-dispatch-dashboard-acting-coordinator-not-recorded-without-handoff`](bugs/2026-11-08-dispatch-dashboard-acting-coordinator-not-recorded-without-handoff.md)
+- [`2026-11-08-dispatch-dashboard-agent-column-blank-for-non-plan-specs`](bugs/2026-11-08-dispatch-dashboard-agent-column-blank-for-non-plan-specs.md)
+- [`2026-11-08-github-actions-major-bumps-held-by-dependabot`](bugs/2026-11-08-github-actions-major-bumps-held-by-dependabot.md)
+- [`2026-11-08-grafana-keeps-old-dashboard-after-configmap-sync`](bugs/2026-11-08-grafana-keeps-old-dashboard-after-configmap-sync.md)
+- [`2026-11-08-hermes-card-replaced-by-reauth-reply`](bugs/2026-11-08-hermes-card-replaced-by-reauth-reply.md)
+- [`2026-11-08-hermes-resolved-message-names-no-sensors`](bugs/2026-11-08-hermes-resolved-message-names-no-sensors.md)
+- [`2026-11-08-slack-hostinger-status-duplicates-cluster-status`](bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md)
+- [`2026-11-08-split-work-panel-shows-pending-with-nothing-to-merge-and-hides-agents`](bugs/2026-11-08-split-work-panel-shows-pending-with-nothing-to-merge-and-hides-agents.md)
+
 ### Candidate milestone — v1.44.0
 
 **v1.44.0 plan 5:** [`hermes-slack-config-sensors`](plans/v1.44.0-hermes-slack-config-sensors.md) (operator, 2026-11-08 sprint pick; design "Manifest + unsigned probe"): a Hermes sensor reads the relay Slack app's manifest and degrades when Interactivity is off or a Request URL is wrong, the two Slack-setting failures that passed every offline test on 2026-11-08; a second sensor checks the relay answers 401 to an unsigned POST. Needs the operator's Slack config token in Keychain and live captures of `apps.manifest.export` before dispatch. Replaces `claude-cost-task-attribution`, unnumbered by Claude on 2026-11-08 (see the ordered backlog under Forward themes).

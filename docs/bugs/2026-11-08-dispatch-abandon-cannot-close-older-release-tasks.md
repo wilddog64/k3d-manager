@@ -1,6 +1,6 @@
 # Bug: `codex-dispatch abandon` cannot close a task from an older release, or one whose worktree is gone
 
-**Status:** LANDED — `5df3a166` on `k3d-manager-v1.43.15` 2026-11-08 (land: 6 suites PASS, `codex_dispatch.bats` 269 s). Live E2 done 2026-11-08 by Claude: 23 stale rows closed with `abandon --version`, rc 0 each; `open` then listed only the 3 v1.43.15 tasks and `2026-11-01-machine-setup-skips-acg-node-deps-and-chromium`, kept because its bug is OPEN and its worktree holds an uncommitted fix. Ledger marks: `offline_tested`, `live_verified`. Independent verifier not run.
+**Status:** VERIFIED — ledger `offline_tested` and `live_verified` on `5df3a166`, rechecked by Claude 2026-11-09. Was: LANDED — `5df3a166` on `k3d-manager-v1.43.15` 2026-11-08 (land: 6 suites PASS, `codex_dispatch.bats` 269 s). Live E2 done 2026-11-08 by Claude: 23 stale rows closed with `abandon --version`, rc 0 each; `open` then listed only the 3 v1.43.15 tasks and `2026-11-01-machine-setup-skips-acg-node-deps-and-chromium`, kept because its bug is OPEN and its worktree holds an uncommitted fix. Ledger marks: `offline_tested`, `live_verified`. Independent verifier not run.
 **Priority:** P3
 **Introduced by:** pre-existing (`abandon` has always resolved the version from the current release branch)
 **Should have been caught by:** spec

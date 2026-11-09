@@ -10,7 +10,7 @@
 **Filed:** 2026-11-08
 **Detected by:** operator, reading the Per spec table on the Agent Dispatch dashboard; cause traced by Claude
 **Affected:** `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` (Per spec, target `E`, `:659`), `bin/k3dm-dispatch-metrics` (`:1712`)
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 
 ## Symptom
 

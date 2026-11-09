@@ -10,7 +10,7 @@
 **Filed:** 2026-11-08
 **Detected by:** operator, asking what "not recorded" means on the Per spec table; cause traced by Claude
 **Affected:** `bin/k3dm-dispatch-metrics` (`:980-983`, `:1700`), `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` (Per spec, Acting coordinator mapping, `:844-845`)
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 
 ## Symptom
 

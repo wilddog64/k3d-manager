@@ -11,7 +11,7 @@
 **Filed:** 2026-11-07
 **Detected by:** Claude, writing the escape-origin rule into the shared `bug-priority` block of `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`
 **Affected:** `.githooks/pre-commit` (new-bug-doc check, `:10-19`)
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 
 ## Observed failure
 

@@ -12,7 +12,7 @@
 **Detected by:** operator, Slack, 2026-11-08 10:12 PST (screenshot: "Hermes correlated incident resolved." — "what
 incident was resolved? not very clear")
 **Affected:** `scripts/lib/hermes/correlator.py`
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 **Related:** `docs/bugs/2026-11-08-hermes-values-branch-flags-deploy-hub-and-r9-retargets-release-branch.md` (the
 incident in question: ci + values_branch; values_branch stayed degraded after "resolved");
 `docs/bugs/2026-09-20-hermes-correlator-never-re-pages-after-incident-latches.md` (FIXED, same class)

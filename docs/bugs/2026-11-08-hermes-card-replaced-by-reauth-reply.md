@@ -15,7 +15,7 @@ at 11:14 PST; the operator pressed Deny before running `/hermes-auth`. The card 
 first: run `/hermes-auth` (valid for 24h)", with the card's own 11:14 timestamp and no "Only visible to you" label;
 after `/hermes-auth` (11:47) the card no longer existed to deny (operator: "the 11:14 does not exist any more").
 **Affected:** `workers/slack-relay/index.js`
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 **Related:** `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md` (also edits
 `workers/slack-relay/index.js`; dispatch the two together); `docs/guides/hermes.md` setup step 3
 

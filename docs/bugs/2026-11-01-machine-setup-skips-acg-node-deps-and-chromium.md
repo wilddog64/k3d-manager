@@ -1,6 +1,6 @@
 # Bug: `make machine-setup` installs no ACG Node packages or Playwright Chromium, so a new hub cannot run the ACG browser automation
 
-**Status:** OPEN — redo on v1.43.15 (operator, 2026-11-08). The 2026-11-01 Codex run exited 0 but was never landed; its base fell ~200 changed lines behind `bin/k3dm-machine-setup`, so the task was abandoned and the fix is to be redispatched fresh. The old function is kept below as a reference.
+**Status:** OPEN — redo on v1.43.16 (operator, 2026-11-09; was v1.43.15). The 2026-11-01 Codex run exited 0 but was never landed; its base fell ~200 changed lines behind `bin/k3dm-machine-setup`, so the task was abandoned and the fix is to be redispatched fresh. The old function is kept below as a reference.
 **Priority:** P3
 **Waiting on:** dispatch — since 2026-11-08
 **Intent approved:** operator, 2026-11-08 ("approve machine-setup intents")
@@ -9,7 +9,7 @@
 **Filed:** 2026-11-01
 **Detected by:** operator + Claude, `make credential-test` in lib-foundation on the M5 (`m5-air.local`)
 **Affected:** `bin/k3dm-machine-setup`
-**Branch:** `k3d-manager-v1.43.15` (was `k3d-manager-v1.43.13`)
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 
 ## Observed failure
 

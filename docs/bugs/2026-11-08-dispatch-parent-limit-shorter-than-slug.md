@@ -1,6 +1,6 @@
 # Dispatch `--parent` limit is shorter than the slugs it must name
 
-**Status:** LANDED — fixed on `k3d-manager-v1.43.15`, 2026-11-08
+**Status:** VERIFIED — `68d991f3`; its shipped test rerun by Claude 2026-11-09, rc 0; no independent verifier. Was: LANDED on `k3d-manager-v1.43.15`, 2026-11-08
 **Priority:** P3
 **Introduced by:** pre-existing
 **Should have been caught by:** offline test
