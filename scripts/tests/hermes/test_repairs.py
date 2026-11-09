@@ -137,28 +137,31 @@ def test_r8_ignores_drift_without_daemonset_owner():
 
 
 def r9_records(status="degraded", stale=True):
-    data = {"expected": "k3d-manager-v1.40.0",
-            "stale": [{"app": "loki", "revision": "k3d-manager-v1.39.0"}] if stale else []}
-    return [record("values_branch", status, "2 apps not on k3d-manager-v1.40.0", data)]
+    data = {"expected": "deploy/hub",
+            "stale": [{"app": "loki", "revision": "k3d-manager-v1.43.15"}] if stale else []}
+    return [record("values_branch", status, "2 apps not on deploy/hub", data)]
 
 
-def test_r9_requires_stale_values_branch_and_pins_release_env():
+def test_r9_requires_stale_values_branch_and_pins_deploy_hub():
     current = state()
     proposal = repairs.propose(r9_records(), current)[0]
     assert proposal["key"] == "r9"
+    assert proposal["name"] == "Reapply ApplicationSets pinned to deploy/hub"
     assert proposal["command"] == "./scripts/k3d-manager deploy_argocd_applicationsets --confirm"
     assert repairs.REPAIRS["r9"]["reversible"] is False
     calls = []
     outcome = repairs.approve(proposal["action_id"], current, r9_records(),
                               lambda *args: calls.append(args) or (0, "done"))
     assert outcome["outcome"] == "executed"
-    assert calls[0][1] == {"K3D_MANAGER_BRANCH": "k3d-manager-v1.40.0"}
+    assert calls[0][1] == {"K3D_MANAGER_BRANCH": "deploy/hub"}  # agent-audit: allow assert-removed spec fixes r9 env to deploy/hub
 
 
 def test_r9_ignores_unknown_healthy_or_empty_stale():
     assert repairs.propose(r9_records("unknown"), state()) == []
     assert repairs.propose(r9_records("healthy"), state()) == []
     assert repairs.propose(r9_records("degraded", False), state()) == []
+    assert repairs.propose([record("values_branch", "degraded", data={
+        "expected": "k3d-manager-v1.43.15", "stale": [{"app": "loki"}]})], state()) == []
 
 
 def r10_records(names=("job-b", "job-a"), context="ctx"):

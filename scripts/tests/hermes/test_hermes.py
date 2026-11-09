@@ -126,11 +126,11 @@ def test_status_checks_handles_invalid_empty_and_timeout_output_as_unknown():
     assert status_checks(lambda *_: (_ for _ in ()).throw(TimeoutError()), {})["status"] == "unknown"
 
 
-def _values_apps(revision="k3d-manager-v1.40.0", stale=0):
+def _values_apps(revision="deploy/hub", stale=0):
     apps = []
     for number in range(45):
         source = {"repoURL": "https://github.com/wilddog64/k3d-manager",
-                  "targetRevision": "k3d-manager-v1.39.0" if number < stale else revision}
+                  "targetRevision": "k3d-manager-v1.43.15" if number < stale else revision}
         if number in (2, 4):
             source["targetRevision"] = "HEAD"
         if number == 2:
@@ -150,7 +150,7 @@ def test_values_branch_realistic_fixture_ignores_head_and_other_repos():
     output = json.dumps(apps)
     assert len(output) > 200_000
     calls = []
-    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"),
                            lambda argv, _env: calls.append(argv) or (0, output), {}, token="x")
     assert result["status"] == "healthy"
     assert result["data"]["checked"] == 42
@@ -158,42 +158,64 @@ def test_values_branch_realistic_fixture_ignores_head_and_other_repos():
     assert calls == [["argocd", "app", "list", "-o", "json", "--grpc-web"]]
 
 
+def test_values_branch_defaults_to_deploy_hub_and_ignores_checkout_branch():
+    git_calls = []
+    checkout = lambda *args: git_calls.append(args) or (0, "k3d-manager-v1.43.15")
+    healthy = values_branch(checkout, lambda *_: (0, json.dumps(_values_apps())), {}, token="x")
+    assert healthy["status"] == "healthy"
+    assert healthy["data"]["expected"] == "deploy/hub"
+    assert repairs.propose([healthy], state={}) == []
+
+    stale_state = {}
+    stale_run = lambda *_: (0, json.dumps(_values_apps(stale=1)))
+    values_branch(checkout, stale_run, stale_state, token="x")
+    values_branch(checkout, stale_run, stale_state, token="x")
+    stale = values_branch(checkout, stale_run, stale_state, token="x")
+    assert stale["status"] == "degraded"
+    assert "app-0@k3d-manager-v1.43.15" in stale["evidence"]
+    assert git_calls == []
+    proposals = repairs.propose([stale], state={})
+    assert len(proposals) == 1 and proposals[0]["key"] == "r9"
+    assert proposals[0]["name"] == "Reapply ApplicationSets pinned to deploy/hub"
+    assert repairs.REPAIRS["r9"]["build_command"]([stale])[1] == {"K3D_MANAGER_BRANCH": "deploy/hub"}
+
+
 def test_values_branch_debounces_lag_then_stale_and_clears():
     output = json.dumps(_values_apps(stale=2))
     current = {}
     run = lambda *_: (0, output)
-    assert [values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), run, current, token="x")["status"]
+    assert [values_branch(lambda *_: (0, "k3d-manager-v1.43.15"), run, current, token="x")["status"]
             for _ in range(2)] == ["healthy", "healthy"]
-    third = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), run, current, token="x")
-    assert third["status"] == "degraded" and "app-0@k3d-manager-v1.39.0" in third["evidence"]
-    clean = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    third = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"), run, current, token="x")
+    assert third["status"] == "degraded" and "app-0@k3d-manager-v1.43.15" in third["evidence"]  # agent-audit: allow assert-removed spec fix step 4 retargets values_branch fixtures to deploy/hub and deletes the skip tests
+    clean = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"),
                           lambda *_: (0, json.dumps(_values_apps())), current, token="x")
     assert clean["status"] == "healthy"
 
 
 def test_values_branch_counts_two_stale_sources_as_one_app():
     apps = [{"metadata": {"name": "one-app"}, "spec": {"sources": [
-        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
-        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.43.15"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.43.15"},
     ]}}]
-    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"),
                            lambda *_: (0, json.dumps(apps)), {}, token="x")
 
     assert result["evidence"].startswith("1 apps (2 source refs) not on")
-    assert result["evidence"].count("one-app@k3d-manager-v1.39.0") == 1
+    assert result["evidence"].count("one-app@k3d-manager-v1.43.15") == 1
     assert len(result["data"]["stale"]) == 2
 
 
 def test_values_branch_counts_multiple_apps_and_mixed_sources():
     apps = [
         {"metadata": {"name": "one-app"}, "spec": {"sources": [
-            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
-            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.40.0"},
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.43.15"},
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "deploy/hub"},
         ]}},
         {"metadata": {"name": "two-app"}, "spec": {"source":
-            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"}}},
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.43.15"}}},
     ]
-    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"),
                            lambda *_: (0, json.dumps(apps)), {}, token="x")
 
     assert result["evidence"].startswith("2 apps (2 source refs) not on")
@@ -202,66 +224,57 @@ def test_values_branch_counts_multiple_apps_and_mixed_sources():
 def test_values_branch_excludes_head_from_stale_counts():
     apps = [{"metadata": {"name": "one-app"}, "spec": {"sources": [
         {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "HEAD"},
-        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.43.15"},
     ]}}]
-    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"),
                            lambda *_: (0, json.dumps(apps)), {}, token="x")
 
     assert result["evidence"].startswith("1 apps (1 source refs) not on")
     assert result["data"]["tracking_head"] == 1
 
 
-def test_values_branch_nonrelease_is_skipped_and_never_pages(monkeypatch):
-    from hermes import pager
-    calls = []
-    state = {}
-    def argo(*args):
-        calls.append(args)
-        return 0, "[]"
-    pager_state = {}
-    for _ in range(pager.SENSOR_UNKNOWN_CYCLES + 1):
-        item = values_branch(lambda *_: (0, "main"), argo, state, token="x")
-        assert item["status"] == "healthy" and item["data"]["skipped"] is True
-        assert pager.health_events([item], pager_state) == []
-    assert calls == []
-    unknown_state, pages = {}, []
-    for _ in range(pager.SENSOR_UNKNOWN_CYCLES):
-        pages += pager.health_events([dict(item, status="unknown")], unknown_state)
-    assert any("values_branch check unknown" in text for text in pages), "control: unknown must page"
-
-
-def test_values_branch_nonrelease_skips_even_without_a_token(monkeypatch):
-    from hermes import sensors as sensor_module
-    monkeypatch.setattr(sensor_module, "_keychain_secret", lambda *_: "")
-    item = values_branch(lambda *_: (0, "claude/foo"), lambda *_: (0, "[]"), {})
-    assert item["status"] == "healthy" and item["data"]["skipped"] is True
+def test_values_branch_nonrelease_checkout_is_still_checked_against_deploy_hub():
+    for branch in ("main", "claude/foo"):
+        argo_calls, current = [], {}
+        checkout = lambda *_: (0, branch)
+        argo = lambda argv, _env: argo_calls.append(argv) or (0, json.dumps(_values_apps(stale=1)))
+        for _ in range(2):
+            values_branch(checkout, argo, current, token="x")
+        item = values_branch(checkout, argo, current, token="x")
+        assert len(argo_calls) == 3
+        assert "skipped" not in item["data"]
+        assert item["data"]["expected"] == "deploy/hub"
+        assert item["status"] == "degraded"
 
 
 def test_values_branch_zero_refs_and_real_failures_are_unknown():
     no_refs = json.dumps([{"metadata": {"name": "head"}, "spec": {"source": {
         "repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "HEAD"}}}])
-    item = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    item = values_branch(lambda *_: (0, "k3d-manager-v1.43.15"),
                          lambda *_: (0, no_refs), {}, token="x")
     assert item["status"] == "unknown" and "no k3d-manager" in item["evidence"]
     failed = values_branch(lambda *_: (1, "git failure"), lambda *_: (0, "[]"), {}, token="x")
     assert failed["status"] == "unknown"
 
 
-def test_values_branch_resolution_order_and_argocd_failures(monkeypatch):
+def test_values_branch_fixed_expected_ref_and_argocd_failures(monkeypatch):
     monkeypatch.setenv("K3DM_RELEASE_BRANCH", "k3d-manager-v1.39.0")
     assert k3dm_hermes is not None
     from hermes.sensors import _values_branch_expected
-    assert _values_branch_expected(lambda *_: (0, "main"), "k3d-manager-v1.40.0")[0] == "k3d-manager-v1.40.0"
-    assert _values_branch_expected(lambda *_: (0, "main"))[0] == "k3d-manager-v1.39.0"
-    bad_json = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    git_calls = []
+    run = lambda *args: git_calls.append(args) or (0, "k3d-manager-v1.43.15")
+    assert _values_branch_expected(run, "deploy/hub")[0] == "deploy/hub"
+    assert _values_branch_expected(run)[0] == "deploy/hub"
+    assert git_calls == []
+    bad_json = values_branch(run,
                              lambda *_: (0, "not json"), {}, token="x")
     assert bad_json["status"] == "unknown"
-    rejected = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+    rejected = values_branch(run,
                              lambda *_: (1, "Unauthenticated"), {}, token="x")
     assert "re-mint" in rejected["evidence"]
     from hermes import sensors as sensor_module
     monkeypatch.setattr(sensor_module, "_keychain_secret", lambda *_: "")
-    missing = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), lambda *_: (0, "[]"), {})
+    missing = values_branch(run, lambda *_: (0, "[]"), {})
     assert missing["status"] == "unknown" and "credential unavailable" in missing["evidence"]
 
 

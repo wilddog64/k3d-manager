@@ -29,6 +29,53 @@ _clean_fixture() {
 EOF
 }
 
+_hub_fixture() {
+  cat <<'EOF'
+{"items":[{"metadata":{"name":"hub-app"},"spec":{"sources":[{"repoURL":"https://github.com/wilddog64/k3d-manager","targetRevision":"deploy/hub"}]}}]}
+EOF
+}
+
+_release_fixture() {
+  cat <<'EOF'
+{"items":[{"metadata":{"name":"release-app"},"spec":{"sources":[{"repoURL":"https://github.com/wilddog64/k3d-manager","targetRevision":"k3d-manager-v1.43.15"}]}}]}
+EOF
+}
+
+_stub_git() {
+  mkdir -p "${BATS_TEST_TMPDIR}/stub-bin"
+  cat >"${BATS_TEST_TMPDIR}/stub-bin/git" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${GIT_CALLS}"
+printf '%s\n' 'k3d-manager-v1.43.15'
+EOF
+  chmod +x "${BATS_TEST_TMPDIR}/stub-bin/git"
+  export GIT_CALLS="${BATS_TEST_TMPDIR}/git-calls"
+  : >"${GIT_CALLS}"
+  export PATH="${BATS_TEST_TMPDIR}/stub-bin:${PATH}"
+}
+
+@test "argocd values branch: no-argument default is deploy/hub and does not call git" {
+  unset K3D_MANAGER_BRANCH
+  _stub_git
+  _kubectl() { _hub_fixture; }
+  [ -d "${BATS_TEST_TMPDIR}/stub-bin" ]
+  run argocd_check_values_branch
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Expected values branch: deploy/hub"* ]]
+  [ ! -s "$GIT_CALLS" ]
+}
+
+@test "argocd values branch: no-argument check flags release ref without calling git" {
+  unset K3D_MANAGER_BRANCH
+  _stub_git
+  _kubectl() { _release_fixture; }
+  [ -d "${BATS_TEST_TMPDIR}/stub-bin" ]
+  run argocd_check_values_branch
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"release-app k3d-manager-v1.43.15"* ]]
+  [ ! -s "$GIT_CALLS" ]
+}
+
 @test "argocd values branch: reports drift and returns 1 when an Application is stale" {
   _kubectl() { _mixed_fixture; }
 

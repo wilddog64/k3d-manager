@@ -2052,16 +2052,12 @@ EOF
 }
 
 function argocd_check_values_branch() {
-   local _expected="${1:-${K3D_MANAGER_BRANCH:-}}"
+   local _expected="${1:-${K3D_MANAGER_BRANCH:-deploy/hub}}"
    local _context="${2:-k3d-k3d-cluster}"
    local _owners="${3:-}"
    local _namespace="${ARGOCD_NAMESPACE:-cicd}"
    local _apps
    local _drift
-
-   if [[ -z "${_expected}" ]]; then
-      _expected="$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
-   fi
 
    _apps="$(_kubectl get application -n "${_namespace}" --context "${_context}" -o json 2>/dev/null)"
    if [[ -z "${_apps}" ]]; then

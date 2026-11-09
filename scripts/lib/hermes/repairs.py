@@ -172,14 +172,12 @@ def _r9_precondition(records, _history, _state):
     item = _rec(records, "values_branch") or {}
     expected = item.get("data", {}).get("expected", "")
     return (_status(records, "values_branch") == "degraded" and
-            bool(item.get("data", {}).get("stale")) and
-            re.fullmatch(r"k3d-manager-v\d+\.\d+\.\d+", expected) is not None)
+            bool(item.get("data", {}).get("stale")) and expected == "deploy/hub")
 
 
 def _r9_command(records):
-    expected = (_rec(records, "values_branch") or {}).get("data", {}).get("expected", "")
     return (["./scripts/k3d-manager", "deploy_argocd_applicationsets", "--confirm"],
-            {"K3D_MANAGER_BRANCH": expected})
+            {"K3D_MANAGER_BRANCH": "deploy/hub"})
 
 
 def _r10_targets(records):
@@ -244,9 +242,9 @@ REPAIRS = {
            "precondition": _r8_precondition, "build_command": _r8_command, "cwd": ROOT,
            "blast_radius": "DaemonSet pods on stale node IPs are recreated", "reversible": True,
            "needs_scope": "local hub kubeconfig"},
-    "r9": {"key": "r9", "name": "Reapply ApplicationSets on the release branch",
+    "r9": {"key": "r9", "name": "Reapply ApplicationSets pinned to deploy/hub",
            "precondition": _r9_precondition, "build_command": _r9_command, "cwd": ROOT,
-           "blast_radius": "every k3d-manager-sourced Application on the hub and app cluster re-targets the release branch and syncs",
+           "blast_radius": "every k3d-manager-sourced Application on the hub and app cluster re-targets deploy/hub and syncs",
            "reversible": False, "needs_scope": "local hub kubeconfig"},
     "r10": {"key": "r10", "name": "Delete failed Jobs superseded by a newer CronJob spec",
             "precondition": _r10_precondition, "build_command": _r10_command, "cwd": None,
