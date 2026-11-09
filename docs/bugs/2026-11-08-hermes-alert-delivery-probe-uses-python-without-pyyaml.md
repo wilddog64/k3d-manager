@@ -1,8 +1,8 @@
 # Bug: Hermes alert_delivery probe runs a python3 without PyYAML on the M5
 
-**Status:** OPEN — specced 2026-11-08, intents approved, dispatched to Luna
+**Status:** LANDED — `4f88391d` on `k3d-manager-v1.43.15`; independent verifier and live check after `make hub-sync` on the M5 pending
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** live check — since 2026-11-08
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Severity:** medium — Hermes cannot check whether Alertmanager can deliver alerts; workaround: run the probe by hand with the venv first on PATH
