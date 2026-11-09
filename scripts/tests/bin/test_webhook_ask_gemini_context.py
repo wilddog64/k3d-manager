@@ -86,7 +86,6 @@ def test_m1_hostinger_question_runs_collector_and_fences_prompt(monkeypatch, tmp
 
     if hasattr(status, "_hostinger_status_text"):
         monkeypatch.setattr(status, "_hostinger_status_text", stub_collector)
-    recorded_prompts_calls = []
     monkeypatch.setattr(agent, "_call_gemini", stub_gemini)
 
     agent._run_cluster_ask(
@@ -135,7 +134,7 @@ def test_m2_collected_data_filters_suggestion_and_files_no_bugs(monkeypatch, tmp
 
 
 def test_m3_unrelated_question_runs_no_collector_and_prompts_no_data(monkeypatch, tmp_path):
-    job_dir = _setup_job(tmp_path, "m3_job")
+    _setup_job(tmp_path, "m3_job")
     collector_calls = []
 
     def stub_collector():
@@ -230,7 +229,7 @@ def test_m5_hostinger_status_report_unchanged(monkeypatch, tmp_path):
 
 
 def test_n1_collector_does_not_run_when_hostinger_only_in_job_output(monkeypatch, tmp_path):
-    job_dir = _setup_job(tmp_path, "n1_job_output")
+    _setup_job(tmp_path, "n1_job_output")
     collector_calls = []
 
     def stub_collector():
@@ -263,7 +262,7 @@ def test_n1_collector_does_not_run_when_hostinger_only_in_job_output(monkeypatch
 
 
 def test_n1_collector_does_not_run_when_hostinger_only_in_thread_context(monkeypatch, tmp_path):
-    job_dir = _setup_job(tmp_path, "n1_thread")
+    _setup_job(tmp_path, "n1_thread")
     collector_calls = []
 
     def stub_collector():
@@ -355,7 +354,7 @@ def test_single_collector_guard_rejects_concurrent_collection_and_releases_after
 
 
 def test_n2_collected_text_inside_fence_and_canary_scrubbed(monkeypatch, tmp_path):
-    job_dir = _setup_job(tmp_path, "n2_job")
+    _setup_job(tmp_path, "n2_job")
     canary_token = "canary_secret_token_xyz987654"
     fixture_with_canary = FIXTURE_PATH.read_text() + f"\ntoken={canary_token}\n"
 
