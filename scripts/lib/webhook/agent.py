@@ -35,6 +35,8 @@ __all__ = [
 
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-3.8-flash-medium")
 _ask_semaphore = threading.Semaphore(2)
+_hostinger_collector_lock = threading.Lock()
+_HOSTINGER_COLLECT_TIMEOUT = 120
 
 
 class AIResult(str):
@@ -262,6 +264,8 @@ _INJECTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+_HOSTINGER_RE = re.compile(r"\b(hostinger|k3s-hostinger)\b", re.IGNORECASE)
+
 def _sanitize_question(raw: str) -> str | None:
     """Return sanitized question or None if it looks like prompt injection."""
     q = raw.strip()
@@ -273,7 +277,7 @@ def _sanitize_question(raw: str) -> str | None:
     return q
 
 
-def _parse_gemini_observations(raw):
+def _parse_gemini_observations(raw, file_bugs=True):
     """Split Gemini's structured response into (answer_text, [filed_paths]).
 
     Expected format:
@@ -296,6 +300,8 @@ def _parse_gemini_observations(raw):
 
     answer_part, obs_part = raw.split(obs_marker, 1)
     answer = answer_part.removeprefix("ANSWER:\n").strip()
+    if not file_bugs:
+        return answer, []
 
     filed = []
     for line in obs_part.splitlines():
@@ -332,7 +338,7 @@ def _parse_gemini_observations(raw):
     return answer, filed
 
 
-def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin", channel_id=""):
+def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin", channel_id="", user_question=None):
     """Spawn claude/gemini/codex with the user's question; post the answer to Slack."""
     if max_turns is None:
         max_turns = _ASK_MAX_TURNS_DEFAULT
@@ -427,6 +433,52 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         )
 
         if agent == "gemini":
+            target_question = question if user_question is None else user_question
+            collected_fence = ""
+            if _HOSTINGER_RE.search(target_question):
+                if not _hostinger_collector_lock.acquire(blocking=False):
+                    _finish("Hostinger status collection failed: a previous collection is still running. Run /cluster-status hostinger.")
+                    return
+
+                from webhook import status
+                from webhook.redact import scrub_credentials
+                from webhook.untrusted import fence
+
+                def _collect():
+                    try:
+                        return status._hostinger_status_text()
+                    finally:
+                        _hostinger_collector_lock.release()
+
+                import concurrent.futures
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                try:
+                    future = executor.submit(_collect)
+                except Exception:
+                    _hostinger_collector_lock.release()
+                    executor.shutdown(wait=False)
+                    raise
+
+                try:
+                    collected_text = future.result(timeout=_HOSTINGER_COLLECT_TIMEOUT)
+                except (concurrent.futures.TimeoutError, TimeoutError):
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    _finish("Hostinger status collection failed: timed out after 120s. Run /cluster-status hostinger.")
+                    return
+                except Exception as exc:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    _finish(f"Hostinger status collection failed: {exc.__class__.__name__}. Run /cluster-status hostinger.")
+                    return
+                else:
+                    executor.shutdown(wait=False)
+
+                text = scrub_credentials(collected_text)
+                if len(text) > 3400:
+                    text = (text[:1600]
+                            + "\n… middle of report truncated …\n"
+                            + text[-1800:])
+                collected_fence = fence("hostinger status", text)
+
             gemini_system = (
                 "You are a Kubernetes troubleshooting assistant. "
                 "The cluster runs Vault, ArgoCD, Istio, ESO, Keycloak (local k3d) and shopping-cart "
@@ -445,18 +497,34 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
                 "- TITLE: <short title> | BODY: <one paragraph describing the issue>\n\n"
                 "Rules for OBSERVATIONS: only include issues you are confident are real bugs or "
                 "misconfigurations. Do not speculate. Each observation must be a distinct issue "
-                "unrelated to the question. Limit to 2 observations maximum.\n"
-                "Pod-state rule: if you notice a pod not in Running/Completed state "
-                "(ContainerCreating, CrashLoopBackOff, Pending, Error, OOMKilled), run "
-                "`kubectl describe pod <name> -n <namespace> --context <ctx>` first and include "
-                "the Events section in the BODY. Never guess the cause from status alone."
+                "unrelated to the question. Limit to 2 observations maximum."
             )
-            gemini_prompt = (
-                f"{gemini_system}{_ctx_block}\n\n"
-                f"---USER QUESTION START---\n{question}\n---USER QUESTION END---"
-            )
+
+            if collected_fence:
+                gemini_prompt = (
+                    f"{gemini_system}{_ctx_block}\n\n"
+                    f"{collected_fence}\n\n"
+                    f"---USER QUESTION START---\n{question}\n---USER QUESTION END---"
+                )
+            else:
+                no_data_line = (
+                    "No live data was collected for this question. If it asks about live cluster state, "
+                    "say that /cluster-status hostinger or asking claude answers it; do not ask the user for kubectl output."
+                )
+                gemini_prompt = (
+                    f"{gemini_system}{_ctx_block}\n\n"
+                    f"{no_data_line}\n\n"
+                    f"---USER QUESTION START---\n{question}\n---USER QUESTION END---"
+                )
+
             answer = _call_gemini(gemini_prompt)
-            answer, filed = _parse_gemini_observations(answer)
+            if collected_fence:
+                from webhook.untrusted import filter_suggestion
+                answer = filter_suggestion(answer)
+                answer, filed = _parse_gemini_observations(answer, file_bugs=False)
+                answer = filter_suggestion(answer)
+            else:
+                answer, filed = _parse_gemini_observations(answer)
             suffix = "\n" + "\n".join(f"Also filed: `{f}`" for f in filed) if filed else ""
             _finish(f"🤖 *gemini:* {answer}{suffix}")
             return
