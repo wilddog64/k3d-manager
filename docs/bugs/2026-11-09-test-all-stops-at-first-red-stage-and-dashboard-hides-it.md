@@ -18,8 +18,8 @@ different defect. `make find-similar-docs` unavailable (vector store unreachable
 (about 55% of all cases) is invisible to the nightly run, and the dashboard reads as if the whole suite ran.
 **Approval:** operator, 2026-11-09: "can you investigate this and file a proper bug if necessary. we don't need to
 dispatch right away"
-**Intent approved:** operator, 2026-11-09: "approve E1 and E2 and dispatch to Flash 3.8"; "let's fold Part B into
-v1.44.0 parallel plan"
+**Intent approved:** operator, 2026-11-09
+**Intent approval words:** "approve E1 and E2 and dispatch to Flash 3.8"; "let's fold Part B into v1.44.0 parallel plan"
 **Dispatch:** operator go 2026-11-09, Part A only, `--agent agy --model gemini-3.8-flash-medium`
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09, reading the k3dm Tests "Total cases" panel ("looks like that our test cases
