@@ -1,3 +1,5 @@
+**2026-11-09 — LANDED tests-dashboard-run-complete-panel `29d4b28f`** (Flash, 1 resume): Run complete stat, failure tables Test case/Test name/Failure reason/Test suite without Target columns. Claude reran outside the sandbox: pytest 10/10, bats 51/51, validate-manifests clean, mutants a–e red. Landed with `--allow-out-of-scope` (bats file is in the spec's Files, added with the correction). E2 live after hub-promote. Nit: hollow `or True` assert at test line 17. **E2E bug VERIFIED** from operator screenshot (PASS stat = e2e_last_run_pass, so E2EResultsMissing resolved). WIP 2/3: promtool (exited, not landed), trust-vault-ca (Luna running).
+
 **2026-11-09 — DISPATCHED trust-vault-ca-no-deploy-metric to Luna** (gpt-6-luna) from `857ab9bb`. WIP 3/3: promtool (exited, not landed), tests-dashboard (correction running), trust-vault-ca (running).
 
 **2026-11-09 — e2e-results-never-reach-m5-hub live check, replay part done** (operator, M5): machine-setup ROLE=hub + e2e-replay RUNNER=m2 → published=79 still_pending=0, newest 1794086864-5662 pass. Pending: operator confirms E2E dashboard (use Last 7 days) and E2EResultsMissing resolved → then VERIFIED.

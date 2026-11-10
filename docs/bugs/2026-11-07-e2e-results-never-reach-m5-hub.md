@@ -2,10 +2,9 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.14`)
-**Status:** LANDED — F1 fix `576e10f3` (Luna) plus N9 test correction `c97a14fa` (Claude), 2026-11-07; F2 fixed live 2026-11-07 (`read:packages` scope; run 1794086864-5662 passed 91/0)
+**Status:** VERIFIED — F1 fix `576e10f3` (Luna) plus N9 test correction `c97a14fa` (Claude), 2026-11-07; F2 fixed live 2026-11-07 (`read:packages` scope; run 1794086864-5662 passed 91/0) — live-verified by operator screenshot 2026-11-09
 **Fix commit:** `576e10f3`, `c97a14fa`
 **Priority:** P2 — the hub has had no e2e signal since the 2026-10-31 cutover; the verification dashboards are empty and `E2EResultsMissing` has fired for the full 3-day window
-**Waiting on:** live check — since 2026-11-07 (replay done 2026-11-09; dashboard + alert-clear confirmation pending)
 **Live check progress (operator, M5, 2026-11-09):** `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip` then `make e2e-replay RUNNER=m2` completed; output ends `[e2e-publish] applied result for run 1794086864-5662 (runner=m2, result=pass)` and `[e2e-remote] replay complete: published=79 still_pending=0` (operator screenshot). Still to see: E2E Verification dashboard populated (range ≥ 3 days; newest result is 2026-11-07 ~13:27 PST) and `E2EResultsMissing` resolved
 **Live check (operator, on the M5):** `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip`, then `make e2e-replay RUNNER=m2`
 **Approval:** operator 2026-11-07: "please spec (a) dispatch to Luna" (F1 option a: `make machine-setup ROLE=hub` installs the conf file and forced-command entry)
@@ -124,3 +123,12 @@ evidence:
 ## Triage 2026-11-07 (Claude)
 
 The Luna worker has exited. It changed `bin/k3dm-machine-setup`, `machine_setup.bats`, `docs/howto/m5-hub-migration.md` and `machine_setup_acceptance.bats`; the last is not in this spec's Files list, so check scope before landing. Live after landing: on the M5, check out v1.43.15, then `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip` (Keychain unlocked), then `make e2e-replay RUNNER=m2` (79 pending).
+
+## Live verification (operator, M5 hub Grafana, 2026-11-09)
+
+After `make e2e-replay RUNNER=m2` (`published=79 still_pending=0`), the E2E Verification dashboard at Last 2 days shows
+Status `m2: vcluster/product-catalog/api+flows` PASS, Last success age 2.28 days, Failing runs in window 19 (the
+2026-11-07 aborts at deploying-substrate, each shown `fixed: passed`), and Recent runs row `1794086864-5662` passed.
+The Status stat queries `e2e_last_run_pass` (`scripts/etc/argocd/platform-ops/grafana-dashboard-e2e.yaml`), the series
+`E2EResultsMissing` tests with `absent()`, so the alert has resolved. Claude read the screenshot; the operator ran the
+commands.
