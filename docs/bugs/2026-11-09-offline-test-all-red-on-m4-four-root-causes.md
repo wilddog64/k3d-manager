@@ -1,8 +1,8 @@
 # Bug: offline test-all is red on the M4 from four separate root causes
 
-**Status:** OPEN — parent filed 2026-11-09; child specs not yet written
+**Status:** OPEN — parent filed 2026-11-09; child specs C1–C4 written and intents approved; children dispatch on `k3d-manager-v1.43.16`
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** dispatch — since 2026-11-09
 **Introduced by:** unknown (four root causes, each with its own origin; see the table)
 **Should have been caught by:** unknown
 **Prior art:** `docs/bugs/2026-10-28-offline-test-all-grep-guard-and-e2e-dispatch-regressions.md` (found by grep, not
@@ -14,7 +14,7 @@ so a new regression would not stand out. One root cause (C3) is also a safety is
 launch agent and only the tripwire stops it.
 **Approval:** operator, 2026-11-09 ("go head to file v1.43.16 test-failure parent bug"); the operator decided on
 2026-11-09 to fix it in bug-only v1.43.16 as one P2 parent with child fixes per root cause (decomposition trial)
-**Intent approved:** not yet
+**Intent approved:** operator, 2026-11-09
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, serial `make test-all` baseline and a per-file parallel run on the M4
 **Release:** v1.43.16 (bug-only; does not use a plan slot)

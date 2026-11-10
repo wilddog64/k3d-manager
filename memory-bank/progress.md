@@ -1,3 +1,5 @@
+- [x] 2026-11-09 v1.43.16 parent bug E1–E3 intents approved; Waiting on → dispatch.
+
 - [x] 2026-11-09 lib-foundation v0.5.5 _run_parallel spec committed; dispatch after install-promtool lands. acg-* skills repointed to bin/cluster-*.
 
 - [x] 2026-11-09 parallel-tests intents approved; README scripts section fixed.
