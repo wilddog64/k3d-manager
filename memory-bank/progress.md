@@ -1,3 +1,4 @@
+- [x] 2026-11-09 Filed P3 trust-vault-ca-run-published-as-acg-up-deployment (not dispatched; Waiting on: operator decision).
 - [x] 2026-11-09 Parallel plan E3/E5 approved; failure-table column change added to tests-dashboard dispatch spec (correction pending).
 - [x] 2026-11-09 Dispatched tests-dashboard-run-complete-panel (Flash 3.8); Part B folded into v1.44.0 parallel plan item 7.
 - [x] 2026-11-09 Filed P3 test-all-stops-at-first-red-stage-and-dashboard-hides-it (not dispatched; Waiting on: operator decision).
