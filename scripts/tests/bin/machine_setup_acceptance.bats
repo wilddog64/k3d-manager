@@ -143,7 +143,7 @@ mk() {
 }
 
 mutating() {
-  grep -E '^(brew (install|reinstall|upgrade|tap|uninstall)|git .*(clone|checkout|reset|pull|clean|switch|merge|rebase|stash)|security (add|delete)|launchctl |make install|make .*install-|curl |sudo |installer |softwareupdate )' "$CALLS" || true
+  grep -E '^(brew (install|reinstall|upgrade|tap|uninstall)|git( -[Cc] [^ ]+| --[a-z-]+=[^ ]+)* (clone|checkout|reset|pull|clean|switch|merge|rebase|stash)( |$)|security (add|delete)|launchctl |make install|make .*install-|curl |sudo |installer |softwareupdate )' "$CALLS" || true
 }
 
 # ---------------------------------------------------------------- M1
