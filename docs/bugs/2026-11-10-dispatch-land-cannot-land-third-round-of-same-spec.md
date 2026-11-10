@@ -2,14 +2,16 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-10 (intent approval and how to unblock r3)
+**Waiting on:** dispatch — since 2026-11-10 (WIP 3/3, and open `checkout-auto-sync` edits `bin/k3dm-codex-dispatch`: dispatch to Luna after it lands, then land r3 through the ledger)
 **Introduced by:** `61256041` (v1.43.6, per-agent dispatch data)
 **Should have been caught by:** offline test
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10)
 **Severity:** a spec that needs two correction rounds cannot be landed through the ledger at all. It blocks
 `control-linux-vagrant-m4-r3` (and with it control-node E2, E3 and the Hostinger E4). Workaround (costly, so P2 not P1): land
 the commit by hand, which skips the ledger's land event that the metrics and the verification ladder read.
-**Approval:** pending
+**Approval:** operator, 2026-11-10: "Dispatch tool fix first (Recommended)"
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "Dispatch tool fix first (Recommended)" (option text: "You approve the P2's intents (E1-E3)")
 **Filed:** 2026-11-10
 **Detected by:** Claude, landing `control-linux-vagrant-m4-r3`, 2026-11-10
 **Branch:** `k3d-manager-v1.43.15`
