@@ -454,9 +454,14 @@ STUB
   done
 }
 
-@test "N3: console runs no install-* at all and writes no LaunchAgents" {
+@test "N3: console only runs install-* named in agents.console.list, never a hub-only agent" {
   ms --role console
-  if grep -E '^make .*install-' "$CALLS"; then false; fi
+  grep -qE '^make .*install-repo-sync' "$CALLS"
+  while read -r line; do
+    t="$(echo "$line" | grep -oE 'install-[a-z0-9-]+' | head -1)"
+    grep -qxF "$t" "$TREE/scripts/etc/machine/agents.console.list"
+    if grep -qxF "$t" "$TREE/scripts/etc/machine/agents.hub.list" && ! grep -qxF "$t" "$TREE/scripts/etc/machine/agents.worker.list"; then false; fi
+  done < <(grep -E '^make .*install-' "$CALLS" || true)
   [ -z "$(ls "$HOME_FX/Library/LaunchAgents" 2>/dev/null)" ]
 }
 
