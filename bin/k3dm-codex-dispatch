@@ -296,7 +296,7 @@ Usage:
   bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--primary-coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch open [--version vX.Y.Z]
-  bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope]
+  bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope] [--allow-instruction-files]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--model ID] [--coordinator VENDOR/MODEL]
   bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
@@ -799,6 +799,23 @@ _dispatch_scope_verdict() {
   if (( in_scope )); then echo "scope: in-scope"; elif (( allow )); then echo "scope: out-of-scope (allowed)"; else return 1; fi
 }
 
+_dispatch_instruction_files() {
+  local worktree="$1" base="$2" path name
+  {
+    git -C "$worktree" diff --name-only "$base" HEAD
+    git -C "$worktree" diff --cached --name-only
+    git -C "$worktree" diff --name-only
+    git -C "$worktree" ls-files --others --exclude-standard
+  } | sort -u | while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    name="${path##*/}"
+    case "$name" in AGENTS.md|CLAUDE.md|GEMINI.md|.mcp.json|.envrc) printf '%s\n' "$path"; continue ;; esac
+    case "$path" in
+      .github/copilot-instructions.md|*/.github/copilot-instructions.md|.claude/*|*/.claude/*|.codex/*|*/.codex/*|.gemini/*|*/.gemini/*) printf '%s\n' "$path" ;;
+    esac
+  done
+}
+
 _dispatch_task_spec() {
   local task="$1" run="$2" spec
   [[ -f "$run/spec" ]] || return 1
@@ -1014,7 +1031,7 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" superseding="" allow=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0
+  local slug="" superseding="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path
   local _landing_parts=""
   while (($#)); do
     case "$1" in
@@ -1026,6 +1043,7 @@ _dispatch_land() {
       --landing-model) (($# >= 2)) || _dispatch_error "--landing-model requires VENDOR/MODEL"; landing_model="$2"; shift 2 ;;
       --review-pending) review_pending=1; shift ;;
       --allow-out-of-scope) allow=1; shift ;;
+      --allow-instruction-files) allow_instruction_files=1; shift ;;
       *) _dispatch_error "unknown land option: $1" ;;
     esac
   done
@@ -1051,9 +1069,27 @@ _dispatch_land() {
   [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
   [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
+  spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
+  base="$(<"$run/base")"
+  instruction_files="$(_dispatch_instruction_files "$task" "$base")"
+  if [[ -n "$instruction_files" && "$allow_instruction_files" -eq 0 ]]; then
+    while IFS= read -r instruction_path; do
+      [[ -n "$instruction_path" ]] || continue
+      echo "instruction-file: $instruction_path"
+      if git -C "$task" ls-files --error-unmatch "$instruction_path" >/dev/null 2>&1; then
+        git -C "$task" diff "$base" HEAD -- "$instruction_path"
+        git -C "$task" diff --cached -- "$instruction_path"
+        git -C "$task" diff -- "$instruction_path"
+      else
+        git -C "$task" diff --no-index -- /dev/null "$instruction_path" || true
+      fi
+    done <<<"$instruction_files"
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope --arg detail instruction-files '.reason=$reason|.detail=$detail'
+    _dispatch_schedule_metrics
+    _dispatch_error "instruction files require --allow-instruction-files"
+  fi
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
   [[ "$(git -C "$task" rev-list --count "origin/$target..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$target"
-  spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   local prior_slug prior_run
   for prior_run in "$_dispatch_worktree_root/$version"/*.run; do
     [[ -f "$prior_run/landed" ]] || continue
@@ -1174,11 +1210,12 @@ _dispatch_land() {
   local test_result=passed
   (( no_test )) && test_result=skipped
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
+    --argjson instruction_files "$(jq -Rn --arg paths "$instruction_files" '$paths|split("\n")|map(select(length>0))')" \
     --argjson wait_seconds "$wait_seconds" --arg tree "$(cat "$run/codex-tree" 2>/dev/null || true)" \
     --arg validation "$validation" --arg test_result "$test_result" \
     --argjson target_moved_commits "$target_count" --arg commit "$land_commit" --argjson change "$change_json" \
     --arg actor "$landing_actor" --arg vendor "$landing_vendor" --arg model "$landing_model" --argjson review_pending "$review_pending" \
-    '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.landing_actor={actor:$actor,vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:(if $actor=="unknown" then "unknown" else "declared" end)}|.review_status=(if $review_pending then "pending" else "unknown" end)|if $commit!="" then .commit=$commit else . end|if ($change|type)=="object" then .change=$change else . end|.chosen=true'
+    '.verifier_lines=$verifier_lines|.instruction_files=$instruction_files|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.landing_actor={actor:$actor,vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:(if $actor=="unknown" then "unknown" else "declared" end)}|.review_status=(if $review_pending then "pending" else "unknown" end)|if $commit!="" then .commit=$commit else . end|if ($change|type)=="object" then .change=$change else . end|.chosen=true'
   case "$review_pending" in
     1) _dispatch_ledger_event_best_effort review_pending "$version" "$slug" --arg actor "$landing_actor" '.landing_actor=$actor|.review_status="pending"' ;;
   esac

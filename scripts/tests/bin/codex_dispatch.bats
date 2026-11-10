@@ -1829,6 +1829,85 @@ EOF
   [[ "$output" == *"$run_dir/state/jobs"* && "$output" == *"$run_dir/state/tmp"* ]]
 }
 
+@test "codex dispatch: instruction files require explicit land authorization" {
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/guard.argv" STUB_ENV="$BATS_TEST_TMPDIR/guard.env"
+  sed -i.bak '/| `a.txt` |/a\
+| `AGENTS.md` |' "$FIXTURE/docs/plans/v9.9.9-demo.md"
+  rm -f "$FIXTURE/docs/plans/v9.9.9-demo.md.bak"
+  git -C "$FIXTURE" add docs/plans/v9.9.9-demo.md; git -C "$FIXTURE" commit -qm list-instruction-file
+  git -C "$FIXTURE" push origin k3d-manager-v9.9.9 >/dev/null
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug protected >/dev/null; sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/protected" before
+  printf 'new instruction\n' >"$task/AGENTS.md"
+  git -C "$task" add AGENTS.md a.txt; git -C "$task" commit -qm protected
+  before="$(git -C "$FIXTURE" rev-parse k3d-manager-v9.9.9)"
+  run dispatch land --slug protected --no-test
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'instruction-file: AGENTS.md'* ]]
+  run dispatch land --slug protected --no-test --allow-out-of-scope
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'instruction-file: AGENTS.md'* && "$output" == *'+new instruction'* ]]
+  [ "$(git -C "$FIXTURE" rev-parse k3d-manager-v9.9.9)" = "$before" ]
+  jq -e -s 'any(.[]; .slug=="protected" and .event=="land_refused" and .reason=="scope" and .detail=="instruction-files")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  if jq -e -s 'any(.[]; .slug=="protected" and .event=="land")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null; then false; fi
+  run dispatch land --slug protected --no-test --allow-out-of-scope --allow-instruction-files
+  [ "$status" -eq 0 ]
+  jq -e -s 'any(.[]; .slug=="protected" and .event=="land" and (.instruction_files|index("AGENTS.md")))' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "codex dispatch: instruction path patterns cover nested names and uncommitted files" {
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/pattern.argv" STUB_ENV="$BATS_TEST_TMPDIR/pattern.env"
+  local path slug task
+  for path in scripts/lib/foundation/CLAUDE.md .claude/hooks/x.sh .github/copilot-instructions.md nested/.envrc nested/.mcp.json; do
+    slug="pattern-$RANDOM"
+    dispatch start --spec docs/plans/v9.9.9-demo.md --slug "$slug" >/dev/null; sleep 1
+    task="$K3DM_WORKTREE_ROOT/v9.9.9/$slug"
+    mkdir -p "$task/${path%/*}" 2>/dev/null || true
+    printf 'protected change\n' >"$task/$path"
+    git -C "$task" add "$path" a.txt; git -C "$task" commit -qm protected
+    run dispatch land --slug "$slug" --no-test --allow-out-of-scope
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"instruction-file: $path"* ]]
+  done
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug untracked >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/untracked"
+  git -C "$task" add a.txt; git -C "$task" commit -qm baseline-edit
+  mkdir -p "$task/nested"
+  printf 'tracked marker\n' >"$task/nested/AGENTS.md"
+  git -C "$task" add nested/AGENTS.md; git -C "$task" commit -qm tracked-instruction
+  printf 'uncommitted marker\n' >>"$task/nested/AGENTS.md"
+  printf 'untracked marker\n' >"$task/nested/CLAUDE.md"
+  run dispatch land --slug untracked --no-test --allow-out-of-scope
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'instruction-file: nested/AGENTS.md'* && "$output" == *'+uncommitted marker'* ]]
+  [[ "$output" == *'instruction-file: nested/CLAUDE.md'* && "$output" == *'+untracked marker'* ]]
+}
+
+@test "codex dispatch: ordinary scope rules remain unchanged" {
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/scope.argv" STUB_ENV="$BATS_TEST_TMPDIR/scope.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug ordinary >/dev/null; sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/ordinary"
+  printf 'changed\n' >"$task/a.txt"
+  git -C "$task" add a.txt; git -C "$task" commit -qm ordinary
+  run dispatch land --slug ordinary --no-test
+  [ "$status" -eq 0 ]
+  git -C "$FIXTURE" push origin k3d-manager-v9.9.9 >/dev/null
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug extra >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/extra"
+  printf 'out of scope\n' >"$task/extra.txt"
+  git -C "$task" add extra.txt a.txt; git -C "$task" commit -qm extra
+  run dispatch land --slug extra --no-test
+  [ "$status" -eq 2 ]
+  run dispatch land --slug extra --no-test --allow-out-of-scope --superseding ordinary
+  [ "$status" -eq 0 ]
+}
+
 @test "codex dispatch: evidence refusals and failure without evidence" {
   printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"sample"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ "$FIXTURE" != "$(git rev-parse --show-toplevel)" ]
