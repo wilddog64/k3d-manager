@@ -1,8 +1,8 @@
 # Bug: a `--trust-vault-ca` run is published as a 2-second successful acg-up deployment
 
-**Status:** OPEN — filed 2026-11-09
+**Status:** OPEN — filed 2026-11-09; dispatched to Luna 2026-11-09 (slug `trust-vault-ca-no-deploy-metric`)
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-09 (WIP 3/3 at approval; dispatch when a slot frees)
+**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** `401e4eca` (v1.43.5, the EXIT-trap push from
 `docs/bugs/2026-10-18-deployment-dashboard-empty-for-cli-lifecycle-runs.md`) combined with the `--trust-vault-ca`
 early exit; the webhook route that runs it unattended came in `ecae8a73` (v1.43.14)
@@ -17,7 +17,7 @@ cause. `make find-similar-docs` unavailable (vector store unreachable from the M
 **Approval:** operator, 2026-11-09
 **Intent approved:** operator, 2026-11-09
 **Intent approval words:** "E1, E2, and E3 approved and dispatch if allowed"
-**Dispatch:** operator go 2026-11-09, conditional on the WIP limit; held at 3/3
+**Dispatch:** operator go 2026-11-09, conditional on the WIP limit; started after gate-guard landed freed a slot, `--agent codex --model gpt-6-luna`
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09, k3dm Deployment Metrics screenshot ("why AWS (acg-up) Duration is 2s? … it is
 weird"); Claude traced it
