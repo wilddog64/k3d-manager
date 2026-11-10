@@ -36,7 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
-.PHONY: hub-promote hub-rollback hub-promote-status
+.PHONY: hub-promote hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -53,7 +53,17 @@ hub-new:
 
 .PHONY: hub-sync
 hub-sync:
-	@bin/k3dm-hub-sync
+	@bin/k3dm-repo-sync --remote "$${K3DM_HUB_HOST:-m5-air.local}"
+
+install-repo-sync:
+	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.local/share/k3d-manager/logs"
+	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"; fi
+
+uninstall-repo-sync:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
 
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:
@@ -1305,6 +1315,8 @@ platform-ops:
 	 _sha=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
 	 _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
 	 (cd "$$_tmp" && _run_command --soft -- ./scripts/k3d-manager deploy_argocd_platform_ops --confirm); \
+	 mkdir -p "$(HOME)/.local/share/k3d-manager/repo-sync"; \
+	 printf '%s\n' "$$_sha" > "$(HOME)/.local/share/k3d-manager/repo-sync/deployed-platform-ops"; \
 	 echo "[platform-ops] applied deploy/hub $$_sha"
 
 ## Apply hub PrometheusRules only (scripts/etc/prometheus/rules) — no full observability redeploy

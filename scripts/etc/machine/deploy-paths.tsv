@@ -1,0 +1,4 @@
+# path prefix	deploy step
+scripts/etc/argocd/platform-ops/	platform-ops
+scripts/lib/webhook/	webhook-restart
+bin/k3dm-webhook	webhook-restart

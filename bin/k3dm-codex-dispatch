@@ -1223,7 +1223,7 @@ _dispatch_land() {
   git -C "$repo_path" worktree remove "$task"
   git -C "$repo_path" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
   git -C "$repo_path" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
-  echo "landed: $slug"; echo "push: git -C $repo_path push origin $target"
+  echo "landed: $slug"; echo "push: git -C $repo_path push origin $target && make hub-sync"
 }
 
 _dispatch_handoff() {

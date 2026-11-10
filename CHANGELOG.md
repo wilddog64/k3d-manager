@@ -8,6 +8,8 @@
 
 ### Added
 
+- Fast-forward each machine's configured checkouts on a five-minute timer; report hub sync lag, webhook restart needs, and pending hub deployment steps without running them.
+
 - Add an Ubuntu Linux control-node setup path with pinned Homebrew installer verification and no secret or sudo setup.
 
 - Add the `deploy/hub` promotion and rollback flow, status reporting, and platform-ops deployment from the promoted tree.

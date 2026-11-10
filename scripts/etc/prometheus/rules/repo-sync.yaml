@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: repo-sync
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: repo.sync
+      interval: 60s
+      rules:
+        - alert: K3dmRepoSyncStale
+          expr: label_replace(time() - k3dm_repo_sync_last_success_timestamp_seconds{repo="k3d-manager"} > 3600, "result", "stale", "", "") or (k3dm_repo_sync_result{repo="k3d-manager",result=~"blocked|fetch_failed"} == 1 and on (repo) time() - k3dm_repo_sync_last_success_timestamp_seconds{repo="k3d-manager"} > 1200)
+          for: 10m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "k3d-manager checkout sync is stale"
+            description: "Repository {{ $labels.repo }} sync result {{ $labels.result }}; inspect ~/.local/share/k3d-manager/repo-sync/state.json."
+        - alert: K3dmDeployPending
+          expr: k3dm_repo_sync_deploy_pending == 1
+          for: 30m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "Hub deployment step {{ $labels.step }} is pending"
+            description: 'Run {{ if eq $labels.step "platform-ops" }}make platform-ops{{ else if eq $labels.step "appsets-reapply" }}make appsets-reapply{{ else }}restart the webhook{{ end }}.'

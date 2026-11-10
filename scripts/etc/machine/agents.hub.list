@@ -14,3 +14,4 @@ install-cloud-bridge
 bin/k3dm-webhook-setup
 bin/k3dm-hermes-setup
 bin/k3dm-heartbeat-setup
+install-repo-sync
