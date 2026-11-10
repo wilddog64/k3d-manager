@@ -1,8 +1,7 @@
 # `find-similar-docs` rc-36 hint sends the operator to item access when the keychain is locked for the session
 
-**Status:** OPEN — dispatched to Luna 2026-11-09
+**Status:** LANDED — `070f8dae` (Luna; Claude review 2026-11-09: test_prior_art.py 103/103 outside any sandbox; N1 and N2 each red with the guard broken, green restored; M4 checked by hand, no test written for it). Independent verifier from Acceptance pending
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** 3a254484
 **Should have been caught by:** spec
 **Severity:** low — no data or service impact; the misleading hint cost one session a needless item change, a new
