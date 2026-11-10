@@ -23,3 +23,6 @@ gemini-config/
 # Session scratch: multi-MB agent logs and draft specs. Never track.
 scratchpad/
 .pub
+
+# Vagrant local machine state (control-node VM test)
+.vagrant/
