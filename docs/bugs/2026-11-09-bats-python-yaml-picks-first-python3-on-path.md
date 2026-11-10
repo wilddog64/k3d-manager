@@ -11,7 +11,8 @@ store unreachable from the M4, 2026-11-09)
 **Severity:** medium — 27 of the 35 offline failures on the M4; one more assertion (`argocd.bats:389`) silently does
 not run on such a host
 **Approval:** operator, 2026-11-09 (parent bug: one P2 parent with a child per root cause)
-**Intent approved:** operator, 2026-11-09 ("your C1 is approved")
+**Intent approved:** operator, 2026-11-09
+**Intent approval words:** "your C1 is approved"
 **Dispatch:** operator go 2026-11-10 ("can you kick off C1 on v1.43.15?"), `--agent codex --model gpt-6-luna`, slug `bats-python-yaml-helper`
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, serial `make test` baseline on the M4
