@@ -378,3 +378,6 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-10: C1 E5 make test rc=0, 2033 ok, 0 not ok under the PyYAML-less direnv python; E4 counts unchanged. C1 LANDED, independent verifier owed.
 - 2026-11-10: C1 VERIFIED (independent Sonnet verifier + Claude rerun). Found control-node impl already landed 4bd764b9 (2026-11-08); operator asked to run E3 (Vagrant) now, then E4 (Hostinger) depending on result.
 - 2026-11-10: control-node-linux dropped from dispatch queue (already landed 4bd764b9). E3 Vagrant started: vagrant up --no-provision, then checksums, role, setup, make test in k3dm-control's clone at release head.
+
+**2026-11-10 — control-node E3 FAILED; E4 not run.** Vagrant VM on the M4: role run1 changed=3, run2 changed=0, k3dm-control no sudo; then setup exited 2 right after `homebrew ok`: `bin/k3dm-machine-setup:102` probes `_run_command -- brew list --formula`, which exits the script via `_err` on the first not-installed formula (P2, introduced 4bd764b9, blocks v1.43.15 PR). Harness: pip install_mode fails under PEP 668; VirtualBox exposes SVE on M4 so portable Ruby SIGILLs; `arm64.nosve arm64.nosme` proven to fix (P3). Both docs filed, intents awaiting operator approval, dispatch to Luna when a WIP slot frees (3/3: hub-loki-retention exited, hub-promote running, lib-foundation exited). VM destroyed.
+
