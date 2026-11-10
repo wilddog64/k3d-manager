@@ -1,3 +1,4 @@
+- [x] 2026-11-09 Landed lib-foundation `_install_promtool` `e44669a` (E1 offline + E2 live verified by Claude).
 - [x] 2026-11-09 Landed e2e-dashboard-local-time `c057aede`.
 - [x] 2026-11-09 Landed trust-vault-ca-no-deploy-metric `0a1a0657`.
 - [x] 2026-11-09 e2e-dashboard local-time P3: intents approved, dispatch go (Luna).

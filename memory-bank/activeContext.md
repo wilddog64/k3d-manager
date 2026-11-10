@@ -1,3 +1,5 @@
+**2026-11-09 — LANDED lib-foundation-v0.5.5-install-promtool `e44669a`** on lib-foundation `feat/install-promtool` (Luna). Claude review: 4 checksums match upstream sha256sums.txt v3.1.0; system.bats 62/62; mutants N1–N5 each red; E2 live on M4 into scratch dir: `promtool, version 3.1.0`. Land needed the lib-foundation checkout switched to `feat/install-promtool` (was on fix/acg-brace-expansion-1.1.21, clean). Next: PR for lib-foundation v0.5.5 (gates: CI, Copilot), then subtree-pull; `_run_parallel` dispatch now unblocked. WIP 0/3.
+
 **2026-11-09 — LANDED e2e-dashboard-local-time `c057aede`** (Luna). bats 27/27; pre-fix and mutants a–c red. E3 live after hub-promote + platform-ops (exporter is platform-ops). WIP now 1/3: promtool (exited, not landed). Gotcha: direnv venv python3 lacks PyYAML; run e2e_observability bats with /opt/homebrew/bin first.
 
 **2026-11-09 — LANDED trust-vault-ca-no-deploy-metric `0a1a0657`** (Luna). N1/N2 red on pre-fix, green on fix (bats 7/7, webhook_lifecycle 22/22). E3 live after promote; verifier owed. Stale up-aws Pushgateway sample: operator decision. WIP: promtool (exited), e2e-dashboard-local-time (exited, reviewing).
