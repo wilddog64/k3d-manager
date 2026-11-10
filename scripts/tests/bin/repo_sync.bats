@@ -270,7 +270,7 @@ run_sync() {
   [ "$status" -eq 0 ]
   [[ "$output" != *"restart pending"* ]]
   grep -q '"webhook_restart_pending": false' "$SCRATCH/state/state.json"
-  ! grep -q '"step": "webhook-restart"' "$SCRATCH/state/state.json"
+  if grep -q '"step": "webhook-restart"' "$SCRATCH/state/state.json"; then false; fi
 }
 
 @test "platform-ops drift is pending, marker current is clear, missing marker is unknown" {
@@ -299,13 +299,13 @@ run_sync() {
   printf '%s\n' "$deployed" > "$SCRATCH/state/deployed-platform-ops"
   run_sync "$HUB_ROOT"
   [ "$status" -eq 0 ]
-  ! grep -q '"step": "platform-ops"' "$SCRATCH/state/state.json"
+  if grep -q '"step": "platform-ops"' "$SCRATCH/state/state.json"; then false; fi
   grep -q 'k3dm_repo_sync_deploy_pending{step="platform-ops"} 0' "$CURL_BODY"
   rm "$SCRATCH/state/deployed-platform-ops"
   run_sync "$HUB_ROOT"
   [ "$status" -eq 0 ]
   grep -q '"platform-ops"' "$SCRATCH/state/state.json"
-  ! grep -q 'k3dm_repo_sync_deploy_pending{step="platform-ops"} 1' "$CURL_BODY"
+  if grep -q 'k3dm_repo_sync_deploy_pending{step="platform-ops"} 1' "$CURL_BODY"; then false; fi
   grep -q 'appsets-check' "$MAKE_LOG"
   if grep -Eq '(^|[[:space:]])(platform-ops|appsets-reapply|hub-promote|hub-rollback)([[:space:]]|$)' "$MAKE_LOG"; then
     return 1
@@ -334,14 +334,14 @@ run_sync() {
   export APPCHECK_MODE=clean
   run_sync "$HUB_ROOT"
   [ "$status" -eq 0 ]
-  ! grep -q '"step": "appsets-reapply"' "$SCRATCH/state/state.json"
+  if grep -q '"step": "appsets-reapply"' "$SCRATCH/state/state.json"; then false; fi
   grep -q 'k3dm_repo_sync_deploy_pending{step="appsets-reapply"} 0' "$CURL_BODY"
   [[ "$output" != *"appsets-reapply"* ]]
   export APPCHECK_MODE=fail
   run_sync "$HUB_ROOT"
   [ "$status" -eq 0 ]
   grep -q '"appsets-reapply"' "$SCRATCH/state/state.json"
-  ! grep -q 'k3dm_repo_sync_deploy_pending{step="appsets-reapply"}' "$CURL_BODY"
+  if grep -q 'k3dm_repo_sync_deploy_pending{step="appsets-reapply"}' "$CURL_BODY"; then false; fi
 }
 
 @test "hub branch stops at deploy/hub while worker follows its upstream" {
@@ -484,7 +484,7 @@ run_sync() {
   run_sync "$HUB_ROOT"
   [ "$status" -eq 0 ]
   grep -q '"webhook_restart_pending": false' "$SCRATCH/state/state.json"
-  ! grep -q '"step": "webhook-restart"' "$SCRATCH/state/state.json"
+  if grep -q '"step": "webhook-restart"' "$SCRATCH/state/state.json"; then false; fi
   [ -n "$recorded" ]
   grep -q 'gui/.*/com.k3d-manager.webhook' "$LAUNCHCTL_LOG"
   grep -q 'lstart=' "$PS_LOG"
@@ -499,7 +499,7 @@ run_sync() {
   [ "$status" -eq 0 ]
   [ -e "$SCRATCH/state/state.json" ]
   grep -q '"appsets-reapply"' "$SCRATCH/state/state.json"
-  ! grep -q '"step": "appsets-reapply"' "$SCRATCH/state/state.json"
+  if grep -q '"step": "appsets-reapply"' "$SCRATCH/state/state.json"; then false; fi
 }
 
 @test "--check reports an already-fetched behind checkout without changing it" {
