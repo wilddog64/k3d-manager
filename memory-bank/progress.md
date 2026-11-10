@@ -383,3 +383,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 **2026-11-10 — control-node P2 + P3: intents approved, dispatch go to Luna, P2 first** ("go ahead for your two suggestions"). Waiting on WIP slot: review/land hub-loki-retention and lib-foundation-v0.5.5-run-parallel first.
 
+**2026-11-10 — LANDED hub-loki-retention `76446d6e`** (Flash 3.8). Review fix: `skip` inside `$(...)` never skipped; helper now sets LOKI_CHART. bats 15/15; pre-fix 6 red; mutants a (no store), b (0s), c (no dispatch stream) red; helm-absent run skips 11-15. E3 live owed after hub-promote. WIP 2/3.
+

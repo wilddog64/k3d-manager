@@ -1,8 +1,8 @@
 # Bug: hub Loki keeps logs forever, and its 10Gi volume is not a limit
 
-**Status:** OPEN
+**Status:** LANDED `76446d6e` 2026-11-10 (Flash 3.8; Claude fixed skip-in-subshell at review). Pre-fix 6 red; mutants a-c red; no-helm skips; E2 verify-config done at spec time. E3 live after hub-promote
 **Priority:** P3 (was P2 at filing; lowered by Claude 2026-11-10 after the baseline below: ~30 MB/day against 743 GB free)
-**Waiting on:** fix running — since 2026-11-10
+**Waiting on:** live check — since 2026-11-10 (needs hub-promote)
 **Introduced by:** pre-existing (`hub-loki` in `scripts/etc/argocd/applicationsets/observability.yaml:32-37` with `scripts/etc/helm/observability/loki-values.yaml`, which never set retention)
 **Should have been caught by:** spec (the Loki spec set a volume size and no retention, and assumed the size bounds the data)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4 all day: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `grep -ril "loki.*retention\|retention.*loki" docs/bugs`: none
