@@ -63,6 +63,20 @@ Out of scope: `scripts/tests/lib/fast_gate.bats` (stubs `python3` itself, line 4
 which run under whatever runs pytest; `scripts/tests/bin/alert_delivery_status_python.bats`, which passes on the M4
 today (listed for the verifier to confirm, not changed).
 
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/tests/python_yaml.bash` | new: `k3dm_python_yaml` helper |
+| `scripts/tests/lib/python_yaml_helper.bats` | new: E1–E3 tests for the helper |
+| `scripts/tests/lib/ci_workflow_no_stage2.bats` | use the helper |
+| `scripts/tests/plugins/argocd_app_cluster_generator.bats` | use the helper |
+| `scripts/tests/plugins/dr_alert_rules.bats` | use the helper |
+| `scripts/tests/plugins/e2e_observability.bats` | use the helper |
+| `scripts/tests/plugins/hub_pushgateway.bats` | use the helper |
+| `scripts/tests/plugins/vectordb_rules.bats` | use the helper |
+| `scripts/tests/plugins/argocd.bats` | use the helper; drop the `import yaml` guard (formerly line 389) |
+
 ## Contract readers
 
 New env var `K3DM_TEST_PYTHON3`, read only by the new helper. `grep -rn K3DM_TEST_PYTHON3` on 2026-11-09 finds no
