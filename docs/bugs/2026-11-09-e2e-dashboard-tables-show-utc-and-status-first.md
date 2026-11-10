@@ -1,8 +1,8 @@
 # Bug: E2E Verification tables show run dates in UTC, and Failure groups leads with the date and status
 
-**Status:** OPEN — filed 2026-11-09
+**Status:** LANDED `c057aede` 2026-11-09 (Luna fix, Claude review: bats e2e_observability 27/27 on the fix; pre-fix 3 red (17, 18, 27); mutants a gmtime/UTC 2 red, b no TZ env 1 red, c run_id/runner swap 1 red; validate-manifests clean; run with /opt/homebrew/bin first on PATH, direnv venv python lacks PyYAML)
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-09
+**Waiting on:** live check — since 2026-11-09 (E3 after `make hub-promote` and `make platform-ops`; independent Acceptance verifier also owed)
 **Introduced by:** pre-existing (`e2e_utc` and the run-date-first column order came in with the run-status columns;
 see CHANGELOG `fixed: passed <date>`)
 **Should have been caught by:** none (presentation preference, not a regression)
