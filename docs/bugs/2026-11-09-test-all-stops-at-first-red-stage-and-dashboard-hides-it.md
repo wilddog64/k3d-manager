@@ -1,8 +1,9 @@
 # Bug: nightly test-all stops at the first red stage, and the Tests dashboard shows the partial count as the total
 
-**Status:** OPEN — filed 2026-11-09; not scheduled (operator: "we don't need to dispatch right away")
+**Status:** OPEN — filed 2026-11-09; Part A dispatched to Gemini 3.8 Flash 2026-11-09; Part B folded into
+`docs/plans/v1.44.0-parallel-offline-tests.md` (operator, 2026-11-09)
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-09 (Part B changes what a run does; Part A needs only intent approval)
+**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** pre-existing. The `&&` chain predates `63d29a47` (v1.43.2), which kept it and added
 `k3dm_test_run_complete` and `OfflineSuiteRunIncomplete` but no dashboard panel for them
 **Should have been caught by:** spec (`docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md` added
@@ -17,12 +18,14 @@ different defect. `make find-similar-docs` unavailable (vector store unreachable
 (about 55% of all cases) is invisible to the nightly run, and the dashboard reads as if the whole suite ran.
 **Approval:** operator, 2026-11-09: "can you investigate this and file a proper bug if necessary. we don't need to
 dispatch right away"
-**Intent approved:** not yet
+**Intent approved:** operator, 2026-11-09: "approve E1 and E2 and dispatch to Flash 3.8"; "let's fold Part B into
+v1.44.0 parallel plan"
+**Dispatch:** operator go 2026-11-09, Part A only, `--agent agy --model gemini-3.8-flash-medium`
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09, reading the k3dm Tests "Total cases" panel ("looks like that our test cases
 increase") — Claude traced it
-**Release:** unscheduled; groom at the next `/release-groom`. Part B overlaps `docs/plans/v1.44.0-parallel-offline-tests.md`
-Part B (same `test-all` recipe)
+**Release:** P3 batch item on `k3d-manager-v1.43.15`, dashboard only. Part B ships with
+`docs/plans/v1.44.0-parallel-offline-tests.md` Part B
 
 ## Symptom
 
@@ -51,41 +54,42 @@ test-all/local`.
 
 ## Fix
 
-### Part A — dashboard (no behaviour change)
+### Part A — dashboard (no behaviour change; dispatched)
 
-- New stat panel "Run complete" on `k3dm_test_run_complete{target="test-all"}`: `1` → "complete" (green), `0` →
-  "stopped early" (red), no data → "no data".
-- "Total cases" and "Failed cases" keep their queries, and their descriptions say a partial run counts only the stages
-  that ran. "Total cases" turns amber when `k3dm_test_run_complete == 0` (a second hidden query or override).
-- Grafana version proof is required before dispatch (CLAUDE.md "Prove external behaviour"): the value mappings and
-  overrides used must be captured from the hub's deployed Grafana.
+File: `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` only.
 
-### Part B — run every stage (operator decision)
+- New `stat` panel "Run complete", query `k3dm_test_run_complete{target="test-all"}` (instant), placed in row y 26 next
+  to "Total cases". `fieldConfig.defaults.mappings`:
+  `[{"type": "value", "options": {"0": {"text": "stopped early", "color": "red"}, "1": {"text": "complete", "color": "green"}}}]`,
+  `"noValue": "no data"`. Its description: a run that stops at a red stage counts only the stages that ran, see
+  `OfflineSuiteRunIncomplete`. Re-flow the `gridPos` of panels in that row so none overlap; give it an unused `id`.
+- "Total cases" and "Failed cases" keep their queries. Each description adds that a partial run (Run complete = stopped
+  early) counts only the stages that ran.
+- No overrides, hidden queries or transformations: only the stat-plus-value-mapping construct already deployed.
 
-Change `test-all` to run all three stages whatever each returns, and exit non-zero if any failed. Each stage prints
-`[test-all] stage-complete <stage>` once it has **run**, pass or fail, so `k3dm_test_run_complete 0` then means a stage
-aborted or was killed, not that it had a failing case. `OfflineSuiteFailing` still carries the failures.
+**External behaviour proof (CLAUDE.md, 2026-11-07):** the hub runs kube-prometheus-stack `67.9.0`
+(`scripts/etc/argocd/applicationsets/observability.yaml:18`, Grafana 11.4.0). The same construct, a `stat` panel with
+`{"type": "value", "options": {"0": {"text": "down", "color": "red"}, "1": {"text": "up", "color": "green"}}}`, is
+deployed on that Grafana in `scripts/etc/argocd/platform-ops/grafana-dashboard-host-cni-ipam.yaml:26` (since
+`32393e17`, 2026-10-29). Claude, 2026-11-09, from the M4 (no hub kube context there); E2 is the live confirmation.
+Deploy path: `scripts/etc/argocd/applicationsets/grafana-dashboards-hub.yaml:38` includes this file, so it reaches the hub
+only after `make hub-promote`.
 
-- For: the nightly run counts and reports every case every night, and E3 of the v1.43.16 parent
-  (`docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`) can compare full counts.
-- Against: a red `make test` no longer saves the ~15 minutes of later stages, and the meaning of the `stage-complete`
-  marker changes for every reader below.
-- Claude's recommendation: do Part B inside `docs/plans/v1.44.0-parallel-offline-tests.md` Part B, which already
-  rewrites this recipe, runs every file regardless of other failures, and keeps the markers. Then only the serial
-  recipe's meaning needs deciding. Part A stands alone as a P3 batch item.
+### Part B — run every stage: moved
+
+Folded into `docs/plans/v1.44.0-parallel-offline-tests.md` Part B (operator, 2026-11-09), with its contract readers and
+acceptance items. Not part of this dispatch.
 
 ## Contract readers
 
-| Reader | Part A | Part B |
-|---|---|---|
-| `bin/k3dm-test-metrics:52` (marker regex), `:203-208` (`run_complete`) | No change | No code change; meaning of `run_complete` changes (ran vs passed) |
-| `scripts/tests/bin/test_k3dm_test_metrics.py:244-273` (marker fixtures) | No change | Add a case: failing stage still prints its marker |
-| `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml:31` (`OfflineSuiteCaseCountDropped`, gated on complete runs) | No change | Fires on more runs, because more runs become complete; floor 2600 is below today's ~4600 |
-| `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml:40` (`OfflineSuiteRunIncomplete`) | No change | Description changes: "a stage aborted", not "a stage failed" |
-| `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` | New panel, descriptions | No change |
-| `scripts/tests/bin/test_test_tripwire.py` (asserts the `test-all` recipe wraps each stage) | No change | Must still pass with the new recipe |
-| `scripts/lib/webhook/lifecycle.py:215`, `bin/k3dm-webhook:1815` (look for `metrics pushed:`) | No change | No change: the push line is kept |
-| `docs/plans/v1.44.0-parallel-offline-tests.md` Part B item 3 (keeps markers) | No change | Must use the same marker meaning |
+| Reader | Part A |
+|---|---|
+| `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` | Changes: new panel, two descriptions |
+| `scripts/etc/argocd/applicationsets/grafana-dashboards-hub.yaml:38` (includes the file) | No change: same file name |
+| `scripts/etc/argocd/applicationsets/grafana-dashboards-acg.yaml:35` (excludes the file) | No change |
+| `scripts/tests/plugins/grafana_dashboard_appsets.bats` (reads the file name) | No change; must still pass |
+| `Makefile:1478` `VALIDATE_MANIFESTS_DEFAULT` (validates the YAML) | No change; must still pass |
+| `bin/k3dm-test-metrics:203-208` (producer of `k3dm_test_run_complete`) | No change: metric name and label unchanged |
 
 ## Acceptance
 
@@ -93,28 +97,26 @@ aborted or was killed, not that it had a failing case. `OfflineSuiteFailing` sti
 must:
   - id: M1
     text: "The k3dm Tests dashboard shows whether the latest test-all run completed every stage, next to Total cases."
-  - id: M2
-    text: "(Part B, if chosen) make test-all runs test, test-bin and test-python even when an earlier stage fails, and exits non-zero if any stage failed."
-  - id: M3
-    text: "(Part B, if chosen) each stage that ran prints its stage-complete marker, so a run with failing cases in all three stages publishes run_complete 1 and every stage's cases."
 must_not:
   - id: N1
     text: "A run that stopped early is never shown on the dashboard without a visible 'stopped early' state."
-  - id: N2
-    text: "(Part B) a failing stage never makes test-all exit 0."
-  - id: N3
-    text: "(Part B) a stage killed or aborted before finishing never prints its marker (run_complete stays 0)."
 evidence:
   - {id: E1, proves: [M1, N1], kind: offline, intent: "The dashboard's JSON has a run-complete panel on the right metric, and a test fails if the panel or its 'stopped early' mapping is removed."}
   - {id: E2, proves: [M1, N1], kind: live, intent: "After a promote, you open the k3dm Tests dashboard and see 'stopped early' for the current nightly run, which is partial."}
-  - {id: E3, proves: [M2, M3, N2, N3], kind: offline, intent: "With fake stages that pass, fail or get killed, test-all runs every stage, exits red when any fails, and prints a marker only for stages that finished."}
 interface:
-  - "make test-all (stages stubbed via MAKE overrides)"
-  - "bin/k3dm-test-metrics --expected-stages"
-  - "scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  - "scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml (ConfigMap; dashboard JSON under data)"
 ```
 
 ## Worker definition of done
 
-- E1 (and E3 if Part B is chosen) pass; paste each command, rc and the proving lines; each must_not shown red by a mutant.
-- The worker does not run the real `make test-all` or touch the hub; E2 is live, after a promote, for the operator.
+- New test file `scripts/tests/bin/test_k3dm_tests_dashboard.py` (pytest): loads the ConfigMap YAML, parses the
+  dashboard JSON, asserts the "Run complete" stat panel queries `k3dm_test_run_complete`, maps `0` to "stopped early"
+  and `1` to "complete", and that no two panels' `gridPos` overlap. The fixture first asserts it read the repo's file
+  (resolved from the test file's own path, not the cwd).
+- Mutants shown red: (a) delete the panel, (b) delete the `0` mapping, (c) change the expr to another metric. Paste
+  each red run.
+- Run: `python3 -m pytest scripts/tests/bin/test_k3dm_tests_dashboard.py -q`,
+  `bats scripts/tests/plugins/grafana_dashboard_appsets.bats`, and `make validate-manifests` if present. Paste each
+  command, rc and the proving lines.
+- `git diff --stat` touches only the dashboard file and the new test file. Leave the changes uncommitted; Claude
+  reviews and lands. Do not run `make test-all`, kubectl, or anything against the hub; E2 is live, for the operator.
