@@ -1,3 +1,5 @@
+**2026-11-10 — LANDED lib-foundation-v0.5.5-run-parallel `5670513`** (lib-foundation `feat/run-parallel`, pushed). Claude review of Luna rework: 9/9 + gxargs skip; N1 and N2 mutants re-run red; Claude fix: a final item without trailing NUL was silently dropped with rc 0 (`read -d '' || [[ -n $item ]]`), new test red on pre-fix. Then DISPATCHED `checkout-auto-sync` (Luna, plan intents approved 2026-11-10). WIP 3/3: checkout-auto-sync, control-linux-vagrant-m4 (Flash), hub-promote-keeps-promoter-commits. Earlier today: P2 machine-setup Linux LANDED `d2cae3a6`; promote reminder 3:33 pm (cron 4d8f21c1) for cf86a93f.
+
 **2026-11-10 — idea row: remote web console for Claude + agents** (operator). Try Claude Code Remote Control first; the console covers dispatches/Hermes/promotion over existing endpoints. Next grooming.
 
 **2026-11-10 — idea row: doc-dedup intrusion for plans/retros/issues** (operator "go ahead to add your suggestions"). Grow hard negatives 4→~12 per dir, then test stripping template headings from the embedding. Goes to next grooming.

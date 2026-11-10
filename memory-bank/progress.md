@@ -394,4 +394,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 **2026-11-10 — idea row: doc-dedup intrusion for plans/retros/issues** (operator "go ahead to add your suggestions"). Grow hard negatives 4→~12 per dir, then test stripping template headings from the embedding. Goes to next grooming.
 
 **2026-11-10 — idea row: remote web console for Claude + agents** (operator). Try Claude Code Remote Control first; the console covers dispatches/Hermes/promotion over existing endpoints. Next grooming.
-
+- 2026-11-10: machine-setup Linux P2 LANDED d2cae3a6; Vagrant P3 dispatched to Flash (control-linux-vagrant-m4); auto-sync amended intents approved; run-parallel LANDED 5670513 on lib-foundation feat/run-parallel (Claude fix: trailing-item drop); checkout-auto-sync dispatched to Luna. WIP 3/3.
