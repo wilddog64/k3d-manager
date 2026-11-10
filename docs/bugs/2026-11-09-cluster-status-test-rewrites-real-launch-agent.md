@@ -87,6 +87,11 @@ The M4's port-forward plist is contaminated. Choose one:
 - **Regenerate it** from `scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl` with the real kubectl
   path.
 
+**Decided (operator, 2026-11-09: "let's do what you recommended"):** moved aside, not deleted. Claude moved the
+plist into the session scratchpad after checking it still held the `bats-run` path. The agent is disabled in launchd
+on the M4 (`launchctl print-disabled`), and the M4 kubeconfig has no `k3d-k3d-cluster` context, so a regenerated
+file could not work there either.
+
 Please also run this on the M5 hub, to confirm the hub's plists were not hit:
 grep -l bats-run ~/Library/LaunchAgents/com.k3d-manager.*.plist
 No output means clean. The hub was probably protected, because there both plists exist and the ports listen, so the
