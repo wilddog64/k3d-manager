@@ -35,6 +35,14 @@ Accept `--superseding` more than once (collect into a list) and require every pr
 in it. Keep the refusal for any prior slug not named, so landing over a landed spec stays explicit. Update the error to
 list every unnamed prior slug at once, and `docs/howto/codex-dispatch.md:259`.
 
+## Files
+
+| File | Change |
+|---|---|
+| `bin/k3dm-codex-dispatch` | repeatable `--superseding`; refusal lists every unnamed prior slug |
+| `scripts/tests/bin/codex_dispatch.bats` | E1 and E2 tests |
+| `docs/howto/codex-dispatch.md` | one sentence on repeats |
+
 ## Contract readers
 
 - `--superseding` (CLI flag): writer the operator or Claude on `land`; reader only `bin/k3dm-codex-dispatch:1039,1099`.
