@@ -377,3 +377,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-10: Loki baseline 297M/~10d (~30MB/day), node disk 743G free; Loki retention bug lowered P2→P3 by Claude (fix keeps running). Loki image is distroless: measure via docker exec on the k3d node.
 - 2026-11-10: C1 E5 make test rc=0, 2033 ok, 0 not ok under the PyYAML-less direnv python; E4 counts unchanged. C1 LANDED, independent verifier owed.
 - 2026-11-10: C1 VERIFIED (independent Sonnet verifier + Claude rerun). Found control-node impl already landed 4bd764b9 (2026-11-08); operator asked to run E3 (Vagrant) now, then E4 (Hostinger) depending on result.
+- 2026-11-10: control-node-linux dropped from dispatch queue (already landed 4bd764b9). E3 Vagrant started: vagrant up --no-provision, then checksums, role, setup, make test in k3dm-control's clone at release head.
