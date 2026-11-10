@@ -385,3 +385,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 **2026-11-10 — LANDED hub-loki-retention `76446d6e`** (Flash 3.8). Review fix: `skip` inside `$(...)` never skipped; helper now sets LOKI_CHART. bats 15/15; pre-fix 6 red; mutants a (no store), b (0s), c (no dispatch stream) red; helm-absent run skips 11-15. E3 live owed after hub-promote. WIP 2/3.
 
+**2026-11-10 — DISPATCHED machine-setup-linux-missing-formula (P2) to Codex gpt-6-luna.** Operator: P3 control-linux-vagrant-m4 goes to Flash 3.8 (agy gemini-3.8-flash-medium) at the next free slot. WIP 3/3: hub-promote-keeps-promoter-commits (running), lib-foundation-v0.5.5-run-parallel (exited, review next), machine-setup-linux-missing-formula (running).
+
