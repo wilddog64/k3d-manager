@@ -1,3 +1,5 @@
+**2026-11-09 — LANDED trust-vault-ca-no-deploy-metric `0a1a0657`** (Luna). N1/N2 red on pre-fix, green on fix (bats 7/7, webhook_lifecycle 22/22). E3 live after promote; verifier owed. Stale up-aws Pushgateway sample: operator decision. WIP: promtool (exited), e2e-dashboard-local-time (exited, reviewing).
+
 **2026-11-09 — DISPATCHING e2e-dashboard-local-time to Luna** (operator go). WIP will be 3/3: promtool, trust-vault-ca, e2e-dashboard-local-time.
 
 **2026-11-09 — e2e-dashboard local-time P3: intents E1–E3 approved** ("your intents approved"). Dispatch go still needed (hub-reaching platform-ops change).

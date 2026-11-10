@@ -1,8 +1,8 @@
 # Bug: a `--trust-vault-ca` run is published as a 2-second successful acg-up deployment
 
-**Status:** OPEN — filed 2026-11-09; dispatched to Luna 2026-11-09 (slug `trust-vault-ca-no-deploy-metric`)
+**Status:** LANDED `0a1a0657` 2026-11-09 (Luna fix, Claude review: N1 bats test 7 and N2 `test_trust_vault_ca_spawns_bounded_standalone_command` red on pre-fix code, 7/7 bats and 22/22 webhook lifecycle green on the fix, M1 positive controls for success, failure and plain up)
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-09
+**Waiting on:** live check — since 2026-11-09 (E3 after `make hub-promote`; independent Acceptance verifier also owed)
 **Introduced by:** `401e4eca` (v1.43.5, the EXIT-trap push from
 `docs/bugs/2026-10-18-deployment-dashboard-empty-for-cli-lifecycle-runs.md`) combined with the `--trust-vault-ca`
 early exit; the webhook route that runs it unattended came in `ecae8a73` (v1.43.14)
