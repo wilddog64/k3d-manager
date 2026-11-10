@@ -249,8 +249,9 @@ _assert_no_panel_overlap() {
   [ "$(jq -r '.title' <<<"${panel}")" = "Failing test cases (latest run)" ]
   [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
   [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "k3dm_test_failure" ]
-  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
-  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job and .Value' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .case == "Test case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job and .Value and .target' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.indexByName | .case == 0 and .name == 1 and .reason == 2 and .suite == 3' <<<"${panel}" >/dev/null
 }
 
 @test "k3dm tests dashboard preserves failed cases across the selected range" {
@@ -262,8 +263,9 @@ _assert_no_panel_overlap() {
   [ "$(jq -r '.title' <<<"${panel}")" = "Failures in selected time range" ]
   [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
   [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "max_over_time(k3dm_test_failure[\$__range])" ]
-  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .instance == "Target / origin" and .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
-  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .job and .Value and (has("instance") | not)' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .case == "Test case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .job and .Value and .instance and .target' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.indexByName | .case == 0 and .name == 1 and .reason == 2 and .suite == 3' <<<"${panel}" >/dev/null
 }
 
 @test "both dashboard appsets self-heal" {
