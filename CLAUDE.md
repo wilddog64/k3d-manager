@@ -156,6 +156,11 @@ Slack app or webhook, a port, an env var, a file path another component reads) l
 `## Contract readers`, found by grep, with file:line, and says for each whether it changes or why it doesn't. A reader
 found after dispatch is a spec defect. Precedent: the hub deploy-ref change moved the expected ref to `deploy/hub`
 without listing `sensors.py:114`, so Hermes paged on it and offered a harmful repair.
+**Writers too (operator, 2026-11-10).** The same list names every component that writes to the contract (commits to
+the ref, sets the key, posts to the webhook), marked `writer`, with what happens to its writes after the change.
+Precedent: the same deploy-ref change missed the CVE promoter (`app-cve-scan.sh:514-591`), which commits pins to the
+branch its app tracks; `make hub-promote` would have discarded them
+(`docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md`).
 **Test controls (operator, 2026-10-30; from "Four ways a test can lie").** Three more rules for
 dispatched tests:
 - **Paired positive control.** A test that asserts "X has no effect" (nothing loaded, nothing
