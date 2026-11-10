@@ -1,3 +1,4 @@
+- [x] 2026-11-09 Dispatched tests-dashboard-run-complete-panel (Flash 3.8); Part B folded into v1.44.0 parallel plan item 7.
 - [x] 2026-11-09 Filed P3 test-all-stops-at-first-red-stage-and-dashboard-hides-it (not dispatched; Waiting on: operator decision).
 - [x] 2026-11-09 v1.43.16 parent bug E1–E3 intents approved; Waiting on → dispatch.
 
