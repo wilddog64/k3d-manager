@@ -1,3 +1,5 @@
+- 2026-11-10: web console row gained the AI-agent threat model (own agents on the same Macs: browser automation, cookie theft, prompt-injected approval; agents prepare, never perform). Still inbox.
+
 - 2026-11-10: operator agreed the web console shaping and added: screen lock must lock the console. Row records layered detection (Chrome IdleDetector, Safari visibility/blur probe, server heartbeat). Still inbox.
 
 - 2026-11-10: web console idea row (docs/ideas.md) gained the operator lock/token design (5 s idle lock, Google/Apple Watch unlock, rotating tokens) with Claude shaping: server-enforced lock, passkey-tap unlock, 2 passkeys, Apple Watch needs live probe. Still inbox.
