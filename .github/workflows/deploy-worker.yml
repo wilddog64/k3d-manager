@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Deploy Slack relay Worker
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: workers/slack-relay
