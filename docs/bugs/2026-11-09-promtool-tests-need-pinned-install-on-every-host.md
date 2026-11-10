@@ -2,7 +2,7 @@
 
 **Status:** OPEN — child C2 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** dispatch — since 2026-11-09
 **Introduced by:** `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` fix (v1.43.5), which
 installed promtool in the CI `lint` job only
 **Should have been caught by:** spec (the 2026-10-24 fix covered one environment; its 2026-10-30 Recurrence named
@@ -15,11 +15,11 @@ lib-foundation, machine setup, CI and ten test files; a pointer is appended to t
 Mac, so a broken alert rule or dashboard query is caught only by CI
 **Approval:** operator, 2026-11-09 (parent bug); install approach set by the operator 2026-11-09: "anything that we
 need to have brew install should turn into _install_* from lib-foundation … make sure that control node will have it"
-**Intent approved:** not yet
+**Intent approved:** operator, 2026-11-09
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, serial `make test-python` baseline on the M4
 **Release:** v1.43.16 (bug-only)
-**Branch:** lib-foundation change first (upstream), then `k3d-manager-v1.43.16`
+**Branch:** lib-foundation change first (upstream), then `k3d-manager-v1.43.16`. Part A spec: `docs/plans/lib-foundation-v0.5.5-install-promtool.md`
 
 ## Symptom
 

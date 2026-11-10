@@ -2,7 +2,7 @@
 
 **Status:** OPEN — child C3 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** dispatch — since 2026-11-09
 **Introduced by:** unknown (the restore call in `bin/cluster-status:431` and the test predate this audit; not bisected)
 **Should have been caught by:** review
 **Prior art:** none above threshold — exact-slug glob empty; `make find-similar-docs` not run to a result (vector
@@ -11,7 +11,7 @@ LaunchAgent-template bugs and `2026-10-24-ci-promql-tests-blocked-by-tripwire-do
 **Severity:** medium-high — a test has already changed a real file on the operator's host; only the tripwire stopped the
 `launchctl` calls that would have loaded it
 **Approval:** operator, 2026-11-09 (parent bug: one P2 parent with a child per root cause)
-**Intent approved:** not yet
+**Intent approved:** operator, 2026-11-09
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, tripwire report in the P=1 parallel run; the file write was found later while
 writing this spec
