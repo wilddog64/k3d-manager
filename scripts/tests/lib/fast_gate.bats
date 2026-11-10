@@ -10,7 +10,7 @@ setup() {
   printf '%s\n' scripts/tests/lib/static.bats > "$fixture/scripts/etc/fast-gate/static.list"
   printf '#!/usr/bin/env bats\n@test "static" { true; }\n' > "$fixture/scripts/tests/lib/static.bats"
   git -C "$fixture" init -q
-  git -C "$fixture" config user.email test@example.com
+  git -C "$fixture" config user.email gate-fixture@localhost
   git -C "$fixture" config user.name Test
   printf 'old\n' > "$fixture/thing.txt"
   for name in one two; do printf '#!/usr/bin/env bats\n# thing.txt\n@test "%s" { true; }\n' "$name" > "$fixture/scripts/tests/lib/$name.bats"; done
@@ -18,6 +18,58 @@ setup() {
   git -C "$fixture" add .
   git -C "$fixture" commit -qm base
   base=$(git -C "$fixture" rev-parse HEAD)
+}
+
+@test "fast gate: refuses a preexisting local fixture identity commit" {
+  [ "$fixture" != "$root" ]
+  printf 'new\n' >> "$fixture/thing.txt"
+  git -C "$fixture" config user.email test@example.invalid
+  git -C "$fixture" commit -qam fixture-identity
+  local commit
+  commit=$(git -C "$fixture" rev-parse --short HEAD)
+  run bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"$commit fixture-identity"* ]]
+  [[ "$output" == *'git config --local --remove-section user'* ]]
+  [[ "$output" != *'PASS scripts/tests/'* ]]
+}
+
+@test "fast gate: refuses a fixture-domain committer email" {
+  [ "$fixture" != "$root" ]
+  printf 'new\n' >> "$fixture/thing.txt"
+  git -C "$fixture" -c user.email=gate-fixture@localhost commit -qam committer-fixture \
+    --author='Gate Fixture <gate-fixture@localhost>'
+  git -C "$fixture" -c user.email=gate@example.com commit --amend --no-edit -q
+  local commit
+  commit=$(git -C "$fixture" rev-parse --short HEAD)
+  run bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"$commit committer-fixture"* ]]
+  [[ "$output" == *'git config --local --remove-section user'* ]]
+  [[ "$output" != *'PASS scripts/tests/'* ]]
+}
+
+@test "fast gate: refuses local core.bare true before running suites" {
+  [ "$fixture" != "$root" ]
+  printf 'new\n' >> "$fixture/thing.txt"
+  git -C "$fixture" commit -qam ordinary-change
+  git -C "$fixture" config core.bare true
+  run bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'local core.bare is true'* ]]
+  [[ "$output" != *'PASS scripts/tests/'* ]]
+}
+
+@test "fast gate: ignores fixture-domain commits already on base" {
+  [ "$fixture" != "$root" ]
+  printf 'base fixture\n' >> "$fixture/thing.txt"
+  git -C "$fixture" -c user.email=test@example.invalid commit -qam old-fixture-identity
+  base=$(git -C "$fixture" rev-parse HEAD)
+  printf 'new\n' >> "$fixture/thing.txt"
+  git -C "$fixture" commit -qam ordinary-change
+  run bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS scripts/tests/lib/static.bats'* ]]
 }
 
 @test "fast gate: selects named tests and static suite only" {

@@ -94,9 +94,13 @@ if [[ "${1:-}" == --worker ]]; then
   worker "$@"
   exit
 fi
-tree=$(git rev-parse --show-toplevel)
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_PREFIX
+if [[ "$(git config --local --get core.bare || true)" == true ]]; then
+  printf 'fast-gate: refusing to run because local core.bare is true\n'
+  exit 1
+fi
+tree=$(git rev-parse --show-toplevel)
 cd "$tree"
 managed_python_bin="${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv/bin"
 if [[ -x "$managed_python_bin/python3" ]]; then
@@ -120,6 +124,16 @@ base=${1:-}
 if [[ -z "$base" ]]; then
   base=$(git merge-base HEAD "origin/$branch" 2>/dev/null || git merge-base HEAD origin/main)
 fi
+fixture_commits=$(git log --format='%h%x09%s%x09%ae%x09%ce' "$base..HEAD")
+while IFS=$'\t' read -r commit subject author_email committer_email; do
+  [[ -n "$commit" ]] || continue
+  if [[ "$author_email" == *@example.invalid || "$author_email" == *@example.com ||
+        "$committer_email" == *@example.invalid || "$committer_email" == *@example.com ]]; then
+    printf 'fast-gate: refusing fixture identity commit %s %s\n' "$commit" "$subject"
+    printf 'fast-gate: repair with: git config --local --remove-section user; then re-author the unpushed commits\n'
+    exit 1
+  fi
+done <<< "$fixture_commits"
 git diff --name-only --diff-filter=ACMR "$base" HEAD > "$work/changed"
 : > "$work/tests"
 add_test() {
