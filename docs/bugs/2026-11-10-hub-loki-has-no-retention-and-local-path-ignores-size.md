@@ -2,12 +2,15 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-10 (intent approval and dispatch go; disk measurements for E3 baseline)
+**Waiting on:** dispatch — since 2026-11-10
 **Introduced by:** pre-existing (`hub-loki` in `scripts/etc/argocd/applicationsets/observability.yaml:32-37` with `scripts/etc/helm/observability/loki-values.yaml`, which never set retention)
 **Should have been caught by:** spec (the Loki spec set a volume size and no retention, and assumed the size bounds the data)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4 all day: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `grep -ril "loki.*retention\|retention.*loki" docs/bugs`: none
 **Severity:** latent hub outage. Loki's data grows without bound on the k3d node's disk, which every hub pod shares. A full node disk brings kubelet DiskPressure evictions and kine write failures, not just lost logs.
 **Approval:** operator, 2026-11-10: "can you investgiate the retention, and we need to setup that policy so it won't fillup diskspace"
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "approve test intents, and go with your suggestion"
+**Dispatch:** operator go 2026-11-10 ("go with your suggestion"), `--agent agy --model gemini-3.8-flash-medium`, slug `hub-loki-retention`; first in the queue (P2 ahead of the control-node plan and the P3s), starts at the first free WIP slot
 **Filed:** 2026-11-10
 **Detected by:** Claude, 2026-11-10, after the operator's hub check showed `loki-0`, `loki-gateway`, promtail on all four nodes and PVC `storage-loki-0` 10Gi `local-path`
 **Branch:** `k3d-manager-v1.43.15`
