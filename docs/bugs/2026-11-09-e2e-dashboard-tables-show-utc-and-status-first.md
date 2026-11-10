@@ -1,8 +1,7 @@
 # Bug: E2E Verification tables show run dates in UTC, and Failure groups leads with the date and status
 
-**Status:** LANDED `c057aede` 2026-11-09 (Luna fix, Claude review: bats e2e_observability 27/27 on the fix; pre-fix 3 red (17, 18, 27); mutants a gmtime/UTC 2 red, b no TZ env 1 red, c run_id/runner swap 1 red; validate-manifests clean; run with /opt/homebrew/bin first on PATH, direnv venv python lacks PyYAML)
+**Status:** VERIFIED — E3 live on the M5 hub 2026-11-10 after promote `74cd3ca1`; LANDED `c057aede` 2026-11-09 (Luna fix, Claude review: bats e2e_observability 27/27 on the fix; pre-fix 3 red (17, 18, 27); mutants a gmtime/UTC 2 red, b no TZ env 1 red, c run_id/runner swap 1 red; validate-manifests clean; run with /opt/homebrew/bin first on PATH, direnv venv python lacks PyYAML)
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-09 (E3 after `make hub-promote` and `make platform-ops`; independent Acceptance verifier also owed)
 **Introduced by:** pre-existing (`e2e_utc` and the run-date-first column order came in with the run-status columns;
 see CHANGELOG `fixed: passed <date>`)
 **Should have been caught by:** none (presentation preference, not a regression)
@@ -87,6 +86,13 @@ interface:
   - "scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml (exporter.py source under data; Deployment env)"
   - "scripts/etc/argocd/platform-ops/grafana-dashboard-e2e.yaml (dashboard JSON under data)"
 ```
+
+## Live verification (operator, M5 hub Grafana, 2026-11-10)
+
+After `make hub-promote REF=74cd3ca1` and `make platform-ops`: exporter pod rolled with
+`[{"name":"TZ","value":"PST8PDT,M3.2.0,M11.1.0"}]`. Failure groups reads Run ID, Runner, Run date, Tier, Target,
+Service, Failure kind, Status now; run `1794086678-29708` reads `2026-11-07 13:25 PST` (was `21:25 UTC`) and Status now
+`fixed: passed 2026-11-07 13:30 PST`. The first screenshot, taken before the pod rolled, still showed UTC.
 
 ## Worker definition of done
 

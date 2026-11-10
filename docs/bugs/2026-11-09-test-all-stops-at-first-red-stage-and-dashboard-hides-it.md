@@ -1,9 +1,9 @@
 # Bug: nightly test-all stops at the first red stage, and the Tests dashboard shows the partial count as the total
 
-**Status:** OPEN — filed 2026-11-09; Part A dispatched to Gemini 3.8 Flash 2026-11-09; Part B folded into
-`docs/plans/v1.44.0-parallel-offline-tests.md` (operator, 2026-11-09)
+**Status:** VERIFIED — Part A `29d4b28f` (Flash fix, Claude review); E2 live on the M5 hub after promote `74cd3ca1`
+(operator screenshot, 2026-11-10): Run complete reads "stopped early", failure tables read Test case, Test name,
+Failure reason, Test suite. Part B folded into `docs/plans/v1.44.0-parallel-offline-tests.md` (operator, 2026-11-09)
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** pre-existing. The `&&` chain predates `63d29a47` (v1.43.2), which kept it and added
 `k3dm_test_run_complete` and `OfflineSuiteRunIncomplete` but no dashboard panel for them
 **Should have been caught by:** spec (`docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md` added
