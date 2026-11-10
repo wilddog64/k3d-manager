@@ -1,8 +1,7 @@
 # Bug: the pre-push fast gate, run from a linked worktree, lets test fixtures write into the real repository
 
-**Status:** OPEN — recurred 2026-11-07 (see Recurrence). Was: FIXED — `9942c413` (Codex; Claude review, independent verifier PASS); live check pending
-**Waiting on:** investigation — since 2026-11-09
-**Priority:** P2 (operator, 2026-11-09: lowered from P1 for the recurrence, whose only damage was commit authorship; was P1 when core.bare and stray branches broke the main checkout)
+**Status:** LANDED — `9942c413` (Codex; Claude review, independent verifier PASS); live check pending. Not reopened: the 2026-11-09 `Test` identity was this incident's leftover, see Correction
+**Priority:** P2 (operator, 2026-11-09: lowered from P1; the 2026-11-09 finding's only damage was commit authorship; was P1 when core.bare and stray branches broke the main checkout)
 **Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31
 **Detected by:** Claude, pushing `k3d-manager-v1.43.13` from a scratch worktree to work around the push drop in
@@ -104,30 +103,16 @@ interface:
   - scripts/ci/fast_gate.sh [BASE]
 ```
 
-## Recurrence (2026-11-07, found 2026-11-09)
+## Correction (2026-11-09): not a recurrence, a missed repair
 
-**Found by:** Claude, 2026-11-09, checking commit authorship for the operator's question whether every repo change can be
-shown to come from them.
+Claude first recorded the `Test <test@example.invalid>` section found on 2026-11-09 as a recurrence starting
+2026-11-07. Reading the reflog author of every local commit since 2026-10-01 showed it was set at **2026-10-31 15:03**,
+the commit that filed this doc, and never removed: the repair above restored `core.bare` but left the `[user]` section
+it had recorded. Every later non-`Test` commit came from GitHub squash merges, the CVE promoter or a pull. Each of the
+11 test files that use `test@example.invalid`, run from the main checkout on 2026-11-09, left `.git/config` unchanged.
 
-**What happened:** the main checkout's `.git/config` again had a `[user]` section, `Test <test@example.invalid>`, the
-fixture identity. It overrode the operator's global identity (`chengkai liang`), so every local commit was authored
-as `Test` and unsigned. The first one is `7c03c57d` (2026-11-07 10:44 -0800); 219 commits on
-`origin/k3d-manager-v1.43.15` carry it. Nothing else in `.git/config` was changed: `core.bare` stayed false, and there
-were no stray branches or worktrees this time. `main` is not affected: GitHub squash-merges PRs as the operator and
-signs them (`main` head verification `valid`).
+Claude removed the section on 2026-11-09 and re-authored the two unpushed commits. Commits pushed in between stay
+authored `Test`; release squash merges author them as the operator on `main`.
 
-**Repair, 2026-11-09:** Claude removed the `[user]` section (copy of the old file kept in the session scratchpad) and
-re-authored the two unpushed commits. Pushed commits were not rewritten; the release squash-merge authors them as the
-operator on `main`.
-
-**Not yet known:** which run wrote it. The `9942c413` fix covers a push from a linked worktree; this happened after
-it, so either another path (a dispatch worktree, a test run outside the gate, an agent sandbox) exports `GIT_DIR`, or
-a fixture runs `git config` without first checking it is inside its temp repo. Suites that set this identity:
-`scripts/tests/bin/hub_sync.bats`, `test_bug_tally.py`, `test_check_bug_evidence.py`, `test_check_bug_status.py`,
-`test_cloud_artifacts.py`, `test_hermes_checkout_lag.py`, `test_prior_art.py`, `test_release_milestones_drift.py`
-(found by `git grep test@example.invalid`).
-
-**Next:** find the writer (run each suite above, from the main checkout and from a worktree, and diff `.git/config`),
-then a fix spec. A guard worth considering: a check in pre-commit and in `make test` that fails when the main
-checkout's `.git/config` has a `[user]` section or `core.bare = true`.
-
+The guard from `9942c413` compares before and after, so it could not see a section already present. That gap is
+filed as `docs/bugs/2026-11-09-fast-gate-guard-misses-preexisting-fixture-identity.md`.
