@@ -2,13 +2,14 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-10 (P3 batch; WIP 3/3 with the third-round-land P2)
 **Introduced by:** `978ea60f` (v1.34.0, Hermes e2e schedule `wed,sat@02:00`), against the 3-day threshold from `d48e465f` (v1.25.0)
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store context missing on the M4, 2026-11-10). Read `docs/bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md` (different root cause: grouping by runner; fixed and live-verified 2026-10-24)
 **Severity:** a false warning for about a day every week, even when every scheduled run passes. It trains the operator
 to ignore the alert that should say the verification signal really is stale.
 **Approval:** operator, 2026-11-10 (reported the alert email; filing follows the deep-dive-every-alert rule)
+**Intent approved:** operator, 2026-11-10 ("approve P3 intents")
 **Filed:** 2026-11-10
 **Detected by:** operator, alert email 2026-11-10
 **Branch:** `k3d-manager-v1.43.15`

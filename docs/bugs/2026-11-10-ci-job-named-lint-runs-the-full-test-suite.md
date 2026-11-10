@@ -2,13 +2,14 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-10 (P3 batch; WIP 3/3 with the third-round-land P2)
 **Introduced by:** unknown (the test steps accreted into `lint` over several releases)
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10). Related, not a duplicate: `docs/plans/v1.44.0-parallel-offline-tests.md` (local runner speed; leaves CI unchanged, line 62)
 **Severity:** misleading, no breakage. A "lint" result takes 20.8 min and a red `lint` usually means a failing test,
 not a lint finding. Lint feedback that could arrive in about a minute waits behind the suite.
 **Approval:** operator, 2026-11-10: "so then we should really make the name correctly reflect what it does"
+**Intent approved:** operator, 2026-11-10 ("approve P3 intents")
 **Filed:** 2026-11-10
 **Detected by:** operator, reading the PR-checks dashboard (lint 20.8 min)
 **Branch:** `k3d-manager-v1.43.15`

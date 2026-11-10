@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-10 (P3 batch; WIP 3/3 with the third-round-land P2)
 **Introduced by:** `897cfe72` (v1.43.15 hub deploy-ref change: the hub reads `deploy/hub`); shows once `checkout-auto-sync` is installed on the hub
 **Should have been caught by:** spec (the deploy-ref plan's Contract readers did not list `bin/k3dm-hermes:624-733`)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10). Related: `docs/bugs/2026-11-06-hub-code-lag-invisible-and-no-catch-up-step.md` (added this check, before deploy/hub existed); `docs/bugs/2026-11-07-hub-code-behind-tile-unknown-matcher-crashes-bugs-dashboard.md` (tile rendering, different root cause)
@@ -11,6 +11,7 @@
 "behind", and on a newer release it says "older release". Neither is a fault: the hub waits for `make hub-promote` by
 design. Workaround: read `make hub-promote-status`, and the promote backlog that `make hub-sync` prints.
 **Approval:** Claude, 2026-11-10 (found while landing `checkout-auto-sync`; reader of a contract the operator set on 2026-11-07)
+**Intent approved:** operator, 2026-11-10 ("approve P3 intents")
 **Filed:** 2026-11-10
 **Detected by:** Claude, contract-reader search while landing `checkout-auto-sync`, 2026-11-10
 **Branch:** `k3d-manager-v1.43.15`
