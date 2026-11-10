@@ -41,11 +41,12 @@ The M4 VM test uses Vagrant and VirtualBox from `scripts/etc/machine/vagrant/con
 ```sh
 cd scripts/etc/machine/vagrant/control-linux
 vagrant up
+vagrant reload
 vagrant ssh -c 'sudo -iu k3dm-control bash -lc "cd /vagrant/k3d-manager && make machine-setup ROLE=control && make test"'
 vagrant destroy -f
 ```
 
-The VM uses arm64 Ubuntu 24.04; the Hostinger run separately covers x86_64. The role's `prereqs` scope is idempotent and does not install Homebrew or edit sudoers or system profiles.
+The VM uses arm64 Ubuntu 24.04; the Hostinger run separately covers x86_64. On Apple Silicon (M4), VirtualBox exposes SVE and SME features in the guest CPU capabilities, but the host M4 lacks non-streaming SVE instructions, which causes Homebrew's portable Ruby installer to crash with `SIGILL (Illegal instruction)` while pouring bottles. The Vagrantfile includes a shell provisioner that appends `arm64.nosve arm64.nosme` to `GRUB_CMDLINE_LINUX_DEFAULT` and runs `update-grub` on aarch64 guests. Running `vagrant reload` after `vagrant up` reboots the VM into the updated kernel flags before machine setup installs Homebrew. The role's `prereqs` scope is idempotent and does not install Homebrew or edit sudoers or system profiles.
 
 Linux skips the macOS Homebrew package and notarization check, Keychain and `secrets.*.list`, LaunchAgents and `agents.*.list`, `FROM=` file copy, operator SSH include, shell links and agent-settings repositories, and smartcd. These skips keep credentials and SSH keys off the internet-facing control node. `make test` labels its OS-only skips `macOS-only`; the current skipped BATS cases are `machine secrets: real throwaway keychain round trip is macOS only` and `M6: stream unlock round trip uses throwaway keychains on macOS`.
 
