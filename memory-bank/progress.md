@@ -393,3 +393,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 **2026-11-10 — idea row: doc-dedup intrusion for plans/retros/issues** (operator "go ahead to add your suggestions"). Grow hard negatives 4→~12 per dir, then test stripping template headings from the embedding. Goes to next grooming.
 
+**2026-11-10 — idea row: remote web console for Claude + agents** (operator). Try Claude Code Remote Control first; the console covers dispatches/Hermes/promotion over existing endpoints. Next grooming.
+

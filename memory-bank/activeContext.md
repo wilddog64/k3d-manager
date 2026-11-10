@@ -1,3 +1,5 @@
+**2026-11-10 — idea row: remote web console for Claude + agents** (operator). Try Claude Code Remote Control first; the console covers dispatches/Hermes/promotion over existing endpoints. Next grooming.
+
 **2026-11-10 — idea row: doc-dedup intrusion for plans/retros/issues** (operator "go ahead to add your suggestions"). Grow hard negatives 4→~12 per dir, then test stripping template headings from the embedding. Goes to next grooming.
 
 **2026-11-10 — remote task branches cleaned** (operator). 14 `task/v1.43.14/*` deleted: 13 landed (git cherry vs release branch / code identical to main); the superseded 2026-11-03 acg-up broad CA-trust rework tagged `archive/acg-up-stalls-broad-rework` (0f31d2db) first. `/post-merge` gained Step 7d to do this every release.
