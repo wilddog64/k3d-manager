@@ -301,21 +301,6 @@ docs/
 - **[Coordinated OrbStack Upgrade](docs/howto/orbstack-upgrade.md)** — Upgrade OrbStack in a planned window with hub preflight, Vault and network recovery, and health checks
 - **[Independent Heartbeats](docs/howto/independent-heartbeats.md)** — Optional outbound heartbeat probes for the M4 services and Hostinger, disabled by default
 
-| Script | Claude Skill | When to use |
-|---|---|---|
-| `bin/cluster-up [--login-prompt]` | `/cluster-up` | Start from scratch — full provision + ghcr-pull-secret |
-| `bin/cluster-down --confirm` | `/cluster-down` | Tear down cluster and tunnel |
-| `bin/cluster-refresh [--login-prompt]` | `/cluster-refresh` | Creds expired or tunnel dropped — daily driver |
-| `bin/cluster-status` | `/cluster-status` | Read-only health check — nodes, pods, ArgoCD, AWS |
-| `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
-
-| Slack command | Purpose |
-|---|---|
-| `/ask-docs <question>` | Reader-only, sourced Q&A over the documentation corpus |
-
-> `GHCR_PAT` env var must be set before `cluster-up` (used to create `ghcr-pull-secret`).
-> Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
-
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
 
@@ -329,6 +314,28 @@ docs/
 
 **AI Tooling**
 - **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
+
+### Convenience Scripts and Slack Commands
+
+Wrappers in `bin/` for the ACG app cluster and the hub, and the Slack commands the hub answers. The make targets are
+provider-aware ([Makefile Reference](docs/howto/makefile.md)); check `CLUSTER_PROVIDER` before running `make down`.
+
+| Script | Make target | When to use |
+|---|---|---|
+| `bin/cluster-up [--login-prompt]` | `make up` (k3s-aws, k3s-gcp) | Start from scratch — full provision + ghcr-pull-secret |
+| `bin/cluster-down --confirm` | `make down` (not k3s-oci) | Tear down cluster and tunnel |
+| `bin/cluster-refresh [--login-prompt]` | `make refresh` | Creds expired or tunnel dropped — daily driver |
+| `bin/cluster-status [--json] [--service NAME]` | `make status`, `make status-json` | Read-only health check — nodes, pods, ArgoCD, AWS |
+| `bin/cluster-sync-apps` | `make sync-apps` | Sync the ArgoCD data layer and show remote pod status |
+| `bin/cluster-preflight <name> [--auto\|--keep\|--reuse]` | `make preflight NAME=<name>` | Deploy the full stack into a throwaway vCluster before touching a real cluster |
+| `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
+
+> `GHCR_PAT` env var must be set before `cluster-up` (used to create `ghcr-pull-secret`).
+> Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
+
+| Slack command | Purpose |
+|---|---|
+| `/ask-docs <question>` | Reader-only, sourced Q&A over the documentation corpus |
 
 ---
 

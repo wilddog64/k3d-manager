@@ -1,3 +1,5 @@
+- [x] 2026-11-09 parallel-tests intents approved; README scripts section fixed.
+
 - [x] 2026-11-09 C2 Part A dispatched (Luna, lib-foundation). Parallel-tests plan written as v1.44.0 plan 1; lead-model-activity-dashboard unnumbered.
 
 - [x] 2026-11-09 C2 + C3 intent approved; lib-foundation Part A spec written for dispatch.
