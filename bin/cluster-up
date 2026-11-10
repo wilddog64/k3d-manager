@@ -288,7 +288,7 @@ function _acg_keycloak_ldap_provider_id() {
 
 function _acg_up_cleanup() {
   local _exit_code=$?
-  if declare -f _k3dm_push_deployment_metrics >/dev/null 2>&1; then
+  if [[ "${_ACG_UP_SKIP_DEPLOYMENT_METRIC:-0}" -ne 1 ]] && declare -f _k3dm_push_deployment_metrics >/dev/null 2>&1; then
     local _duration_secs=$(( $(date +%s) - _k3dm_deployment_start_epoch ))
     _k3dm_push_deployment_metrics "up" "${_cluster_provider}" \
       "$([[ "${_exit_code}" -eq 0 ]] && printf 'success' || printf 'failed')" \
@@ -341,6 +341,7 @@ function _acg_up_clear_stack_marker() {
   fi
 }
 _ACG_UP_OWNED_PIDS=""
+_ACG_UP_SKIP_DEPLOYMENT_METRIC=0
 trap _acg_up_cleanup EXIT
 _acg_up_clear_stack_marker
 
@@ -461,6 +462,7 @@ for arg in "$@"; do
   esac
 done
 if [[ "${trust_vault_ca_only:-0}" -eq 1 ]]; then
+  _ACG_UP_SKIP_DEPLOYMENT_METRIC=1
   _acg_export_and_trust_vault_ca
   exit $?
 fi

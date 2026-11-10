@@ -52,6 +52,7 @@ class WebhookLifecycleTests(unittest.TestCase):
             self.assertEqual(recorded, [])
             self.assertEqual(checked, [])
             self.assertEqual(cleaned, [])
+            self.assertEqual(self.published_metrics, [])
         finally:
             lifecycle.os.waitpid = original_waitpid
             lifecycle.os.WIFEXITED = original_wifexited
@@ -73,7 +74,7 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle.configure_runtime(
             lambda message: None,
             lambda job_id, text: self.notifications.append((job_id, text)),
-            lambda *args: None,
+            lambda *args: self.published_metrics.append(args),
             lambda lines: "stall",
             lambda lines: "failure",
             lambda text: text,
@@ -365,6 +366,8 @@ class WebhookLifecycleTests(unittest.TestCase):
         self.assertIn("cluster-up* (aws)", terminal)
         self.assertIn("Command exit: 0", terminal)
         self.assertIn("Node ready", terminal)
+        self.assertEqual(len(self.published_metrics), 1)
+        self.assertEqual(self.published_metrics[0][0:3], ("up", "aws", "success"))
 
     def test_cluster_terminal_summary_handles_empty_output_and_nonzero_exit(self):
         job_id = "a1b2c3e4"
