@@ -1,6 +1,6 @@
 # Bug: BATS tests that parse YAML use the first python3 on PATH, which may lack PyYAML
 
-**Status:** LANDED `d96547df` 2026-11-10; E1-E5 passed in Claude's review (independent verifier still owed before VERIFIED)
+**Status:** VERIFIED `d96547df` 2026-11-10 (Claude review E1-E5; independent Sonnet verifier from the Acceptance block only: all M/N pass on post, M1-M4 and N3 red on pre; Claude reran its script)
 **Priority:** P2
 **Introduced by:** pre-existing (each file has called bare `python3` since it was written; it surfaced when the
 personal envrc's `layout python3` put a venv without PyYAML first on PATH)
@@ -158,3 +158,13 @@ test-only.
   1/1, 45/45, 8/8, 2/2, 27/27, 7/7, 18/18.
 - E1-E3: the 8 touched suites green with the venv python first on PATH (base: 2 reds); helper tests 3/3; mutant
   "probe always true" turns tests 1-2 red.
+
+## Independent verification (Sonnet subagent, Acceptance block only, 2026-11-10)
+
+Trees exported at `6a8719bc` (pre) and `d96547df` (post), worker's helper tests removed; script
+`scratchpad/c1-verify/tests/verify.sh`. Post: M1 (7/7 files rc=0 with a PyYAML-less python3 first), M2, M3, M4 (argocd
+case 28 `not ok` without PyYAML, `ok` with it), N1 (counts 1/45/8/2/27/7/18), N2 (no install/venv), N3 all PASS.
+Pre: M1 FAIL (6 files red; argocd passes vacuously), M2, M3, M4, N3 FAIL. Mutant "helper returns /usr/bin/true" turns
+N3 red. Claude reran the script on post: same PASS lines. Notes: e2e_observability.bats dropped two
+`skip "python3 not installed"` guards (confirmed in the diff); those cases now fail instead of skipping, as M2 requires.
+The plain export lacks `.git`, so hub_pushgateway case 7 (`git grep`) needed a git-initialised copy.
