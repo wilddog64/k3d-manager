@@ -2,12 +2,14 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval, then dispatch)
+**Waiting on:** dispatch — since 2026-11-10 (WIP 3/3)
 **Introduced by:** `4bd764b9` (v1.43.15, `scripts/etc/machine/vagrant/control-linux/Vagrantfile`)
 **Should have been caught by:** live check (the Vagrantfile was never run end to end before E3)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
 **Severity:** test harness only. The control-node live check E3 cannot run as documented; it needs two manual workarounds.
 **Approval:** operator, 2026-11-10: "go ahead to file P3 and dispatch to Luna"
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "go ahead for your two suggestions"
 **Dispatch:** operator go 2026-11-10 ("dispatch to Luna"), `--agent codex --model gpt-6-luna`, slug `control-linux-vagrant-m4`; waits for intent approval and a WIP slot
 **Filed:** 2026-11-10
 **Detected by:** Claude, 2026-11-10, live E3 of `docs/plans/v1.43.15-control-node-linux.md`

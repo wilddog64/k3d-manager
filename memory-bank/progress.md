@@ -381,3 +381,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 **2026-11-10 — control-node E3 FAILED; E4 not run.** Vagrant VM on the M4: role run1 changed=3, run2 changed=0, k3dm-control no sudo; then setup exited 2 right after `homebrew ok`: `bin/k3dm-machine-setup:102` probes `_run_command -- brew list --formula`, which exits the script via `_err` on the first not-installed formula (P2, introduced 4bd764b9, blocks v1.43.15 PR). Harness: pip install_mode fails under PEP 668; VirtualBox exposes SVE on M4 so portable Ruby SIGILLs; `arm64.nosve arm64.nosme` proven to fix (P3). Both docs filed, intents awaiting operator approval, dispatch to Luna when a WIP slot frees (3/3: hub-loki-retention exited, hub-promote running, lib-foundation exited). VM destroyed.
 
+**2026-11-10 — control-node P2 + P3: intents approved, dispatch go to Luna, P2 first** ("go ahead for your two suggestions"). Waiting on WIP slot: review/land hub-loki-retention and lib-foundation-v0.5.5-run-parallel first.
+

@@ -2,13 +2,15 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-10 (intent approval, then dispatch)
+**Waiting on:** dispatch — since 2026-11-10 (WIP 3/3)
 **Introduced by:** `4bd764b9` (v1.43.15, `bin/k3dm-machine-setup:102`)
 **Should have been caught by:** offline test (the Linux cases in `scripts/tests/bin/machine_setup.bats` stay green; why is part of the fix)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
 **Severity:** blocks the v1.43.15 control-node feature. On a fresh Linux node, `make machine-setup ROLE=control` exits 2 with no message right after `homebrew ok`; no formula is installed, no repo cloned. Introduced in the open release, so it blocks the release PR.
 **Approval:** operator, 2026-11-10: "go ahead to file P3 and dispatch to Luna" (given for the Vagrant P3 while this was being traced; same live run)
-**Dispatch:** pending intent approval; `--agent codex --model gpt-6-luna`, slug `machine-setup-linux-missing-formula`
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "go ahead for your two suggestions"
+**Dispatch:** operator go 2026-11-10 ("go ahead for your two suggestions": dispatch to Luna, first), `--agent codex --model gpt-6-luna`, slug `machine-setup-linux-missing-formula`; waits for a WIP slot
 **Filed:** 2026-11-10
 **Detected by:** Claude, 2026-11-10, live E3 of `docs/plans/v1.43.15-control-node-linux.md` (Vagrant VM on the M4)
 **Branch:** `k3d-manager-v1.43.15`
