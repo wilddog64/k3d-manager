@@ -1,8 +1,7 @@
 # Bug: BATS tests that parse YAML use the first python3 on PATH, which may lack PyYAML
 
-**Status:** LANDED `d96547df` 2026-11-10 (Luna fix, Claude review: 8 touched suites 0 failures with the direnv venv python3 first on PATH (it lacks PyYAML); release-branch base 2 reds in hub_pushgateway+argocd; helper tests 3/3; mutant probe-always-true 2 red; E5 make test running)
+**Status:** LANDED `d96547df` 2026-11-10; E1-E5 passed in Claude's review (independent verifier still owed before VERIFIED)
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-10 (E5 make test on the M4 with direnv)
 **Introduced by:** pre-existing (each file has called bare `python3` since it was written; it surfaced when the
 personal envrc's `layout python3` put a venv without PyYAML first on PATH)
 **Should have been caught by:** review
@@ -147,3 +146,15 @@ test-only.
 - E2's red run against pre-fix `argocd.bats` is shown.
 - `git diff --stat` touches only the seven bats files and the new helper, plus new tests.
 - No `pip`, `uv` or `venv` command appears in the diff or the run log.
+
+## Verification (Claude, M4, 2026-11-10)
+
+- E5 seen: "Claude runs make test on the M4 from your normal shell, with direnv active, and it shows zero yaml failures."
+  `make test` at `d96547df`, `python3` = direnv venv (`ModuleNotFoundError: No module named 'yaml'`), rc=0, 2033 ok,
+  0 `not ok`. Errors seen: 2 bats BW02 warnings (`app_cve_scan_trigger.bats:91`, `e2e_sandbox_preflight.bats:372`,
+  pre-existing, unrelated); the `security find-generic-password` lines are the tripwire tally ("blocked 559 call(s) to
+  host tools; none reached a real binary"), not real Keychain reads.
+- E4 seen: "Case counts per file are the same before and after." `@test` counts at `6a8719bc` vs `d96547df`:
+  1/1, 45/45, 8/8, 2/2, 27/27, 7/7, 18/18.
+- E1-E3: the 8 touched suites green with the venv python first on PATH (base: 2 reds); helper tests 3/3; mutant
+  "probe always true" turns tests 1-2 red.

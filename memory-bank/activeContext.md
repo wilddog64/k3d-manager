@@ -319,3 +319,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-10: Loki retention P2 intents approved + Flash 3.8 go (slug hub-loki-retention). Queue: hub-loki-retention, control-node-linux, human-continuation-prompts-rename, codex-subagent-ledger-gaps. Operator owes du/df baseline on M5 for E3.
 - 2026-11-10: C1 bats-python-yaml-helper LANDED d96547df (pushed, origin matches); E5 make test running on M4. hub-loki-retention dispatched to Flash 3.8 (WIP 3/3: hub-promote P2, _run_parallel exited-not-landed, loki). Queue next: control-node-linux, rename, subagent fix.
 - 2026-11-10: Loki baseline 297M/~10d (~30MB/day), node disk 743G free; Loki retention bug lowered P2→P3 by Claude (fix keeps running). Loki image is distroless: measure via docker exec on the k3d node.
+- 2026-11-10: C1 E5 make test rc=0, 2033 ok, 0 not ok under the PyYAML-less direnv python; E4 counts unchanged. C1 LANDED, independent verifier owed.
