@@ -1,7 +1,7 @@
 # Bug: hub Loki keeps logs forever, and its 10Gi volume is not a limit
 
 **Status:** OPEN
-**Priority:** P2
+**Priority:** P3 (was P2 at filing; lowered by Claude 2026-11-10 after the baseline below: ~30 MB/day against 743 GB free)
 **Waiting on:** fix running — since 2026-11-10
 **Introduced by:** pre-existing (`hub-loki` in `scripts/etc/argocd/applicationsets/observability.yaml:32-37` with `scripts/etc/helm/observability/loki-values.yaml`, which never set retention)
 **Should have been caught by:** spec (the Loki spec set a volume size and no retention, and assumed the size bounds the data)
@@ -20,7 +20,11 @@
 
 On the M5 hub, 2026-11-10 (operator, `kubectl get pods,pvc -A`): `monitoring/loki-0` Running 10d, promtail on
 `k3d-k3d-cluster-server-0` and agents 0–2, PVC `storage-loki-0` Bound 10Gi `local-path`. Nothing in our values sets
-retention, so nothing is ever deleted. Current usage not yet measured (see E3).
+retention, so nothing is ever deleted. Baseline (operator, M5, 2026-11-10, `docker exec k3d-k3d-cluster-agent-1 du -d1 -h /var/lib/rancher/k3s/storage` and
+`df -h`; the Loki image has no `du`/`df`, so the volume is read from the node): `storage-loki-0` **297M** after about
+10 days (pod age 10d), roughly 30 MB/day; Prometheus volume 2.5G (bounded by its own `retentionSize: 8GB`);
+`/dev/vdb1` 778G, 35G used, **743G free (5%)**. No near-term outage; the risk is a log burst (crash loop, debug
+logging) with nothing ever deleted. E3 compares against this baseline; expected steady state ~400-500 MB at 14 days.
 
 ## Root cause, with proof from the deployed versions
 
