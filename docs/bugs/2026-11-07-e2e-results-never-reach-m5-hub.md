@@ -5,7 +5,8 @@
 **Status:** LANDED — F1 fix `576e10f3` (Luna) plus N9 test correction `c97a14fa` (Claude), 2026-11-07; F2 fixed live 2026-11-07 (`read:packages` scope; run 1794086864-5662 passed 91/0)
 **Fix commit:** `576e10f3`, `c97a14fa`
 **Priority:** P2 — the hub has had no e2e signal since the 2026-10-31 cutover; the verification dashboards are empty and `E2EResultsMissing` has fired for the full 3-day window
-**Waiting on:** live check — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07 (replay done 2026-11-09; dashboard + alert-clear confirmation pending)
+**Live check progress (operator, M5, 2026-11-09):** `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip` then `make e2e-replay RUNNER=m2` completed; output ends `[e2e-publish] applied result for run 1794086864-5662 (runner=m2, result=pass)` and `[e2e-remote] replay complete: published=79 still_pending=0` (operator screenshot). Still to see: E2E Verification dashboard populated (range ≥ 3 days; newest result is 2026-11-07 ~13:27 PST) and `E2EResultsMissing` resolved
 **Live check (operator, on the M5):** `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip`, then `make e2e-replay RUNNER=m2`
 **Approval:** operator 2026-11-07: "please spec (a) dispatch to Luna" (F1 option a: `make machine-setup ROLE=hub` installs the conf file and forced-command entry)
 **Assigned:** Codex Luna (`MODEL=gpt-6-luna`)

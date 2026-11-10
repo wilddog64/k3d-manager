@@ -1,8 +1,9 @@
 # Bug: the fast gate lets commits authored with a fixture identity through when the identity was already set
 
-**Status:** OPEN — dispatched to Luna 2026-11-09
+**Status:** LANDED `d6e5524c` 2026-11-09 (Luna; Claude review: N1–N3 red on the pre-fix gate, N4 green both, 17/17 green fixed; land gate passed incl. codex_dispatch.bats)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-09
+**Waiting on:** investigation — since 2026-11-09 (independent Acceptance verifier not yet run)
+**Fix commit:** `d6e5524c`
 **Introduced by:** `9942c413` (the repo-state guard compares before and after only)
 **Should have been caught by:** spec
 **Prior art:** `docs/bugs/2026-10-31-pre-push-gate-from-linked-worktree-writes-into-real-repo.md` (found by grep, not

@@ -1,3 +1,4 @@
+- [x] 2026-11-09 LANDED fast-gate-guard-fixture-identity d6e5524c (verifier owed); tests-dashboard correction resumed.
 - [x] 2026-11-09 trust-vault-ca acg-up P3 intents approved; dispatch held at WIP 3/3.
 - [x] 2026-11-09 Filed P3 trust-vault-ca-run-published-as-acg-up-deployment (not dispatched; Waiting on: operator decision).
 - [x] 2026-11-09 Parallel plan E3/E5 approved; failure-table column change added to tests-dashboard dispatch spec (correction pending).
