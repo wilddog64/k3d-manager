@@ -15,11 +15,11 @@ Vagrant.configure("2") do |config|
       set -eu
       if [ "$(uname -m)" = "aarch64" ]; then
         if ! grep -q 'arm64.nosve' /etc/default/grub; then
-          if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
-            sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT="\\(.*\\)"/GRUB_CMDLINE_LINUX_DEFAULT="\\1 arm64.nosve arm64.nosme"/' /etc/default/grub
-            sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=" /GRUB_CMDLINE_LINUX_DEFAULT="/' /etc/default/grub
+          if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub; then
+            sed -i -e 's/GRUB_CMDLINE_LINUX="\\(.*\\)"/GRUB_CMDLINE_LINUX="arm64.nosve arm64.nosme \\1"/' /etc/default/grub
+            sed -i -e 's/arm64.nosme "/arm64.nosme"/' /etc/default/grub
           else
-            echo 'GRUB_CMDLINE_LINUX_DEFAULT="arm64.nosve arm64.nosme"' >> /etc/default/grub
+            echo 'GRUB_CMDLINE_LINUX="arm64.nosve arm64.nosme"' >> /etc/default/grub
           fi
           update-grub
         fi
@@ -33,6 +33,7 @@ Vagrant.configure("2") do |config|
     ansible.galaxy_roles_path = "/vagrant"
     ansible.playbook = "tests/playbook-prereqs.yml"
     ansible.inventory_path = "tests/inventory"
+    ansible.limit = "all"
     ansible.extra_vars = { "homebrew_user" => "k3dm-control", "provision_homebrew_scope" => "prereqs" }
   end
 end
