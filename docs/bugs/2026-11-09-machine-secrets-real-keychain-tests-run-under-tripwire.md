@@ -2,7 +2,7 @@
 
 **Status:** OPEN — child C4 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** dispatch — since 2026-11-09
 **Introduced by:** `bd68d6ff` (v1.43.12, 2026-10-31), which added both real-Keychain cases to a file that
 `make test-bin` runs under `scripts/tests/tripwire.sh`
 **Should have been caught by:** review
@@ -11,7 +11,7 @@ store unreachable from the M4, 2026-11-09)
 **Severity:** medium — one case is permanently red under `make test-bin`; the other passes by skipping, so the real
 round trip is never exercised by any gate
 **Approval:** operator, 2026-11-09 (parent bug: one P2 parent with a child per root cause)
-**Intent approved:** not yet
+**Intent approved:** operator, 2026-11-09 ("C4 is approved"); dispatch go not yet given
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, serial `make test-bin` baseline on the M4
 **Release:** v1.43.16 (bug-only)

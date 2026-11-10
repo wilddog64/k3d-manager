@@ -1,3 +1,5 @@
+- [x] 2026-11-09 v1.43.16 C4 intent approved; C2 spec written (lib-foundation `_install_promtool`, pinned 3.1.0 + sha256). Open: C2 and C3 intent approval; C1/C4 dispatch go after v1.43.16 cut.
+
 **2026-11-09 — ideas.md parallel-test row updated** with slowest-first 338 s result; still `inbox`, not in any release (next /release-groom decides). C2 paused for operator choice (local promtool vs other); C2 is a recurrence of 2026-10-24 promtool bug.
 **2026-11-09 — C4 child spec written** (`docs/bugs/2026-11-09-machine-secrets-real-keychain-tests-run-under-tripwire.md`): move both real-Keychain cases to scripts/tests/host + new `make test-host` (no tripwire, restores search list); E2/E3 live by Claude. Intent pending (C3, C4); C1 approved. C2 next.
 **2026-11-09 — C1 intent approved by operator** ("your C1 is approved"). Waiting on: dispatch go + k3d-manager-v1.43.16 branch (cut after v1.43.15 merges). C3 intent still pending.

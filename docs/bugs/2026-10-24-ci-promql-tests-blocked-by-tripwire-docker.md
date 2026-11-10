@@ -90,3 +90,7 @@ not been true since the pyenv fallback in `6f0fb4af` (2026-09-25).
 Under `tripwire.sh` the docker fallback can never succeed, so it is dead code in every offline run.
 Candidate fixes: install `promtool` 3.1.0 locally (as CI does), or have these tests skip with a
 named reason when no `promtool` is on PATH instead of falling back to docker.
+
+**Scheduled 2026-11-09:** this Recurrence is now fixed as child C2 of the v1.43.16 parent:
+`docs/bugs/2026-11-09-promtool-tests-need-pinned-install-on-every-host.md` (lib-foundation `_install_promtool`,
+pinned 3.1.0 with sha256, no docker fallback and no skip).
