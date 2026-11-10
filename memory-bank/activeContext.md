@@ -1,3 +1,4 @@
+**2026-11-09 — C4 child spec written** (`docs/bugs/2026-11-09-machine-secrets-real-keychain-tests-run-under-tripwire.md`): move both real-Keychain cases to scripts/tests/host + new `make test-host` (no tripwire, restores search list); E2/E3 live by Claude. Intent pending (C3, C4); C1 approved. C2 next.
 **2026-11-09 — C1 intent approved by operator** ("your C1 is approved"). Waiting on: dispatch go + k3d-manager-v1.43.16 branch (cut after v1.43.15 merges). C3 intent still pending.
 **2026-11-09 — C1 child spec written** (`docs/bugs/2026-11-09-bats-python-yaml-picks-first-python3-on-path.md`): helper k3dm_python_yaml + K3DM_TEST_PYTHON3; also removes silent `import yaml` guard at argocd.bats:389 (vacuous pass). Intent approval pending for C3 and C1; C4, C2 next.
 **2026-11-09 — M5 hub LaunchAgents clean** (operator grep for bats-run: no output). C3 intent approval pending; starting C1 spec.
