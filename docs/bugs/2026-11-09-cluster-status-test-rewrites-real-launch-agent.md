@@ -94,7 +94,7 @@ file could not work there either.
 
 Please also run this on the M5 hub, to confirm the hub's plists were not hit:
 grep -l bats-run ~/Library/LaunchAgents/com.k3d-manager.*.plist
-No output means clean. The hub was probably protected, because there both plists exist and the ports listen, so the
+**M5 result (operator, 2026-11-09, `m5-air.local`): no output, clean.** The hub was probably protected, because there both plists exist and the ports listen, so the
 restore returns early.
 
 ## Acceptance
