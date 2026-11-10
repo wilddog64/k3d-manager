@@ -389,3 +389,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 **2026-11-10 — CI red on 906aa12e from the Loki landing** (render tests did `helm pull`; tripwire blocks it). Fixed: chart fixture `scripts/tests/fixtures/helm/loki-18.2.0.tgz` + sha256, no network; 15/15 under tripwire. Lesson: land TEST= must wrap with scripts/tests/tripwire.sh. Remote-approval request (Slack or cloud-bridge, CI-green) appended to the 2026-11-08 ideas row part 3 for the next grooming. Hostinger E4 target: srv1754834.hstgr.cloud (2.25.146.252).
 
+**2026-11-10 — remote task branches cleaned** (operator). 14 `task/v1.43.14/*` deleted: 13 landed (git cherry vs release branch / code identical to main); the superseded 2026-11-03 acg-up broad CA-trust rework tagged `archive/acg-up-stalls-broad-rework` (0f31d2db) first. `/post-merge` gained Step 7d to do this every release.
+
