@@ -1,8 +1,8 @@
 # Bug: the fast gate lets commits authored with a fixture identity through when the identity was already set
 
-**Status:** OPEN — filed 2026-11-09
+**Status:** OPEN — dispatched to Luna 2026-11-09
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** `9942c413` (the repo-state guard compares before and after only)
 **Should have been caught by:** spec
 **Prior art:** `docs/bugs/2026-10-31-pre-push-gate-from-linked-worktree-writes-into-real-repo.md` (found by grep, not
@@ -12,6 +12,7 @@ the M4, 2026-11-09).
 **Severity:** medium — every local commit from 2026-10-31 15:03 to 2026-11-09 was authored `Test
 <test@example.invalid>` and pushed without a warning; no data loss, `main` unaffected (GitHub squash merges)
 **Approval:** operator, 2026-11-09 ("go ahead lower P1 to P2 and dispach it to Luna if allows")
+**Intent approved:** operator, 2026-11-09
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, checking commit authorship for the operator
 **Affected:** `scripts/ci/fast_gate.sh`
