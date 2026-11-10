@@ -1,6 +1,6 @@
 # v1.44.0 — Lead model activity dashboard: what each lead (coordinator) model did, how well and at what cost
 
-**Status:** APPROVED 2026-11-05. Dispatch after its prerequisite bugs land and `k3d-manager-v1.44.0` is cut.
+**Status:** APPROVED 2026-11-05. Unnumbered 2026-11-09 by Claude (was v1.44.0 plan 1), displaced by the operator's parallel-tests exception; back in the ordered backlog in `docs/roadmap.md`. Dispatch after its prerequisite bugs land and a release takes it.
 **Approval:** operator, 2026-11-05 ("we need to have dashbaord to capture lead model's activites"; "also we are not able to capture agy metrics for that 5 hours work"). Plan approved by the operator 2026-11-05 ("approved").
 **Intent approved:** operator, 2026-11-05
 **Branch:** `k3d-manager-v1.44.0` (cut from `main` after v1.43.15 merges)
