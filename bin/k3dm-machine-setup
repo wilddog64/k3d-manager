@@ -99,8 +99,8 @@ if [[ "$platform" == linux ]]; then
       kind=formula; name="$raw"; case "$raw" in cask:*) kind=cask; name="${raw#cask:}" ;; formula:*) name="${raw#formula:}" ;; esac
       if [[ "$kind" == cask ]]; then report "cask:${name}" 'skipped (linux)'; continue; fi
       grep -Fqx "formula:${name}" "${manifest_dir}/brew.control.linux-skip.list" && { report "brew:${name}" 'skipped (linux; no formula build)'; continue; }
-      if _run_command -- brew list --formula "$name" >/dev/null 2>&1; then report "brew:${name}" ok
-      elif [[ "$mode" == setup ]] && _run_command -- brew install "$name"; then report "brew:${name}" installed
+      if _run_command --soft --quiet -- brew list --formula "$name" >/dev/null 2>&1; then report "brew:${name}" ok
+      elif [[ "$mode" == setup ]] && _run_command --soft --quiet -- brew install "$name"; then report "brew:${name}" installed
       else report "brew:${name}" missing; failed=1; fi
     done 3< "${manifest_dir}/brew.control.list"
     local venv="${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv"

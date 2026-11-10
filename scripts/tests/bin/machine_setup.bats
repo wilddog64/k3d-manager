@@ -128,6 +128,51 @@ PY
   done
 }
 
+@test "Linux continues after missing formulas and failed installs with real command failure semantics" {
+  setup_linux_brew_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIX_PREFIX" == "$BATS_TEST_TMPDIR/"* ]]
+  mkdir -p "$FIX_PREFIX/bin"
+  printf '%s\n' formula:gh formula:broken formula:later > "$FIXROOT/scripts/etc/machine/brew.control.list"
+  printf '%s\n' 'fixture/control-repo|https://github.com/example/control-repo.git|main|control' > "$FIXROOT/scripts/etc/machine/repos.list"
+  cat > "$FIXROOT/scripts/lib/system.sh" <<'SH'
+_run_command() {
+  local soft=0
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --soft|--no-exit) soft=1; shift ;;
+      --quiet|--prefer-sudo|--require-sudo|--interactive-sudo) shift ;;
+      --) shift; break ;;
+      *) break ;;
+    esac
+  done
+  "$@" || { local rc=$?; (( soft )) || exit "$rc"; return "$rc"; }
+}
+SH
+  cat > "$FIX_PREFIX/bin/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG.brew"
+# Captured from the 2026-11-10 Ubuntu 24.04 aarch64 VM on the M4: missing gh exits 1.
+case "$1:$2" in
+  shellenv:) exit 0 ;;
+  list:--formula) exit 1 ;;
+  install:gh|install:later) exit 0 ;;
+  install:broken) exit 42 ;;
+esac
+exit 0
+SH
+  chmod +x "$FIX_PREFIX/bin/brew"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'brew:gh'*'installed'* ]]
+  [[ "$output" == *'brew:broken'*'missing'* ]]
+  [[ "$output" == *'brew:later'*'installed'* ]]
+  [[ "$output" == *'repo:fixture/control-repo'*'installed'* ]]
+  grep -Fq 'brew install gh' "$CALL_LOG.brew"
+  grep -Fq 'brew install broken' "$CALL_LOG.brew"
+  grep -Fq 'brew install later' "$CALL_LOG.brew"
+  grep -Fq 'git clone --branch main --single-branch https://github.com/example/control-repo.git' "$CALL_LOG.git"
+}
+
 @test "control role manifests stay limited to development tools and smartcd" {
   [ -r "$MACHINE_DIR/brew.control.list" ]
   [ -r "$MACHINE_DIR/secrets.control.list" ]
