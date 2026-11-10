@@ -66,6 +66,13 @@ File: `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` only.
 - "Total cases" and "Failed cases" keep their queries. Each description adds that a partial run (Run complete = stopped
   early) counts only the stages that ran.
 - No overrides, hidden queries or transformations: only the stat-plus-value-mapping construct already deployed.
+- **Failure tables (operator, 2026-11-09, added to this dispatch as a correction):** in "Failures in selected time
+  range" (id 8) and "Failing test cases (latest run)" (id 4), drop the "Target / origin" (`instance`) and "Target"
+  (`target`) columns (add both to `excludeByName`). Columns, in order: "Test case" (`case`, renamed from "Case"),
+  "Test name", "Failure reason", then "Test suite". Today every publisher sends `target=test-all` and origin `local`
+  (`Makefile:1581`, `bin/k3dm-webhook:1815`; no caller passes `--origin ci`), so both columns repeat one value on
+  every row. If a second target or origin ever publishes, add the column back. Test suite stays because a case number
+  is only unique within its suite.
 
 **External behaviour proof (CLAUDE.md, 2026-11-07):** the hub runs kube-prometheus-stack `67.9.0`
 (`scripts/etc/argocd/applicationsets/observability.yaml:18`, Grafana 11.4.0). The same construct, a `stat` panel with
@@ -85,7 +92,8 @@ acceptance items. Not part of this dispatch.
 | File | Change |
 |---|---|
 | `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` | "Run complete" stat panel; two descriptions |
-| `scripts/tests/bin/test_k3dm_tests_dashboard.py` | new pytest (E1) |
+| `scripts/tests/bin/test_k3dm_tests_dashboard.py` | new pytest (E1, E3) |
+| `scripts/tests/plugins/grafana_dashboard_appsets.bats` | update the panel 8 assertions at lines 265-266 (they pin "Target / origin", "Case" and a kept `instance`) |
 
 ## Contract readers
 
@@ -104,12 +112,17 @@ acceptance items. Not part of this dispatch.
 must:
   - id: M1
     text: "The k3dm Tests dashboard shows whether the latest test-all run completed every stage, next to Total cases."
+  - id: M2
+    text: "Both failure tables show Test case, Test name, Failure reason, Test suite, in that order."
 must_not:
   - id: N1
     text: "A run that stopped early is never shown on the dashboard without a visible 'stopped early' state."
+  - id: N2
+    text: "Neither failure table shows a Target or Target / origin column."
 evidence:
   - {id: E1, proves: [M1, N1], kind: offline, intent: "The dashboard's JSON has a run-complete panel on the right metric, and a test fails if the panel or its 'stopped early' mapping is removed."}
   - {id: E2, proves: [M1, N1], kind: live, intent: "After a promote, you open the k3dm Tests dashboard and see 'stopped early' for the current nightly run, which is partial."}
+  - {id: E3, proves: [M2, N2], kind: offline, intent: "The dashboard JSON for both failure tables lists Test case, Test name, Failure reason, Test suite in that order and hides target and instance; a test fails if either column comes back or the order changes. Operator's request 2026-11-09."}
 interface:
   - "scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml (ConfigMap; dashboard JSON under data)"
 ```
