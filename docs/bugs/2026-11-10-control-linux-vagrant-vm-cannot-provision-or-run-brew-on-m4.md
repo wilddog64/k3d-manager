@@ -1,8 +1,8 @@
 # Bug: control-linux Vagrant VM cannot provision, and Homebrew crashes in it on the M4
 
-**Status:** LANDED `4cf6a95b` 2026-11-10 (Flash; Claude review: static test red on pre-fix, pip and no-aarch64-guard mutants red, ruby -c OK; new file `scripts/tests/bin/control_linux_vagrant.bats`, allowed by the Files row)
+**Status:** OPEN — E2 FAILED 2026-11-10 on `dfb29052` (landed fix `4cf6a95b` incomplete: flags dropped by grub, Ansible targets no host); fix proven live, see "E2 failure"
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-10 (E2: Claude, vagrant destroy/up/reload on the M4)
+**Waiting on:** fix running — since 2026-11-10 (correction round, Flash, slug `control-linux-vagrant-m4-r2`; same intents M1, M2, N1, N2)
 **Introduced by:** `4bd764b9` (v1.43.15, `scripts/etc/machine/vagrant/control-linux/Vagrantfile`)
 **Should have been caught by:** live check (the Vagrantfile was never run end to end before E3)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
@@ -46,6 +46,59 @@ In `scripts/etc/machine/vagrant/control-linux/Vagrantfile`:
 
 The E3 `/etc` checks (`/etc/sudoers`, `/etc/profile`, `/etc/zshrc`) are unaffected: the grub edit touches only
 `/etc/default/grub`, VM-only.
+
+## E2 failure (Claude, M4, 2026-11-10, on `dfb29052`; Vagrant 2.4.9, VirtualBox 7.2.22, box 202502.21.0)
+
+`vagrant up --no-provision`, `vagrant provision`, `vagrant reload`, `vagrant provision`. Log:
+scratchpad `control-e3/run.log` and `provision1.log`. Two defects, both live-proven:
+
+1. **Kernel flags never reach the kernel (spec defect: item 2 above named the wrong variable).** The shell step ran
+   and `update-grub` succeeded, but after reload `/proc/cmdline` ends at `autoinstall ds=nocloud-net` and
+   `/proc/cpuinfo` still lists `sme2 sve2`. bento's `GRUB_CMDLINE_LINUX_DEFAULT` is
+   `"autoinstall ds=nocloud-net;s=http://10.0.2.2:8237/ubuntu/"`; the generated `grub.cfg` line 170 is
+   `linux /vmlinuz-... ro net.ifnames=0 biosdevname=0  autoinstall ds=nocloud-net;s=http://... arm64.nosve arm64.nosme`,
+   and grub ends the `linux` command at the unquoted `;`, so everything appended after it is dropped.
+   **Proven fix:** put the flags at the start of `GRUB_CMDLINE_LINUX`, which grub emits before DEFAULT. Live probe in
+   the same VM: `GRUB_CMDLINE_LINUX="arm64.nosve arm64.nosme net.ifnames=0 biosdevname=0 "`, `update-grub`,
+   `vagrant reload` → `/proc/cmdline` = `... ro arm64.nosve arm64.nosme net.ifnames=0 biosdevname=0 autoinstall ds=nocloud-net`,
+   and no sve/sve2/sme/sme2 in `/proc/cpuinfo`.
+2. **Ansible targets no host.** `[WARNING]: Could not match supplied host pattern, ignoring: default` then
+   `[ERROR]: Specified inventory, host pattern and/or --limit leaves us with no hosts to target.` The role repo's
+   `tests/inventory` (provision-homebrew `845eaef`) lists only `localhost`, and Vagrant 2.4.9 passes
+   `--limit=<machine name>` unless `ansible.limit` is set (`plugins/provisioners/ansible/provisioner/base.rb:159-164`
+   in `/opt/vagrant/embedded/gems/gems/vagrant-2.4.9`). **Proven fix:** `ansible.limit = "all"`. Live probe:
+   `sudo ansible-playbook -i tests/inventory -c local --limit all tests/playbook-prereqs.yml` → `failed=0`.
+
+Also observed: `install_mode = "default"` on Ubuntu installs ansible-core `2.21.5-1ppa~noble` from the Ansible PPA,
+not Ubuntu's archive. Not pip, so N1 holds; the how-to should say "Ansible PPA", not "Ubuntu's ansible-core".
+
+### Correction round (same intents M1, M2, N1, N2; E1 strengthened)
+
+- Vagrantfile: flags at the start of `GRUB_CMDLINE_LINUX` (still aarch64-guarded, still idempotent via the
+  `arm64.nosve` grep); `ansible.limit = "all"`.
+- `control_linux_vagrant.bats`: fail if the flags are written to `GRUB_CMDLINE_LINUX_DEFAULT`, or if `ansible.limit`
+  is unset while `inventory_path` is set. Red on `4cf6a95b`'s Vagrantfile.
+- How-to: "Ansible PPA"; one line on why the flags go in `GRUB_CMDLINE_LINUX`.
+- How-to VM sequence: `make test` runs in k3dm-control's own clone
+  (`~/src/gitrepo/personal/k3d-manager`, after `git checkout <release branch>`), not in `/vagrant/k3d-manager`. Probe:
+  `/vagrant/k3d-manager` is the host's synced folder owned by `vagrant`, and `make test` there exits at once with
+  `scratch/test-logs/all/...log: Permission denied`. `make machine-setup` from `/vagrant/k3d-manager` is fine (it only
+  reads the tree).
+
+Probe of the rest of E3 in the same VM after the two manual fixes (scratchpad `control-e3/run2.log`): role rerun
+`changed=0`; `/etc/sudoers` and `/etc/profile` sha256 unchanged, `/etc/zshrc` absent before and after; k3dm-control
+`groups=1001(k3dm-control)`, "not allowed to run sudo"; prefix `k3dm-control 755`; `make machine-setup ROLE=control`
+rc 0 with every Linux formula installed, both repos cloned (https remotes, no credential), macOS steps
+`skipped (linux)`; `make machine-check ROLE=control` all ok; Homebrew 7.0.13, shellcheck 0.11.0 (M4: 0.11.0),
+Bats 1.14.0; no `~/.ssh` before or after.
+
+### Correction round: worker definition of done
+
+- Read the "E2 failure" and "Correction round" sections above; change only the three files in the Files table.
+- Do not run Vagrant or VirtualBox. Show `bats scripts/tests/bin/control_linux_vagrant.bats` green, then red with
+  each mutant: flags written to `GRUB_CMDLINE_LINUX_DEFAULT` (today's line), and `ansible.limit` removed. Paste
+  command, rc and proving lines for each. `ruby -c` the Vagrantfile. Leave changes uncommitted; Claude reviews,
+  lands and reruns E2.
 
 ## Files
 
