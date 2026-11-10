@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-09
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-09 (intent approval; then batched P3 dispatch when WIP allows)
+**Waiting on:** dispatch — since 2026-11-09 (WIP 3/3 at approval; dispatch when a slot frees)
 **Introduced by:** `401e4eca` (v1.43.5, the EXIT-trap push from
 `docs/bugs/2026-10-18-deployment-dashboard-empty-for-cli-lifecycle-runs.md`) combined with the `--trust-vault-ca`
 early exit; the webhook route that runs it unattended came in `ecae8a73` (v1.43.14)
@@ -14,8 +14,10 @@ introduced the push, different defect. `docs/bugs/2026-11-07-webhook-cluster-tru
 cause. `make find-similar-docs` unavailable (vector store unreachable from the M4, 2026-11-09).
 **Severity:** low — no outage. The k3dm Deployment Metrics dashboard reports a CA-trust run as the last AWS deployment
 (2 s, SUCCESS), and the run resets `DeploymentMetricsStale`, hiding a real gap in deployments.
-**Approval:** not yet
-**Intent approved:** not yet
+**Approval:** operator, 2026-11-09
+**Intent approved:** operator, 2026-11-09
+**Intent approval words:** "E1, E2, and E3 approved and dispatch if allowed"
+**Dispatch:** operator go 2026-11-09, conditional on the WIP limit; held at 3/3
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09, k3dm Deployment Metrics screenshot ("why AWS (acg-up) Duration is 2s? … it is
 weird"); Claude traced it
