@@ -209,20 +209,27 @@ SH
   [ "$(git branch --show-current)" = k3d-manager-v1.43.100 ]
 }
 
-@test "make hub-sync passes an explicit BRANCH but leaves the default unset" {
+@test "make hub-sync refuses explicit branches and calls repo sync only by default" {
   cp "$ROOT/Makefile" "$WORK/Makefile"
   mkdir -p "$WORK/bin"
-  cat > "$WORK/bin/k3dm-hub-sync" <<'SH'
+  cat > "$WORK/bin/k3dm-repo-sync" <<'SH'
 #!/usr/bin/env bash
-printf 'BRANCH=<%s>\n' "${BRANCH-}"
+printf '%s\n' "$*" >> "$SYNC_LOG"
 SH
-  chmod +x "$WORK/bin/k3dm-hub-sync"
+  chmod +x "$WORK/bin/k3dm-repo-sync"
+  export SYNC_LOG="$WORK/repo-sync.log"
+  : > "$SYNC_LOG"
   [ -f "$WORK/Makefile" ]
   [ "$(cd "$(dirname "$WORK/Makefile")" && pwd)" = "$WORK" ]
   run "$REAL_MAKE" -f "$WORK/Makefile" hub-sync BRANCH=k3d-manager-v9.9.9
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"BRANCH=<k3d-manager-v9.9.9>"* ]]
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"make hub-promote"* ]]
+  [ ! -s "$SYNC_LOG" ]
+  run env BRANCH=k3d-manager-v9.9.9 "$REAL_MAKE" -f "$WORK/Makefile" hub-sync
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"make hub-promote"* ]]
+  [ ! -s "$SYNC_LOG" ]
   run env -u BRANCH "$REAL_MAKE" -f "$WORK/Makefile" hub-sync
   [ "$status" -eq 0 ]
-  [[ "$output" == *"BRANCH=<>"* ]]
+  [ "$(cat "$SYNC_LOG")" = "--remote m5-air.local" ]
 }

@@ -385,7 +385,7 @@ data:
           "id": 19,
           "type": "stat",
           "title": "Hub code behind",
-          "description": "Commits with code changes on the hub's branch that the hub's checkout has not pulled. Doc text does not need a pull: it appears within about 5 minutes. If a fix is not showing, run make hub-sync in a shell on the hub. The count is for the branch the hub is on. If the second value says older release, run make hub-sync BRANCH=<the branch it names>.",
+          "description": "Commits with code changes on the hub's branch that the hub's checkout has not pulled. Doc text does not need a pull: it appears within about 5 minutes. If a fix is not showing, run make hub-sync in a shell on the hub. The count is for the branch the hub is on.",
           "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [

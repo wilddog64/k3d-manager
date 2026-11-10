@@ -53,6 +53,9 @@ hub-new:
 
 .PHONY: hub-sync
 hub-sync:
+	@if { [ "$(origin BRANCH)" = "command line" ] || [ "$(origin BRANCH)" = "environment" ]; } && [ -n "$$BRANCH" ]; then \
+	  echo 'The hub follows deploy/hub. To move it, run: make hub-promote REF=<commit-ish>' >&2; exit 2; \
+	fi
 	@bin/k3dm-repo-sync --remote "$${K3DM_HUB_HOST:-m5-air.local}"
 
 install-repo-sync:
