@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC1091,SC2016
 
 APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability-acg.yaml"
 HUB_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability.yaml"
@@ -6,6 +7,28 @@ VALUES="${BATS_TEST_DIRNAME}/../../etc/helm/observability/loki-values.yaml"
 PROM_VALUES="${BATS_TEST_DIRNAME}/../../etc/helm/observability/kube-prometheus-stack-values.yaml"
 PROMTAIL="${BATS_TEST_DIRNAME}/../../etc/observability/promtail.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+# shellcheck disable=SC1091
+source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+
+_ensure_loki_chart_18_2_0() {
+  if ! command -v helm >/dev/null 2>&1; then
+    skip "helm is missing: required to render loki chart"
+  fi
+  local candidate
+  for candidate in "${LOKI_CHART_ARCHIVE:-}" "${TMPDIR:-/tmp}/loki-18.2.0.tgz" "${TMPDIR:-/tmp}/k3dm-loki-chart/loki-18.2.0.tgz"; do
+    if [[ -n "${candidate}" && -f "${candidate}" ]]; then
+      LOKI_CHART="${candidate}"
+      return 0
+    fi
+  done
+  local dest="${TMPDIR:-/tmp}"
+  if helm pull --destination "${dest}" --version 18.2.0 grafana-community/loki >/dev/null 2>&1 || \
+     helm pull --destination "${dest}" --repo https://grafana-community.github.io/helm-charts --version 18.2.0 loki >/dev/null 2>&1; then
+    LOKI_CHART="${dest}/loki-18.2.0.tgz"
+    return 0
+  fi
+  skip "unable to pull chart loki 18.2.0"
+}
 
 @test "loki: observability-acg includes a loki application" {
   run grep -nF -- 'app: loki' "${APPSET}"
@@ -95,5 +118,185 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "${status}" -eq 0 ]
 
   run grep -nF -- 'ArgoCD/Image Updater dashboard applied on' "${PLUGIN}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: values configure compactor retention and limits_config (M1, M2)" {
+  run "$(k3dm_python_yaml)" - "${VALUES}" <<'PY'
+import sys, yaml
+
+values = yaml.safe_load(open(sys.argv[1]))
+loki = values.get("loki") or {}
+compactor = loki.get("compactor") or {}
+assert compactor.get("retention_enabled") is True, f"retention_enabled not True: {compactor}"
+assert compactor.get("delete_request_store") == "filesystem", f"delete_request_store not filesystem: {compactor}"
+
+limits = loki.get("limits_config") or {}
+assert limits.get("retention_period") == "336h", f"retention_period not 336h: {limits}"
+
+expected_streams = {
+    '{job="k3dm-dispatch-run"}': {"period": "720h", "priority": 1},
+    '{namespace="trivy-system"}': {"period": "720h", "priority": 1},
+    '{namespace="cicd"}': {"period": "720h", "priority": 1},
+}
+streams = limits.get("retention_stream") or []
+stream_map = {s.get("selector"): s for s in streams}
+for sel, exp in expected_streams.items():
+    assert sel in stream_map, f"missing stream rule: {sel}"
+    assert stream_map[sel].get("period") == exp["period"], f"{sel} period mismatch: {stream_map[sel]}"
+    assert stream_map[sel].get("priority") == exp["priority"], f"{sel} priority mismatch: {stream_map[sel]}"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: values never leave retention disabled or set retention_period to 0 (N2)" {
+  run "$(k3dm_python_yaml)" - "${VALUES}" <<'PY'
+import sys, yaml
+
+values = yaml.safe_load(open(sys.argv[1]))
+loki = values.get("loki") or {}
+compactor = loki.get("compactor") or {}
+retention_enabled = compactor.get("retention_enabled")
+assert retention_enabled is True, f"N2 violation: retention is disabled or not set (got {retention_enabled})"
+
+limits = loki.get("limits_config") or {}
+period = str(limits.get("retention_period", "")).strip()
+assert period and period not in ("0", "0s", "0h", "0m", "0d"), f"N2 violation: retention_period is 0 or unset (got '{period}')"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: rendered config enables compactor retention with filesystem store and 14-day default (M1)" {
+  local chart
+  _ensure_loki_chart_18_2_0
+  chart="${LOKI_CHART}"
+  run helm template loki "${chart}" -s templates/config.yaml -f "${VALUES}"
+  [ "${status}" -eq 0 ]
+  local rendered="${output}"
+
+  run "$(k3dm_python_yaml)" - "${rendered}" <<'PY'
+import sys, yaml
+
+docs = list(yaml.safe_load_all(sys.argv[1]))
+cm = [d for d in docs if d and d.get("kind") == "ConfigMap" and d.get("metadata", {}).get("name") == "loki"][0]
+cfg = yaml.safe_load(cm["data"]["config.yaml"])
+
+compactor = cfg.get("compactor") or {}
+assert compactor.get("retention_enabled") is True, f"M1: compactor.retention_enabled not True: {compactor}"
+assert compactor.get("delete_request_store") == "filesystem", f"M1: delete_request_store not filesystem: {compactor}"
+
+limits = cfg.get("limits_config") or {}
+assert limits.get("retention_period") == "336h", f"M1: limits_config.retention_period not 336h: {limits}"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: rendered config keeps 30-day retention for dashboard streams (M2)" {
+  local chart
+  _ensure_loki_chart_18_2_0
+  chart="${LOKI_CHART}"
+  run helm template loki "${chart}" -s templates/config.yaml -f "${VALUES}"
+  [ "${status}" -eq 0 ]
+  local rendered="${output}"
+
+  run "$(k3dm_python_yaml)" - "${rendered}" <<'PY'
+import sys, yaml
+
+docs = list(yaml.safe_load_all(sys.argv[1]))
+cm = [d for d in docs if d and d.get("kind") == "ConfigMap" and d.get("metadata", {}).get("name") == "loki"][0]
+cfg = yaml.safe_load(cm["data"]["config.yaml"])
+
+limits = cfg.get("limits_config") or {}
+streams = limits.get("retention_stream") or []
+
+expected = {
+    '{job="k3dm-dispatch-run"}': {"period": "720h", "priority": 1},
+    '{namespace="trivy-system"}': {"period": "720h", "priority": 1},
+    '{namespace="cicd"}': {"period": "720h", "priority": 1},
+}
+
+stream_map = {s.get("selector"): s for s in streams}
+for sel, exp in expected.items():
+    assert sel in stream_map, f"M2: missing retention_stream rule for {sel}"
+    assert stream_map[sel].get("period") == exp["period"], f"M2: {sel} period mismatch: {stream_map[sel]}"
+    assert stream_map[sel].get("priority") == exp["priority"], f"M2: {sel} priority mismatch: {stream_map[sel]}"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: rendered config preserves chart limits_config defaults (M3)" {
+  local chart
+  _ensure_loki_chart_18_2_0
+  chart="${LOKI_CHART}"
+  run helm template loki "${chart}" -s templates/config.yaml -f "${VALUES}"
+  [ "${status}" -eq 0 ]
+  local rendered="${output}"
+
+  run "$(k3dm_python_yaml)" - "${rendered}" <<'PY'
+import sys, yaml
+
+docs = list(yaml.safe_load_all(sys.argv[1]))
+cm = [d for d in docs if d and d.get("kind") == "ConfigMap" and d.get("metadata", {}).get("name") == "loki"][0]
+cfg = yaml.safe_load(cm["data"]["config.yaml"])
+
+limits = cfg.get("limits_config") or {}
+assert limits.get("reject_old_samples") is True, f"M3: reject_old_samples not True: {limits}"
+assert limits.get("reject_old_samples_max_age") == "168h", f"M3: reject_old_samples_max_age not 168h: {limits}"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: rendered config never enables retention without a delete_request_store (N1)" {
+  local chart
+  _ensure_loki_chart_18_2_0
+  chart="${LOKI_CHART}"
+  run helm template loki "${chart}" -s templates/config.yaml -f "${VALUES}"
+  [ "${status}" -eq 0 ]
+  local rendered="${output}"
+
+  run "$(k3dm_python_yaml)" - "${rendered}" <<'PY'
+import sys, yaml
+
+docs = list(yaml.safe_load_all(sys.argv[1]))
+cm = [d for d in docs if d and d.get("kind") == "ConfigMap" and d.get("metadata", {}).get("name") == "loki"][0]
+cfg = yaml.safe_load(cm["data"]["config.yaml"])
+
+compactor = cfg.get("compactor") or {}
+retention_enabled = compactor.get("retention_enabled", False)
+store = compactor.get("delete_request_store")
+
+if retention_enabled and not store:
+    sys.exit("N1 violation: retention_enabled is True but delete_request_store is not configured")
+
+assert retention_enabled is True and store == "filesystem", (
+    f"N1: expected retention_enabled True and delete_request_store filesystem, got retention={retention_enabled}, store={store}"
+)
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: rendered config never leaves retention disabled or set retention_period to 0 (N2)" {
+  local chart
+  _ensure_loki_chart_18_2_0
+  chart="${LOKI_CHART}"
+  run helm template loki "${chart}" -s templates/config.yaml -f "${VALUES}"
+  [ "${status}" -eq 0 ]
+  local rendered="${output}"
+
+  run "$(k3dm_python_yaml)" - "${rendered}" <<'PY'
+import sys, yaml
+
+docs = list(yaml.safe_load_all(sys.argv[1]))
+cm = [d for d in docs if d and d.get("kind") == "ConfigMap" and d.get("metadata", {}).get("name") == "loki"][0]
+cfg = yaml.safe_load(cm["data"]["config.yaml"])
+
+compactor = cfg.get("compactor") or {}
+retention_enabled = compactor.get("retention_enabled")
+assert retention_enabled is True, f"N2 violation: rendered retention_enabled is not True: {compactor}"
+
+limits = cfg.get("limits_config") or {}
+period = str(limits.get("retention_period", "")).strip()
+assert period and period not in ("0", "0s", "0h", "0m", "0d"), f"N2 violation: rendered retention_period is 0 or unset (got '{period}')"
+PY
   [ "${status}" -eq 0 ]
 }
