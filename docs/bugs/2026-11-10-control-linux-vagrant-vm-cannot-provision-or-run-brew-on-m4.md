@@ -1,8 +1,8 @@
 # Bug: control-linux Vagrant VM cannot provision, and Homebrew crashes in it on the M4
 
-**Status:** OPEN
+**Status:** LANDED `4cf6a95b` 2026-11-10 (Flash; Claude review: static test red on pre-fix, pip and no-aarch64-guard mutants red, ruby -c OK; new file `scripts/tests/bin/control_linux_vagrant.bats`, allowed by the Files row)
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-10
+**Waiting on:** live check — since 2026-11-10 (E2: Claude, vagrant destroy/up/reload on the M4)
 **Introduced by:** `4bd764b9` (v1.43.15, `scripts/etc/machine/vagrant/control-linux/Vagrantfile`)
 **Should have been caught by:** live check (the Vagrantfile was never run end to end before E3)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
