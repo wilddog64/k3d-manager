@@ -12,6 +12,7 @@
 the Slack signature still apply
 **Approval:** operator, 2026-11-09 ("go ahead for that": 10 minutes plus one use per grant, dispatched with the
 reauth-reply P3; a TOTP second factor goes to `docs/ideas.md`)
+**Intent approved:** operator, 2026-11-09, E1 only; E2 not yet approved
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09 ("24h is too long")
 **Affected:** `workers/slack-relay/index.js`

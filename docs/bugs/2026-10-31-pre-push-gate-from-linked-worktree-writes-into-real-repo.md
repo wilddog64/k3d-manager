@@ -2,7 +2,7 @@
 
 **Status:** OPEN — recurred 2026-11-07 (see Recurrence). Was: FIXED — `9942c413` (Codex; Claude review, independent verifier PASS); live check pending
 **Waiting on:** investigation — since 2026-11-09
-**Priority:** P1
+**Priority:** P2 (operator, 2026-11-09: lowered from P1 for the recurrence, whose only damage was commit authorship; was P1 when core.bare and stray branches broke the main checkout)
 **Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31
 **Detected by:** Claude, pushing `k3d-manager-v1.43.13` from a scratch worktree to work around the push drop in
