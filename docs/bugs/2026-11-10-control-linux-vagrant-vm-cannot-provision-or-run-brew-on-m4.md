@@ -1,8 +1,8 @@
 # Bug: control-linux Vagrant VM cannot provision, and Homebrew crashes in it on the M4
 
-**Status:** OPEN — E2 FAILED 2026-11-10 on `dfb29052` (landed fix `4cf6a95b` incomplete: flags dropped by grub, Ansible targets no host); fix proven live, see "E2 failure"
+**Status:** OPEN — E2 rerun FAILED 2026-11-10 on `1c990581` (r2 fixed the kernel flags; Ansible still cannot reach localhost); third fix proven live, see "E2 rerun failure"
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-10 (correction round, Flash, slug `control-linux-vagrant-m4-r2`; same intents M1, M2, N1, N2)
+**Waiting on:** fix running — since 2026-11-10 (correction round 2, Flash, slug `control-linux-vagrant-m4-r3`; same intents M1, M2, N1, N2)
 **Introduced by:** `4bd764b9` (v1.43.15, `scripts/etc/machine/vagrant/control-linux/Vagrantfile`)
 **Should have been caught by:** live check (the Vagrantfile was never run end to end before E3)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
@@ -91,6 +91,29 @@ Probe of the rest of E3 in the same VM after the two manual fixes (scratchpad `c
 rc 0 with every Linux formula installed, both repos cloned (https remotes, no credential), macOS steps
 `skipped (linux)`; `make machine-check ROLE=control` all ok; Homebrew 7.0.13, shellcheck 0.11.0 (M4: 0.11.0),
 Bats 1.14.0; no `~/.ssh` before or after.
+
+### E2 rerun failure (Claude, 2026-11-10, M4, `1c990581`, fresh `vagrant destroy` + `vagrant up`)
+
+- Kernel flags: fixed. `/proc/cmdline` = `... ro arm64.nosve arm64.nosme net.ifnames=0 biosdevname=0 autoinstall ds=nocloud-net`;
+  no sve/sme in `/proc/cpuinfo`.
+- Ansible: `fatal: [localhost]: UNREACHABLE! ... vagrant@localhost: Permission denied (publickey,password).` With
+  `localhost` named in `tests/inventory`, Ansible does not use its implicit local connection; it SSHes to localhost.
+  The earlier "proven fix" for defect 2 passed `-c local` by hand, which Vagrant's `ansible_local` never passes, so it
+  proved `--limit all` but not the command Vagrant runs. Defect 1 hid this one.
+- **Proven fix:** add `"ansible_connection" => "local"` to `ansible.extra_vars`. Live probe in the same VM, as the
+  `vagrant` user, Vagrant's own argument shape with no `-c`: `ANSIBLE_ROLES_PATH=/vagrant ansible-playbook --limit=all
+  --inventory-file=tests/inventory --extra-vars='{"homebrew_user":"k3dm-control","provision_homebrew_scope":"prereqs","ansible_connection":"local"}'
+  tests/playbook-prereqs.yml` (ansible-core 2.21.5) → `ok=7 changed=3 unreachable=0 failed=0`; `id k3dm-control` →
+  `uid=1001(k3dm-control)`.
+
+### Correction round 2 (same intents M1, M2, N1, N2)
+
+- Vagrantfile: `ansible.extra_vars` gains `"ansible_connection" => "local"`; nothing else changes.
+- `control_linux_vagrant.bats`: fail if `inventory_path` is set and `extra_vars` does not set `ansible_connection` to
+  `local`. Show it red with that key removed, green with it. Keep the existing two mutant checks green.
+- Worker definition of done: change only the Vagrantfile and `scripts/tests/bin/control_linux_vagrant.bats`. Do not run
+  Vagrant or VirtualBox. Paste command, rc and proving lines for green and for the mutant; `ruby -c` the Vagrantfile.
+  Leave changes uncommitted; Claude reviews, lands and reruns E2.
 
 ### Correction round: worker definition of done
 
