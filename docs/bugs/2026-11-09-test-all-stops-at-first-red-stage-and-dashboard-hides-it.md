@@ -80,6 +80,13 @@ only after `make hub-promote`.
 Folded into `docs/plans/v1.44.0-parallel-offline-tests.md` Part B (operator, 2026-11-09), with its contract readers and
 acceptance items. Not part of this dispatch.
 
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` | "Run complete" stat panel; two descriptions |
+| `scripts/tests/bin/test_k3dm_tests_dashboard.py` | new pytest (E1) |
+
 ## Contract readers
 
 | Reader | Part A |
