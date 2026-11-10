@@ -1,3 +1,4 @@
+**2026-11-09 — C1 intent approved by operator** ("your C1 is approved"). Waiting on: dispatch go + k3d-manager-v1.43.16 branch (cut after v1.43.15 merges). C3 intent still pending.
 **2026-11-09 — C1 child spec written** (`docs/bugs/2026-11-09-bats-python-yaml-picks-first-python3-on-path.md`): helper k3dm_python_yaml + K3DM_TEST_PYTHON3; also removes silent `import yaml` guard at argocd.bats:389 (vacuous pass). Intent approval pending for C3 and C1; C4, C2 next.
 **2026-11-09 — M5 hub LaunchAgents clean** (operator grep for bats-run: no output). C3 intent approval pending; starting C1 spec.
 **2026-11-09 — M4 contaminated alertmanager-port-forward.plist moved aside** (operator go) into the session scratchpad; agent was disabled in launchd and the M4 has no k3d-k3d-cluster context. M5 grep for bats-run still owed by the operator. C3 intent approval pending.

@@ -2,7 +2,7 @@
 
 **Status:** OPEN — child C1 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-09
+**Waiting on:** dispatch — since 2026-11-09
 **Introduced by:** pre-existing (each file has called bare `python3` since it was written; it surfaced when the
 personal envrc's `layout python3` put a venv without PyYAML first on PATH)
 **Should have been caught by:** review
@@ -11,7 +11,7 @@ store unreachable from the M4, 2026-11-09)
 **Severity:** medium — 27 of the 35 offline failures on the M4; one more assertion (`argocd.bats:389`) silently does
 not run on such a host
 **Approval:** operator, 2026-11-09 (parent bug: one P2 parent with a child per root cause)
-**Intent approved:** not yet
+**Intent approved:** operator, 2026-11-09 ("your C1 is approved"); dispatch go not yet given
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, serial `make test` baseline on the M4
 **Release:** v1.43.16 (bug-only)
