@@ -2,7 +2,7 @@
 
 **Status:** OPEN — dispatched to Luna 2026-11-10
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-10 (Luna, slug `dispatch-land-cannot-land-third-round-of-same-spec`)
+**Waiting on:** fix running — since 2026-11-10 (Luna, slug `2026-11-10-dispatch-land-cannot-land-third-round-of-same-spec`)
 **Introduced by:** `61256041` (v1.43.6, per-agent dispatch data)
 **Should have been caught by:** offline test
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10)
