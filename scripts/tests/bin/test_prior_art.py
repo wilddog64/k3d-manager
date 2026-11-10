@@ -702,14 +702,46 @@ class TestVaultFallback:
             stdout = ""
             stderr = ""
 
-        monkeypatch.setattr(pa.subprocess, "run", lambda *_a, **_k: Denied())
+        def keychain(argv, **_kwargs):
+            assert argv[:2] == ["security", "find-generic-password"]
+            assert argv[3] == "gemini-cli-api-key"
+            return Denied()
+
+        monkeypatch.setattr(pa.subprocess, "run", keychain)
         monkeypatch.setattr(pa, "vault_api_key", _vault_raises("cluster unreachable"))
         with pytest.raises(pa.EmbeddingsUnavailable) as caught:
             pa.api_key()
         message = str(caught.value)
+        assert "show-keychain-info" in message
+        assert "unlock-keychain" in message
+        assert message.index("show-keychain-info") < message.index("set-generic-password-partition-list")
+        assert "errSecInteractionNotAllowed" in message
         assert "set-generic-password-partition-list" in message
         assert "gemini-cli-api-key" in message
         assert "add-generic-password" not in message
+
+    def test_the_rc44_hint_does_not_suggest_lock_recovery(self, monkeypatch):
+        monkeypatch.setenv(pa.KEY_ENV, "")
+        monkeypatch.setattr(pa, "KEYCHAIN_ITEMS", ("gemini-cli-api-key",))
+
+        class Missing:
+            returncode = 44
+            stdout = ""
+            stderr = ""
+
+        def keychain(argv, **_kwargs):
+            assert argv[:2] == ["security", "find-generic-password"]
+            assert argv[3] == "gemini-cli-api-key"
+            return Missing()
+
+        monkeypatch.setattr(pa.subprocess, "run", keychain)
+        monkeypatch.setattr(pa, "vault_api_key", _vault_raises("cluster unreachable"))
+        with pytest.raises(pa.EmbeddingsUnavailable) as caught:
+            pa.api_key()
+        message = str(caught.value)
+        assert "rc 44" in message
+        assert "show-keychain-info" not in message
+        assert "unlock-keychain" not in message
 
 
 class TestExecFailureDetail:

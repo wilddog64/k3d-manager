@@ -394,9 +394,9 @@ def api_key():
 
     A failure reports *why* each source was rejected, because "no credential" reads the same
     for an absent item, a denied read and an empty value, and those need different fixes. The
-    common one here is rc 36 (``errSecInteractionNotAllowed``, -25308 truncated to a byte): the
-    item exists and the keychain is unlocked, but the process cannot present the authorization
-    prompt, so no value is returned.
+    common one here is rc 36 (``errSecInteractionNotAllowed``, -25308 truncated to a byte):
+    either the login keychain is locked for this session or the item's access control prevents
+    this process from presenting the authorization prompt, so no value is returned.
 
     The hub Vault is tried last rather than first because it is the slowest and least available
     source — it needs a reachable cluster — while the keychain answers locally. It is tried at
@@ -424,8 +424,11 @@ def api_key():
         detail = (found.stderr or "").strip().splitlines()
         hint = ""
         if found.returncode == 36:
-            hint = " (errSecInteractionNotAllowed — the item exists but its access control "
-            hint += "will not serve this process; widen it with "
+            hint = " (errSecInteractionNotAllowed — first check whether the login keychain "
+            hint += "is locked with 'security show-keychain-info "
+            hint += "~/Library/Keychains/login.keychain-db'; if that is refused, run "
+            hint += "'security unlock-keychain' in this session. If the check answers, the "
+            hint += "item's access control may not serve this process; widen it with "
             hint += "'security set-generic-password-partition-list -S apple-tool:,apple: "
             hint += f"-s {item}', or export ${KEY_ENV})"
         reasons.append(
