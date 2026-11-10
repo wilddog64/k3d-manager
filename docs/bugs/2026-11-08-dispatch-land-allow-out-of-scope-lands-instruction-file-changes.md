@@ -1,8 +1,8 @@
 # `land --allow-out-of-scope` lands a worker's changes to agent instruction and hook files
 
-**Status:** OPEN — dispatched to Luna 2026-11-09
+**Status:** LANDED — `0959fc6a` (Luna; Claude review 2026-11-09: codex_dispatch.bats 117/117; N1, N3 and N2/N4 each red with their guard broken, green restored, file restored byte-identical). Independent verifier and E2 pending
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-09
+**Waiting on:** live check — since 2026-11-09
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Severity:** medium — no known exploit, but one landed edit to an instruction or hook file steers every later agent
