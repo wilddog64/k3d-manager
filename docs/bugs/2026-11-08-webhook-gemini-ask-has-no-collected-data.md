@@ -155,3 +155,12 @@ Before your last message, do all of these and paste the evidence:
   same morning while `/cluster-status hostinger` worked; that is a Slack app setting, not part of this fix. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary
   is reachable on PATH.
 - The webhook must be restarted after the fix lands for E2 (`feedback_restart_webhook_after_verify`).
+
+## Cross-vendor review (2026-11-09)
+
+Codex review child: "land after fixes", one should-fix. On a 120 s timeout, `executor.shutdown(wait=False,
+cancel_futures=True)` (`scripts/lib/webhook/agent.py:465`) cannot stop a collector thread that is already running,
+so it outlives the reply. Claude checked the collector: `_hostinger_status_text` calls `_smoke_test_services`
+(`scripts/lib/webhook/smoke.py:566`), and every HTTP call there has `timeout=8` and every kubectl spawn `timeout=8`
+with a fixed retry count. So a stray thread ends on its own within the retry window, and one ask cannot leave a thread
+that runs forever. No new bug filed; if repeated asks ever show thread growth in the webhook, file one then.
