@@ -1,8 +1,8 @@
 # Bug: Linux control setup exits on the first formula that is not installed yet
 
-**Status:** OPEN
+**Status:** LANDED `d2cae3a6` 2026-11-10 (Luna; Claude review: new Linux case red on pre-fix and on the probe-only mutant, 147/147 under the tripwire)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-10
+**Waiting on:** live check — since 2026-11-10 (E2 with the control-node E3 rerun, after the Vagrant P3 lands)
 **Introduced by:** `4bd764b9` (v1.43.15, `bin/k3dm-machine-setup:102`)
 **Should have been caught by:** offline test (the Linux cases in `scripts/tests/bin/machine_setup.bats` stay green; why is part of the fix)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
