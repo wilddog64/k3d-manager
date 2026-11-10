@@ -1,5 +1,9 @@
 #!/usr/bin/env bats
 
+setup() {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+}
+
 ROOT="${BATS_TEST_DIRNAME}/../.."
 TEMPLATE="${ROOT}/etc/launchd/com.k3d-manager.hub-pushgateway-port-forward.plist.tmpl"
 VALUES="${ROOT}/etc/helm/observability/pushgateway-hub-values.yaml"
@@ -26,7 +30,7 @@ VALUES="${ROOT}/etc/helm/observability/pushgateway-hub-values.yaml"
 }
 
 @test "hub Prometheus scrapes the Pushgateway with honor_labels" {
-  run python3 - "${ROOT}/etc/helm/observability/kube-prometheus-stack-values.yaml" <<'PY'
+  run "$(k3dm_python_yaml)" - "${ROOT}/etc/helm/observability/kube-prometheus-stack-values.yaml" <<'PY'
 import sys
 import yaml
 
@@ -40,7 +44,7 @@ PY
 }
 
 @test "hub Prometheus imports k3dm test metrics from the laptop Pushgateway" {
-  run python3 - "${ROOT}/etc/helm/observability/kube-prometheus-stack-values.yaml" <<'PY'
+  run "$(k3dm_python_yaml)" - "${ROOT}/etc/helm/observability/kube-prometheus-stack-values.yaml" <<'PY'
 import sys
 import yaml
 

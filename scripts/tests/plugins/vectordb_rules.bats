@@ -1,5 +1,9 @@
 #!/usr/bin/env bats
 
+setup() {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+}
+
 RULES="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules/vectordb.yaml"
 DASHBOARD="${DASHBOARD:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-vectordb.yaml}"
 OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-configmap.yaml"
@@ -28,7 +32,7 @@ OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-c
 }
 
 @test "drift alert uses kind counts and first-seen age" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import sys, yaml
 doc = yaml.safe_load(open(sys.argv[1]))
 rule = next(r for g in doc["spec"]["groups"] for r in g["rules"] if r.get("alert") == "VectorDBIndexDrift")
@@ -42,7 +46,7 @@ assert "for" not in rule, rule
 }
 
 @test "drift dashboard panels show kind counts and oldest age without overlaps" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import json, sys
 doc = json.loads(open(sys.argv[1]).read().split("k3dm-vectordb.json: |", 1)[1])
 panels = doc["panels"]
@@ -78,7 +82,7 @@ for i, a in enumerate(panels):
 
 @test "absence alone is not the whole staleness expression" {
   local _expr
-  _expr="$(python3 -c '
+  _expr="$("$(k3dm_python_yaml)" -c '
 import sys, yaml
 with open(sys.argv[1]) as handle:
     document = yaml.safe_load(handle)
@@ -109,7 +113,7 @@ for group in document["spec"]["groups"]:
 }
 
 @test "dashboard has six ingestion panels using emitted metrics" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import json, re, sys
 text = open(sys.argv[1]).read()
 payload = text.split("k3dm-vectordb.json: |", 1)[1]
@@ -131,7 +135,7 @@ for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
 }
 
 @test "rows and corpus panel formats document counts as whole documents" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import json, sys
 text = open(sys.argv[1]).read()
 dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
@@ -146,7 +150,7 @@ assert len(panel["targets"]) == 2
 }
 
 @test "rows and corpus remain distinguishable when their values overlap" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import json, sys
 text = open(sys.argv[1]).read()
 dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
@@ -177,7 +181,7 @@ assert panel.get("options", {}).get("legend", {}).get("showLegend") is True, pan
 }
 
 @test "every rule keeps string labels and its own annotations" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import sys, yaml
 document = yaml.safe_load(open(sys.argv[1]))
 for group in document["spec"]["groups"]:
@@ -191,7 +195,7 @@ for group in document["spec"]["groups"]:
 }
 
 @test "dashboard has four ordered rows and unique panel ids" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import json, sys
 d = json.loads(open(sys.argv[1]).read().split("k3dm-vectordb.json: |", 1)[1])
 p = d["panels"]
@@ -210,7 +214,7 @@ for i, a in enumerate(p):
 }
 
 @test "retrieval alerts use the specified expressions and windows" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import sys, yaml
 d = yaml.safe_load(open(sys.argv[1]))
 r = {x["alert"]: x for g in d["spec"]["groups"] for x in g["rules"]}
@@ -225,7 +229,7 @@ assert "make index-docs DRY_RUN=1" in r["VectorDBRetrievalReturnsOutdatedDocs"][
 }
 
 @test "retrieval probe age panel keeps a daily probe green and matches the stale alert boundary" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import json, sys, yaml
 text = open(sys.argv[1]).read()
 dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
@@ -251,7 +255,7 @@ assert rule["for"] == "30m", rule
 }
 
 @test "existing dashboard panel queries and presentation are unchanged" {
-  run python3 -c '
+  run "$(k3dm_python_yaml)" -c '
 import hashlib, json, sys
 d = json.loads(open(sys.argv[1]).read().split("k3dm-vectordb.json: |", 1)[1])
 expected = {1:"7f6ea5cb20329d56bb522cd5219f4e606e011b9fbc6eb7d940fa309e719c70f7", 2:"0c93c17f4c3fa87d86a63864db7f2798311c19097530ef7a6a1bad5c658d53e5", 3:"e4c7b45ffaf97d1f08c4b50fed271b9b9ba7f9f3a977de39b61266d7dbe6e1e4", 4:"5a7f0363b16d68abee61b324d884c110bbfcfc95336b4a5c49302ca7d62ced1c", 5:"8ddb381ddcc5c8efd42abc902e24d1331cf54410eb34799eec59aff19d13030c", 10:"689bec316858eaefeab9f16224fa64747893ae45b7468d11a1cb95b53a5c2b0b", 11:"bbfece3dcb2f7b405102897d33adbedd982205dc37b1e285ee7b0ff7e2bde64c", 12:"a49266f4cd87b889fb474aa6bb11bdcf9e91b5c239a85fe7314c910c0b4849d9", 13:"6ccef05b3eef9dd87baa50684e08191ae447eb366e42a7f48e34297906d446a8", 14:"e4bee98f895f14d73d11803cfa404346ef538a4059b8ed9174d2e01b60f25cc3", 15:"6dff8369e533917c2ba866634b173875e0fba760a7e13fc885dc975708ab3c86", 16:"afb10cd117b5f00e095383e82df2dc463dab5843f7637881a68bf00e907f0aca"}

@@ -3,6 +3,7 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
   source "${ARGOCD_PLUGIN_SOURCE:-${BATS_TEST_DIRNAME}/../../plugins/argocd.sh}"
 }
 
@@ -386,10 +387,8 @@ JSON
   [ "$output" = "1" ]
   run grep -c 'argocd.argoproj.io/secret-type: cluster' "$RENDERED_FILE"
   [ "$output" = "1" ]
-  if command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' >/dev/null 2>&1; then
-    run python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$RENDERED_FILE"
-    [ "$status" -eq 0 ]
-  fi
+  run "$(k3dm_python_yaml)" -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$RENDERED_FILE"
+  [ "$status" -eq 0 ]
 }
 
 @test "register_app_cluster: remote secret keeps platform-helm labels" {
