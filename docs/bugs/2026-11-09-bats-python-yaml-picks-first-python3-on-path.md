@@ -1,8 +1,8 @@
 # Bug: BATS tests that parse YAML use the first python3 on PATH, which may lack PyYAML
 
-**Status:** OPEN — child C1 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
+**Status:** LANDED `d96547df` 2026-11-10 (Luna fix, Claude review: 8 touched suites 0 failures with the direnv venv python3 first on PATH (it lacks PyYAML); release-branch base 2 reds in hub_pushgateway+argocd; helper tests 3/3; mutant probe-always-true 2 red; E5 make test running)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-10
+**Waiting on:** live check — since 2026-11-10 (E5 make test on the M4 with direnv)
 **Introduced by:** pre-existing (each file has called bare `python3` since it was written; it surfaced when the
 personal envrc's `layout python3` put a venv without PyYAML first on PATH)
 **Should have been caught by:** review

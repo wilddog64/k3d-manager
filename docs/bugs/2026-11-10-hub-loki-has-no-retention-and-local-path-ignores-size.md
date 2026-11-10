@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-10
+**Waiting on:** fix running — since 2026-11-10
 **Introduced by:** pre-existing (`hub-loki` in `scripts/etc/argocd/applicationsets/observability.yaml:32-37` with `scripts/etc/helm/observability/loki-values.yaml`, which never set retention)
 **Should have been caught by:** spec (the Loki spec set a volume size and no retention, and assumed the size bounds the data)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4 all day: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `grep -ril "loki.*retention\|retention.*loki" docs/bugs`: none
