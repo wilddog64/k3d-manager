@@ -24,6 +24,10 @@ setup() {
       echo "ansible.limit must be set to 'all' when inventory_path is set" >&2
       return 1
     fi
+    if ! grep -E 'extra_vars.*["'\'']ansible_connection["'\'']\s*=>\s*["'\'']local["'\'']' "${VAGRANTFILE}"; then
+      echo "ansible.extra_vars must set ansible_connection to 'local' when inventory_path is set" >&2
+      return 1
+    fi
   fi
 }
 
