@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-09
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-09 (dispatch go: reaches the hub via platform-ops after promote)
+**Waiting on:** fix running — since 2026-11-09
 **Introduced by:** pre-existing (`e2e_utc` and the run-date-first column order came in with the run-status columns;
 see CHANGELOG `fixed: passed <date>`)
 **Should have been caught by:** none (presentation preference, not a regression)
@@ -13,6 +13,7 @@ does not exist`, 2026-11-09); exact-slug glob: none
 Tier -> Target -> Service Failure Kind -> Status Now"
 **Intent approved:** operator, 2026-11-09
 **Intent approval words:** "your intents approved"
+**Dispatch:** operator go 2026-11-09 ("Luna"), `--agent codex --model gpt-6-luna`, slug `e2e-dashboard-local-time`
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09, E2E Verification "Failure groups" screenshot
 **Branch:** `k3d-manager-v1.43.15`

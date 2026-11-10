@@ -1,3 +1,5 @@
+**2026-11-09 — DISPATCHING e2e-dashboard-local-time to Luna** (operator go). WIP will be 3/3: promtool, trust-vault-ca, e2e-dashboard-local-time.
+
 **2026-11-09 — e2e-dashboard local-time P3: intents E1–E3 approved** ("your intents approved"). Dispatch go still needed (hub-reaching platform-ops change).
 
 **2026-11-09 — FILED P3 `docs/bugs/2026-11-09-e2e-dashboard-tables-show-utc-and-status-first.md`** (operator request): E2E tables to Pacific local time via exporter `TZ=PST8PDT,M3.2.0,M11.1.0` (probed on python:3.12-alpine), Failure groups order Run ID→Runner→Run date→Tier→Target→Service→Failure kind→Status now. Waiting on intent approval; WIP 2/3, no file overlap with open dispatches.

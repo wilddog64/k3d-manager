@@ -1,3 +1,4 @@
+- [x] 2026-11-09 e2e-dashboard local-time P3: intents approved, dispatch go (Luna).
 - [ ] 2026-11-09 P3 e2e-dashboard local time + column order: filed, awaiting intent approval.
 - [x] 2026-11-09 Landed tests-dashboard-run-complete-panel `29d4b28f`; E2E results bug VERIFIED (live).
 - [x] 2026-11-09 Dispatched trust-vault-ca-no-deploy-metric (Luna).
