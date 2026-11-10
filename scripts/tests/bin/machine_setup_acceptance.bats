@@ -379,7 +379,7 @@ STUB
 @test "M5: README and Makefile link the howto" {
   grep -q 'docs/howto/machine-setup.md' "$SRC/README.md"
   grep -q 'docs/howto/machine-setup.md' "$SRC/Makefile"
-  [ "$(grep -c 'docs/howto/machine-setup.md' "$SRC/README.md")" -ge 2 ]
+  awk '/^### How-To/{h=1;next} /^##+ |^---/{h=0} h' "$SRC/README.md" | grep -q 'docs/howto/machine-setup.md'
 }
 
 # ---------------------------------------------------------------- N1
