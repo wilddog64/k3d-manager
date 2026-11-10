@@ -1,6 +1,6 @@
 # Bug: hub Loki keeps logs forever, and its 10Gi volume is not a limit
 
-**Status:** LANDED `76446d6e` 2026-11-10 (Flash 3.8; Claude fixed skip-in-subshell at review). Pre-fix 6 red; mutants a-c red; no-helm skips; E2 verify-config done at spec time. E3 live after hub-promote
+**Status:** LANDED `76446d6e` 2026-11-10 (Flash 3.8; Claude fixed skip-in-subshell at review). Pre-fix 6 red; mutants a-c red; no-helm skips; E2 verify-config done at spec time. CI on `906aa12e` went red: the render tests ran `helm pull`, which the test tripwire blocks (my land gate ran the bats file without the tripwire). Fixed by committing the pinned chart as `scripts/tests/fixtures/helm/loki-18.2.0.tgz` (sha256 checked) and dropping the pull; 15/15 under `scripts/tests/tripwire.sh`, mutant a still red. E3 live after hub-promote
 **Priority:** P3 (was P2 at filing; lowered by Claude 2026-11-10 after the baseline below: ~30 MB/day against 743 GB free)
 **Waiting on:** live check — since 2026-11-10 (needs hub-promote)
 **Introduced by:** pre-existing (`hub-loki` in `scripts/etc/argocd/applicationsets/observability.yaml:32-37` with `scripts/etc/helm/observability/loki-values.yaml`, which never set retention)

@@ -10,24 +10,19 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 # shellcheck disable=SC1091
 source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
 
+LOKI_CHART_FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/helm/loki-18.2.0.tgz"
+LOKI_CHART_SHA256="b68d1323113018dfabb7c8d9f86f14f37cdcd955a9f80c032ddd184cf1409ff2"
+
+# Chart pulled 2026-11-10 by Claude on the M4: helm pull --repo https://grafana-community.github.io/helm-charts --version 18.2.0 loki
 _ensure_loki_chart_18_2_0() {
   if ! command -v helm >/dev/null 2>&1; then
     skip "helm is missing: required to render loki chart"
   fi
-  local candidate
-  for candidate in "${LOKI_CHART_ARCHIVE:-}" "${TMPDIR:-/tmp}/loki-18.2.0.tgz" "${TMPDIR:-/tmp}/k3dm-loki-chart/loki-18.2.0.tgz"; do
-    if [[ -n "${candidate}" && -f "${candidate}" ]]; then
-      LOKI_CHART="${candidate}"
-      return 0
-    fi
-  done
-  local dest="${TMPDIR:-/tmp}"
-  if helm pull --destination "${dest}" --version 18.2.0 grafana-community/loki >/dev/null 2>&1 || \
-     helm pull --destination "${dest}" --repo https://grafana-community.github.io/helm-charts --version 18.2.0 loki >/dev/null 2>&1; then
-    LOKI_CHART="${dest}/loki-18.2.0.tgz"
-    return 0
-  fi
-  skip "unable to pull chart loki 18.2.0"
+  [ -f "${LOKI_CHART_FIXTURE}" ]
+  local sum
+  sum="$(shasum -a 256 "${LOKI_CHART_FIXTURE}" 2>/dev/null || sha256sum "${LOKI_CHART_FIXTURE}")"
+  [ "${sum%% *}" = "${LOKI_CHART_SHA256}" ]
+  LOKI_CHART="${LOKI_CHART_FIXTURE}"
 }
 
 @test "loki: observability-acg includes a loki application" {
