@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-10 (WIP 3/3)
+**Waiting on:** fix running — since 2026-11-10
 **Introduced by:** `4bd764b9` (v1.43.15, `bin/k3dm-machine-setup:102`)
 **Should have been caught by:** offline test (the Linux cases in `scripts/tests/bin/machine_setup.bats` stay green; why is part of the fix)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none

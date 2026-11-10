@@ -10,7 +10,7 @@
 **Approval:** operator, 2026-11-10: "go ahead to file P3 and dispatch to Luna"
 **Intent approved:** operator, 2026-11-10
 **Intent approval words:** "go ahead for your two suggestions"
-**Dispatch:** operator go 2026-11-10 ("dispatch to Luna"), `--agent codex --model gpt-6-luna`, slug `control-linux-vagrant-m4`; waits for intent approval and a WIP slot
+**Dispatch:** operator 2026-11-10: "when allow, please dispatch this to Flash 3.8" (confirmed: P3 to Flash, P2 stays on Luna), `--agent agy --model gemini-3.8-flash-medium`, slug `control-linux-vagrant-m4`; next free WIP slot
 **Filed:** 2026-11-10
 **Detected by:** Claude, 2026-11-10, live E3 of `docs/plans/v1.43.15-control-node-linux.md`
 **Branch:** `k3d-manager-v1.43.15`
