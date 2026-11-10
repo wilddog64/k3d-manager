@@ -1,3 +1,5 @@
+- 2026-11-10: operator go: edge intrusion detection added to docs/plans/v1.54.0-ai-attack-surface-security-boundary-hardening.md (scope item 8, deliverable, acceptance). Roadmap v1.53.0 Mac protection now covers three Macs (M5 hub, M4 worker, M2 console; roll out M2 → M4 → M5).
+
 - 2026-11-10: web console row gained intruder detection from the internet: existing plans (v1.62.0 Falco, v1.54.0 attack surface, v1.53.0 Mac, v2.6.4 triage) cover inside, not the edge; edge rules on Access/webhook/console events, off-hub alerts, report only. Still inbox.
 
 - 2026-11-10: web console row gained the audit-trail shape (Loki not evidence: hub-local, auth off, 14d; hash-chained events + off-hub write-once copy + Loki for search/alerts). Still inbox.

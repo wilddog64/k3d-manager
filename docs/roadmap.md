@@ -811,16 +811,22 @@ PR lifecycle history moved to v1.54.0 on 2026-10-29 (over the five-plan cap).
 
 ### Candidate milestone — v1.53.0
 
-**Mac workstation protection for the two operator MacBooks** (operator, 2026-10-23). Everything
+**Mac workstation protection for the three operator MacBooks** (operator, 2026-10-23; three Macs since the M5 arrived, operator 2026-11-10). Everything
 security-related so far watches the cluster: Trivy, cosign and Kyverno at admission, and Falco
 (v1.62.0) on Linux nodes only. The laptops get nothing beyond Apple's built-ins. Yet they hold the
 login Keychain, the SSH keys and the GitHub tokens, and they run agents that execute code. Malware
 that rewrites itself defeats signature checks such as XProtect, so this release relies on allowlists
 and watching behaviour instead. It needs no cluster changes and nothing from the v1.46–v1.54 releases.
 
+The three Macs differ in what they hold, so allowlists and alert baselines are per machine: the **M5** is the hub
+(k3d cluster, cloudflared, the webhook and Hermes LaunchAgents, Keychain tokens; the highest-value target), the **M4**
+is the worker (Claude Code, Codex and agy dispatches, lands and pushes; agents run code here), and the **M2** is the
+console (browser, Grafana, SSH terminal; where the web console would be opened). Roll out on the M2 first, then the
+M4, then the M5.
+
 | Piece | What it does | Rollout |
 |---|---|---|
-| Santa allowlist | Blocks any program that is not allowed. A changed binary gets a new fingerprint, so code that rewrites itself is blocked, not missed. | Monitor-only for two weeks on both Macs, then review what it logged. Switch to blocking only after the operator approves. |
+| Santa allowlist | Blocks any program that is not allowed. A changed binary gets a new fingerprint, so code that rewrites itself is blocked, not missed. | Monitor-only for two weeks on each Mac, then review what it logged. Switch to blocking only after the operator approves. |
 | BlockBlock | Alerts when anything installs itself to run at startup, the step almost every info-stealer needs. | Alert only. |
 | LuLu | Outbound firewall that asks before a new program connects out, to catch data being sent away. | Allow the agents, Homebrew, git and kubectl first; alert on anything else. |
 | osquery | Reports startup items, Keychain access and newly allowed binaries to the hub, so the v2.6.4 triage loop also covers the laptops. | Read-only queries on a schedule, small volume. |
@@ -828,7 +834,7 @@ and watching behaviour instead. It needs no cluster changes and nothing from the
 
 Constraints:
 - Installing and configuring the tools is the operator's job. Claude writes the spec, the
-  configuration and the guide, and runs no privileged or system-extension change on either Mac.
+  configuration and the guide, and runs no privileged or system-extension change on any of the three Macs.
 - Santa stays monitor-only until the operator approves blocking.
 - The osquery output must never carry secret values, Keychain item contents or full command lines.
   It sends only names, paths and counts, under the same label rules as the Falco plan.
