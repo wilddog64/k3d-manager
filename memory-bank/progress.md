@@ -411,3 +411,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-10: web console row gained the AI-agent threat model (own agents on the same Macs: browser automation, cookie theft, prompt-injected approval; agents prepare, never perform). Still inbox.
 
 - 2026-11-10: web console row gained the audit-trail shape (Loki not evidence: hub-local, auth off, 14d; hash-chained events + off-hub write-once copy + Loki for search/alerts). Still inbox.
+
+- 2026-11-10: web console row gained intruder detection from the internet: existing plans (v1.62.0 Falco, v1.54.0 attack surface, v1.53.0 Mac, v2.6.4 triage) cover inside, not the edge; edge rules on Access/webhook/console events, off-hub alerts, report only. Still inbox.
