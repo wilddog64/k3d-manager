@@ -2,12 +2,15 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval and dispatch go)
+**Waiting on:** dispatch — since 2026-11-10
 **Introduced by:** pre-existing (the panel title and description since the reason bars; see CHANGELOG "Agent Dispatch Human continuation prompts")
 **Should have been caught by:** review
 **Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `docs/plans/v1.45.0-human-operator-turns.md` covers the same panel (read: this doc takes only its rename step; the plan keeps the real turn counting)
 **Severity:** cosmetic, misleading. The operator read the bars (correction, clarification, continue) as their own effort; they are Claude's coordinator → sub-agent resume prompts recorded in the ledger.
 **Approval:** operator, 2026-11-10: "also can you schedule the label fix?"
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "go with your suggestion"
+**Dispatch:** operator go 2026-11-10 ("go with your suggestion"), `--agent agy --model gemini-3.8-flash-medium`, slug `human-continuation-prompts-rename`; queued behind control-node-linux (WIP limit 3)
 **Filed:** 2026-11-10
 **Detected by:** operator, 2026-11-07 (v1.43.14 retro); re-raised 2026-11-10
 **Branch:** `k3d-manager-v1.43.15`

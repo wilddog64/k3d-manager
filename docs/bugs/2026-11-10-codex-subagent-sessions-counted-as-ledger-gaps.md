@@ -2,12 +2,15 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval and dispatch go)
+**Waiting on:** dispatch — since 2026-11-10
 **Introduced by:** v1.43.15 (`docs/plans/v1.43.15-cost-attribution-coverage.md`: `_classify_session` re-parents only `guardian_review` sessions)
 **Should have been caught by:** spec (the 2026-11-01 M4 capture the spec copied had no `thread_source: subagent` session)
 **Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none
 **Severity:** metric misattribution. Agent Cost "Ledger gaps" (30d) reads $1.86 / 15 sessions; $1.31 / 7 of it is dispatch work. "Dispatch coverage (by cost)" reads lower than it is.
 **Approval:** operator, 2026-11-10 ("yes, please" to finding which sessions make up the ledger gap)
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "go with your suggestion"
+**Dispatch:** operator go 2026-11-10 ("go with your suggestion"), `--agent codex --model gpt-6-luna`, slug `codex-subagent-ledger-gaps`; queued behind control-node-linux (WIP limit 3)
 **Filed:** 2026-11-10
 **Detected by:** Claude, 2026-11-10, during the cost-attribution live E3 check (operator screenshots, 30d)
 **Branch:** `k3d-manager-v1.43.15`
