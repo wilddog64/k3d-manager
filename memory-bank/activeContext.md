@@ -1,3 +1,5 @@
+- 2026-11-11: Idea row added (b1f0eb62): Hermes security triage verdict on Flash 3.8/Luna 6.1, report-only, no tools; groom at next /release-groom.
+
 - 2026-11-11: Operator raised the install-* K3DM_AGENT_LOAD=0 bootout bug to P2; Acceptance/readers/DoD added; dispatched to Flash 3.8 (agy gemini-3.8-flash-medium) as `install-agent-load-zero-no-bootout`. WIP 2/3 (r3 exited, awaiting review).
 
 - 2026-11-11: K3dmRepoSyncStale (m4-air) was self-inflicted: Claude's 04:13 unstubbed `make install-repo-sync HOME=scratch K3DM_AGENT_LOAD=0` booted out the live M4 agent (launchd log names the caller). Reloaded 08:13, sync current. Filed P3 docs/bugs/2026-11-11-install-targets-with-agent-load-zero-boot-out-the-live-agent.md. Article tests-that-lied committed (tech-articles cfef843, README c695346). PR #139 E2E rerun after runner DNS hang. r3 hub-promote dispatch exited — review next.
