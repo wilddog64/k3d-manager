@@ -1,8 +1,8 @@
 # cluster-up step 10d: realm-import port-forward collides with the Keycloak browser agent on :18080
 
-**Status:** OPEN — found 2026-11-11 by Claude investigating /cluster-up aws job `63ed929e` on the M5
+**Status:** LANDED 2026-11-11 (`3b0e6534`, Claude review: 196/196 bats, new tests red pre-fix) — found 2026-11-11 by Claude investigating /cluster-up aws job `63ed929e` on the M5
 **Priority:** P1
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11
 **Severity:** high — `/cluster-up aws` fails at step 10d on a hub where the Keycloak browser agent is loaded, leaving a billable CloudFormation stack
 **Introduced by:** unknown (the Host-less probe wrapper on the M5 is dated 2026-11-06 04:25, the day `632ac235` added Hostinger's writer of this agent; not proven)
 **Should have been caught by:** live check

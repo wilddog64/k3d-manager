@@ -1,8 +1,8 @@
 # shopping-cart-frontend CI cannot rebuild to pick up Alpine security fixes
 
-**Status:** OPEN — found 2026-11-11 by Claude during the operator-approved manual rebuild for CVE-2026-9947 / CVE-2026-87636 (libxslt)
+**Status:** LANDED 2026-11-11 on shopping-cart-frontend `fix/ci-rebuild-alpine-fixes` (`34cfac9`; not yet on main) — found 2026-11-11 by Claude during the operator-approved manual rebuild for CVE-2026-9947 / CVE-2026-87636 (libxslt)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** operator decision — since 2026-11-11
 **Severity:** medium — a fixed Alpine package cannot reach the live frontend without a code commit, so a CVSS 9.6 libxslt fix sits published but unshipped
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
@@ -86,3 +86,9 @@ interface:
 - `ghcr.io/wilddog64/shopping-cart-frontend:sha-*` / `:latest`: writer this job (gains dispatch-triggered writes); readers ArgoCD Image Updater / Hostinger frontend deployment (unchanged; they already follow new digests, as `sha-54998781` went live without its kustomization PR).
 - `ci/frontend-image-sha-*` branches: writer the deploy step (unchanged; dispatch runs also create them).
 - k3d-manager `app-cve-scan.sh` rebuild dispatcher (PR #135 `fix/cve-rebuild-dispatch` in this repo): to grep at dispatch whether it triggers `workflow_dispatch` and relied on the skip.
+
+## Review notes (Claude, 2026-11-11)
+
+- External behaviour proof: an `ARG` that the following `RUN` never references still busts that `RUN`'s cache. Probe on the M4, Docker 29.8.2 (OrbStack), 2026-11-11: `FROM alpine:3.22` / `ARG APK_UPGRADE_EPOCH` / `RUN date > /stamp`; epoch 1 twice gave the same image `sha256:4b3d2b2f…` (step `CACHED`), epoch 2 gave `sha256:e825bbfa…`.
+- `tests/ci/test_ci_contract.py`: 2 of 3 red on pre-fix code (workflow_dispatch row, cache buster), all green after; the third is the `ci(deploy):` skip regression guard and passes both ways by design. Not yet wired into the frontend CI.
+- Next: PR `fix/ci-rebuild-alpine-fixes` → main (needs the operator's go), then `gh workflow run` on main for E-live: image digest changes and the scanned image carries libxslt 1.1.43-r4.

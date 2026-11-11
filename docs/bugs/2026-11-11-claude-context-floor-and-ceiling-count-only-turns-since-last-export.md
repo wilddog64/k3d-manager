@@ -1,8 +1,8 @@
 # Claude context floor and ceiling count only the turns since the exporter's last run
 
-**Status:** OPEN — found 2026-11-11 by Claude after the operator questioned the panel
+**Status:** LANDED 2026-11-11 (`36cd00fa`, Claude review: 204 pytest, warm = cold on real data, 1d ceiling 166,986) — found 2026-11-11 by Claude after the operator questioned the panel
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11
 **Severity:** medium — Agent Cost "Floor, observed ceiling and configured threshold" reads 99.8K / 99.8K while auto-compaction fires at 163–171K, so the compaction-threshold study (`docs/plans/v1.43.6-claude-context-compaction-metrics.md`) reads wrong data
 **Introduced by:** unknown (context turns arrived in 61256041 v1.43.6, the ceiling and floor in 82c1d9c8 v1.43.14; which one dropped persisted turns is not yet traced)
 **Should have been caught by:** offline test
