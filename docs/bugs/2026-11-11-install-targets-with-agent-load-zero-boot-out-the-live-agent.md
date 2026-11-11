@@ -61,6 +61,13 @@ bootout or unload runs in the `0` mode; leave a reader untouched when it already
 Out of scope: `uninstall-*` targets (unloading is their job), the label-scoped bootout form itself, and
 `install-webhook-token-rotate` (it does not read `K3DM_AGENT_LOAD`).
 
+## Files
+
+- `Makefile`
+- `scripts/tests/bin/hub_new.bats`
+- `scripts/tests/bin/makefile_agent_load.bats` (new, if not folded into hub_new.bats)
+- Shell readers under Contract readers only if the audit finds a bootout in the `0` mode.
+
 ## Acceptance
 
 ```yaml
