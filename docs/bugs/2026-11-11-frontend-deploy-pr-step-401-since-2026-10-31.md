@@ -42,3 +42,5 @@ Fix for this deploy: the overlay pin is bumped on `k3d-manager-v1.43.15` to `sha
 digest checked with `docker buildx imagetools inspect`, libxslt 1.1.43-r4). It is inert until promoted to `deploy/hub`.
 Open question for grooming: whether a promoter pin should be released when a newer `main` build is clean, or the
 deploy flow should update the overlay instead of the base.
+
+**Live 2026-11-11 (Claude):** after promote `64e98c62` (tag `hub-promote/20261111T235223Z`), Hostinger pod `frontend-6cb766d98f-6whgt` runs `ghcr.io/wilddog64/shopping-cart-frontend@sha256:97d0b172db3bfeaaabb8e4d75b6183369be87d080b2f3d564779b38b2f7fe18c`, Ready; `apk info -v` in the pod: `libxslt-1.1.43-r4`, `libxml2-2.13.9-r2`. The CVE fix is live; the 401 in the deploy-PR step is still open.
