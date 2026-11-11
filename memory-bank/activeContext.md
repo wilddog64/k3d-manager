@@ -1,5 +1,6 @@
 - 2026-11-11: Idea row added (b1f0eb62): Hermes security triage verdict on Flash 3.8/Luna 6.1, report-only, no tools; groom at next /release-groom.
 
+- 2026-11-11: Keycloak P1 (3b0e6534) independently VERIFIED offline (E1/E2, Claude rerun 6/6 fixed, 5 red pre-fix, control ok; dispatch verify recorded). E3 live waits for promote (deploy/hub 745abb50 lacks 3b0e6534) + relay plist check on M5, then operator runs /cluster-up aws.
 - 2026-11-11: #140 merged but has no live effect: hub overlay services/shopping-cart-frontend pins digest 14bf71a5 (CVE promoter 74cd3ca1, sha-54998781). Claude bumped the pin to 97d0b172 (sha-b04f0c1f, libxslt r4) on the release branch; needs promote to deploy/hub. Operator can only promote at home; asked about a /promote skill. /pat-rotate is the local gh CLI token, not PACKAGES_TOKEN.
 - 2026-11-11: operator OK → killed orphan r2 agy PID 74329 (5h42m) and its stuck test 87405; no hub-promote dispatch left open.
 - 2026-11-11: hub-promote promoter-commit fix LANDED `aa97c491` (r4 Flash; Claude review: 30/30 own run, shellcheck clean, mutants a–d red per worker). Bug doc → LANDED, Waiting on live check (E2 on next CVE promoter commit). Follow-up noted: uncontained_commits fails open on git cherry error. Needs `make hub-promote` of a commit containing aa97c491 before it protects the hub.

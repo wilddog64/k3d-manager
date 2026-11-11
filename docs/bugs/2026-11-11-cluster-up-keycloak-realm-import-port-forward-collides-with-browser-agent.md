@@ -104,3 +104,16 @@ operator ran `launchctl bootout gui/$(id -u)/com.k3d-manager.browser.keycloak-ht
 the job ended `up complete`, status `success`. The agent was reinstalled afterwards from the old wrapper (`runs = 9`,
 `spawn scheduled`), so it still restart-loops until the fix is promoted. This proves the workaround, not the fix: E3 still
 needs a cluster-up after `make hub-promote` includes `3b0e6534`.
+
+## Independent verification (2026-11-11)
+
+An independent verifier, given only the Acceptance block and the interface list, wrote its own tests for E1 and E2
+(not in the repo). Claude re-ran them on m4-air: on the fixed tree (`3b0e6534`) 6/6 pass, rc=0; on the pre-fix tree (`3b0e6534^`) tests 1-5 fail and the
+positive control (all-404 stub makes the probe restart) still passes, rc=1. The probe was exercised for all three writers
+(cluster-up, cluster-refresh, k3s-hostinger). Caveat: the verifier's `diff -r` of the two trees listed the fix's test-file changes;
+it says it did not open them.
+
+**Before E3:** the fixed probe goes through `/etc/hosts` (keycloak.shopping-cart.local -> 127.0.0.1), then the system relay
+(80 -> 18080), then the agent's port-forward. Confirm `/Library/LaunchDaemons/com.k3d-manager.relay.keycloak-http.plist`
+exists on the M5 (otherwise `make install-browser-relays`), and that `deploy/hub` contains `3b0e6534`.
+E3 still needs `/cluster-up aws` after that promote.
