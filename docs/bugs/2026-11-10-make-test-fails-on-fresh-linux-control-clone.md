@@ -2,12 +2,14 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval; then dispatch as children when WIP allows)
+**Waiting on:** dispatch — since 2026-11-11 (three children A/B/C as WIP allows; P3 batch rules)
 **Introduced by:** A `82c1d9c8` (v1.43.14 release squash); B pre-existing (`945018ee`, v1.36.0); C `76446d6e` (v1.43.15, helm skip guard)
 **Should have been caught by:** A review (the 2026-08-03 lesson: fixtures must not depend on branch-only commits); B offline test (host tool not stubbed); C offline test (skip guard never run on a host without helm)
 **Prior art:** `docs/issues/2026-08-03-stale-test-refs-fixture-orphaned-by-branch-cleanup.md` — read, same class as A (recurrence; that doc recommended a self-contained fixture); `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` — read, related to C (tripwire vs tool fallback), different mechanism; `make find-similar-docs` not run (vector store unreachable from the M4)
 **Severity:** test-only. Blocks M3 of `docs/plans/v1.43.15-control-node-linux.md` (make test on Ubuntu 24.04 with only labelled skips), so control-node E3 cannot pass and Hostinger E4 stays held. Workaround: install helm and apache2-utils on the node and clone with all branches.
 **Approval:** Claude, 2026-11-10 (found in control-node E3); dispatch needs the operator's intent approval
+**Intent approved:** operator, 2026-11-11
+**Intent approval words:** "approve P3 intent" (reply to Claude's E3 rerun report, which asked for this P3's intents)
 **Filed:** 2026-11-10
 **Detected by:** Claude, live E3 probe, Vagrant `bento/ubuntu-24.04` aarch64 on the M4, k3dm-control's clone at `dfb29052` (scratchpad `control-e3/make-test2.log`: 2033 ok, 21 skip, 7 not ok)
 **Branch:** `k3d-manager-v1.43.15`

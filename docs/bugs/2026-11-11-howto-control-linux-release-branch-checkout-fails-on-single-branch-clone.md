@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (intent approval; batch with other P3s on `docs/howto/machine-setup.md`)
+**Waiting on:** dispatch — since 2026-11-11 (next free slot; WIP 3/3)
 **Introduced by:** `4bd764b9` (control-node-linux: the how-to's VM sequence)
 **Should have been caught by:** live check (the sequence was first run end to end in this E3 rerun)
 **Prior art:** exact-slug glob: none. `make find-similar-docs`: unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-11)
@@ -10,6 +10,9 @@
 `error: pathspec 'k3d-manager-v1.43.15' did not match any file(s) known to git`. Workaround: `git fetch origin
 <branch>:refs/remotes/origin/<branch>` then `git checkout --no-track -B <branch> origin/<branch>`.
 **Approval:** Claude, 2026-11-11 (found running control-node E3 in Vagrant under the operator's go)
+**Intent approved:** operator, 2026-11-11
+**Intent approval words:** "go ahead for that how-to checkout P3"
+**Dispatch go:** operator, 2026-11-11: "go ahead for that how-to checkout P3"
 **Filed:** 2026-11-11
 **Detected by:** Claude, control-node E3 rerun on the M4 Vagrant VM, 2026-11-11
 **Branch:** `k3d-manager-v1.43.15`
