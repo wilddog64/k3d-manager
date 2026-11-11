@@ -377,3 +377,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-10: control-node-linux dropped from dispatch queue (already landed 4bd764b9). E3 Vagrant started: vagrant up --no-provision, then checksums, role, setup, make test in k3dm-control's clone at release head.
 
 - 2026-11-11: CI lint red (runs 42939374114, 42947911553) diagnosed: repo-sync label unclassified + hub-sync test breaks under GNU make sub-make banner, both from f310b4d4. Filed docs/bugs/2026-11-11-ci-lint-red-repo-sync-unclassified-and-hub-sync-sub-make-banner.md (P2); fix in working tree, 21/21 Linux MAKELEVEL=1, 209/209 macOS; waiting on operator go to commit.
+- 2026-11-11: CI fix 367d6caa pushed (CI watch running). Agent-cost + flash/fable P3 batch LANDED e7e1efd6 (Flash fix, Claude review; bats 49/49 with 5 red pre-fix; pytest 201). Waiting on hub-promote + live check. Next: hermes-approval review/land.

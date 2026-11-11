@@ -1,8 +1,8 @@
 # Bug: Agent Cost dashboard counts an unpriced Claude model (Fable) as $0, silently
 
-**Status:** OPEN
+**Status:** LANDED 2026-11-11 `e7e1efd6` — Flash (Gemini 3.8) fix, Claude review: Fable price verified against platform.claude.com pricing (read 2026-11-10), weekly_scoped parser checked against the real statusline cache on the M4 (display_name "Fable"), allowlist covers every ledger model slug. Offline: agent_dispatch_dashboard.bats 49/49 (tests 14, 32, 47, 48, 49 red on pre-fix code), test_dispatch_metrics.py 201 passed (promtool test left to CI). Landed with --allow-out-of-scope: the scope checker reads the Files entry `scripts/tests/` as an exact path, not a prefix
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-10 (Flash, slug `2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero`, P3 batch)
+**Waiting on:** live check — since 2026-11-11 (after hub-promote: Agent Cost shows the unpriced stat at 0 and the Fable row; Landed specs table shows Worker model)
 **Introduced by:** `1bf0cf40` (v1.43.14, claude-context-cost-per-turn: "0 for an unpriced model"); dashboard side pre-existing
 **Should have been caught by:** spec (the exporter counts unpriced messages but no panel shows the count)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store unreachable, 2026-11-10)

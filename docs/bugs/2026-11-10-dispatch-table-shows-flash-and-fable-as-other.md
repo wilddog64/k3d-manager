@@ -1,8 +1,8 @@
 # Bug: Dispatch table shows Gemini Flash and Claude Fable workers as `google/other`, and the Worker column is off-screen
 
-**Status:** OPEN
+**Status:** LANDED 2026-11-11 `e7e1efd6` — Flash (Gemini 3.8) fix, Claude review: Fable price verified against platform.claude.com pricing (read 2026-11-10), weekly_scoped parser checked against the real statusline cache on the M4 (display_name "Fable"), allowlist covers every ledger model slug. Offline: agent_dispatch_dashboard.bats 49/49 (tests 14, 32, 47, 48, 49 red on pre-fix code), test_dispatch_metrics.py 201 passed (promtool test left to CI). Landed with --allow-out-of-scope: the scope checker reads the Files entry `scripts/tests/` as an exact path, not a prefix
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-10 (batched into Flash dispatch `2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero`)
+**Waiting on:** live check — since 2026-11-11 (after hub-promote: Agent Cost shows the unpriced stat at 0 and the Fable row; Landed specs table shows Worker model)
 **Introduced by:** pre-existing: `MODEL_IDENTITY_ALLOWLIST` was not updated when Flash 3.8 dispatches began (first: `2026-11-02-hub-data-export-never-ran`)
 **Should have been caught by:** review (the dispatch that first used `gemini-3.8-flash-medium` did not check the Worker column)
 **Prior art:** exact-slug glob: none; `ls docs/bugs | grep allowlist`: two unrelated docs. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10)
