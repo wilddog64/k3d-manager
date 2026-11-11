@@ -1,8 +1,7 @@
 # Bug: `cluster-up` step 4.1 hits the launchd reload race (error 5), fails the run, and leaves the hub's Vault port-forward unloaded
 
-**Status:** LANDED 2026-11-11 — Claude (operator: "as this is only one line fix, you can work this yourself"): step 4.1 calls `bin/launchd-reload` and fails naming `make install-vault-port-forward`. Offline: `cluster_up_vault_pf_agent.bats` 4/4; M1, M3 and N2 red on pre-fix `bin/cluster-up`, M2 (control) green; N2 red with the guard replaced by `|| true`; `launchd_reload.bats` + `cluster_up.bats` 83/83, rc 0
+**Status:** VERIFIED 2026-11-11 (live E2: /cluster-up aws job 63ed929e on the M5 passed step 4.1, agent pid 23104 running, :18200 health 200) — was LANDED 2026-11-11 — Claude (operator: "as this is only one line fix, you can work this yourself"): step 4.1 calls `bin/launchd-reload` and fails naming `make install-vault-port-forward`. Offline: `cluster_up_vault_pf_agent.bats` 4/4; M1, M3 and N2 red on pre-fix `bin/cluster-up`, M2 (control) green; N2 red with the guard replaced by `|| true`; `launchd_reload.bats` + `cluster_up.bats` 83/83, rc 0
 **Priority:** P2 — `/cluster-up aws` on the hub fails at step 4.1 whenever `com.k3d-manager.vault-port-forward` is already loaded (the hub build loads it), and the hub loses `127.0.0.1:18200`; workaround: `make install-vault-port-forward` on the M5 restores :18200 (operator ran it 2026-11-11, http 200), then rerun `/cluster-up aws`
-**Waiting on:** live check — since 2026-11-11 (E2: `/cluster-up aws` on the M5 with the agent loaded)
 **Introduced by:** pre-existing (the bootout-then-bootstrap pair at `bin/cluster-up:733-734` predates the 2026-10-31 and 2026-11-03 reload-race fixes)
 **Should have been caught by:** review — the 2026-10-31 and 2026-11-03 fixes repaired the same race in their own files without sweeping the other callers
 **Severity:** medium — an unattended cluster-up fails after the AWS stack is created and k3s and ArgoCD are installed; meanwhile hub readers of :18200 lose Vault (webhook smoke `scripts/lib/webhook/smoke.py:184`, `scripts/plugins/observability.sh:98,351`, `bin/argocd-app-sync:112`, `bin/hub-restore:78`, `bin/rotate-ghcr-pat`, `bin/restore-hub-ghcr-pat`)
@@ -105,3 +104,7 @@ interface:
 ## Stub provenance
 
 `launchctl print` of an unloaded label exits 113 (M5, recorded in `docs/bugs/2026-10-31-hub-port-forward-reload-race-and-hub-migrate-entrypoint.md:27`). `Bootstrap failed: 5: Input/output error` with exit 5 is from the M5 job above (2026-11-10 18:34 PST).
+
+## Live check (Claude, M5, 2026-11-11 04:25 PST)
+
+Job `63ed929e` output lines 403-404: `Step 4.1/12 — Installing Vault port-forward LaunchAgent` then `Vault port-forward LaunchAgent installed (launchd: com.k3d-manager.vault-port-forward)`; `launchctl print` shows state running, pid 23104; `curl http://127.0.0.1:18200/v1/sys/health` → 200. The job later failed at step 10d (Keycloak admin token), unrelated to this fix.
