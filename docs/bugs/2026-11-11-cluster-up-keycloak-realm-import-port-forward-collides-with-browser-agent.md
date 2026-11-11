@@ -95,3 +95,12 @@ Port 18080 on the M5 (to be confirmed by grep in the spec): `bin/cluster-up:1136
 ## Side finding
 
 The failed run left CloudFormation stack `k3d-manager-cluster` (us-west-2) running (billable), and the job's port-forward survived the failure path's `kill "${_kc_pf_pid}"`.
+
+## Workaround proven live (2026-11-11)
+
+/cluster-up aws job `40d0e3dd` on the M5 ran pre-fix code (`deploy/hub` 745abb50, `_kc_pf_port=18080`). Before step 10d the
+operator ran `launchctl bootout gui/$(id -u)/com.k3d-manager.browser.keycloak-http`; Claude confirmed the agent unloaded and
+:18080 free. Step 10d then passed (realm import, e2e identity, frontendUrl; output lines 348-351), 10d.5-10g.9 passed, and
+the job ended `up complete`, status `success`. The agent was reinstalled afterwards from the old wrapper (`runs = 9`,
+`spawn scheduled`), so it still restart-loops until the fix is promoted. This proves the workaround, not the fix: E3 still
+needs a cluster-up after `make hub-promote` includes `3b0e6534`.
