@@ -7,8 +7,8 @@
 **Introduced by:** bd68d6ff (v1.43.12, `K3DM_AGENT_LOAD=0` guard added beside an existing unconditional bootout)
 **Should have been caught by:** offline test
 **Prior art:** `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing); exact-slug glob: none. Related, different root cause: `docs/bugs/2026-11-11-cluster-up-vault-port-forward-reload-race-fails-and-unloads-hub-agent.md`.
-**Approval:** operator, 2026-11-11: "probably should file a P2 bug and dispatch to Flash 3.8" (raised from P3; Claude agreed: it paged once and the only workaround is a manual reload).
-**Intent approved:** operator, 2026-11-11 (same message; intents E1–E3 below shown to the operator in the dispatch report)
+**Approval:** operator, 2026-11-11: "probably should file a P2 bug and dispatch to Flash 3.8" (raised from P3; Claude agreed: it paged once and the only workaround is a manual reload). Same message approves intents E1–E3.
+**Intent approved:** operator, 2026-11-11
 
 ## What happened
 
