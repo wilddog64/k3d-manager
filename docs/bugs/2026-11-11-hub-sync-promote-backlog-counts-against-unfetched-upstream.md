@@ -1,8 +1,8 @@
 # hub-sync promote backlog counts against an upstream ref the hub never fetches
 
-**Status:** OPEN — found by the independent verifier for `v1.43.15-checkout-auto-sync` (2026-11-11)
+**Status:** LANDED — `d06c0340` (2026-11-11; Flash 3.8 worker, Claude review: E1/E3 red on pre-fix, refspec mutation red, repo_sync.bats 18/18); found by the independent verifier for `v1.43.15-checkout-auto-sync`
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-11
+**Waiting on:** investigation — since 2026-11-11 (independent verifier running; then live E4 after a promote)
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing), not run
