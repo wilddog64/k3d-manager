@@ -61,13 +61,15 @@ hub-sync:
 install-repo-sync:
 	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.local/share/k3d-manager/logs"
 	@sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist" || { echo "install-repo-sync: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist" >&2; exit 1; }
-	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
 	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
 	  echo "install-repo-sync: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
-	elif launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"; then \
-	  echo "install-repo-sync: OK, com.k3d-manager.repo-sync loaded; log: $(HOME)/.local/share/k3d-manager/logs/repo-sync.log"; \
 	else \
-	  echo "install-repo-sync: FAILED, launchctl bootstrap of com.k3d-manager.repo-sync did not load the agent" >&2; exit 1; \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true; \
+	  if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"; then \
+	    echo "install-repo-sync: OK, com.k3d-manager.repo-sync loaded; log: $(HOME)/.local/share/k3d-manager/logs/repo-sync.log"; \
+	  else \
+	    echo "install-repo-sync: FAILED, launchctl bootstrap of com.k3d-manager.repo-sync did not load the agent" >&2; exit 1; \
+	  fi; \
 	fi
 
 uninstall-repo-sync:
@@ -99,8 +101,11 @@ install-test-metrics:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.test-metrics" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" \
+	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; \
+	fi
 
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
@@ -658,9 +663,11 @@ install-cleanup:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" \
+	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"; \
+	fi
 	@echo "Cleanup agent installed — fires daily at 03:00"
 
 ## Install the bounded k3d agent health/recovery watchdog (restarts after 3 failures)
@@ -668,8 +675,10 @@ install-node-health-watch:
 	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.node-health-watch.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"; \
+	fi
 	@echo "Node health watchdog installed — recovery is bounded to agent-0 with a 5-minute cooldown"
 
 uninstall-node-health-watch:
@@ -682,8 +691,10 @@ install-sandbox-reaper:
 	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.sandbox-reaper" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.sandbox-reaper" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"; \
+	fi
 	@echo "Expired-sandbox reaper installed — fires every 10 minutes"
 
 uninstall-sandbox-reaper:
@@ -818,9 +829,11 @@ install-cloud-bridge:
 	  scripts/etc/launchd/com.k3d-manager.cloud-bridge.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" \
+	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"; \
+	fi
 	@echo "Cloud bridge installed — polling origin/cloud-requests every 60s; log: $(HOME)/Library/Logs/k3dm-cloud-bridge.log"
 
 ## Revoke cloud-session access — stop and remove the bridge LaunchAgent

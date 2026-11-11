@@ -412,11 +412,12 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
 
 @test "M5: Makefile singleton installers write the plist and never load it with K3DM_AGENT_LOAD=0" {
   local target label
+  touch "$CALLS"
   for target in cleanup node-health-watch sandbox-reaper test-metrics; do
     K3DM_AGENT_LOAD=0 /usr/bin/make -s -C "$REPO" "install-${target}" >/dev/null
     [ -s "$AGENTS_DIR/com.k3d-manager.${target}.plist" ] || { echo "no plist for $target" >&2; return 1; }
   done
-  run grep -E '^launchctl (bootstrap|load|kickstart)' "$CALLS"
+  run grep -E '^launchctl (bootout|unload|bootstrap|load|kickstart)' "$CALLS"
   [ "$status" -eq 1 ]
 }
 
