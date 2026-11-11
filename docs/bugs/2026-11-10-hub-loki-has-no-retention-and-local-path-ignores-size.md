@@ -2,7 +2,7 @@
 
 **Status:** LANDED `76446d6e` 2026-11-10 (Flash 3.8; Claude fixed skip-in-subshell at review). Pre-fix 6 red; mutants a-c red; no-helm skips; E2 verify-config done at spec time. CI on `906aa12e` went red: the render tests ran `helm pull`, which the test tripwire blocks (my land gate ran the bats file without the tripwire). Fixed by committing the pinned chart as `scripts/tests/fixtures/helm/loki-18.2.0.tgz` (sha256 checked) and dropping the pull; 15/15 under `scripts/tests/tripwire.sh`, mutant a still red. E3 live after hub-promote
 **Priority:** P3 (was P2 at filing; lowered by Claude 2026-11-10 after the baseline below: ~30 MB/day against 743 GB free)
-**Waiting on:** live check — since 2026-11-10 (needs hub-promote)
+**Waiting on:** live check — since 2026-11-10 (E3 next-day volume reading due 2026-11-11 ~23:50Z; old-log deletion visible from ~2026-11-13)
 **Introduced by:** pre-existing (`hub-loki` in `scripts/etc/argocd/applicationsets/observability.yaml:32-37` with `scripts/etc/helm/observability/loki-values.yaml`, which never set retention)
 **Should have been caught by:** spec (the Loki spec set a volume size and no retention, and assumed the size bounds the data)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4 all day: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `grep -ril "loki.*retention\|retention.*loki" docs/bugs`: none
@@ -129,3 +129,11 @@ interface:
   `retention_period: 0s`, (c) drop the `job="k3dm-dispatch-run"` stream rule.
 - Run `bats scripts/tests/plugins/argocd_loki.bats` and `make validate-manifests`; paste command, rc and proving lines.
   Leave changes uncommitted; Claude reviews and lands.
+
+## E3 live (Claude, M5 over SSH, 2026-11-10/11, after `hub-promote/20261110T234204Z` = `cf86a93f`)
+
+- loki-0 restarted 23:49Z, `2/2 Running`, 0 restarts. ConfigMap `loki`: `retention_enabled: true`, `delete_request_store: filesystem`, `retention_period: 336h`.
+- Compactor: 23:59:08Z "compactor startup delay completed", "compactor started", `expiration.go:82` "overall smallest retention period 1793145548.245" (= 2026-10-27T23:59Z, exactly 14 days back): retention is being applied.
+- Startup warnings (memberlist DNS `no such host`, fast-join, ingester `empty ring`) are single-replica cold-start noise; no later errors.
+- Volume: `storage-loki-0` 291M at 2026-11-10T23:53Z (baseline 297M at filing; the drop is WAL flush on restart, not retention). Next reading ~2026-11-11 23:50Z.
+- Not yet seen: deletion of logs older than 14 days. The oldest data is about 11 days old, so nothing is due before ~2026-11-13.
