@@ -9,7 +9,8 @@
 **Severity:** reporting only. The ledger records the exact model; the dashboard hides it. Workaround: read `<run>/model` or the ledger `start` event.
 **Approval:** Claude, 2026-11-10 (operator asked: "for agent can we show what agy model for a particular spec")
 **Dispatch go:** operator, 2026-11-10: "go as you recommeded for those two"
-**Intent approved:** operator, 2026-11-10 ("intent approved", E1-E3)
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** ("intent approved", E1-E3)
 **Filed:** 2026-11-10
 **Detected by:** Claude, answering the operator's question about the Agent Dispatch "Landed specs" table
 **Branch:** `k3d-manager-v1.43.15`

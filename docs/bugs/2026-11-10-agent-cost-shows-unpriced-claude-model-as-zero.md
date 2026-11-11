@@ -9,7 +9,8 @@
 **Severity:** cosmetic and reporting. Claude API-equivalent cost reads low by whatever Fable (or any new model) used; tokens are still shown by model.
 **Approval:** operator, 2026-11-10: "go for those three as you suggested (approved)" (filing)
 **Dispatch go:** operator, 2026-11-10: "go as you recommeded for those two"
-**Intent approved:** operator, 2026-11-10: "intent approved", in reply to Claude's offer to widen this P3 with the Fable panel and the weekly-limit export (E4-E6 added that turn)
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** "intent approved", in reply to Claude's offer to widen this P3 with the Fable panel and the weekly-limit export (E4-E6 added that turn)
 **Widened:** 2026-11-10, folds in the `docs/ideas.md` row "Export the Claude Fable weekly limit" (same dashboard file, one dispatch)
 **Filed:** 2026-11-10
 **Detected by:** Claude, 2026-11-10, answering the operator's "I wonder if our dashboard can capture Fable's activities" after the operator allowed Fable subagents

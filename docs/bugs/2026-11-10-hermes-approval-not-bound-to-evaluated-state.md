@@ -15,7 +15,8 @@ code, than the one the operator read on the card. r9 and r10 are irreversible. T
 one-attempt-per-incident rule still apply, which is why this is P2 and not P1.
 **Approval:** operator, 2026-11-10: "yes" (file it, after a LinkedIn reader suggested binding approvals to the
 **Dispatch go:** operator, 2026-11-10: "go as you recommeded for those two"
-**Intent approved:** operator, 2026-11-10 ("approve P2")
+**Intent approved:** operator, 2026-11-10
+**Intent approval words:** ("approve P2")
 evaluated revision and policy version)
 **Filed:** 2026-11-10
 **Detected by:** external reader comment on the operator's LinkedIn post about the 2026-11-08 wrong-branch incident;
