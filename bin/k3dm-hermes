@@ -276,8 +276,14 @@ def _drain_approvals(state, relay, drain_url):
         records_now, _event = _run_cycle(state)
         outcome = repairs.approve(action_id, state, records_now, _repair_runner)
         delete_approval(drain_url, token, action_id)
-        post_summary(relay, f"Hermes repair {action_id} ({proposal.get('name', '')}) approved in Slack "
-                            f"by <@{item['approved_by']}>: {outcome.get('outcome')}")
+        result = outcome.get("outcome", "unknown outcome")
+        if result.startswith("refused:"):
+            message = (f"Hermes repair {action_id} ({proposal.get('name', '')}) approval refused: "
+                       f"{result.removeprefix('refused:').strip()} (requested by <@{item['approved_by']}>)")
+        else:
+            message = (f"Hermes repair {action_id} ({proposal.get('name', '')}) approved in Slack "
+                       f"by <@{item['approved_by']}>: {result}")
+        post_summary(relay, message)
         outcomes.append({"action_id": action_id, "outcome": outcome.get("outcome")})
     return outcomes
 

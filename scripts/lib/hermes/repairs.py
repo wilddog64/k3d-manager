@@ -6,8 +6,10 @@ durable audit, auto-verification) is NOT implemented and needs its own scope doc
 """
 
 import hashlib
+import json
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import shlex
 import subprocess
@@ -30,6 +32,50 @@ PORT_FORWARD_LABELS = {
 }
 R10_NAMESPACES = ("identity", "monitoring", "cicd")
 R10_NAME = re.compile(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?")
+PROPOSAL_TTL = timedelta(minutes=30)
+
+
+def _git_revision(ref):
+    """Resolve a commit from this Hermes checkout without fetching."""
+    try:
+        result = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--verify", "--quiet",
+                                 f"{ref}^{{commit}}"], capture_output=True, text=True,
+                                check=False, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _utc_now():
+    return datetime.now(timezone.utc)
+
+
+def _parse_utc(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _expired(proposal):
+    try:
+        return _utc_now() > _parse_utc(proposal.get("expires_at", ""))
+    except (TypeError, ValueError):
+        return True
+
+
+VOLATILE_DATA_FIELDS = {"kine": frozenset(("last_compaction_ts", "state_db_bytes", "slow_sql_count"))}
+
+
+def _records_digest(records, reads):
+    selected = {}
+    for item in records:
+        sensor = item.get("sensor")
+        if sensor not in reads:
+            continue
+        volatile = VOLATILE_DATA_FIELDS.get(sensor, frozenset())
+        data = {key: value for key, value in (item.get("data") or {}).items()
+                if key not in volatile}
+        selected[sensor] = {"sensor": sensor, "status": item.get("status"), "data": data}
+    encoded = json.dumps(selected, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode()).hexdigest()
 
 
 def _rec(records, name):
@@ -207,22 +253,27 @@ def _r10_command(records):
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
+           "reads": ("eso", "data_layer"),
            "blast_radius": "one local webhook LaunchAgent", "reversible": True,
            "needs_scope": None},
     "r2": {"key": "r2", "name": "Kick zombie port-forward", "precondition": _r2_precondition,
            "build_command": _r2_command, "cwd": None,
+           "reads": ("reachability", "node_pressure", "data_layer"),
            "blast_radius": "one local port-forward LaunchAgent", "reversible": True,
            "needs_scope": None},
     "r3": {"key": "r3", "name": "Refresh Hostinger edge access layer", "precondition": _r3_precondition,
            "build_command": _r3_command, "cwd": ROOT,
+           "reads": ("reachability",),
            "blast_radius": "local edge and port-forward access layer", "reversible": True,
            "needs_scope": None},
     "r4": {"key": "r4", "name": "Rerun transient CI jobs", "precondition": _r4_precondition,
            "build_command": _r4_command, "cwd": None,
+           "reads": ("ci",),
            "blast_radius": "one GitHub Actions run re-execution", "reversible": True,
            "needs_scope": "actions:write"},
     "r5": {"key": "r5", "name": "Quarantine stale ACG reconciliation", "precondition": _r5_precondition,
            "build_command": _r5_command, "cwd": None,
+           "reads": ("kine",),
            "blast_radius": "hub ArgoCD application controller; GitOps reconciliation pauses", "reversible": True,
            "needs_scope": "local hub kubeconfig"},
     # Proposal-only on purpose. The 2026-09-11 incident established that pausing
@@ -232,22 +283,27 @@ REPAIRS = {
     # restarting the control plane is a human decision.
     "r6": {"key": "r6", "name": "Restart hub K3s server to revive stalled Kine compaction",
            "precondition": _r6_precondition, "build_command": _r6_command, "cwd": None,
+           "reads": ("kine",),
            "blast_radius": "hub control plane restarts; brief apiserver outage", "reversible": False,
            "needs_scope": "local docker socket"},
     "r7": {"key": "r7", "name": "Restore cosign signing key and ESO grant",
            "precondition": _r7_precondition, "build_command": _r7_command, "cwd": ROOT,
+           "reads": ("eso",),
            "blast_radius": "Vault secret/cosign/signing, cosign-verify policy, ESO role grant, one ExternalSecret resync",
            "reversible": True, "needs_scope": "macOS Keychain (k3d-manager-signing), local hub kubeconfig"},
     "r8": {"key": "r8", "name": "Recycle drifted host-network DaemonSet pods",
            "precondition": _r8_precondition, "build_command": _r8_command, "cwd": ROOT,
+           "reads": ("hostnet_drift",),
            "blast_radius": "DaemonSet pods on stale node IPs are recreated", "reversible": True,
            "needs_scope": "local hub kubeconfig"},
     "r9": {"key": "r9", "name": "Reapply ApplicationSets pinned to deploy/hub",
            "precondition": _r9_precondition, "build_command": _r9_command, "cwd": ROOT,
+           "reads": ("values_branch",),
            "blast_radius": "every k3d-manager-sourced Application on the hub and app cluster re-targets deploy/hub and syncs",
            "reversible": False, "needs_scope": "local hub kubeconfig"},
     "r10": {"key": "r10", "name": "Delete failed Jobs superseded by a newer CronJob spec",
             "precondition": _r10_precondition, "build_command": _r10_command, "cwd": None,
+            "reads": ("superseded_jobs",),
             "blast_radius": "named failed Job objects (and their finished pods) in one allowlisted namespace; CronJobs untouched",
             "reversible": False, "needs_scope": "local hub kubeconfig"},
 }
@@ -283,7 +339,13 @@ def propose(records, state):
         action_id = f"{key}-" + hashlib.sha1((key + command).encode()).hexdigest()[:8]
         proposal = {"action_id": action_id, "key": key, "name": repair["name"],
                     "command": command, "blast_radius": repair["blast_radius"],
-                    "proposed_at": proposed_at, "evidence": _evidence(records, key)}
+                    "proposed_at": proposed_at,
+                    "expires_at": (_parse_utc(proposed_at) + PROPOSAL_TTL).isoformat().replace("+00:00", "Z"),
+                    "records_digest": _records_digest(records, repair["reads"]),
+                    "hermes_revision": _git_revision("HEAD"),
+                    "deploy_hub_revision": (_git_revision("refs/remotes/origin/deploy/hub")
+                                             if key == "r9" else ""),
+                    "evidence": _evidence(records, key)}
         pending[action_id] = proposal
         proposals.append(proposal)
     return proposals
@@ -310,6 +372,18 @@ def approve(action_id, state, records_now, runner):
         return {"outcome": "refused: action is not allowlisted", "action_id": action_id}
     if key in state.get("repairs_attempted_this_incident", []):
         return {"outcome": "refused: repair already attempted this incident", "action_id": action_id}
+    if _expired(proposal):
+        return {"outcome": "refused: proposal expired", "action_id": action_id}
+    current_revision = _git_revision("HEAD")
+    if not proposal.get("hermes_revision") or not current_revision or proposal["hermes_revision"] != current_revision:
+        return {"outcome": "refused: Hermes code revision changed", "action_id": action_id}
+    if key == "r9":
+        stored_deploy = proposal.get("deploy_hub_revision", "")
+        current_deploy = _git_revision("refs/remotes/origin/deploy/hub")
+        if not stored_deploy or not current_deploy:
+            return {"outcome": "refused: deploy-ref-unknown", "action_id": action_id}
+        if stored_deploy != current_deploy:
+            return {"outcome": "refused: deploy-ref-moved", "action_id": action_id}
     history = state.setdefault("correlation_history", [])
     if not repair["precondition"](records_now, history, state):
         return {"outcome": "refused: precondition no longer holds", "action_id": action_id}
@@ -317,8 +391,10 @@ def approve(action_id, state, records_now, runner):
         return {"outcome": "refused: webhook LaunchAgent not present", "action_id": action_id}
 
     argv, env = repair["build_command"](records_now)
-    if key == "r10" and shlex.join(argv) != proposal["command"]:
-        return {"outcome": "refused: target set changed since proposal", "action_id": action_id}
+    if shlex.join(argv) != proposal["command"]:
+        return {"outcome": "refused: command changed since proposal", "action_id": action_id}
+    if proposal.get("records_digest") != _records_digest(records_now, repair["reads"]):
+        return {"outcome": "refused: sensor records changed since proposal", "action_id": action_id}
     if key == "r4" and not env.get("GH_TOKEN"):
         return {"outcome": "skipped: hermes GitHub token unavailable", "action_id": action_id}
     command = shlex.join(argv)
