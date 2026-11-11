@@ -48,6 +48,20 @@ refuse with a distinct outcome when any of them differs or the proposal has expi
 comparison to every repair, and post the refusal to the thread so the operator sees why. Keep the button value
 (`action_id|nonce`) and the `action_id` format unchanged, so the relay worker contract does not move.
 
+### Clarification (Claude, 2026-11-11, answering the worker's question)
+
+- **Source of the r9 `deploy/hub` commit:** `git rev-parse --verify --quiet 'refs/remotes/origin/deploy/hub^{commit}'`
+  run in the Hermes checkout. On the hub that ref is kept current by checkout-auto-sync's 5-minute fetch. Do not fetch
+  at `propose` or `approve` (no network calls from the approval path).
+- **Repo root:** resolve it from the module's own path (`Path(__file__)`), never from the current directory. Use one
+  helper for both the code revision (`HEAD`) and the deploy ref.
+- **Fail closed:** if the ref cannot be resolved at `propose`, store an empty value. At `approve`, refuse an r9
+  proposal whose stored or current deploy commit is empty (`refused: deploy-ref-unknown`), or when they differ
+  (`refused: deploy-ref-moved`). Other repairs do not read the deploy ref.
+- **Tests:** point the helper at a scratch git repo (monkeypatch its root). Create `refs/remotes/origin/deploy/hub` with
+  `git update-ref`; move it between `propose` and `approve` for the refusal case. First assert the root is the scratch
+  repo and not this checkout.
+
 ## Files
 
 | File | Change |
