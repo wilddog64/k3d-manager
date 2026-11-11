@@ -2,12 +2,13 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-10 (P3 batch with the agent-cost P3; WIP 3/3)
 **Introduced by:** pre-existing: `MODEL_IDENTITY_ALLOWLIST` was not updated when Flash 3.8 dispatches began (first: `2026-11-02-hub-data-export-never-ran`)
 **Should have been caught by:** review (the dispatch that first used `gemini-3.8-flash-medium` did not check the Worker column)
 **Prior art:** exact-slug glob: none; `ls docs/bugs | grep allowlist`: two unrelated docs. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10)
 **Severity:** reporting only. The ledger records the exact model; the dashboard hides it. Workaround: read `<run>/model` or the ledger `start` event.
 **Approval:** Claude, 2026-11-10 (operator asked: "for agent can we show what agy model for a particular spec")
+**Intent approved:** operator, 2026-11-10 ("intent approved", E1-E3)
 **Filed:** 2026-11-10
 **Detected by:** Claude, answering the operator's question about the Agent Dispatch "Landed specs" table
 **Branch:** `k3d-manager-v1.43.15`
