@@ -105,3 +105,15 @@ Before your last message, do all of these and paste the evidence:
 - Batch with `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md` (same file, both P3; CLAUDE.md
   P3 batching).
 - Until it lands: run `/hermes-auth` before pressing a card's button. A reauth lasts 24h.
+
+## Recurrence 2026-11-11: the reply does not say the decision was refused
+
+- The operator pressed **Deny** on `r9-d9add2e2` (values_branch reapply, 11:53 PST) with an expired re-auth. The only reply
+  was `🔐 Re-authenticate first: run /hermes-auth (valid for 24h)` (`workers/slack-relay/index.js:268`). Operator:
+  "this is confusing as I don't know my denial is working or not".
+- Nothing was recorded (the KV write happens only after the re-auth check), so the proposal simply expired after 30 min.
+- Add to the fix: the refusal names the action and the outcome, e.g. `🔐 Your Deny of r9-d9add2e2 was NOT recorded:
+  re-authenticate with /hermes-auth, then press again (expires HH:MM)`, and keeps the card's buttons (the original bug).
+  A successful Deny should also reply as plainly as Approve does (`replaceResponseUrl … denied by <@user>`).
+  Acceptance: a test per refusal path (no KV, not allowed, no re-auth) asserting the reply contains the action ID and
+  "NOT recorded".
