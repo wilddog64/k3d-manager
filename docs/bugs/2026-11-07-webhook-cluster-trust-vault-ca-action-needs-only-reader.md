@@ -1,9 +1,9 @@
 # Bug: `POST /api/v1/cluster {"action": "trust-vault-ca"}` is authorized for a reader token
 
-**Status:** LANDED `d4dbe1ac` 2026-11-07 (Luna; Claude review tightened the flag check to `bool()`, matching `do_POST`). Offline: 31/31 pass; 4 fail on pre-fix code, N1 included
+**Status:** LIVE-VERIFIED 2026-11-11 — Claude POSTed `{"action": "trust-vault-ca"}` to `https://webhook.3ai-talk.org/api/v1/cluster` with the reader token (Keychain `k3dm-webhook-token-reader` on the M4, sent over stdin) at 02:22:10Z: `http=403`, body `{"error":"forbidden: cluster-trust-vault-ca requires role admin"}`; the M5 webhook checkout is `b635d07d`, which contains the fix (E2). Was: LANDED `d4dbe1ac` 2026-11-07 (Luna; Claude review tightened the flag check to `bool()`, matching `do_POST`). Offline: 31/31 pass; 4 fail on pre-fix code, N1 included
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-07
 **Fix commit:** `d4dbe1ac`
+**Live evidence:** 2026-11-11 · run claude-reader-post-0222z · env m5-air · scenario reader-token-trust-vault-ca-forbidden · commit b635d07d · proves E2
 **Introduced by:** `ecae8a73` (v1.43.14)
 **Should have been caught by:** review
 **Severity:** medium — a token with the lowest role can start an admin-classed job on the hub (`bin/cluster-up --trust-vault-ca`, which can raise a SecurityAgent dialog on the hub's screen and pushes a deployment metric); no secret is exposed, because the Vault CA certificate is public
