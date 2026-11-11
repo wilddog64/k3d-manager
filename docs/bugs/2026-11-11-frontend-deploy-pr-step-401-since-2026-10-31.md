@@ -29,3 +29,16 @@ new `sha-b04f0c1f` has `libxslt-1.1.43-r4`.
 1. Operator: rotate `PACKAGES_TOKEN` (needs `pull_requests: write` and `contents: write` on the repo), or switch this step to `GITHUB_TOKEN` with `permissions: pull-requests: write`, if the repo setting allows Actions to create PRs.
 2. Make a failed main-branch publish visible: an alert or notice when the deploy step fails, so a dead token does not hide for 11 days.
 3. Check the other shopping-cart repos that open deploy PRs with the same secret.
+
+## Update 2026-11-11: PR #140 cannot reach Hostinger (Claude)
+
+#140 merged at 18:56Z (`eec4f42d`), but the live pod did not change. Hostinger's frontend is rendered from
+k3d-manager `services/shopping-cart-frontend/kustomization.yaml` on `deploy/hub`, and that overlay carries the CVE
+promoter's digest pin (`74cd3ca1`, `sha256:14bf71a5…` = `sha-54998781`, built 2026-11-10). A digest in the overlay's
+`images:` overrides the base `newTag`, so once the promoter pins an app, frontend `main` builds and deploy PRs have no
+effect until the pin moves. Correction: the live image was `sha-54998781`, not `sha-00a96173` as first recorded.
+
+Fix for this deploy: the overlay pin is bumped on `k3d-manager-v1.43.15` to `sha256:97d0b172…` (`sha-b04f0c1f`, index
+digest checked with `docker buildx imagetools inspect`, libxslt 1.1.43-r4). It is inert until promoted to `deploy/hub`.
+Open question for grooming: whether a promoter pin should be released when a newer `main` build is clean, or the
+deploy flow should update the overlay instead of the base.
