@@ -1,3 +1,4 @@
+- [x] 2026-11-11 LANDED cluster-up step 4.1 launchd-reload fix (Claude); E2 live pending.
 - [x] 2026-11-11 Filed P2 cluster-up step 4.1 launchd reload race; key-import E3 partial.
 - [x] 2026-11-11 Filed P2 ACG auto-login diagnostics (lib-foundation fix); ACG live check rerun c998511f in progress.
 - [x] 2026-11-11 trust-vault-ca reader 403 LIVE-VERIFIED; filed P3 live-verified n/a for test-only bugs.

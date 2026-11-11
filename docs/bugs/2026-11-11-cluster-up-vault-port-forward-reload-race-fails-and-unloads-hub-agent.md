@@ -1,18 +1,20 @@
 # Bug: `cluster-up` step 4.1 hits the launchd reload race (error 5), fails the run, and leaves the hub's Vault port-forward unloaded
 
-**Status:** OPEN
+**Status:** LANDED 2026-11-11 — Claude (operator: "as this is only one line fix, you can work this yourself"): step 4.1 calls `bin/launchd-reload` and fails naming `make install-vault-port-forward`. Offline: `cluster_up_vault_pf_agent.bats` 4/4; M1, M3 and N2 red on pre-fix `bin/cluster-up`, M2 (control) green; N2 red with the guard replaced by `|| true`; `launchd_reload.bats` + `cluster_up.bats` 83/83, rc 0
 **Priority:** P2 — `/cluster-up aws` on the hub fails at step 4.1 whenever `com.k3d-manager.vault-port-forward` is already loaded (the hub build loads it), and the hub loses `127.0.0.1:18200`; workaround: `make install-vault-port-forward` on the M5 restores :18200 (operator ran it 2026-11-11, http 200), then rerun `/cluster-up aws`
-**Waiting on:** operator decision — since 2026-11-11 (intent approval; release placement)
+**Waiting on:** live check — since 2026-11-11 (E2: `/cluster-up aws` on the M5 with the agent loaded)
 **Introduced by:** pre-existing (the bootout-then-bootstrap pair at `bin/cluster-up:733-734` predates the 2026-10-31 and 2026-11-03 reload-race fixes)
 **Should have been caught by:** review — the 2026-10-31 and 2026-11-03 fixes repaired the same race in their own files without sweeping the other callers
 **Severity:** medium — an unattended cluster-up fails after the AWS stack is created and k3s and ArgoCD are installed; meanwhile hub readers of :18200 lose Vault (webhook smoke `scripts/lib/webhook/smoke.py:184`, `scripts/plugins/observability.sh:98,351`, `bin/argocd-app-sync:112`, `bin/hub-restore:78`, `bin/rotate-ghcr-pat`, `bin/restore-hub-ghcr-pat`)
 **Approval:** operator 2026-11-11: "can you investigate this and file bug if necessary" (same session, ACG cluster-up investigation)
-**Intent approved:** pending
+**Intent approved:** operator 2026-11-11: "approve checks"
 **Prior art:** `docs/bugs/2026-10-31-hub-port-forward-reload-race-and-hub-migrate-entrypoint.md`, `docs/bugs/2026-11-03-observability-launchd-reload-race-and-direnv-python.md`, `docs/bugs/v1.7.1-bugfix-launchd-ensure-bootout-before-bootstrap.md`, `docs/issues/2026-09-16-restart-webhook-bootstrap-io-error.md` — read; same race, different callers, all fixed locally; this is a recurrence at a caller none of them changed (`make find-similar-docs` not run: vector store unreachable from the M4)
 **Filed:** 2026-11-11
 **Detected by:** Claude, reading operator Slack job `c998511f` on the M5
 **Affected:** `bin/cluster-up` (`:722-736`)
 **Branch:** `k3d-manager-v1.43.15`
+**Release:** v1.43.15
+**Assigned:** Claude
 
 ## Observed (M5, 2026-11-10 18:34 PST, `~/.local/share/k3d-manager/webhook-jobs/c998511f/output:395-410`)
 

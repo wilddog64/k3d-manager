@@ -730,8 +730,9 @@ if _is_mac; then
     -e "s|{{KUBECTL_PATH}}|${_vault_pf_kubectl}|g" \
     -e "s|{{HOME}}|${HOME}|g" \
     "${_vault_pf_tmpl}" > "${_vault_pf_plist}"
-  launchctl bootout "gui/$(id -u)/${_vault_pf_label}" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "${_vault_pf_plist}"
+  if ! "${REPO_ROOT}/bin/launchd-reload" "${_vault_pf_label}" "${_vault_pf_plist}"; then
+    _err "[acg-up] Vault port-forward LaunchAgent reload failed; reinstall: make install-vault-port-forward"
+  fi
   _info "[acg-up] Vault port-forward LaunchAgent installed (launchd: ${_vault_pf_label})"
 fi
 
