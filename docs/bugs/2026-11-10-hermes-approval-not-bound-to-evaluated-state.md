@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-10 (WIP 3/3)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals); `edfc9a5c` (v1.43.0) added the one exception, r10
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store unreachable, 2026-11-10). Read
@@ -14,6 +14,7 @@ showed a card can outlive the rule it was built under)
 code, than the one the operator read on the card. r9 and r10 are irreversible. The precondition re-check and the
 one-attempt-per-incident rule still apply, which is why this is P2 and not P1.
 **Approval:** operator, 2026-11-10: "yes" (file it, after a LinkedIn reader suggested binding approvals to the
+**Intent approved:** operator, 2026-11-10 ("approve P2")
 evaluated revision and policy version)
 **Filed:** 2026-11-10
 **Detected by:** external reader comment on the operator's LinkedIn post about the 2026-11-08 wrong-branch incident;
