@@ -71,3 +71,11 @@ interface:
 ## Contract readers
 
 `~/.local/share/k3d-manager/claude-usage/rollup.json`: writer and reader `bin/k3dm-dispatch-metrics` (`--claude-cache`, default at `:2768`). Others to grep in the spec. Series readers: `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml` (floor/ceiling panel, mean context per turn, cache rebuilds).
+
+## Live data point (2026-11-11)
+
+Operator saw this session auto-compact around 165K–166K on the status line, while the Agent Cost panel showed
+a ceiling of 121,601. The session transcript (`066b7ee7-…jsonl`) records two `trigger: auto` compactions with
+`preTokens` 167,539 and 167,899. The real ceiling is about 167.5K–168K; the panel's 121,601 comes from the
+warm-cache undercount described above. After the fix lands and is promoted, E-live: the ceiling panel reads
+within the 163K–171K band.
