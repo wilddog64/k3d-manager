@@ -1,8 +1,7 @@
 # Bug: Linux control setup exits on the first formula that is not installed yet
 
-**Status:** LANDED `d2cae3a6` 2026-11-10 (Luna; Claude review: new Linux case red on pre-fix and on the probe-only mutant, 147/147 under the tripwire)
+**Status:** VERIFIED — `d2cae3a6` (Luna). E2 live, Claude, M4 Vagrant VM, 2026-11-11, release head `17d42da6`: `make machine-setup ROLE=control` as k3dm-control rc 0 twice; run 1 installed Homebrew and every Linux formula, run 2 reports each of gh, git, jq, tmux, bats-core, shellcheck, yq, ripgrep, git-extras, kubernetes-cli, python@3, dtach, socat `ok`; repos k3d-manager and lib-foundation cloned
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-10 (E2 with the control-node E3 rerun, after the Vagrant P3 lands)
 **Introduced by:** `4bd764b9` (v1.43.15, `bin/k3dm-machine-setup:102`)
 **Should have been caught by:** offline test (the Linux cases in `scripts/tests/bin/machine_setup.bats` stay green; why is part of the fix)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none

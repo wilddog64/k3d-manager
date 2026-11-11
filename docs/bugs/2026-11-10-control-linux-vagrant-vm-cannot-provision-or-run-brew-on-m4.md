@@ -1,8 +1,7 @@
 # Bug: control-linux Vagrant VM cannot provision, and Homebrew crashes in it on the M4
 
-**Status:** LANDED `01985706` 2026-11-10 (round 3, Flash; landed with `--superseding` for both earlier rounds after `6d2dc472`); E2 rerun started 2026-11-10
+**Status:** VERIFIED — `01985706` (round 3, Flash). E2 live, Claude, M4, 2026-11-11: `vagrant destroy -f` + `vagrant up` rc 0, ansible_local `ok=7 changed=3 failed=0`; `vagrant provision` `changed=0`; after `vagrant reload` `/proc/cmdline` has `arm64.nosve arm64.nosme`, cpuinfo sve/sme 0; `brew --version` as k3dm-control after setup: Homebrew 7.0.13 rc 0
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-10 (E2 rerun on the M4, Claude)
 **Introduced by:** `4bd764b9` (v1.43.15, `scripts/etc/machine/vagrant/control-linux/Vagrantfile`)
 **Should have been caught by:** live check (the Vagrantfile was never run end to end before E3)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none

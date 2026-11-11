@@ -76,3 +76,12 @@ interface:
   clone under the scratchpad; for B, PATH without htpasswd; for C, PATH without helm), then green. For C also show
   N1: a `kubectl apply` through the tripwire is still blocked. Paste command, rc and proving lines. Leave changes
   uncommitted; Claude reviews and lands.
+
+## Recurrence (Claude, 2026-11-11)
+
+Control-node E3 rerun after the Vagrant P3 and the missing-formula P2 landed: fresh M4 Vagrant VM, k3dm-control's
+clone at `ad383619`, `make test` rc 2: 2040 tests, 2033 ok, 21 skip, the same 7 not ok (272, 526, 800-804). Rerun
+of those three files with `bats --print-output-on-failure` outside the tripwire: 272 `htpasswd required` (B), 526
+`git show 028b898f` CalledProcessError (A), Loki M1 `skip helm is missing` (C: skips outside the tripwire, fails
+inside). Same three causes; no new failure. E3 stays FAILED on this bug alone; Hostinger E4 stays held.
+
