@@ -2,12 +2,12 @@
 
 **Status:** OPEN — found by the independent verifier for `v1.43.15-checkout-auto-sync` (2026-11-11)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-11
+**Waiting on:** dispatch — since 2026-11-11
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing), not run
-**Approval:** pending
-**Intent approved:** pending
+**Approval:** operator, 2026-11-11 ("approved"): fix in v1.43.15
+**Intent approved:** operator, 2026-11-11
 
 ## Symptom
 
@@ -59,3 +59,13 @@ interface:
   - bin/k3dm-repo-sync (hub role, ROOT checkout)
   - make hub-sync
 ```
+
+## Worker definition of done
+
+- Edit only `bin/k3dm-repo-sync` and a new or existing test under `scripts/tests/bin/` for it.
+- Tests use a local bare origin in a scratch dir and a scratch `HOME`; Pushgateway URL `http://127.0.0.1:9`; no
+  `launchctl`, `gh` or network. Assert the fixture first (scratch HOME, bare origin path, not the real tree).
+- E1 and E3 tests shown red against the pre-fix `bin/k3dm-repo-sync` (paste the red output in your final message).
+- One mutation (drop the new refspec) shown red.
+- `shellcheck bin/k3dm-repo-sync` clean; the existing repo-sync bats suite still green.
+- Do not commit; leave the changes in the worktree.
