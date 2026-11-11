@@ -13,7 +13,7 @@
 **Detected by:** Claude, reviewing operator Slack job `eebeb490` on the M5
 **Affected:** lib-foundation `scripts/lib/acg/playwright/lib/pluralsight_login.js` (`loginWithPage`, `:108-143`), `scripts/lib/acg/acg_session_check.js` (`_main`, `:53-107`)
 **Branch:** `k3d-manager-v1.43.15` (spec); fix lands upstream in lib-foundation first, then subtree pull
-**Release:** v1.43.15 if there is room; Introduced by is `unknown`, so under the bug-triage rule it needs a workaround (stated above) and the operator's decision to move
+**Release:** carried to v1.44.0 unless it lands in v1.43.15 — operator 2026-11-11: "sounds good" (to keeping P2 and carrying it). Workaround: sign in by hand on the M5's CDP Chrome; M5 job history shows one lapse in 9 days between uses (`7bd85dcc` 2026-11-01 OK, `eebeb490` 2026-11-10 expired), and auto-login has never succeeded on the M5
 
 ## Observed (M5, 2026-11-11, job output `~/.local/share/k3d-manager/webhook-jobs/eebeb490/output`)
 
