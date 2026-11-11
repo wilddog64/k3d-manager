@@ -1,3 +1,4 @@
+- 2026-11-11: Groomed (operator "go ahead with your recommendation"): promote-smoothing part 2 is v1.44.0 plan 3 `deploy-hub-behind-alert` (K3dmPromoteWaiting names the newest CI-green SHA not on deploy/hub; reuses hub-promote green rule via new `is-green`; depends on the backlog P2; dispatch gate = M5 launchd gh auth proof). Displaced `fleet-host-cpu-memory-alerts` (fixtures unmet) to ordered backlog #1. Hermes reauth bug 2026-11-08 raised P3->P2, v1.44.0, before part 3. Part 3 after part 1 lands; cloud-session path may ship before the Slack button. Intents pending.
 - [ ] 2026-11-11 hub-promote r4 running on Flash 3.8 (r3 rejected; spec corrected `fed9081c`).
 - [x] 2026-11-11 AGENT_LOAD=0 bootout P2 VERIFIED (`bc09f24f`, live E3 m4-air).
 - [x] 2026-11-11 P3 audit: 10 P3s held for post-merge triage; Waiting on corrected. N3 TMPDIR fixture P3 filed. ideas: k3d-manager-control.
