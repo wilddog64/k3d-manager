@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-11 (P3 batch)
 **Introduced by:** `f310b4d4` (checkout-auto-sync)
 **Should have been caught by:** review (the plan defines the metric as commits behind; no test covers a diverged checkout)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10). Related: `docs/plans/v1.43.15-checkout-auto-sync.md`
@@ -10,6 +10,7 @@
 its upstream is correctly left alone, but the log says `0 after` and `k3dm_repo_sync_behind_commits` is 0, so it looks
 current. Workaround: read the `behind before` number in the log, or run `git status` in that checkout.
 **Approval:** Claude, 2026-11-10 (found on the first M4 run after the operator ran `make install-repo-sync`)
+**Intent approved:** operator, 2026-11-11 ("P2/P3 approved")
 **Filed:** 2026-11-10
 **Detected by:** Claude, first repo-sync run on the M4, 2026-11-10
 **Branch:** `k3d-manager-v1.43.15`

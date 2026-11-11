@@ -60,13 +60,20 @@ hub-sync:
 
 install-repo-sync:
 	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.local/share/k3d-manager/logs"
-	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"; fi
+	@sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist" || { echo "install-repo-sync: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist" >&2; exit 1; }
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
+	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
+	  echo "install-repo-sync: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
+	elif launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"; then \
+	  echo "install-repo-sync: OK, com.k3d-manager.repo-sync loaded; log: $(HOME)/.local/share/k3d-manager/logs/repo-sync.log"; \
+	else \
+	  echo "install-repo-sync: FAILED, launchctl bootstrap of com.k3d-manager.repo-sync did not load the agent" >&2; exit 1; \
+	fi
 
 uninstall-repo-sync:
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
-	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
+	@rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
+	@echo "uninstall-repo-sync: OK, com.k3d-manager.repo-sync unloaded and plist removed"
 
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:

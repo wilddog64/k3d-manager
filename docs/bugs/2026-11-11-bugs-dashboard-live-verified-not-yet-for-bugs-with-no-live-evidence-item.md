@@ -7,7 +7,7 @@
 **Should have been caught by:** spec
 **Severity:** low — two v1.43.15 test-only P2s sit orange "not yet" for ever, as if a live check were owed; workaround: read the doc's Acceptance block
 **Approval:** operator 2026-11-11: "go ahead to file a P3 bug and dispatch to Flash 3.8 when allow"
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-11 ("P3: intent approved")
 **Prior art:** none (Pass 1: no slug match; Pass 2 `make find-similar-docs` not run: vector store unreachable from the M4, context `k3d-k3d-cluster` missing)
 **Assigned:** Gemini Flash 3.8 (`AGENT=agy MODEL=gemini-3.8-flash-medium`)
 **Filed:** 2026-11-11

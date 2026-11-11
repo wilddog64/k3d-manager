@@ -2,12 +2,13 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-10 (intent approval)
+**Waiting on:** dispatch — since 2026-11-11 (P3 batch)
 **Introduced by:** `7253ece4` (v1.23.0, PR #112: the limiter moved after auth, deliberately; see Prior art)
 **Should have been caught by:** spec (v1.23.0 fixed the shared-bucket lockout but left failed attempts with no limit and no signal)
 **Prior art:** `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` — read, same code path, different defect: it moved `_rate_limited` after `_auth` because one global pre-auth bucket let an unauthenticated flood 429 the operator; that reason still holds and constrains this fix. `make find-similar-docs` not run (vector store unreachable: `context "k3d-k3d-cluster" does not exist`, 2026-11-10)
 **Severity:** detection and hygiene. Tokens are 256-bit random (`bin/rotate-webhook-token:9`, `openssl rand -hex 32`), so guessing is not a practical threat; the gap is that a guessing or flooding source is invisible and unbounded (log growth, CPU). Filed as P3 by Claude after reading the prior art and the token strength; proposed as P2 before that, operator may raise it.
 **Approval:** operator, 2026-11-10: "go for those three as you suggested (approved)" (filing)
+**Intent approved:** operator, 2026-11-11 ("P2/P3 approved")
 **Filed:** 2026-11-10
 **Detected by:** Fable review of `docs/plans/v1.54.0-ai-attack-surface-security-boundary-hardening.md` (finding G2); verified by Claude in code, 2026-11-10
 **Branch:** `k3d-manager-v1.43.15`
