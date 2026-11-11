@@ -3228,6 +3228,144 @@ def test_claude_context_metrics_follow_release_scoped_claude_turns():
     assert 'k3dm_claude_context_turns{window="v1.0.0",agent="main"} 1' in output
 
 
+def test_claude_context_warm_cache_equals_cold_cache_and_drops_no_series(tmp_path, monkeypatch):
+    # Proves M1, N1 (E1): exporter run twice on fixed transcripts (cold, then warm with no new lines)
+    # gets identical context series, including floor, ceiling, quantiles, and turn counts.
+    # An old cache without context_turns is treated as cold and also yields identical context series.
+    scratch_home = tmp_path / "home"
+    scratch_home.mkdir()
+    monkeypatch.setenv("HOME", str(scratch_home))
+    assert Path(os.environ["HOME"]) == scratch_home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = scratch_home / ".claude/projects"
+    projects.mkdir(parents=True)
+    assert projects.is_dir()
+    fake_repo = tmp_path / "repo"
+    fake_repo.mkdir()
+    assert fake_repo.is_dir()
+
+    now = 1_800_000_000
+    t_turn1 = now - 7200
+    t_boundary = now - 5000
+    t_turn2 = now - 3600
+
+    def turn(mid, stamp, inp, write=0):
+        usage = {"input_tokens": inp, "cache_read_input_tokens": 10,
+                 "cache_creation": {"ephemeral_5m_input_tokens": write, "ephemeral_1h_input_tokens": 0}}
+        return {"type": "assistant", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stamp)),
+                "message": {"id": mid, "model": "m", "usage": usage}}
+    boundary = {"type": "system", "subtype": "compact_boundary", "compactMetadata": {"trigger": "auto", "preTokens": 160000},
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_boundary))}
+
+    transcript = projects / "session.jsonl"
+    transcript.write_text("\n".join(json.dumps(row) for row in [
+        turn("t1", t_turn1, 100),
+        boundary,
+        turn("t2", t_turn2, 200, 50001),
+    ]) + "\n")
+
+    cache = scratch_home / "rollup.json"
+
+    # Cold run
+    ctx_cold = {}
+    rec_cold = dispatch_metrics._claude_rollup(projects, cache, ctx_cold)
+    out_cold = dispatch_metrics.render([], 0, now, claude_records=rec_cold, claude_context=ctx_cold, repo_root=fake_repo)
+
+    # Warm run (second run, no new lines)
+    ctx_warm = {}
+    rec_warm = dispatch_metrics._claude_rollup(projects, cache, ctx_warm)
+    out_warm = dispatch_metrics.render([], 0, now, claude_records=rec_warm, claude_context=ctx_warm, repo_root=fake_repo)
+
+    cold_series = [l for l in out_cold.splitlines() if l.startswith("k3dm_claude_context_")]
+    warm_series = [l for l in out_warm.splitlines() if l.startswith("k3dm_claude_context_")]
+
+    assert len(cold_series) > 0
+    assert warm_series == cold_series
+
+    # Check key metrics explicitly
+    assert 'k3dm_claude_context_ceiling_tokens{window="1d"} 50211' in out_warm
+    assert 'k3dm_claude_context_floor_tokens{window="1d"} 50211' in out_warm
+    assert 'k3dm_claude_context_turns{window="1d",agent="main"} 2' in out_warm
+    assert 'k3dm_claude_context_tokens{window="1d",agent="main",quantile="0.5"} 110' in out_warm
+    assert 'k3dm_claude_context_tokens{window="1d",agent="main",quantile="0.9"} 50211' in out_warm
+
+    # Backward compatibility: old cache with only offsets and records (no context_turns key)
+    # must be treated as cold for context turns and yield identical series.
+    raw_cache = json.loads(cache.read_text())
+    old_cache_data = {"offsets": raw_cache["offsets"], "records": raw_cache["records"]}
+    old_cache = scratch_home / "old_rollup.json"
+    old_cache.write_text(json.dumps(old_cache_data))
+    ctx_old = {}
+    rec_old = dispatch_metrics._claude_rollup(projects, old_cache, ctx_old)
+    out_old = dispatch_metrics.render([], 0, now, claude_records=rec_old, claude_context=ctx_old, repo_root=fake_repo)
+    old_series = [l for l in out_old.splitlines() if l.startswith("k3dm_claude_context_")]
+    assert old_series == cold_series
+
+    # Survival across transcript deletion: persisted context_turns survive when transcripts are deleted
+    transcript.unlink()
+    ctx_del = {}
+    rec_del = dispatch_metrics._claude_rollup(projects, cache, ctx_del)
+    out_del = dispatch_metrics.render([], 0, now, claude_records=rec_del, claude_context=ctx_del, repo_root=fake_repo)
+    del_series = [l for l in out_del.splitlines() if l.startswith("k3dm_claude_context_")]
+    assert del_series == cold_series
+
+
+def test_claude_context_ceilings_differ_across_windows(tmp_path, monkeypatch):
+    # Proves M2 (E2): a test with turns at 2h, 3d and 20d ago gets three different ceilings for 1d, 7d and 30d
+    # asserting 1d ceiling <= 7d ceiling <= 30d ceiling.
+    scratch_home = tmp_path / "home"
+    scratch_home.mkdir()
+    monkeypatch.setenv("HOME", str(scratch_home))
+    assert Path(os.environ["HOME"]) == scratch_home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = scratch_home / ".claude/projects"
+    projects.mkdir(parents=True)
+    assert projects.is_dir()
+    fake_repo = tmp_path / "repo"
+    fake_repo.mkdir()
+    assert fake_repo.is_dir()
+
+    now = 1_800_000_000
+    t_2h = now - 2 * 3600
+    t_3d = now - 3 * 86400
+    t_20d = now - 20 * 86400
+
+    def turn(mid, stamp, inp):
+        usage = {"input_tokens": inp, "cache_read_input_tokens": 0,
+                 "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 0}}
+        return {"type": "assistant", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stamp)),
+                "message": {"id": mid, "model": "m", "usage": usage}}
+
+    transcript = projects / "session.jsonl"
+    transcript.write_text("\n".join(json.dumps(row) for row in [
+        turn("t_20d", t_20d, 30000),
+        turn("t_3d", t_3d, 20000),
+        turn("t_2h", t_2h, 10000),
+    ]) + "\n")
+
+    cache = scratch_home / "rollup.json"
+
+    # Cold run
+    ctx_cold = {}
+    rec_cold = dispatch_metrics._claude_rollup(projects, cache, ctx_cold)
+    out_cold = dispatch_metrics.render([], 0, now, claude_records=rec_cold, claude_context=ctx_cold, repo_root=fake_repo)
+
+    # Warm run
+    ctx_warm = {}
+    rec_warm = dispatch_metrics._claude_rollup(projects, cache, ctx_warm)
+    out_warm = dispatch_metrics.render([], 0, now, claude_records=rec_warm, claude_context=ctx_warm, repo_root=fake_repo)
+
+    for out in (out_cold, out_warm):
+        assert 'k3dm_claude_context_ceiling_tokens{window="1d"} 10000' in out
+        assert 'k3dm_claude_context_ceiling_tokens{window="7d"} 20000' in out
+        assert 'k3dm_claude_context_ceiling_tokens{window="30d"} 30000' in out
+
+    c_1d = 10000
+    c_7d = 20000
+    c_30d = 30000
+    assert c_1d < c_7d < c_30d
+
+
 def test_claude_quota_metrics_emitted_from_usage_cache(tmp_path, capsys):
     cache = tmp_path / "statusline-usage-cache.json"
     data = {

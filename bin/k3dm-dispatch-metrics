@@ -168,8 +168,16 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
         pass
     compactions = []
     reads = []
-    context_turns = []
-    context_boundaries = []
+    cached_turns = cache.get("context_turns")
+    if isinstance(cached_turns, dict):
+        turns_by_id = dict(cached_turns)
+    elif isinstance(cached_turns, list):
+        turns_by_id = {t["id"]: t for t in cached_turns if isinstance(t, dict) and "id" in t}
+    else:
+        turns_by_id = {}
+    cached_boundaries = cache.get("context_boundaries")
+    boundaries_list = [b for b in cached_boundaries if isinstance(b, dict)] if isinstance(cached_boundaries, list) else []
+    seen_boundaries = {(b.get("session"), b.get("ts")) for b in boundaries_list}
     root = Path(projects_dir)
     if root.is_dir():
         for path in sorted(root.rglob("*.jsonl")):
@@ -211,7 +219,11 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                             pre_tokens = meta.get("preTokens")
                             pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
                             compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
-                            context_boundaries.append({"ts": item.get("timestamp"), "session": hashlib.sha256(key.encode()).hexdigest()})
+                            session_id = hashlib.sha256(key.encode()).hexdigest()
+                            b_key = (session_id, item.get("timestamp"))
+                            if b_key not in seen_boundaries:
+                                seen_boundaries.add(b_key)
+                                boundaries_list.append({"ts": item.get("timestamp"), "session": session_id})
                             before = {name: dict(ranges) for name, ranges in latest.items()}
                             segment_seen.clear()
                             continue
@@ -265,8 +277,6 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                             generation = edited[fpath]
                                             pending.setdefault(call_id, []).append((fpath, read_range, record, generation, previous))
                                             latest.setdefault(fpath, {})[read_range] = (None, generation)
-                            if line_pos < offset:
-                                continue
                             mid, model = message.get("id"), message.get("model")
                             usage = message.get("usage") or {}
                             if context_out is not None and isinstance(mid, str) and isinstance(model, str):
@@ -275,15 +285,15 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                 cache1 = creation.get("ephemeral_1h_input_tokens", 0)
                                 values = [usage.get("input_tokens", 0), usage.get("cache_read_input_tokens", 0), cache5, cache1]
                                 if all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0 for value in values):
-                                    context_turns.append({"id": mid, "ts": item.get("timestamp"), "context": sum(values),
+                                    turns_by_id[mid] = {"id": mid, "ts": item.get("timestamp"), "context": sum(values),
                                         "session": hashlib.sha256(key.encode()).hexdigest(), "subagent": "/subagents/" in key,
-                                        "model": model, "speed": usage.get("speed"), "cache_5m": cache5, "cache_1h": cache1})
+                                        "model": model, "speed": usage.get("speed"), "cache_5m": cache5, "cache_1h": cache1}
                                 if mid in cache["records"]:
                                     cached = cache["records"][mid]
                                     cached.setdefault("id", mid)
                                     cached.setdefault("subagent", "/subagents/" in key)
                                     cached.setdefault("session", hashlib.sha256(key.encode()).hexdigest())
-                            if not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
+                            if line_pos < offset or not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
                                 continue
                             creation = usage.get("cache_creation") or {}
                             cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
@@ -302,8 +312,10 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
     if context_out is not None:
         context_out["compactions"] = compactions
         context_out["reads"] = reads
-        context_out["turns"] = context_turns
-        context_out["boundaries"] = context_boundaries
+        context_out["turns"] = list(turns_by_id.values())
+        context_out["boundaries"] = boundaries_list
+        cache["context_turns"] = turns_by_id
+        cache["context_boundaries"] = boundaries_list
     target = Path(cache_path)
     temp = None
     try:
