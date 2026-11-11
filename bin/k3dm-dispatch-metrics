@@ -38,8 +38,9 @@ BUG_SPEC_RE = re.compile(r"^docs/bugs/(\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*)\.md
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
 MODEL_IDENTITY_ALLOWLIST = {
     "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
-    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1",
     "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+    "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high",
 }
 RUNGS = ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed")
 STATUSES = ("done", "pending", "unknown")
@@ -2005,6 +2006,39 @@ def _claude_quota(lines, cache_path):
                 lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {stamp}")
             except (ValueError, TypeError, AttributeError):
                 pass
+
+    limits = data.get("limits")
+    if isinstance(limits, list):
+        for item in limits:
+            if not isinstance(item, dict):
+                continue
+            if item.get("kind") != "weekly_scoped":
+                continue
+            scope = item.get("scope")
+            if not isinstance(scope, dict):
+                continue
+            model = scope.get("model")
+            if not isinstance(model, dict):
+                continue
+            display_name = model.get("display_name")
+            if not isinstance(display_name, str) or not display_name.strip():
+                continue
+            percent = item.get("percent")
+            if not isinstance(percent, (int, float)) or isinstance(percent, bool):
+                continue
+            limit_name = f"weekly_{display_name.strip().lower()}"
+            label = f'limit="{limit_name}",window_minutes="10080"'
+            lines.append(f"k3dm_claude_quota_used_ratio{{{label}}} {percent / 100}")
+            resets_at = item.get("resets_at")
+            if isinstance(resets_at, str):
+                try:
+                    from datetime import datetime
+                    stamp = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
+                    lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {stamp}")
+                except (ValueError, TypeError, AttributeError):
+                    pass
+            elif isinstance(resets_at, (int, float)) and not isinstance(resets_at, bool):
+                lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {resets_at}")
 
 
 def _quota_efficiency(lines, events, quota, now):

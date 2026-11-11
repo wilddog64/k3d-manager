@@ -1034,7 +1034,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 0 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed label_values and sort 8 replaced by query_result(sort_desc) and sort 0, bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 98  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets, plus 4 cost attribution targets
+    assert sum("$window" in expr for expr in expressions) == 99  # agent-audit: allow assert-removed includes unpriced claude messages target
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -2471,7 +2471,7 @@ def test_per_spec_identity_queries_give_one_row_per_task():
     assert "k3dm_dispatch_task_landing_actor" in exprs["R"]
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
-    assert organize["renameByName"]["worker"] == "Worker"
+    assert organize["renameByName"]["worker"] == "Worker model"  # agent-audit: allow assert-removed renamed Worker to Worker model per bug 2026-11-10-dispatch-table-shows-flash-and-fable-as-other
     assert organize["renameByName"]["coordinator"] == "Coordinator (legacy)"
     assert organize["renameByName"]["primary_coordinator"] == "Primary coordinator"
     assert organize["renameByName"]["acting_coordinator"] == "Acting coordinator"
@@ -3505,3 +3505,95 @@ def test_cost_attribution_coverage_and_guardian_assignment(tmp_path, monkeypatch
 def test_parent_limit_matches_dispatcher_slug_limit():
     assert dispatch_metrics.PARENT_RE.fullmatch("p" * 120)
     assert not dispatch_metrics.PARENT_RE.fullmatch("p" * 121)
+
+
+def test_claude_cost_prices_fable_at_published_rates_and_preserves_opus():
+    price_file = dispatch_metrics._repo_root() / "scripts/etc/agent/codex-model-prices.json"
+    _, _, _, claude_models = dispatch_metrics._prices(price_file)
+    now = 1_800_000_000
+    fable_rec = _claude_message("fable-1", now, model="claude-fable-5-1",
+                                input=10_000, output=1_000, cache_read=5_000,
+                                cache_5m=2_000, cache_1h=1_000)
+    opus_rec = _claude_message("opus-1", now, model="claude-opus-5-5",
+                               input=10_000, output=1_000, cache_read=5_000,
+                               cache_5m=2_000, cache_1h=1_000)
+    cost_fable = dispatch_metrics._claude_cost(fable_rec, claude_models)
+    cost_opus = dispatch_metrics._claude_cost(opus_rec, claude_models)
+    assert cost_opus == pytest.approx(0.079)
+    assert cost_fable is not None
+    assert cost_fable == pytest.approx(0.19625)
+
+
+def test_claude_quota_exports_weekly_fable_limit_and_preserves_five_hour_seven_day(tmp_path):
+    cache_path = tmp_path / "statusline-usage-cache.json"
+    cache_data = {
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-10T19:00:00+00:00"},
+        "seven_day": {"utilization": 17.0, "resets_at": "2026-11-15T19:00:00+00:00"},
+        "limits": [
+            {"kind": "session", "group": "session", "percent": 5},
+            {"kind": "weekly_all", "group": "weekly", "percent": 17},
+            {
+                "kind": "weekly_scoped",
+                "group": "weekly",
+                "percent": 1,
+                "scope": {"model": {"id": None, "display_name": "Fable"}},
+                "resets_at": "2026-11-12T22:00:00.023023+00:00",
+                "is_active": False,
+            },
+        ],
+    }
+    cache_path.write_text(json.dumps(cache_data), encoding="utf-8")
+    lines = []
+    dispatch_metrics._claude_quota(lines, str(cache_path))
+    output = "\n".join(lines)
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output
+    assert 'k3dm_claude_quota_used_ratio{limit="weekly_fable",window_minutes="10080"} 0.01' in output
+    assert 'k3dm_claude_quota_resets_at_seconds{limit="weekly_fable",window_minutes="10080"}' in output
+
+    cache_path_no_limits = tmp_path / "cache_no_limits.json"
+    cache_path_no_limits.write_text(json.dumps({
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-10T19:00:00+00:00"},
+        "seven_day": {"utilization": 17.0, "resets_at": "2026-11-15T19:00:00+00:00"},
+    }), encoding="utf-8")
+    lines2 = []
+    dispatch_metrics._claude_quota(lines2, str(cache_path_no_limits))
+    output2 = "\n".join(lines2)
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output2
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output2
+    assert "weekly_fable" not in output2
+
+
+def test_model_identity_allowlists_flash_fable_and_normalizes_unknown_models():
+    output = dispatch_metrics.render([
+        event(1, "start", "flash-run", agent="agy",
+              worker_identity={"vendor": "google", "model": "gemini-3.8-flash-medium", "source": "explicit", "status": "selected"}),
+        event(2, "agent_exit", "flash-run", usage={"total_tokens": 100}),
+        event(3, "land", "flash-run"),
+        event(4, "start", "fable-run", agent="agy",
+              worker_identity={"vendor": "anthropic", "model": "claude-fable-5-1", "source": "explicit", "status": "selected"}),
+        event(5, "agent_exit", "fable-run", usage={"total_tokens": 100}),
+        event(6, "land", "fable-run"),
+        event(7, "start", "luna-run", agent="codex",
+              worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "explicit", "status": "selected"}),
+        event(8, "codex_exit", "luna-run", tokens=100),
+        event(9, "land", "luna-run"),
+        event(10, "start", "madeup-run", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unreal-ai-model-x", "source": "explicit", "status": "selected"}),
+        event(11, "codex_exit", "madeup-run", tokens=100),
+        event(12, "land", "madeup-run"),
+    ], 0, 100)
+    lines = [line for line in output.splitlines() if line.startswith('k3dm_dispatch_model_identity{window="1d",') and 'role="worker"' in line]
+    by_slug = {}
+    for line in lines:
+        for slug in ("flash-run", "fable-run", "luna-run", "madeup-run"):
+            if f'slug="{slug}"' in line:
+                by_slug[slug] = line
+    assert 'model="gemini-3.8-flash-medium"' in by_slug["flash-run"]
+    assert 'display="google/gemini-3.8-flash-medium (selected)"' in by_slug["flash-run"]
+    assert 'model="claude-fable-5-1"' in by_slug["fable-run"]
+    assert 'display="anthropic/claude-fable-5-1 (selected)"' in by_slug["fable-run"]
+    assert 'model="gpt-6-luna"' in by_slug["luna-run"]
+    assert 'display="openai/gpt-6-luna (selected)"' in by_slug["luna-run"]
+    assert 'model="other"' in by_slug["madeup-run"]
+    assert 'display="openai/other (selected)"' in by_slug["madeup-run"]

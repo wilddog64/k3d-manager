@@ -723,14 +723,14 @@ data:
                   "slug": 1,
                   "repo": 2,
                   "agent": 3,
-                  "Value #A": 4,
-                  "Value #B": 5,
-                  "Value #C": 6,
-                  "Value #J": 7,
-                  "Value #D": 8,
-                  "Value #F": 9,
-                  "Value #G": 10,
-                  "worker": 11,
+                  "worker": 4,
+                  "Value #A": 5,
+                  "Value #B": 6,
+                  "Value #C": 7,
+                  "Value #J": 8,
+                  "Value #D": 9,
+                  "Value #F": 10,
+                  "Value #G": 11,
                   "coordinator": 12,
                   "primary_coordinator": 13,
                   "acting_coordinator": 14,
@@ -757,7 +757,7 @@ data:
                   "Value #D": "Runs",
                   "Value #F": "API equiv.",
                   "Value #G": "Claude ≈",
-                  "worker": "Worker",
+                  "worker": "Worker model",
                   "coordinator": "Coordinator (legacy)",
                   "primary_coordinator": "Primary coordinator",
                   "acting_coordinator": "Acting coordinator",
@@ -816,7 +816,7 @@ data:
                {
                  "matcher": {
                    "id": "byName",
-                   "options": "Worker"
+                   "options": "Worker model"
                  },
                  "properties": [
                    {

@@ -583,7 +583,7 @@ data:
           "description": "Claude Code usage priced at Anthropic API list rates; not the subscription bill. A time window counts every message in it, including spec writing, design and discussion. A release counts only messages sent while one of its specs was between dispatch and land, split across specs that overlap. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.",
           "gridPos": {
             "h": 6,
-            "w": 6,
+            "w": 4,
             "x": 0,
             "y": 13
           },
@@ -610,6 +610,56 @@ data:
           }
         },
         {
+          "id": 119,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Unpriced messages",
+          "description": "Count of Claude messages from unpriced models in the selected window. The Claude API-equivalent cost excludes those messages.",
+          "gridPos": {
+            "h": 6,
+            "w": 4,
+            "x": 4,
+            "y": 13
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_claude_unpriced_messages{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
           "id": 29,
           "type": "stat",
           "options": {
@@ -621,8 +671,8 @@ data:
           "description": "Release scope only; time windows show no data, because their total is all Claude work, not only dispatch work. Claude at API prices divided by the release's landed specs. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.",
           "gridPos": {
             "h": 6,
-            "w": 6,
-            "x": 6,
+            "w": 4,
+            "x": 8,
             "y": 13
           },
           "datasource": {
@@ -1459,6 +1509,128 @@ data:
               }
             },
             "overrides": []
+          }
+        },
+        {
+          "id": 120,
+          "type": "row",
+          "title": "Fable",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 74
+          }
+        },
+        {
+          "id": 121,
+          "type": "barchart",
+          "title": "Fable tokens per day",
+          "description": "Daily token volume for claude-fable-5-1 on its own axis. Last 30 days.",
+          "gridPos": {
+            "h": 8,
+            "w": 18,
+            "x": 0,
+            "y": 75
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (date) (k3dm_dispatch_claude_daily_tokens{model=\"claude-fable-5-1\"})",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "Value": "Tokens"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "xField": "date",
+            "showValue": "never",
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
+        },
+        {
+          "id": 122,
+          "type": "gauge",
+          "title": "Fable weekly limit",
+          "description": "Fable weekly scoped limit and reset time, from statusline cache.",
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 75
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_quota_used_ratio{limit=\"weekly_fable\"}",
+              "instant": true,
+              "legendFormat": "used"
+            },
+            {
+              "expr": "k3dm_claude_quota_resets_at_seconds{limit=\"weekly_fable\"} * 1000",
+              "instant": true,
+              "legendFormat": "resets at"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.7
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "resets at"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeFromNow"
+                  }
+                ]
+              }
+            ]
           }
         }
       ]
