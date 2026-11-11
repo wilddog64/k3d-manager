@@ -1,7 +1,7 @@
 # Bug: `cluster-up` step 4.1 hits the launchd reload race (error 5), fails the run, and leaves the hub's Vault port-forward unloaded
 
 **Status:** OPEN
-**Priority:** P2 — `/cluster-up aws` on the hub fails at step 4.1 whenever `com.k3d-manager.vault-port-forward` is already loaded (the hub build loads it), and the hub loses `127.0.0.1:18200`; workaround: rerun `/cluster-up aws` (the agent is then unloaded, so the bootout is a no-op and the bootstrap succeeds and reinstalls it)
+**Priority:** P2 — `/cluster-up aws` on the hub fails at step 4.1 whenever `com.k3d-manager.vault-port-forward` is already loaded (the hub build loads it), and the hub loses `127.0.0.1:18200`; workaround: `make install-vault-port-forward` on the M5 restores :18200 (operator ran it 2026-11-11, http 200), then rerun `/cluster-up aws`
 **Waiting on:** operator decision — since 2026-11-11 (intent approval; release placement)
 **Introduced by:** pre-existing (the bootout-then-bootstrap pair at `bin/cluster-up:733-734` predates the 2026-10-31 and 2026-11-03 reload-race fixes)
 **Should have been caught by:** review — the 2026-10-31 and 2026-11-03 fixes repaired the same race in their own files without sweeping the other callers
@@ -39,12 +39,13 @@ Read-only checks on the M5 right after:
 
 ## Fix
 
-In `bin/cluster-up` step 4.1 only:
-1. After the bootout, poll `launchctl print "gui/$(id -u)/${_vault_pf_label}"` until it exits non-zero, at most `LAUNCHD_RELOAD_TRIES` (default 30) times, `sleep 0.2` apart. This is the 2026-10-31 approach.
-2. Then bootstrap. If it fails with exit 5, retry up to 3 times, 0.5 s apart. Any other exit, or a 4th failure, fails the step with: `Vault port-forward LaunchAgent bootstrap failed (exit N); reinstall: launchctl bootstrap gui/$(id -u) <plist>`.
-3. After bootstrap, confirm `launchctl print` exits 0 for the label before printing "installed".
+In `bin/cluster-up` step 4.1 only, replace the raw pair at `:733-734` with the repo's existing helper, which the Makefile already uses for this same agent (`Makefile:687`, `make install-vault-port-forward`) and five others:
 
-Do not change the plist template, the label, the transient port-forward (`:690-720`), or any other file's launchctl calls.
+    "${REPO_ROOT}/bin/launchd-reload" "${_vault_pf_label}" "${_vault_pf_plist}"
+
+`bin/launchd-reload` boots out the label (treating exit 3, not loaded, as fine), polls `launchctl print` until the label is gone (`LAUNCHD_RELOAD_TRIES`, default 30, `LAUNCHD_RELOAD_WAIT` 0.5 s), then bootstraps. When it fails, step 4.1 fails with: `Vault port-forward LaunchAgent reload failed; reinstall: make install-vault-port-forward`. Do not add a bootstrap retry. The operator ran `make install-vault-port-forward` on the M5 on 2026-11-11 with the agent unloaded, and it reloaded cleanly: `launchctl list` shows the label at PID 10215, and :18200 `/v1/sys/health` returns http 200.
+
+Do not change `bin/launchd-reload`, the plist template, the label, the transient port-forward (`:690-720`), or any other file's launchctl calls.
 
 ## Files
 
@@ -62,30 +63,28 @@ The LaunchAgent label `com.k3d-manager.vault-port-forward` and its plist path (f
 
 ## Not in scope (same raw pattern, not seen failing)
 
-The same raw bootout-then-bootstrap pair is at `bin/k3dm-webhook-setup:105-106`, `scripts/plugins/hub_data.sh:517-518`, `scripts/plugins/hub_snapshot.sh:354-355` and `scripts/plugins/vault.sh:1408-1409`. That this is the third local fix of the same race argues for one shared helper. It goes in `docs/ideas.md` as a row, not in this spec.
+The same raw bootout-then-bootstrap pair is at `bin/k3dm-webhook-setup:105-106`, `scripts/plugins/hub_data.sh:517-518`, `scripts/plugins/hub_snapshot.sh:354-355` and `scripts/plugins/vault.sh:1408-1409`. The shared helper already exists (`bin/launchd-reload`); moving those four callers to it goes in `docs/ideas.md` as a row, not in this spec.
 
 ## Acceptance
 
 ```yaml
 must:
   - id: M1
-    text: "when the label is still listed for a few polls after bootout (stub launchctl print exits 0 twice, then 113), cluster-up waits, then bootstraps once and prints 'installed'"
+    text: "when the label is still listed for a few polls after bootout (stub launchctl print exits 0 twice, then 113), step 4.1 waits, bootstraps once, and prints 'installed' (paired positive control for N1)"
   - id: M2
-    text: "when bootstrap fails with exit 5 once and then succeeds, step 4.1 succeeds (paired positive control for N1)"
+    text: "when the label is not loaded (bootout exits 3, print exits 113 at once), bootstrap runs once"
   - id: M3
-    text: "when the label is not loaded at all (print exits 113 at once), bootstrap runs once with no extra wait"
+    text: "step 4.1 calls bin/launchd-reload with the label and the plist path, and makes no direct launchctl bootstrap call of its own"
 must_not:
   - id: N1
-    text: "a single exit-5 bootstrap failure ends the run (red on pre-fix cluster-up)"
+    text: "bootstrap is called while launchctl print still reports the label loaded (red on pre-fix cluster-up: the stub records bootstrap right after bootout)"
   - id: N2
-    text: "step 4.1 prints 'installed' when launchctl print of the label exits non-zero after bootstrap"
-  - id: N3
-    text: "bootstrap is retried for an exit code other than 5 (stub exit 37 fails the step at once, naming exit 37)"
+    text: "step 4.1 prints 'installed' when bin/launchd-reload exits non-zero (label never drops, or bootstrap exits 5); it fails naming make install-vault-port-forward"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1, N2, N3]
+    proves: [M1, M2, M3, N1, N2]
     kind: offline
-    intent: "tests run the real step 4.1 with a fake launchctl that is slow to drop the old agent or refuses once with error 5: cluster-up waits or retries and the agent ends up loaded, while any other error, or an agent that isn't really loaded, still fails the step"
+    intent: "tests run the real step 4.1 with a fake launchctl that is slow to drop the old agent: cluster-up waits until it is gone before starting the new one, and if the reload still fails the step stops and tells you to run make install-vault-port-forward instead of claiming success"
   - id: E2
     proves: [M1, N1]
     kind: live
