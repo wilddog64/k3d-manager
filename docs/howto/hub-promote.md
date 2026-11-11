@@ -40,8 +40,21 @@ make appsets-check
 make platform-ops
 ```
 
-If GitHub checks are unavailable during an outage, `BREAK_GLASS=1` skips only
-the check-run gate. The commit must still be on `origin`, and the terminal
+`make hub-promote` verifies that `deploy/hub` does not contain commits missing
+from the target ref (such as image-pin commits written to `deploy/hub` by the CVE
+promoter). If any uncontained commits exist, the promote refuses, lists each
+dropped commit subject, and prints the command to carry them over:
+
+```sh
+git cherry-pick -x <commit-sha>
+```
+
+Cherry-pick the commits onto the release branch, push to `origin`, wait for CI
+checks to pass, and re-run `make hub-promote`.
+
+If GitHub checks are unavailable during an outage or you must intentionally
+discard uncontained commits, `BREAK_GLASS=1` skips the check-run gate and the
+containment refusal. The commit must still be on `origin`, and the terminal
 confirmation and promotion record are still required:
 
 ```sh
@@ -53,9 +66,17 @@ make hub-promote REF=<commit-ish> BREAK_GLASS=1
 `make hub-rollback` uses the promotion tags as a stack: after promoting A, B and
 C, successive rollbacks move to B and then A. When you want to move forward
 again, promote that commit explicitly with `make hub-promote REF=<commit-ish>`.
+If `deploy/hub` holds promoter commits added after the last promotion (not in
+the promotion stack top), `make hub-rollback` refuses and lists them unless
+overridden with `BREAK_GLASS=1`:
+
+```sh
+make hub-rollback BREAK_GLASS=1
+```
 
 `make hub-promote-status` prints the current hub SHA, the last three promotion
-tags, and the current release branch's ahead count. It does not change refs.
+tags, the current release branch's ahead count, and any uncontained commits on
+`deploy/hub` not yet in the release branch. It does not change refs.
 
 `make appsets-reapply` pins both ApplicationSet stages to `deploy/hub`, even
 when run from a feature or release checkout. Use `APPSETS_STAGE=hub` to apply

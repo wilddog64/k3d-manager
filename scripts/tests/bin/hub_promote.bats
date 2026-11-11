@@ -538,3 +538,125 @@ REF: $promoted"
   [ "$status" -eq 0 ]
   grep -q COMMITTED_CONTROL "$KUBECTL_CAPTURE"
 }
+
+_create_promoter_commit_on_hub() {
+  local msg="${1:-fix(cve): pin shopping-cart-frontend to sha256:14bf71a5}"
+  git -C "$WORK" fetch -q origin deploy/hub
+  git -C "$WORK" checkout -q -B deploy/hub origin/deploy/hub
+  printf 'sha256:14bf71a5\n' > "$WORK/cve-pin.txt"
+  git -C "$WORK" add cve-pin.txt
+  git -C "$WORK" commit -qm "$msg"
+  PROMOTER_SHA="$(git -C "$WORK" rev-parse HEAD)"
+  git -C "$WORK" push -q origin HEAD:refs/heads/deploy/hub
+}
+
+@test "N1: promote refuses when deploy/hub contains uncontained promoter commit (E1)" {
+  [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
+  [ "$ORIGIN" != *"github.com"* ]
+  _make_candidate
+  _create_promoter_commit_on_hub
+  promoter_sha="$PROMOTER_SHA"
+  promoter_short="$(git -C "$WORK" rev-parse --short "$promoter_sha")"
+  hub_before="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
+  [ "$hub_before" = "$promoter_sha" ]
+
+  # Promotion without BREAK_GLASS must refuse and name the dropped commit
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"$promoter_short"* ]]
+  [[ "$output" == *"fix(cve): pin shopping-cart-frontend"* ]]
+  [[ "$output" == *"git cherry-pick -x"* ]]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$hub_before" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+
+  # BREAK_GLASS=1 skips containment refusal
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 1
+  [ "$status" -eq 0 ]
+  new_head="$(git -C "$WORK" rev-parse refs/remotes/origin/k3d-manager-v1.43.15)"
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$new_head" ]
+  tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}')"
+  git -C "$WORK" fetch -q origin "$tag_ref"
+  [[ "$(git -C "$WORK" cat-file -p FETCH_HEAD)" == *"mode: break-glass"* ]]
+}
+
+@test "M1: promote succeeds when target contains promoter commit by cherry-pick" {
+  [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
+  [ "$ORIGIN" != *"github.com"* ]
+  _make_candidate
+  _create_promoter_commit_on_hub
+  promoter_sha="$PROMOTER_SHA"
+  git -C "$WORK" checkout -q k3d-manager-v1.43.15
+  git -C "$WORK" cherry-pick -x "$promoter_sha"
+  candidate_sha="$(git -C "$WORK" rev-parse HEAD)"
+  git -C "$WORK" push -q origin HEAD:refs/heads/k3d-manager-v1.43.15
+
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$candidate_sha" ]
+  tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}')"
+  [ -n "$tag_ref" ]
+}
+
+@test "M1 positive control: promote succeeds when target contains deploy/hub by ancestry" {
+  [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
+  [ "$ORIGIN" != *"github.com"* ]
+  git -C "$WORK" checkout -q deploy/hub
+  git -C "$WORK" checkout -qb feature/ancestor-candidate
+  printf 'feature on deploy/hub\n' > "$WORK/anc.txt"
+  git -C "$WORK" add anc.txt
+  git -C "$WORK" commit -qm 'anc commit'
+  anc_sha="$(git -C "$WORK" rev-parse HEAD)"
+  git -C "$WORK" push -q origin HEAD:refs/heads/feature/ancestor-candidate
+
+  _run_promoter_tty promote success promote feature/ancestor-candidate 0
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$anc_sha" ]
+}
+
+@test "N2: rollback refuses promoter commits not in stack top; BREAK_GLASS=1 permits (E3)" {
+  [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
+  [ "$ORIGIN" != *"github.com"* ]
+  _prepare_promotion_history
+  _promote_sha "$A_SHA"
+  _promote_sha "$B_SHA"
+
+  _create_promoter_commit_on_hub "fix(cve): pin service to sha256:2222"
+  promoter_sha="$PROMOTER_SHA"
+  promoter_short="$(git -C "$WORK" rev-parse --short "$promoter_sha")"
+  hub_before="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
+  [ "$hub_before" = "$promoter_sha" ]
+
+  # Rollback without BREAK_GLASS must refuse and name the promoter commit
+  _run_promoter_tty promote empty rollback
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"$promoter_short"* ]]
+  [[ "$output" == *"fix(cve): pin service"* ]]
+  [[ "$output" == *"git cherry-pick -x"* ]]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$hub_before" ]
+
+  # Rollback with BREAK_GLASS=1 succeeds and returns to earlier promotion
+  _run_promoter_tty promote empty rollback 1
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$A_SHA" ]
+  tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}' | sort -r | head -1)"
+  git -C "$WORK" fetch -q origin "$tag_ref"
+  tag_data="$(git -C "$WORK" cat-file -p FETCH_HEAD)"
+  grep -Fxq 'action: rollback' <<< "$tag_data"
+  grep -Fxq "new: $A_SHA" <<< "$tag_data"
+  [[ "$tag_data" == *"mode: break-glass"* ]]
+}
+
+@test "status reports uncontained commits on deploy/hub" {
+  [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
+  [ "$ORIGIN" != *"github.com"* ]
+  _make_candidate
+  _create_promoter_commit_on_hub "fix(cve): pin shopping-cart to sha256:abcd"
+  promoter_sha="$PROMOTER_SHA"
+  promoter_short="$(git -C "$WORK" rev-parse --short "$promoter_sha")"
+
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" RELEASE_BRANCH=k3d-manager-v1.43.15 PATH="$PATH" "$WORK/bin/k3dm-hub-promote" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"uncontained commits on deploy/hub"* ]]
+  [[ "$output" == *"$promoter_short"* ]]
+  [[ "$output" == *"carry them over: git cherry-pick -x"* ]]
+}

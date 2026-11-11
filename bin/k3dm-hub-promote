@@ -18,6 +18,29 @@ GH_REPO="${GH_REPO:-wilddog64/k3d-manager}"
 die() { printf '[hub-promote] ERROR: %s\n' "$*" >&2; exit 1; }
 git_cmd() { _run_command --soft -- git -C "$REPO_ROOT" "$@"; }
 
+uncontained_commits() {
+  local target="$1" old="$2"
+  if [[ "$old" =~ ^0+$ || -z "$target" || -z "$old" ]]; then
+    return 0
+  fi
+  git_cmd cherry "$target" "$old" 2>/dev/null | awk '$1 == "+" {print $2}' || true
+}
+
+print_uncontained_list() {
+  local c short subj
+  for c in "$@"; do
+    short="$(git_cmd rev-parse --short "$c" 2>/dev/null || printf '%s' "$c")"
+    subj="$(git_cmd log -1 --format='%s' "$c" 2>/dev/null || printf '(no subject)')"
+    printf '  %s %s\n' "$short" "$subj"
+  done
+  local cp_cmd="git cherry-pick -x"
+  for c in "$@"; do
+    short="$(git_cmd rev-parse --short "$c" 2>/dev/null || printf '%s' "$c")"
+    cp_cmd+=" $short"
+  done
+  printf '[hub-promote] carry them over: %s\n' "$cp_cmd"
+}
+
 remote_sha() {
   local allow_missing="${1:-0}"
   local rows sha
@@ -112,12 +135,26 @@ status() {
   if [[ -z "$release" ]]; then release=main; fi
   ahead="$(git_cmd rev-list --count "$sha..$release" 2>/dev/null || printf '?')"
   printf '[hub-promote] %s ahead of deploy/hub: %s\n' "$release" "$ahead"
+  local rel_sha
+  rel_sha="$(git_cmd rev-parse --verify "refs/remotes/$REMOTE/$release^{commit}" 2>/dev/null || git_cmd rev-parse --verify "$release^{commit}" 2>/dev/null || true)"
+  if [[ -n "$rel_sha" ]]; then
+    local -a uncontained=()
+    while IFS= read -r c; do
+      [[ -n "$c" ]] && uncontained+=("$c")
+    done < <(uncontained_commits "$rel_sha" "$sha")
+    if (( ${#uncontained[@]} > 0 )); then
+      printf '[hub-promote] uncontained commits on deploy/hub:\n'
+      print_uncontained_list "${uncontained[@]}"
+    fi
+  fi
 }
 
 rollback() {
+  local break_glass="${1:-0}"
   local old target tag tag_data action sha top
   local -a tags=()
   local -a stack=()
+  git_cmd fetch "$REMOTE" --prune
   old="$(remote_sha)"
   mapfile -t tags < <(git_cmd ls-remote --tags "$REMOTE" "refs/tags/${TAG_PREFIX}*" | awk '$2 !~ /\^\{\}$/ {print $2}' | sort -k1,1)
   for tag in "${tags[@]}"; do
@@ -141,17 +178,38 @@ rollback() {
     esac
   done
   (( ${#stack[@]} >= 2 )) || die 'there is no earlier promotion to return to'
-  [[ "${stack[${#stack[@]}-1]}" == "$old" ]] || die 'deploy/hub does not match the promotion stack top'
+  top="${stack[${#stack[@]}-1]}"
+  if [[ "$old" != "$top" ]]; then
+    if ! git_cmd merge-base --is-ancestor "$top" "$old" 2>/dev/null; then
+      die 'deploy/hub does not match the promotion stack top'
+    fi
+  fi
+  local -a uncontained=()
+  while IFS= read -r c; do
+    [[ -n "$c" ]] && uncontained+=("$c")
+  done < <(uncontained_commits "$top" "$old")
+  if (( ${#uncontained[@]} > 0 )); then
+    if [[ "$break_glass" != 1 ]]; then
+      printf '[hub-promote] ERROR: deploy/hub has uncontained commits not in promotion stack top %s:\n' "$top" >&2
+      print_uncontained_list "${uncontained[@]}" >&2
+      die 'deploy/hub does not match the promotion stack top'
+    fi
+  fi
   target="${stack[${#stack[@]}-2]}"
   show_and_confirm "$old" "$target" rollback
-  record_move "$old" "$target" rollback
+  record_move "$old" "$target" rollback "" "$break_glass"
 }
 
 main() {
-  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] | rollback | status'
+  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] | rollback [BREAK_GLASS=1] | status'
   case "$1" in
     status) [[ $# == 1 ]] || die 'status takes no arguments'; status ;;
-    rollback) [[ $# == 1 ]] || die 'rollback takes no arguments'; rollback ;;
+    rollback)
+      [[ $# -ge 1 && $# -le 2 ]] || die 'usage: k3dm-hub-promote rollback [BREAK_GLASS=1]'
+      local break_glass="${2:-${BREAK_GLASS:-0}}"
+      [[ "$break_glass" == 0 || "$break_glass" == 1 ]] || die 'BREAK_GLASS must be 0 or 1'
+      rollback "$break_glass"
+      ;;
     promote)
       [[ $# -ge 2 && $# -le 3 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1]'
       local ref="$2" break_glass="${3:-${BREAK_GLASS:-0}}" old new
@@ -162,6 +220,17 @@ main() {
       if [[ "$new" == "$old" ]]; then
         printf '[hub-promote] deploy/hub is already at %s; nothing to promote\n' "$new"
         exit 0
+      fi
+      local -a uncontained=()
+      while IFS= read -r c; do
+        [[ -n "$c" ]] && uncontained+=("$c")
+      done < <(uncontained_commits "$new" "$old")
+      if (( ${#uncontained[@]} > 0 )); then
+        if [[ "$break_glass" != 1 ]]; then
+          printf '[hub-promote] ERROR: deploy/hub contains %d commit(s) not in %s:\n' "${#uncontained[@]}" "$ref" >&2
+          print_uncontained_list "${uncontained[@]}" >&2
+          exit 1
+        fi
       fi
       if [[ "$break_glass" != 1 ]]; then check_runs "$new"; fi
       show_and_confirm "$old" "$new" promote "$ref"
