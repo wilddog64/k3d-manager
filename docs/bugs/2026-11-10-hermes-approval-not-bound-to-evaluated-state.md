@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-10 (WIP 3/3)
+**Waiting on:** fix running — since 2026-11-10 (Luna, slug `2026-11-10-hermes-approval-not-bound-to-evaluated-state`)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals); `edfc9a5c` (v1.43.0) added the one exception, r10
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store unreachable, 2026-11-10). Read
@@ -14,6 +14,7 @@ showed a card can outlive the rule it was built under)
 code, than the one the operator read on the card. r9 and r10 are irreversible. The precondition re-check and the
 one-attempt-per-incident rule still apply, which is why this is P2 and not P1.
 **Approval:** operator, 2026-11-10: "yes" (file it, after a LinkedIn reader suggested binding approvals to the
+**Dispatch go:** operator, 2026-11-10: "go as you recommeded for those two"
 **Intent approved:** operator, 2026-11-10 ("approve P2")
 evaluated revision and policy version)
 **Filed:** 2026-11-10
@@ -45,6 +46,15 @@ for repairs that act on deployments (r9), plus `expires_at` (proposed_at + a sho
 refuse with a distinct outcome when any of them differs or the proposal has expired: generalise r10's command
 comparison to every repair, and post the refusal to the thread so the operator sees why. Keep the button value
 (`action_id|nonce`) and the `action_id` format unchanged, so the relay worker contract does not move.
+
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/lib/hermes/repairs.py` | binding stored at `propose`; checks and expiry at `approve` |
+| `bin/k3dm-hermes` | post the refusal reason to the thread |
+| `scripts/tests/hermes/test_repairs.py` | E1 tests |
+| `scripts/tests/hermes/test_approvals.py` | button value and outcome tests |
 
 ## Contract readers
 

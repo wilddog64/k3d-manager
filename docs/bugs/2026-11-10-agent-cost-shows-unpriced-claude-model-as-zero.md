@@ -2,12 +2,13 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-10 (P3 batch; WIP 3/3)
+**Waiting on:** fix running — since 2026-11-10 (Flash, slug `2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero`, P3 batch)
 **Introduced by:** `1bf0cf40` (v1.43.14, claude-context-cost-per-turn: "0 for an unpriced model"); dashboard side pre-existing
 **Should have been caught by:** spec (the exporter counts unpriced messages but no panel shows the count)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store unreachable, 2026-11-10)
 **Severity:** cosmetic and reporting. Claude API-equivalent cost reads low by whatever Fable (or any new model) used; tokens are still shown by model.
 **Approval:** operator, 2026-11-10: "go for those three as you suggested (approved)" (filing)
+**Dispatch go:** operator, 2026-11-10: "go as you recommeded for those two"
 **Intent approved:** operator, 2026-11-10: "intent approved", in reply to Claude's offer to widen this P3 with the Fable panel and the weekly-limit export (E4-E6 added that turn)
 **Widened:** 2026-11-10, folds in the `docs/ideas.md` row "Export the Claude Fable weekly limit" (same dashboard file, one dispatch)
 **Filed:** 2026-11-10
@@ -54,7 +55,8 @@
 | `scripts/etc/agent/codex-model-prices.json` | `claude-fable-5-1` rates, `checked` |
 | `bin/k3dm-dispatch-metrics` | `_claude_quota`: weekly_scoped limits |
 | `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml` | unpriced stat; Fable row |
-| `scripts/tests/` (dispatch-metrics and agent-cost dashboard suites) | E1, E2, E4, E5 |
+| `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` | batched P3: Worker model column (see below) |
+| `scripts/tests/` (dispatch-metrics, agent-cost and agent-dispatch dashboard suites) | E1, E2, E4, E5; batched P3 E1, E2 |
 
 ## Contract readers
 
@@ -95,3 +97,9 @@ interface:
 
 - Change only the price file, `bin/k3dm-dispatch-metrics` (`_claude_quota` only), the Agent Cost dashboard and tests. Show E2's test red on today's dashboard, then
   green. Paste the price-page capture (URL, date) and command, rc and proving lines. Leave changes uncommitted.
+
+## Batched in this dispatch
+
+Also implement `docs/bugs/2026-11-10-dispatch-table-shows-flash-and-fable-as-other.md` (same
+`bin/k3dm-dispatch-metrics`; one open dispatch per file): its Fix 1-2, its Acceptance E1-E2, and its worker
+definition of done. Report the two bugs' evidence separately.
