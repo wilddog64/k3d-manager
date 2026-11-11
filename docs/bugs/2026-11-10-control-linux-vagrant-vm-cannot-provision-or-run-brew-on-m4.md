@@ -1,8 +1,8 @@
 # Bug: control-linux Vagrant VM cannot provision, and Homebrew crashes in it on the M4
 
-**Status:** OPEN — E2 rerun FAILED 2026-11-10 on `1c990581` (r2 fixed the kernel flags; Ansible still cannot reach localhost); third fix proven live, see "E2 rerun failure"
+**Status:** LANDED `01985706` 2026-11-10 (round 3, Flash; landed with `--superseding` for both earlier rounds after `6d2dc472`); E2 rerun started 2026-11-10
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-10 (correction round 2, Flash, slug `control-linux-vagrant-m4-r3`; same intents M1, M2, N1, N2)
+**Waiting on:** live check — since 2026-11-10 (E2 rerun on the M4, Claude)
 **Introduced by:** `4bd764b9` (v1.43.15, `scripts/etc/machine/vagrant/control-linux/Vagrantfile`)
 **Should have been caught by:** live check (the Vagrantfile was never run end to end before E3)
 **Prior art:** `make find-similar-docs` not run (vector store unreachable from the M4, 2026-11-10); exact-slug glob: none
