@@ -38,6 +38,14 @@ EOF
 echo 501
 EOF
   chmod +x "$STUB_DIR/id"
+  # plutil is macOS-only; output captured on m4-air (macOS 26.5.2), 2026-11-11:
+  # "/Users/<user>/Library/LaunchAgents/com.k3d-manager.acg-watch.plist: OK", rc 0
+  cat > "$STUB_DIR/plutil" <<'EOF'
+#!/usr/bin/env bash
+[ "$1" = "-lint" ] && [ -f "$2" ] || { printf '%s: file does not exist or is not readable\n' "$2" >&2; exit 1; }
+printf '%s: OK\n' "$2"
+EOF
+  chmod +x "$STUB_DIR/plutil"
 
   export HOME="$SCRATCH_HOME"
   export PATH="$STUB_DIR:$PATH"
@@ -46,6 +54,7 @@ EOF
   # Fixture assertion
   [ -d "$AGENTS_DIR" ]
   [ "$(command -v launchctl)" = "$STUB_DIR/launchctl" ]
+  [ "$(command -v plutil)" = "$STUB_DIR/plutil" ]
   [ "$HOME" = "$SCRATCH_HOME" ]
 }
 

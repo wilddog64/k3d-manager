@@ -1,5 +1,6 @@
 - 2026-11-11: Idea row added (b1f0eb62): Hermes security triage verdict on Flash 3.8/Luna 6.1, report-only, no tools; groom at next /release-groom.
 
+- 2026-11-11: CI red on v1.43.15 since dfc35911: makefile_agent_load.bats (bc09f24f) ran macOS plutil on Linux. Claude added a captured plutil stub (test-only), P1 doc docs/bugs/2026-11-11-makefile-agent-load-tests-call-macos-plutil-on-linux-ci.md. Promote needs this CI green first: new REF = this commit once green.
 - 2026-11-11: Keycloak P1 (3b0e6534) independently VERIFIED offline (E1/E2, Claude rerun 6/6 fixed, 5 red pre-fix, control ok; dispatch verify recorded). E3 live waits for promote (deploy/hub 745abb50 lacks 3b0e6534) + relay plist check on M5, then operator runs /cluster-up aws.
 - 2026-11-11: #140 merged but has no live effect: hub overlay services/shopping-cart-frontend pins digest 14bf71a5 (CVE promoter 74cd3ca1, sha-54998781). Claude bumped the pin to 97d0b172 (sha-b04f0c1f, libxslt r4) on the release branch; needs promote to deploy/hub. Operator can only promote at home; asked about a /promote skill. /pat-rotate is the local gh CLI token, not PACKAGES_TOKEN.
 - 2026-11-11: operator OK → killed orphan r2 agy PID 74329 (5h42m) and its stuck test 87405; no hub-promote dispatch left open.
