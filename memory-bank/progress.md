@@ -1,3 +1,4 @@
+- [ ] 2026-11-11 hub-promote r4 running on Flash 3.8 (r3 rejected; spec corrected `fed9081c`).
 - [x] 2026-11-11 AGENT_LOAD=0 bootout P2 VERIFIED (`bc09f24f`, live E3 m4-air).
 - [x] 2026-11-11 P3 audit: 10 P3s held for post-merge triage; Waiting on corrected. N3 TMPDIR fixture P3 filed. ideas: k3d-manager-control.
 - [ ] shopping-cart-frontend PR #139 green — operator merge, then libxslt check.
