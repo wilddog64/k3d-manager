@@ -1133,7 +1133,7 @@ kubectl apply --context k3d-k3d-cluster -f "${REPO_ROOT}/scripts/etc/argocd/iden
 
 _kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"
 _kc_ready_poll_interval_seconds="${KEYCLOAK_READY_POLL_INTERVAL_SECONDS:-10}"
-_kc_pf_port=18080
+_kc_pf_port=18880
 
 _info "[acg-up] Waiting for Keycloak deployment to be Available (up to ${_kc_ready_timeout_seconds}s)..."
 _kc_ready_started_at="${SECONDS}"
@@ -1501,7 +1501,7 @@ if _is_mac; then
   _keycloak_browser_plist_tmp="${_ACG_STATE_DIR}/run/keycloak-browser-http.plist"
   _keycloak_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_keycloak_browser_log}")"
-  _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "18080" "80" "http://127.0.0.1:18080/health/ready" "${_keycloak_browser_kubeconfig}" "127.0.0.1" "keycloak-browser-http"
+  _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "18080" "80" "http://keycloak.shopping-cart.local/health/ready" "${_keycloak_browser_kubeconfig}" "127.0.0.1" "keycloak-browser-http"
   if [[ -f "${K3DM_LAUNCHD_DIR:-/Library/LaunchDaemons}/com.k3d-manager.relay.keycloak-http.plist" ]] && curl -sf --max-time 1 http://keycloak.shopping-cart.local/health/ready >/dev/null 2>&1; then
     _info "[acg-up] Istio ingress HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
   else

@@ -232,7 +232,7 @@ argocd = (state / 'bin/argocd-browser-https.sh').read_text()
 keycloak = (state / 'bin/keycloak-browser-http.sh').read_text()
 frontend = (state / 'bin/frontend-browser-http.sh').read_text()
 assert 'LOCAL_PORT=18443' in argocd and 'https://127.0.0.1:18443/healthz' in argocd
-assert 'LOCAL_PORT=18080' in keycloak and 'http://127.0.0.1:18080/health/ready' in keycloak
+assert 'LOCAL_PORT=18080' in keycloak and 'http://keycloak.shopping-cart.local/health/ready' in keycloak
 assert '--address=127.0.0.3' in frontend and 'svc/frontend 18083:80' in frontend
 assert 'curl' not in frontend
 # The handwritten sandbox wrapper must stay identical to cluster-up's heredoc.

@@ -509,7 +509,7 @@ PLIST
   _keycloak_browser_log="${_ACG_STATE_DIR}/logs/keycloak-browser-http.log"
   _keycloak_browser_wrapper="${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
   _keycloak_browser_kubeconfig="${HOME}/.kube/config"
-  _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "18080" "80" "http://127.0.0.1:18080/health/ready" "${_keycloak_browser_kubeconfig}" "127.0.0.1" "keycloak-browser-http"
+  _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "18080" "80" "http://keycloak.shopping-cart.local/health/ready" "${_keycloak_browser_kubeconfig}" "127.0.0.1" "keycloak-browser-http"
   _user_agent_install_if_missing "${_keycloak_browser_label}" "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "${_keycloak_browser_plist}"
   _launchd_ensure "${_keycloak_browser_label}" "${_keycloak_browser_plist}" user
 

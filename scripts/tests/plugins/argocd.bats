@@ -232,6 +232,50 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "Keycloak browser wrapper health probe reaches ingress with routed hostname" {
+  local wrapper="${BATS_TEST_TMPDIR}/keycloak-wrapper.sh"
+  local log="${BATS_TEST_TMPDIR}/keycloak-wrapper.log"
+  local scratch_home="${BATS_TEST_TMPDIR}/home"
+  mkdir -p "${scratch_home}/bin"
+  [ "${wrapper}" = "${BATS_TEST_TMPDIR}/keycloak-wrapper.sh" ]
+  run grep -F '"http://keycloak.shopping-cart.local/health/ready"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  run grep -F '"http://keycloak.shopping-cart.local/health/ready"' bin/cluster-refresh
+  [ "$status" -eq 0 ]
+  run grep -F '"http://keycloak.shopping-cart.local/health/ready"' scripts/lib/providers/k3s-hostinger.sh
+  [ "$status" -eq 0 ]
+  cat > "${scratch_home}/bin/kubectl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == *"port-forward"* ]]; then exec sleep 1; fi
+exit 0
+EOF
+  cat > "${scratch_home}/bin/curl" <<EOF
+#!/usr/bin/env bash
+if [[ "\$*" == *"http://keycloak.shopping-cart.local/health/ready"* ]]; then
+  touch "${BATS_TEST_TMPDIR}/host-seen"
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${scratch_home}/bin/kubectl" "${scratch_home}/bin/curl"
+  _argocd_write_port_forward_wrapper "${wrapper}" "${log}" "${scratch_home}/bin/kubectl" "${scratch_home}/bin/curl" \
+    "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "18080" "80" \
+    "http://keycloak.shopping-cart.local/health/ready" "" "127.0.0.1" "keycloak-browser-http"
+  "${wrapper}" &
+  local wrapper_pid=$!
+  for _ in {1..30}; do
+    [[ -f "${BATS_TEST_TMPDIR}/host-seen" ]] && break
+    sleep 0.1
+  done
+  kill -9 "${wrapper_pid}" 2>/dev/null || true
+  wait "${wrapper_pid}" 2>/dev/null || true
+  [ -f "${BATS_TEST_TMPDIR}/host-seen" ]
+  run grep -F 'healthz reachable — monitoring backend availability' "${log}"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz did not become reachable — restarting' "${log}"
+  [ "$status" -ne 0 ]
+}
+
 @test "_argocd_write_port_forward_wrapper falls back when the requested context is missing" {
   run grep -Eq 'config get-contexts .*\$\{CONTEXT\}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]

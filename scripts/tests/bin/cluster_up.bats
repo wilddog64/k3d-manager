@@ -324,6 +324,17 @@ function _run_sandbox_ttl_helper() {
   [[ "$line" != *'"8880" "8080"'* ]]
 }
 
+@test "step 10d uses a private port outside browser agent and relay ports" {
+  local port
+  port=$(sed -n 's/^_kc_pf_port=//p' bin/cluster-up | head -n 1)
+  [ -n "$port" ]
+  [[ "$port" != 18080 && "$port" != 18082 && "$port" != 18083 && "$port" != 18443 ]]
+  run grep -F -- '"${_kc_pf_port}:8080"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  run grep -F -- 'localhost:${_kc_pf_port}/realms/master/protocol/openid-connect/token' bin/cluster-up
+  [ "$status" -eq 0 ]
+}
+
 @test "acg-up sources overrides and exits at the dry-run Step 4 seam" {
   run grep -nF 'source "${REPO_ROOT}/scripts/lib/system_overrides.sh"' bin/cluster-up
   [ "$status" -eq 0 ]
