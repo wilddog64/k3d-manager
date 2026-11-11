@@ -1,3 +1,4 @@
+- [x] 2026-11-11 Repo-sync stale alert root-caused (self-inflicted bootout), agent reloaded, P3 filed.
 - [x] 2026-11-11 landed keycloak P1 3b0e6534, context P2 36cd00fa, frontend P2 34cfac9 (branch); hub-promote r2 still running.
 - [ ] 2026-11-11 4 dispatches running: keycloak P1 (Luna), context P2 (Flash), frontend P2 (Luna), hub-promote r2 (Flash).
 - [ ] 2026-11-11 P1 keycloak step-10d port collision filed; P2 context floor/ceiling filed; Fable E6 PASS (E3 owed); frontend rerun 43020700531 pending result.
