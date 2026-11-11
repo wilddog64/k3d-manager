@@ -1,3 +1,5 @@
+- 2026-11-11 dispatches OPEN (4; P1 over WIP 3 allowed): Keycloak port P1 → Luna (gpt-6-luna confirmed); context floor P2 → Flash 3.8; frontend rebuild P2 → Luna in shopping-cart-frontend on branch fix/ci-rebuild-alpine-fixes (Claude created from origin/main); hub-promote-keeps-promoter-commits ABANDONED (agy hung, no conversation id, resume impossible) → restarted as hub-promote-keeps-promoter-commits-r2 on Flash 3.8. Fable P3 E3 still owed: offline k3dm_dispatch_claude_unpriced_messages{7d}=0; needs operator screenshot of Claude cost/unpriced stat.
+
 - **REMIND OPERATOR AT NEXT `make hub-promote`:** check Agent Cost → Codex spend by category: token row now reads `codex-auto-review tokens` in orange (commit 8d34fe0b); also E3 for the Fable P3 and the context floor/ceiling panel once its fix lands.
 - 2026-11-11: operator approved intents (frontend rebuild P2, Keycloak P1, context P2). Dispatching: frontend → Luna, Keycloak P1 → Luna, context P2 → Flash 3.8; hub-promote-keeps-promoter-commits resumed on Flash after operator killed 78799/78784. Fable E6 noted; operator's Claude-tokens screenshot shows claude-fable-5-1 tokens (not E3 cost).
 
