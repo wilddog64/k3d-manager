@@ -2,7 +2,7 @@
 
 **Status:** VERIFIED — `d06c0340` independently verified 2026-11-11 (Acceptance-only sonnet verifier: backlog 3/2/unknown on head vs 0/0/3 on pre; refspec and fetch_failed-guard mutants red); landed 2026-11-11 ( Flash 3.8 worker, Claude review: E1/E3 red on pre-fix, refspec mutation red, repo_sync.bats 18/18); found by the independent verifier for `v1.43.15-checkout-auto-sync`
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-11 (E4 on the M5 after the next promote: hub-sync backlog matches make hub-promote-status)
+**Live:** E4 2026-11-11 PASS on the backlog itself (see Live check below); its comparison target, `make hub-promote-status`, is wrong on the hub (`docs/bugs/2026-11-10-hub-promote-status-ahead-counts-local-release-branch.md`)
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing), not run
@@ -74,3 +74,7 @@ interface:
 - One mutation (drop the new refspec) shown red.
 - `shellcheck bin/k3dm-repo-sync` clean; the existing repo-sync bats suite still green.
 - Do not commit; leave the changes in the worktree.
+
+## Live check (E4) — 2026-11-11, Claude, M5 over ssh
+
+After promote `64e98c62` (tag `hub-promote/20261111T235223Z`): hub state.json `promote_backlog: 2`; `git rev-list --count origin/deploy/hub..origin/k3d-manager-v1.43.15` on the hub = 2 (`64e98c62..5c268d3b`). The backlog is correct. `make hub-promote-status` printed 0, a separate known bug (`docs/bugs/2026-11-10-hub-promote-status-ahead-counts-local-release-branch.md`, recurrence appended), so the "matches hub-promote-status" wording of E4 could not hold; the backlog was checked against git directly.

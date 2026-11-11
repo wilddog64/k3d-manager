@@ -63,3 +63,7 @@ interface:
 
 - `scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl`
 - `scripts/tests/bin/repo_sync_launchd_env.bats` (new)
+
+## Live corroboration 2026-11-11 (Claude, M5)
+
+After the operator ran `make appsets-reapply`, an interactive `make appsets-check` on the hub printed `All Applications reference values branch deploy/hub` (0 Apps on `k3d-manager-v1.43.15`), yet the launchd-written state.json still read `deploy_unknown: ['appsets-reapply']`. The check passes from a shell with Homebrew on PATH and fails from the job.

@@ -66,3 +66,7 @@ interface:
   - "bin/k3dm-hub-promote status (env RELEASE_BRANCH, REMOTE)"
   - "make hub-promote-status"
 ```
+
+## Recurrence 2026-11-11 (Claude, M5 over ssh, after promote 64e98c62)
+
+`make hub-promote-status` printed `k3d-manager-v1.43.15 ahead of deploy/hub: 0` while `origin/k3d-manager-v1.43.15` (`5c268d3b`) was 2 commits ahead of `origin/deploy/hub` (`64e98c62`): `git rev-list --count origin/deploy/hub..origin/k3d-manager-v1.43.15` = 2. The local branch sits at `64e98c62` because the hub checkout follows `deploy/hub`, so on the hub this line reads 0 after every promote. The hub-sync backlog (state.json `promote_backlog: 2`) was right. CLAUDE.md tells Claude to confirm promotion with this command, so the 0 is the number most likely to be misread.
