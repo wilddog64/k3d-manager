@@ -256,7 +256,7 @@ agy runs inside the task worktree and can write its `.git` directory. The dispat
 
 Resume an agy task with `bin/k3dm-codex-dispatch resume --slug <slug> --prompt-file <path>`. The dispatcher resumes only with the conversation ID stored from that task's JSON output; if agy did not return one, start a new task. It never selects the latest conversation implicitly. `--network` is unavailable for agy.
 
-For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace an already landed implementation, name that slug with `land --superseding <landed-slug>`.
+For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace already landed implementations, name each slug with a repeated `--superseding <landed-slug>` flag; one flag still works when replacing a single landing.
 
 ### Record local agy activity
 

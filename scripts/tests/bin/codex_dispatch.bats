@@ -694,6 +694,41 @@ GIT
   [ "$(jq -r 'select(.event=="land" and .slug=="second")|.chosen' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = true ]
 }
 
+@test "codex dispatch: third same-spec landing names every prior round" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/rounds.argv" STUB_ENV="$BATS_TEST_TMPDIR/rounds.env"
+  local slug
+  for slug in round1 round2 round3; do
+    dispatch start --spec docs/plans/v9.9.9-demo.md --slug "$slug" >/dev/null
+    sleep 1
+    printf '%s implementation\n' "$slug" >"$K3DM_WORKTREE_ROOT/v9.9.9/$slug/a.txt"
+    git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" add a.txt
+    git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" commit -m "$slug" >/dev/null
+    if [[ "$slug" != round3 ]]; then
+      if [[ "$slug" == round1 ]]; then
+        dispatch land --slug "$slug" --no-test >/dev/null
+      else
+        dispatch land --slug "$slug" --no-test --superseding round1 >/dev/null
+      fi
+      git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+      git -C "$FIXTURE" fetch -q origin k3d-manager-v9.9.9:refs/remotes/origin/k3d-manager-v9.9.9
+    fi
+  done
+  run dispatch land --slug round3 --no-test
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"round1"* ]]
+  [[ "$output" == *"round2"* ]]
+  run dispatch land --slug round3 --no-test --superseding round1
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"round2"* ]]
+  [[ "$output" != *"round1"* ]]
+  run dispatch land --slug round3 --no-test --superseding round1 --superseding round2
+  [ "$status" -eq 0 ]
+  [ "$(jq -r 'select(.event=="land" and .slug=="round3")|.chosen' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = true ]
+}
+
 @test "codex dispatch: start refuses a non-release branch" {
   git -C "$FIXTURE" checkout -b feature >/dev/null
   run dispatch start --spec docs/plans/v9.9.9-demo.md

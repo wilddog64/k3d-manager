@@ -1031,12 +1031,13 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" superseding="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path
+  local slug="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
+  local -a superseding=()
   local _landing_parts=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
-      --superseding) (($# >= 2)) || _dispatch_error "--superseding requires a slug"; superseding="$2"; shift 2 ;;
+      --superseding) (($# >= 2)) || _dispatch_error "--superseding requires a slug"; superseding+=("$2"); shift 2 ;;
       --test) (($# >= 2)) || _dispatch_error "--test requires a command"; test_set=1; test_cmd="$2"; shift 2 ;;
       --no-test) no_test=1; shift ;;
       --landing-actor) (($# >= 2)) || _dispatch_error "--landing-actor requires a value"; landing_actor="$2"; shift 2 ;;
@@ -1090,15 +1091,22 @@ _dispatch_land() {
   fi
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
   [[ "$(git -C "$task" rev-list --count "origin/$target..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$target"
-  local prior_slug prior_run
   for prior_run in "$_dispatch_worktree_root/$version"/*.run; do
     [[ -f "$prior_run/landed" ]] || continue
     prior_slug="$(basename "$prior_run" .run)"
     [[ "$prior_slug" == "$slug" ]] && continue
     if [[ -f "$prior_run/spec" && "$(<"$prior_run/spec")" == "$spec" ]]; then
-      [[ "$superseding" == "$prior_slug" ]] || _dispatch_error "spec already landed by $prior_slug; use --superseding $prior_slug"
+      superseding_match=0
+      for superseding_slug in "${superseding[@]}"; do
+        [[ "$superseding_slug" == "$prior_slug" ]] && superseding_match=1
+      done
+      if (( superseding_match == 0 )); then
+        [[ -z "$unnamed_prior" ]] || unnamed_prior+=" "
+        unnamed_prior+="$prior_slug"
+      fi
     fi
   done
+  [[ -z "$unnamed_prior" ]] || _dispatch_error "spec already landed by $unnamed_prior; name each with --superseding"
   if ! _dispatch_scope_verdict "$task" "$spec" "$target" "$allow"; then
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
     _dispatch_schedule_metrics
