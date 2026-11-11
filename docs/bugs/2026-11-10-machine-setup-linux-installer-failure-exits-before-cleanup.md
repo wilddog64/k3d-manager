@@ -2,12 +2,13 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-10 (batch with other P3s on `bin/k3dm-machine-setup`)
+**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
 **Introduced by:** `4bd764b9` (v1.43.15, `bin/k3dm-machine-setup:85,90`)
 **Should have been caught by:** offline test (N6 tests checked that nothing ran, not the cleanup or the report line)
 **Prior art:** `docs/bugs/2026-11-10-machine-setup-linux-exits-on-first-missing-formula.md` (same `_run_command` without `--soft` shape, lines 102-103, fixed in `d2cae3a6`) — read, same pattern at different lines; `make find-similar-docs` not run (vector store unreachable from the M4)
 **Severity:** hygiene. N6 still holds (exits non-zero, runs nothing, prefix unchanged), but an empty `${TMPDIR:-/tmp}/homebrew-install.XXXXXX` is left behind and the operator sees a raw `ERROR: failed to execute curl ...` instead of `homebrew installer download failed`.
 **Approval:** Claude, 2026-11-10 (found by the control-node independent verifier; dispatch needs the operator's intent approval)
+**Intent approved:** operator, 2026-11-11
 **Filed:** 2026-11-10
 **Detected by:** independent verifier (Sonnet, Acceptance block only) for `docs/plans/v1.43.15-control-node-linux.md`, extra check `download-failure-leaves-no-tempfile`; reproduced by Claude on `17167381`
 **Branch:** `k3d-manager-v1.43.15`

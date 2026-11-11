@@ -1,8 +1,7 @@
 # Bug: `install-*` with `K3DM_AGENT_LOAD=0` boots out the live agent it promises not to load
 
-**Status:** OPEN
+**Status:** VERIFIED 2026-11-11 — `bc09f24f` (Flash 3.8 worker, reviewed and landed by Claude). E1 red on pre-fix `5360d714`, green after (43/43 with hub_new.bats); live E3 on m4-air with the real launchctl: repo-sync stayed loaded, runs 8 → 8, no bootout in the launchd log.
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
 **Severity:** Low. A warning alert. The agent stays unloaded until someone reloads it.
 **Introduced by:** bd68d6ff (v1.43.12, `K3DM_AGENT_LOAD=0` guard added beside an existing unconditional bootout)
 **Should have been caught by:** offline test

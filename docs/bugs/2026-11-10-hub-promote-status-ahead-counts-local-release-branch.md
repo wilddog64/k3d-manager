@@ -2,12 +2,13 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-10 (folds into the next dispatch on `bin/k3dm-hub-promote`; `hub-promote-keeps-promoter-commits` is open on it)
+**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
 **Introduced by:** v1.44.0 hub-deploy-ref work (`bin/k3dm-hub-promote` `status()`), landed in v1.43.15
 **Should have been caught by:** offline test (status is tested only in a fixture where local and origin agree)
 **Prior art:** `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` absent on the M4, 2026-11-10); exact-slug glob: none
 **Severity:** misleading status line on the operator's promote host. Before a promote, the operator reads `ahead: 0` and may conclude there is nothing to promote when origin has new commits. No wrong ref is moved: `hub-promote` itself resolves `REF` against origin.
 **Approval:** Claude, 2026-11-10 (filed from two live sightings; dispatch needs the operator's intent approval)
+**Intent approved:** operator, 2026-11-11
 **Filed:** 2026-11-10
 **Detected by:** Claude, from the operator's M5 output: 2026-11-10 plan sweep (first sighting) and the `make hub-promote REF=906aa12e` screen the same day (second)
 **Branch:** `k3d-manager-v1.43.15`

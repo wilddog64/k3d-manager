@@ -1,3 +1,6 @@
+- [x] 2026-11-11 AGENT_LOAD=0 bootout P2 VERIFIED (`bc09f24f`, live E3 m4-air).
+- [x] 2026-11-11 P3 audit: 10 P3s held for post-merge triage; Waiting on corrected. N3 TMPDIR fixture P3 filed. ideas: k3d-manager-control.
+- [ ] shopping-cart-frontend PR #139 green — operator merge, then libxslt check.
 - [x] 2026-11-11 AGENT_LOAD=0 bootout P2 dispatched to Flash 3.8.
 - [x] 2026-11-11 Repo-sync stale alert root-caused (self-inflicted bootout), agent reloaded, P3 filed.
 - [x] 2026-11-11 landed keycloak P1 3b0e6534, context P2 36cd00fa, frontend P2 34cfac9 (branch); hub-promote r2 still running.

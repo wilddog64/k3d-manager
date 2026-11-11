@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-11 (P3 batch)
+**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
 **Introduced by:** `f310b4d4` (checkout-auto-sync)
 **Should have been caught by:** review (the plan defines the metric as commits behind; no test covers a diverged checkout)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10). Related: `docs/plans/v1.43.15-checkout-auto-sync.md`
