@@ -1,6 +1,8 @@
 # Bug: Hermes alert_delivery probe runs a python3 without PyYAML on the M5
 
-**Status:** VERIFIED — `4f88391d`; offline by an independent verifier, live on m5-air.local 2026-11-08 19:15 PST: `hermes-status` shows alert_delivery healthy, 2 route trees, 13 healthy, 0 unknown
+**Status:** LIVE-VERIFIED 2026-11-11 — Claude queried the M5 Prometheus at 02:16Z (`deploy/hub` `cf86a93f`): `hermes_sensor_status{sensor="alert_delivery",status="healthy"}` = 0 (healthy), last Hermes tick 195 s earlier (E2). Was: VERIFIED — `4f88391d`; offline by an independent verifier, live on m5-air.local 2026-11-08 19:15 PST: `hermes-status` shows alert_delivery healthy, 2 route trees, 13 healthy, 0 unknown
+**Fix commit:** `4f88391d`
+**Live evidence:** 2026-11-11 · run claude-prom-query-0216z · env m5-air · scenario alert-delivery-sensor-healthy · commit cf86a93f · proves E2
 **Priority:** P2
 **Introduced by:** unknown
 **Should have been caught by:** unknown

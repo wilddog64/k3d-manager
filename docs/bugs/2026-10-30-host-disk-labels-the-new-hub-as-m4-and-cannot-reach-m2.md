@@ -1,8 +1,9 @@
 # Bug: Host Disk dashboard labels the new hub's disk as "m4" and shows m2 down after the cutover
 
-**Status:** VERIFIED 2026-11-08 — M1 met live again after `d70047d5` reached the M5: all four hosts `up` with correct labels (operator screenshot, below). The 2026-11-04 E2E runner regression is covered by `2026-11-07-e2e-results-never-reach-m5-hub.md` (run 1794086864-5662 PASSED from the M5)
+**Status:** LIVE-VERIFIED 2026-11-11 — Claude queried the M5 Prometheus at 02:15Z (`deploy/hub` `cf86a93f`): `k3dm_disk_probe_success` is 1 for m5, m4, m2 and hostinger (E3). Was: VERIFIED 2026-11-08 — M1 met live again after `d70047d5` reached the M5: all four hosts `up` with correct labels (operator screenshot, below). The 2026-11-04 E2E runner regression is covered by `2026-11-07-e2e-results-never-reach-m5-hub.md` (run 1794086864-5662 PASSED from the M5)
 **Fix commit:** 1708c97a
 **Live evidence:** 2026-10-31 · run k3dm-disk-metrics-m5-1420z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit 4f409ba6 · proves E3
+**Live evidence:** 2026-11-11 · run claude-prom-query-0215z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit cf86a93f · proves E3
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30

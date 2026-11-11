@@ -1,6 +1,8 @@
 # Bug: `make hub-promote` refuses every release-branch commit, because CI runs only on pull requests
 
-**Status:** VERIFIED — 2026-11-08: push CI run 42481822700 green on `86585e4c`; the operator's `make hub-promote` on M5 passed the check-run gate without BREAK_GLASS (tag `hub-promote/20261108T131509Z`)
+**Status:** LIVE-VERIFIED 2026-11-11 — Claude read the operator's latest promote tag `hub-promote/20261110T234204Z` (`74cd3ca1` → `cf86a93f`, a release-branch commit): no `mode: break-glass` line, so the check-run gate passed on its own. Was: VERIFIED — 2026-11-08: push CI run 42481822700 green on `86585e4c`; the operator's `make hub-promote` on M5 passed the check-run gate without BREAK_GLASS (tag `hub-promote/20261108T131509Z`)
+**Fix commit:** `efb035fe`
+**Live evidence:** 2026-11-11 · run hub-promote-20261110T234204Z · env m5-air · scenario release-branch-promote-without-break-glass · commit cf86a93f · proves fix
 **Priority:** P2
 **Introduced by:** `897cfe72` (v1.43.15, hub-deploy-ref)
 **Should have been caught by:** spec

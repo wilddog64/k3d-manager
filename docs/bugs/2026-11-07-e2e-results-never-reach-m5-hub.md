@@ -2,8 +2,9 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.14`)
-**Status:** VERIFIED — F1 fix `576e10f3` (Luna) plus N9 test correction `c97a14fa` (Claude), 2026-11-07; F2 fixed live 2026-11-07 (`read:packages` scope; run 1794086864-5662 passed 91/0) — live-verified by operator screenshot 2026-11-09
+**Status:** LIVE-VERIFIED 2026-11-11 — Claude on the M5 at 02:16Z (`deploy/hub` `cf86a93f`): `platform-ops` holds e2e-result ConfigMaps from the M2 (newest 2026-11-10T04:14Z), `E2EResultsMissing` is not firing (E1); the newest result is phase `recording-result`, 102 total, 0 failed (E2). Was: VERIFIED — F1 fix `576e10f3` (Luna) plus N9 test correction `c97a14fa` (Claude), 2026-11-07; F2 fixed live 2026-11-07 (`read:packages` scope; run 1794086864-5662 passed 91/0) — live-verified by operator screenshot 2026-11-09
 **Fix commit:** `576e10f3`, `c97a14fa`
+**Live evidence:** 2026-11-11 · run claude-kubectl-e2e-cm-0216z · env m5-air · scenario e2e-results-reach-hub · commit cf86a93f · proves E1,E2
 **Priority:** P2 — the hub has had no e2e signal since the 2026-10-31 cutover; the verification dashboards are empty and `E2EResultsMissing` has fired for the full 3-day window
 **Live check progress (operator, M5, 2026-11-09):** `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip` then `make e2e-replay RUNNER=m2` completed; output ends `[e2e-publish] applied result for run 1794086864-5662 (runner=m2, result=pass)` and `[e2e-remote] replay complete: published=79 still_pending=0` (operator screenshot). Still to see: E2E Verification dashboard populated (range ≥ 3 days; newest result is 2026-11-07 ~13:27 PST) and `E2EResultsMissing` resolved
 **Live check (operator, on the M5):** `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip`, then `make e2e-replay RUNNER=m2`

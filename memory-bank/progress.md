@@ -1,3 +1,4 @@
+- [x] 2026-11-11 Four P2s LIVE-VERIFIED from Claude's read-only M5 probes (host-disk, e2e results, hub-promote, alert-delivery); hub-data-export partial.
 - [x] 2026-11-10 Promote `74cd3ca1`; E2E local-time and Tests dashboard VERIFIED live.
 - [x] 2026-11-10 Cherry-picked CVE frontend pin `74cd3ca1`; filed P2 hub-promote-discards-cve-promoter-commits; dispatched lib-foundation run-parallel (Luna).
 - [x] 2026-11-09 Landed lib-foundation `_install_promtool` `e44669a` (E1 offline + E2 live verified by Claude).
