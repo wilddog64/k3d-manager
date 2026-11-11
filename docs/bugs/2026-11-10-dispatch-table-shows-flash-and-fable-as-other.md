@@ -1,8 +1,7 @@
 # Bug: Dispatch table shows Gemini Flash and Claude Fable workers as `google/other`, and the Worker column is off-screen
 
-**Status:** LANDED 2026-11-11 `e7e1efd6` — Flash (Gemini 3.8) fix, Claude review: Fable price verified against platform.claude.com pricing (read 2026-11-10), weekly_scoped parser checked against the real statusline cache on the M4 (display_name "Fable"), allowlist covers every ledger model slug. Offline: agent_dispatch_dashboard.bats 49/49 (tests 14, 32, 47, 48, 49 red on pre-fix code), test_dispatch_metrics.py 201 passed (promtool test left to CI). Landed with --allow-out-of-scope: the scope checker reads the Files entry `scripts/tests/` as an exact path, not a prefix
+**Status:** VERIFIED 2026-11-11 — live E3 met after hub-promote 745abb50 (see Live evidence). Was: LANDED 2026-11-11 `e7e1efd6` — Flash (Gemini 3.8) fix, Claude review: Fable price verified against platform.claude.com pricing (read 2026-11-10), weekly_scoped parser checked against the real statusline cache on the M4 (display_name "Fable"), allowlist covers every ledger model slug. Offline: agent_dispatch_dashboard.bats 49/49 (tests 14, 32, 47, 48, 49 red on pre-fix code), test_dispatch_metrics.py 201 passed (promtool test left to CI). Landed with --allow-out-of-scope: the scope checker reads the Files entry `scripts/tests/` as an exact path, not a prefix
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-11 (after hub-promote: Agent Cost shows the unpriced stat at 0 and the Fable row; Landed specs table shows Worker model)
 **Introduced by:** pre-existing: `MODEL_IDENTITY_ALLOWLIST` was not updated when Flash 3.8 dispatches began (first: `2026-11-02-hub-data-export-never-ran`)
 **Should have been caught by:** review (the dispatch that first used `gemini-3.8-flash-medium` did not check the Worker column)
 **Prior art:** exact-slug glob: none; `ls docs/bugs | grep allowlist`: two unrelated docs. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10)
@@ -79,3 +78,8 @@ interface:
   Leave changes uncommitted; Claude reviews and lands. Batch with
   `docs/bugs/2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero.md` (same `bin/k3dm-dispatch-metrics`; one open
   dispatch per file).
+
+## Live evidence (2026-11-11, after `make hub-promote` to `745abb50` and `make platform-ops`, operator-run)
+
+- **E3 — met (M1, M2).** The operator's screenshot of Agent Dispatch → Per spec shows a "Worker model" column right after Agent. Row `cost-a…` reads agy / `google/gemini-3.8-flash-medium (selected)`, as do the other six agy rows. Hub Prometheus, read by Claude: `k3dm_dispatch_model_identity{slug="cost-attribution-coverage", role="worker"}` has `model="gemini-3.8-flash-medium"`, `source="explicit"`, `display="google/gemini-3.8-flash-medium (selected)"`.
+- **N1 holds live.** `count by (model)` shows 2 series still at `other`. Both are `2026-11-04-dr-drill-publish-opaque-m2-ssh-auth-failure`, roles coordinator and landing_actor, `display "anthropic/other (declared)"`: a declared Anthropic name that is not an API model ID, so it correctly maps to `other`. Flash now exports as `gemini-3.8-flash-medium` (48 series) and `gemini-3.8-flash-high` (3).
