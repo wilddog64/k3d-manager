@@ -9,7 +9,7 @@ metadata:
 data:
   k3dm-bugs.json: |
     {
-      "title": "k3dm Bug Tracking",
+      "title": "k3dm Release Tracking",
       "uid": "k3dm-bugs",
       "links": [
         {

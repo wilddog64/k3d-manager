@@ -30,7 +30,7 @@ data:
         },
         {
           "type": "link",
-          "title": "Bug Tracking",
+          "title": "Release Tracking",
           "url": "/d/k3dm-bugs"
         }
       ],

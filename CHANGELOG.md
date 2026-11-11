@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Rename the k3dm Bug Tracking dashboard to **k3dm Release Tracking**: it carries release plans, forecast and target state as well as bugs. The uid stays `k3dm-bugs`, so saved links keep working; the Agent dashboards' header link is renamed to match.
 - Run CI on every push to a `k3d-manager-v*` release branch, not only on pull requests. `make hub-promote` requires green GitHub check runs on the commit it promotes, and release-branch commits had none until a PR opened, so the hub could not be promoted during development without `BREAK_GLASS=1`. The `lint` job's same-repository guard now also admits push events, which only the repository's own branches can produce.
 
 ### Added

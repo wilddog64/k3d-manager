@@ -381,7 +381,7 @@ expected={"type":"dashboards","tags":["k3dm-agents"],"asDropdown":False,"include
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  text=(base/filename).read_text(); d=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
  assert "k3dm-agents" in d["tags"] and d["links"][0]==expected
- assert d["links"][1]=={"type":"link","title":"Bug Tracking","url":"/d/k3dm-bugs"}
+ assert d["links"][1]=={"type":"link","title":"Release Tracking","url":"/d/k3dm-bugs"}
 print("ok")
 PY
   [ "$status" -eq 0 ]

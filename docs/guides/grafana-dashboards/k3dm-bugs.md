@@ -1,4 +1,4 @@
-# k3dm Bug Tracking (`k3dm-bugs`) — hub
+# k3dm Release Tracking (`k3dm-bugs`) — hub
 
 [← Grafana dashboards index](../grafana-dashboards.md)
 
@@ -202,7 +202,7 @@ with `OPEN`.
 The pre-commit guard refuses a Status value that starts with none of those recognized words,
 and refuses `OPEN` followed by `fix landed`. Keep extra detail after the recognized first word.
 
-In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
+In the k3dm Release Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 
 Bug Tracking defaults to **Auto (current)**: the **Release** row (Release, Bugs filed, Bugs open and Bugs fixed) and Bugs table follow `k3dm_bug_current_release_info` for the selected repository. Choose **Manual** to use **Manual releases (ignored in Auto)**, which retains historical multi-select and **All**; the Release tile shows the picked releases as that box names them, or All. **Open, scheduled later** and **Open, untriaged** are repository-wide counts in both modes. “Filed in” follows the shared attribution rule: the bug doc's **Branch:** line, otherwise the first tag containing the commit that added it, otherwise the current release branch. If the selected repository has no current-release metric, use Manual; Auto has no release to match. In Manual, panels filter with `release=~"$release"`; the `release_order` label only sorts release choices and tables (it holds an ordering prefix and the release value), so never filter on it.
 

@@ -30,7 +30,7 @@ data:
         },
         {
           "type": "link",
-          "title": "Bug Tracking",
+          "title": "Release Tracking",
           "url": "/d/k3dm-bugs"
         }
       ],
@@ -906,7 +906,7 @@ data:
                     "id": "links",
                     "value": [
                       {
-                        "title": "Open this release in Bug Tracking",
+                        "title": "Open this release in Release Tracking",
                         "url": "/d/k3dm-bugs?var-release=${__data.fields.version}",
                         "targetBlank": true
                       }
