@@ -1,8 +1,8 @@
 # Bug: `dispatch land` cannot land a third round of the same spec
 
-**Status:** OPEN — dispatched to Luna 2026-11-10
+**Status:** LANDED — `6d2dc472` (Luna; Claude reviewed), 2026-11-10. E1 red on pre-fix (refusal named one slug), green after; E2 unchanged; land gate codex_dispatch.bats rc 0. E3 live pending (land control-linux-vagrant-m4-r3)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-10 (Luna, slug `2026-11-10-dispatch-land-cannot-land-third-round-of-same-spec`)
+**Waiting on:** live check — since 2026-11-10 (E3: Claude lands control-linux-vagrant-m4-r3 naming both rounds)
 **Introduced by:** `61256041` (v1.43.6, per-agent dispatch data)
 **Should have been caught by:** offline test
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10)
