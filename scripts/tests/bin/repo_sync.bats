@@ -381,7 +381,7 @@ run_sync() {
   git -C "$SCRATCH/seed" add backlog && git -C "$SCRATCH/seed" commit -m backlog >/dev/null
   git -C "$SCRATCH/seed" push origin HEAD:main >/dev/null 2>&1
   export SSH_REMOTE_SCRIPT="$HUB_ROOT/bin/k3dm-repo-sync"
-  run "$REAL_MAKE" -f "$PROJECT_ROOT/Makefile" hub-sync
+  run "$REAL_MAKE" --no-print-directory -f "$PROJECT_ROOT/Makefile" hub-sync
   [ "$status" -eq 0 ]
   [[ "$output" == hub\ *": main at "* ]]
   expected_tail="(updated); deploy pending: platform-ops; deploy/hub ${promoted:0:7}; promote backlog: 0"
@@ -390,7 +390,7 @@ run_sync() {
   grep -q 'BatchMode=yes' "$SSH_LOG"
   grep -q 'ConnectTimeout=10' "$SSH_LOG"
   export SSH_MODE=fail
-  run "$REAL_MAKE" -f "$PROJECT_ROOT/Makefile" hub-sync
+  run "$REAL_MAKE" --no-print-directory -f "$PROJECT_ROOT/Makefile" hub-sync
   [ "$status" -eq 0 ]
   [[ "$output" == *"WARNING: hub sync failed over SSH"* ]]
 }
