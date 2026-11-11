@@ -1,8 +1,8 @@
 # Bug: a Hermes approval runs whatever the repair builds at click time, not what the card showed
 
-**Status:** OPEN
+**Status:** LANDED 2026-11-11 `a985ac90` (Luna, resume 3; Claude review + one fix: per-cycle kine counters `state_db_bytes`/`slow_sql_count` excluded from the records digest, else every r5 approval is refused; new test red on the worker's code)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-10 (Luna, slug `2026-11-10-hermes-approval-not-bound-to-evaluated-state`)
+**Waiting on:** live check — since 2026-11-11 (independent verifier owed; live after hub-promote)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals); `edfc9a5c` (v1.43.0) added the one exception, r10
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store unreachable, 2026-11-10). Read

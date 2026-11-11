@@ -1,3 +1,4 @@
+- [x] 2026-11-11 LANDED Hermes approval binding P2 a985ac90 (verifier + live owed).
 - [x] 2026-11-11 Intents approved (CVE P2, ACG P2, 3 P3s); install-repo-sync prints OK/FAILED; cluster-up 63ed929e running for step 4.1 E2.
 - [x] 2026-11-11 LANDED cluster-up step 4.1 launchd-reload fix (Claude); E2 live pending.
 - [x] 2026-11-11 Filed P2 cluster-up step 4.1 launchd reload race; key-import E3 partial.
