@@ -60,6 +60,11 @@ interface:
   - make hub-sync
 ```
 
+## Files
+
+- `bin/k3dm-repo-sync`
+- `scripts/tests/bin/repo_sync_promote_backlog.bats` (new)
+
 ## Worker definition of done
 
 - Edit only `bin/k3dm-repo-sync` and a new or existing test under `scripts/tests/bin/` for it.
