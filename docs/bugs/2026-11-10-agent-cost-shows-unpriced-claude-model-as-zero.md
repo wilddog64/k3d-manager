@@ -2,7 +2,7 @@
 
 **Status:** LANDED 2026-11-11 `e7e1efd6` — Flash (Gemini 3.8) fix, Claude review: Fable price verified against platform.claude.com pricing (read 2026-11-10), weekly_scoped parser checked against the real statusline cache on the M4 (display_name "Fable"), allowlist covers every ledger model slug. Offline: agent_dispatch_dashboard.bats 49/49 (tests 14, 32, 47, 48, 49 red on pre-fix code), test_dispatch_metrics.py 201 passed (promtool test left to CI). Landed with --allow-out-of-scope: the scope checker reads the Files entry `scripts/tests/` as an exact path, not a prefix
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-11 (E6 visual only: operator screenshot of the Fable row with the weekly gauge)
+**Waiting on:** live check — since 2026-11-11 (E3 only: Fable cost above 0 and unpriced count 0 on Agent Cost; E6 passed)
 **Introduced by:** `1bf0cf40` (v1.43.14, claude-context-cost-per-turn: "0 for an unpriced model"); dashboard side pre-existing
 **Should have been caught by:** spec (the exporter counts unpriced messages but no panel shows the count)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store unreachable, 2026-11-10)
@@ -109,3 +109,7 @@ definition of done. Report the two bugs' evidence separately.
 
 - **E3 — met.** Hub Prometheus, read by Claude: `k3dm_dispatch_claude_unpriced_messages` is 0 in all 17 windows (1d, 7d, 30d, every release). Fable 7d tokens are `k3dm_dispatch_claude_tokens{model="claude-fable-5-1"}`: cache_read 722,100; cache_write 81,833; input 389; output 10,949. At the captured prices that is about $1.80–$2.40, depending on whether cache writes are 5m or 1h. It is included in `k3dm_dispatch_claude_api_cost_usd{window="7d"}` = $455.03, matching the operator's screenshot. Cost has no per-model label, so Fable's share is shown by hand calculation, not by a series.
 - **E6 — data met; panel not yet seen.** `k3dm_claude_quota_used_ratio{limit="weekly_fable"}` = 0.01, matching the statusline cache (`weekly_scoped` Fable 1). `seven_day` = 0.36, matching `weekly_all` 36. The operator's screenshot shows `claude-fable-5-1` as its own series on 2026-11-10 in Claude tokens per day (Fable daily tokens 815,271). It does not show the Fable row's weekly gauge.
+
+## Live E6 (operator screenshot, checked by Claude, 2026-11-11 04:35 PST)
+
+Agent Cost → Fable row: "Fable tokens per day" shows a bar for 2026-11-10 (~830K tokens); "Fable weekly limit" gauge 1% used, resets "in a day". M4 statusline cache `/tmp/claude/statusline-usage-cache.json` (mtime 04:34) has `kind: weekly_scoped, percent: 1, resets_at: 2026-11-12T22:00Z` (~33h away). Gauge matches the statusline. **E6 PASS.** E3 (Fable cost > 0, unpriced 0) not in this screenshot: still owed.

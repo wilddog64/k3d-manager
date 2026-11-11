@@ -899,6 +899,9 @@ assert "k3dm_codex_unpriced_tokens" in refs["B"]["expr"]
 assert spend["fieldConfig"]["defaults"]["unit"]=="currencyUSD"
 units=[prop["value"] for o in spend["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byFrameRefID","options":"B"} for prop in o["properties"] if prop["id"]=="unit"]
 assert units==["short"],units
+assert len(refs["B"]["legendFormat"].replace("{{model}}","codex-auto-review"))<=26,refs["B"]["legendFormat"]
+colors=[prop["value"]["fixedColor"] for o in spend["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byFrameRefID","options":"B"} for prop in o["properties"] if prop["id"]=="color"]
+assert colors and colors[0]!="blue",colors
 assert "$0" in spend["description"] and "/bin/" not in spend["description"]
 print("ok")
 PY
