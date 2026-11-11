@@ -131,15 +131,20 @@ def result_for(path, is_hub):
         rec["result"] = "skipped:no-upstream"
         return rec
     upstream = up.stdout.strip()
-    target = "origin/deploy/hub" if is_hub and path.resolve() == ROOT.resolve() else upstream
+    remote, _, ref = upstream.partition("/")
     if is_hub and path.resolve() == ROOT.resolve():
-        fetch_args = ["fetch", "--no-tags", "origin", "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub"]
-        target = "origin/deploy/hub"
+        fetch_args = [
+            "fetch",
+            "--no-tags",
+            remote,
+            f"+refs/heads/deploy/hub:refs/remotes/{remote}/deploy/hub",
+            f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}",
+        ]
+        target = f"{remote}/deploy/hub"
     else:
-        remote, _, ref = upstream.partition("/")
         fetch_args = ["fetch", "--no-tags", remote, f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}"]
         target = upstream
-    comparison_ref = "origin/deploy/hub" if is_hub and path.resolve() == ROOT.resolve() else upstream
+    comparison_ref = f"{remote}/deploy/hub" if is_hub and path.resolve() == ROOT.resolve() else upstream
     counts = git(path, "rev-list", "--left-right", "--count", f"HEAD...{comparison_ref}")
     if counts.returncode == 0:
         vals = counts.stdout.split()
@@ -318,9 +323,11 @@ def main():
                   or (query.returncode == 0 and "All Applications reference values branch deploy/hub" not in query_output)):
                 state["deploy_unknown"].append("appsets-reapply")
             try:
-                upstream_ref = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip()
-                backlog = git(ROOT, "rev-list", "--count", f"origin/deploy/hub..{upstream_ref}")
-                state["promote_backlog"] = int(backlog.stdout.strip()) if backlog.returncode == 0 else None
+                root_rec = next((r for r in records if pathlib.Path(r["path"]).resolve() == ROOT.resolve()), None)
+                if root_rec and root_rec.get("result") != "fetch_failed":
+                    upstream_ref = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip()
+                    backlog = git(ROOT, "rev-list", "--count", f"origin/deploy/hub..{upstream_ref}")
+                    state["promote_backlog"] = int(backlog.stdout.strip()) if backlog.returncode == 0 else None
                 state["deploy_hub_sha"] = git(ROOT, "rev-parse", "origin/deploy/hub").stdout.strip()
             except Exception:
                 pass
