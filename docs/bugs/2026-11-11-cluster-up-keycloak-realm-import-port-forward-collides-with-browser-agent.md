@@ -2,12 +2,13 @@
 
 **Status:** OPEN — found 2026-11-11 by Claude investigating /cluster-up aws job `63ed929e` on the M5
 **Priority:** P1
-**Waiting on:** operator decision — since 2026-11-11
+**Waiting on:** fix running — since 2026-11-11
 **Severity:** high — `/cluster-up aws` fails at step 10d on a hub where the Keycloak browser agent is loaded, leaving a billable CloudFormation stack
 **Introduced by:** unknown (the Host-less probe wrapper on the M5 is dated 2026-11-06 04:25, the day `632ac235` added Hostinger's writer of this agent; not proven)
 **Should have been caught by:** live check
 **Prior art:** docs/bugs/2026-11-06-hostinger-refresh-skips-argocd-keycloak-browser-agents.md (find-similar-docs unavailable: vector store context missing; picked by filename) — read, different defect (that one added the agent; this one is its collision with step 10d and its probe)
-**Approval:** not yet
+**Approval:** operator, 2026-11-11 ("go ahead to dispatch")
+**Intent approved:** operator, 2026-11-11
 
 ## Symptom
 
@@ -37,6 +38,23 @@ Not proven: exactly which listener the job's curl reached in each of the five at
 ## Workaround (untested)
 
 Before rerunning, unload the agent with `launchctl bootout gui/$(id -u)/com.k3d-manager.browser.keycloak-http`, then rerun or resume `/cluster-up aws`. Step 10d then owns :18080, and the agent is reinstalled at line 1504. Not yet run. Priority drops to P2 once it is proven.
+
+## Files
+
+| File | Change |
+|---|---|
+| `bin/cluster-up` | step 10d private admin port-forward on its own port (`_kc_pf_port`, also used at `:1337-1396`, `:1620`), never 18080 or any browser-agent/relay port |
+| `scripts/plugins/argocd.sh` | `_argocd_write_port_forward_wrapper` health probe can carry the Host the ingress routes |
+| `scripts/lib/providers/k3s-hostinger.sh` | keycloak browser wrapper (`:612`) probes with that Host |
+| `bin/cluster-refresh` | keycloak browser wrapper (`:512`) probes with that Host |
+| `bin/cluster-up` (`:1504`) | same, for the agent cluster-up installs |
+| `scripts/tests/bin/cluster_up.bats`, `scripts/tests/plugins/argocd*.bats` (or the suite that covers the wrapper) | E1, E2 |
+
+## Worker definition of done
+
+- Change only the files above. Grep every writer of a keycloak-http wrapper and every user of port 18080 first, and list them in your report; if one is missing from the Files table, stop and report it rather than editing it.
+- Do not touch the running launchd agents or the live hub; E3 is Claude's.
+- Show every `must_not` test red against today's code, then green. Mutation-test each guard (break it, see the test fail, restore). Run the full touched suites, not only the new tests, and run the change once read-only against real data where the spec says how. Paste command, rc and the proving lines for each; list every error you saw, and any choice the spec left open. Leave changes uncommitted; Claude reviews and lands.
 
 ## Acceptance
 

@@ -2,13 +2,14 @@
 
 **Status:** OPEN — found 2026-11-11 by Claude during the operator-approved manual rebuild for CVE-2026-9947 / CVE-2026-87636 (libxslt)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-11 (intent approval, then dispatch to Luna)
+**Waiting on:** fix running — since 2026-11-11
 **Severity:** medium — a fixed Alpine package cannot reach the live frontend without a code commit, so a CVSS 9.6 libxslt fix sits published but unshipped
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Prior art:** docs/bugs/2026-11-11-app-cve-scan-ignores-unknown-severity-the-alert-counts.md (not scored; vector store unavailable) — read, related: that bug is the k3d-manager alert side, this one is the frontend repo's build side
 **Repo:** wilddog64/shopping-cart-frontend (`.github/workflows/ci.yml`, `Dockerfile`)
 **Approval:** operator, 2026-11-11 ("first trigger a plain rerun to see what happen. depending on that to write a spec and dispatch to Luna")
+**Intent approved:** operator, 2026-11-11
 
 ## What happened (Claude, 2026-11-11)
 
@@ -25,6 +26,20 @@
 3. No change to the Trivy severity gate here. Whether CI should fail on `UNKNOWN` is an operator decision recorded in the app-cve-scan bug.
 
 Out of scope: run 42749861025's deploy-step failure (`k8s/base/kustomization.yaml was not updated to newTag: sha-…`). Separate defect, to be filed after this lands.
+
+## Files
+
+| File | Change |
+|---|---|
+| `.github/workflows/ci.yml` | push job also on `workflow_dispatch` from main; `APK_UPGRADE_EPOCH=${{ github.run_id }}` in both build steps |
+| `Dockerfile` | `ARG APK_UPGRADE_EPOCH` directly above the runtime-stage `RUN apk upgrade --no-cache` |
+| `tests/ci/` (new, or the repo's existing test location) | E1 and E2 offline tests (Python or BATS reading the YAML and Dockerfile) |
+
+## Worker definition of done
+
+- Work in `wilddog64/shopping-cart-frontend` only, on a branch from `main`; change only the files above. Do not push or open a PR: Claude reviews, then opens the PR.
+- E1 evaluates the `if:` expression with a small evaluator over the five event cases, not by grepping the string.
+- Show every `must_not` test red against today's code, then green. Mutation-test each guard (break it, see the test fail, restore). Run the full touched suites, not only the new tests, and run the change once read-only against real data where the spec says how. Paste command, rc and the proving lines for each; list every error you saw, and any choice the spec left open. Leave changes uncommitted; Claude reviews and lands.
 
 ## Acceptance
 

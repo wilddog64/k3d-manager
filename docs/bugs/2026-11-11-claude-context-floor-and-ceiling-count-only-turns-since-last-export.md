@@ -2,12 +2,13 @@
 
 **Status:** OPEN — found 2026-11-11 by Claude after the operator questioned the panel
 **Priority:** P2
-**Waiting on:** dispatch
+**Waiting on:** fix running — since 2026-11-11
 **Severity:** medium — Agent Cost "Floor, observed ceiling and configured threshold" reads 99.8K / 99.8K while auto-compaction fires at 163–171K, so the compaction-threshold study (`docs/plans/v1.43.6-claude-context-compaction-metrics.md`) reads wrong data
 **Introduced by:** unknown (context turns arrived in 61256041 v1.43.6, the ceiling and floor in 82c1d9c8 v1.43.14; which one dropped persisted turns is not yet traced)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold (find-similar-docs unavailable: vector store context missing; `ls docs/bugs | grep -E 'ceiling|floor|context'` found no match)
-**Approval:** not yet
+**Approval:** operator, 2026-11-11 ("go ahead to dispatch")
+**Intent approved:** operator, 2026-11-11
 
 ## Symptom
 
@@ -25,6 +26,19 @@ The operator's screenshot (2026-11-11) shows floor 99.8K, observed 99.8K, config
 ## Fix direction
 
 Persist context turns in the cache (or recompute them from all lines within the widest window) so a run with a warm cache emits the same context series as a cold run on the same transcripts. Check the other per-turn series built from `turns` and `boundaries`.
+
+## Files
+
+| File | Change |
+|---|---|
+| `bin/k3dm-dispatch-metrics` | context turns (and compaction boundaries they pair with) survive a warm cache: persisted in the cache, or recomputed over the widest window |
+| `scripts/tests/bin/test_dispatch_metrics.py` | E1, E2 |
+
+## Worker definition of done
+
+- Change only the files above. Keep the cache backward compatible: an old cache without the new key must still work (treat it as cold for context turns).
+- Read-only real-data run: `bin/k3dm-dispatch-metrics --dry-run` with a copy of `~/.local/share/k3d-manager/claude-usage/rollup.json` in a scratch dir and `K3DM_PUSHGATEWAY_URL=http://127.0.0.1:9`; warm and cold runs must give the same `k3dm_claude_context_*` lines. Never push metrics.
+- Show every `must_not` test red against today's code, then green. Mutation-test each guard (break it, see the test fail, restore). Run the full touched suites, not only the new tests, and run the change once read-only against real data where the spec says how. Paste command, rc and the proving lines for each; list every error you saw, and any choice the spec left open. Leave changes uncommitted; Claude reviews and lands.
 
 ## Acceptance
 
