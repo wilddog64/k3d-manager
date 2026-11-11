@@ -1,8 +1,7 @@
 # Bug: CI lint red on the release branch: repo-sync LaunchAgent has no hub classification, and the hub-sync test breaks under a parent make
 
-**Status:** LANDED 2026-11-11 — Claude (operator: "go ahead"): repo-sync classified in hub-local.list; hub-sync test passes --no-print-directory. Offline: Linux MAKELEVEL=1 21/21, macOS 209/209, rc 0
+**Status:** VERIFIED 2026-11-11 — CI run 42952933807 on 446d2c49: lint success, alertmanager-behaviour success (E2). Was: LANDED 2026-11-11 367d6caa — Claude (operator: "go ahead"): repo-sync classified in hub-local.list; hub-sync test passes --no-print-directory. Offline: Linux MAKELEVEL=1 21/21, macOS 209/209, rc 0
 **Priority:** P2 — CI lint is red on `k3d-manager-v1.43.15`, which blocks the release PR gate; the product is unaffected (test registry and test harness only); no workaround short of the fix
-**Waiting on:** live check — since 2026-11-11 (E2: next CI lint run green)
 **Introduced by:** `f310b4d4` (v1.43.15, checkout auto-sync): added `com.k3d-manager.repo-sync.plist.tmpl` and the hub-sync test
 **Should have been caught by:** offline test — both suites were run only on macOS with bats invoked directly; CI runs them under `make test-bin` on GNU make 4
 **Severity:** low — no runtime behaviour changes; the release cannot pass its CI gate until fixed
