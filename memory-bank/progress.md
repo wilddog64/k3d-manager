@@ -1,3 +1,4 @@
+- [x] 2026-11-11 Filed P2 ACG auto-login diagnostics (lib-foundation fix); ACG live check rerun c998511f in progress.
 - [x] 2026-11-11 trust-vault-ca reader 403 LIVE-VERIFIED; filed P3 live-verified n/a for test-only bugs.
 - [x] 2026-11-11 Four P2s LIVE-VERIFIED from Claude's read-only M5 probes (host-disk, e2e results, hub-promote, alert-delivery); hub-data-export partial.
 - [x] 2026-11-10 Promote `74cd3ca1`; E2E local-time and Tests dashboard VERIFIED live.
