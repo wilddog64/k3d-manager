@@ -36,7 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
-.PHONY: hub-promote hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
+.PHONY: promote hub-promote hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -470,6 +470,13 @@ hub-rollback:
 ## Show the current hub ref and promotion history (read-only)
 hub-promote-status:
 	@bin/k3dm-hub-promote status
+
+## Promote REF to the hub, then appsets-check and platform-ops; stops at the first failure
+promote:
+	@[ -n "$${REF:-}" ] || { echo 'usage: make promote REF=<commit-ish>' >&2; exit 2; }
+	@$(MAKE) --no-print-directory hub-promote REF="$$REF"
+	@$(MAKE) --no-print-directory appsets-check
+	@$(MAKE) --no-print-directory platform-ops
 
 ## Count bug docs per release by status and priority (RELEASE=vX.Y.Z, JSON=1)
 bug-tally:
@@ -1759,6 +1766,7 @@ help:
 	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
 	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
 	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 optional)"
+	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
 	@echo "    make hub-rollback          Roll back deploy/hub to the previous recorded promotion"
 	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"

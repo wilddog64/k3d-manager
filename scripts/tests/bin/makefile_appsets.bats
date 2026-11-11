@@ -59,3 +59,54 @@ _run_make() {
   [[ "${output}" == *"make hub-rollback"* ]]
   [[ "${output}" == *"make hub-promote-status"* ]]
 }
+
+_promote_stub() {
+  STUB_MAKE="${BATS_TEST_TMPDIR}/stub-make"
+  [[ "${STUB_MAKE}" == "${BATS_TEST_TMPDIR}/"* ]]
+  cat > "${STUB_MAKE}" <<'STUB'
+#!/usr/bin/env bash
+target=""
+for arg in "$@"; do
+  case "$arg" in --*|-*) ;; *=*) ;; *) target="$arg" ;; esac
+done
+printf '%s REF=%s\n' "$target" "${REF:-}" >> "${CALL_LOG}"
+[[ "$target" == "${FAIL_TARGET:-none}" ]] && exit 1
+exit 0
+STUB
+  chmod +x "${STUB_MAKE}"
+}
+
+@test "promote runs hub-promote, appsets-check, platform-ops in order with REF" {
+  _promote_stub
+  _run_make promote REF=abc123 MAKE="${STUB_MAKE}"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 1p "${CALL_LOG}")" = "hub-promote REF=abc123" ]
+  [ "$(sed -n 2p "${CALL_LOG}" | cut -d' ' -f1)" = "appsets-check" ]
+  [ "$(sed -n 3p "${CALL_LOG}" | cut -d' ' -f1)" = "platform-ops" ]
+  [ "$(wc -l < "${CALL_LOG}" | tr -d ' ')" -eq 3 ]
+}
+
+@test "promote stops after a declined or failed hub-promote" {
+  _promote_stub
+  run env CALL_LOG="${CALL_LOG}" FAIL_TARGET=hub-promote make --no-print-directory -C "${WORK}" promote REF=abc123 MAKE="${STUB_MAKE}"
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "${CALL_LOG}" | tr -d ' ')" -eq 1 ]
+  run grep -E 'appsets-check|platform-ops' "${CALL_LOG}"
+  [ "$status" -ne 0 ]
+}
+
+@test "promote stops before platform-ops when appsets-check fails" {
+  _promote_stub
+  run env CALL_LOG="${CALL_LOG}" FAIL_TARGET=appsets-check make --no-print-directory -C "${WORK}" promote REF=abc123 MAKE="${STUB_MAKE}"
+  [ "$status" -ne 0 ]
+  run grep -F 'platform-ops' "${CALL_LOG}"
+  [ "$status" -ne 0 ]
+}
+
+@test "promote without REF refuses before calling anything" {
+  _promote_stub
+  run env -u REF CALL_LOG="${CALL_LOG}" make --no-print-directory -C "${WORK}" promote MAKE="${STUB_MAKE}"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"usage: make promote REF="* ]]
+  [ ! -s "${CALL_LOG}" ]
+}
