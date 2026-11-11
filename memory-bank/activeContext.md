@@ -1,5 +1,6 @@
 - 2026-11-11: Idea row added (b1f0eb62): Hermes security triage verdict on Flash 3.8/Luna 6.1, report-only, no tools; groom at next /release-groom.
 
+- 2026-11-11: CI GREEN on ad0e8171 (run 43100108594, lint+alertmanager-behaviour): promotable. Pushed 259d2395 (appset P2), c02fe243 (Hermes reauth recurrence), 28992253 (dashboard renamed k3dm Release Tracking, uid k3dm-bugs kept; agent dashboards link renamed; bats 49+48, pytest 3+204 green). CI on 28992253 running.
 - 2026-11-11: Hermes values_branch 19:52Z (15 hub apps on v1.43.15): cluster-preflight:51, k3s-hostinger.sh:893, observability.sh:23/676 default values ref to HEAD. P2 filed docs/bugs/2026-11-11-appset-callers-default-values-ref-to-checkout-branch-not-deploy-hub.md; approving Hermes r9 is the workaround.
 - 2026-11-11: CI red on v1.43.15 since dfc35911: makefile_agent_load.bats (bc09f24f) ran macOS plutil on Linux. Claude added a captured plutil stub (test-only), P1 doc docs/bugs/2026-11-11-makefile-agent-load-tests-call-macos-plutil-on-linux-ci.md. Promote needs this CI green first: new REF = this commit once green.
 - 2026-11-11: Keycloak P1 (3b0e6534) independently VERIFIED offline (E1/E2, Claude rerun 6/6 fixed, 5 red pre-fix, control ok; dispatch verify recorded). E3 live waits for promote (deploy/hub 745abb50 lacks 3b0e6534) + relay plist check on M5, then operator runs /cluster-up aws.
