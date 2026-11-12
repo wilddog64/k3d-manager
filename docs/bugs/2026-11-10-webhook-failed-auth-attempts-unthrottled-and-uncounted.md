@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unauthenticated requests to the public webhook bypass rate limiting and metrics (only logged to the access log), leaving failed auth attempts unthrottled and unmonitored); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** `7253ece4` (v1.23.0, PR #112: the limiter moved after auth, deliberately; see Prior art)
 **Should have been caught by:** spec (v1.23.0 fixed the shared-bucket lockout but left failed attempts with no limit and no signal)
 **Prior art:** `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` — read, same code path, different defect: it moved `_rate_limited` after `_auth` because one global pre-auth bucket let an unauthenticated flood 429 the operator; that reason still holds and constrains this fix. `make find-similar-docs` not run (vector store unreachable: `context "k3d-k3d-cluster" does not exist`, 2026-11-10)

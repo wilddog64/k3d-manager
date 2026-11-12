@@ -3,9 +3,10 @@
 **Filed:** 2026-07-07
 **Source:** /ask agent observations, verified live 2026-07-07
 **Branch:** `k3d-manager-v1.14.0`
-**Status:** DESIGN — decisions signed off 2026-07-10. Still NOT a copy-paste bugfix: the Phase 1 implementation spec must be written before any handoff.
+**Status:** CLOSED — design work, not a bug: moved to `docs/ideas.md` (grooming 2026-11-12, operator); was: DESIGN — decisions signed off 2026-07-10. Still NOT a copy-paste bugfix: the Phase 1 implementation spec must be written before any handoff.
 **Priority:** P3 — design work; nothing is broken today
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Single-cluster assumptions and hardcoded `ubuntu-k3s` context references degrade multi-cluster Vault auth and non-AWS reconciliation paths, but workarounds exist via per-invocation variable overrides, deleting the dan…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** close — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Tracked project:** App-cluster Vault auth portability (kubecontext-keyed helper per provider; "Vault endpoint is the open seam")
 
 ## Why these three are one bug

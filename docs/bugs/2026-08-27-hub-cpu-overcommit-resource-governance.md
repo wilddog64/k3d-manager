@@ -5,7 +5,9 @@
 CoreDNS, repo-server in restart storms.
 **Status:** SPEC
 **Priority:** P2 — the hub control plane can stall under CPU overcommit; the load-shed changes are the workaround
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The hub control plane is severely degraded by CPU overcommit and restart storms, but has a durable live-patch workaround (`kubectl patch hpa`) and was deferred in backlog triage rather than treated as an active outage); Claude proposed P2. Agreed.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Release:** unscheduled — revisit after the 2026-10-29 hub rebuild drill; candidate v1.56.0 (monthly hub rebuilds) (backlog triage, Claude, 2026-10-22)
 
 ## Symptom

@@ -3,9 +3,10 @@
 **Filed:** 2026-08-30
 **Branch:** `k3d-manager-v1.27.0`
 **Component:** `scripts/plugins/signing.sh`, `scripts/etc/signing/cluster-policy-verify-images.yaml.tmpl`
-**Status:** ROOT-CAUSED + fixed live (Audit) on the app cluster (hostinger). Template codified.
+**Status:** LANDED — fixed live (Audit) and codified (grooming 2026-11-12, operator); was: ROOT-CAUSED + fixed live (Audit) on the app cluster (hostinger). Template codified.
 **Priority:** P3 — fixed live (Audit) and codified
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Kyverno `verifyImages` in Audit mode failed with 401 on direct `Pod` admission (blocking promotion to Enforce) while workload pods remained running and has a clean workaround by matching workload controllers with dedi…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** status corrected — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 
 ## Symptom
 

@@ -1,9 +1,10 @@
 # Bug: ArgoCD Apps & Image Updater Hub dashboard KPI cards misaligned
 
-**Status:** OPEN — UI defect observed; fractional job metric requires investigation
+**Status:** CLOSED — research, not a bug: moved to `docs/ideas.md` (grooming 2026-11-12, operator); was: UI defect observed; fractional job metric requires investigation
 **Branch:** unscheduled P3 backlog (triage 2026-10-15, operator-approved placement)
 **Priority:** P3
-**Waiting on:** investigation
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Dashboard panel misalignment and fractional counter display (`3.02`) are cosmetic and metric-hygiene issues with no impact on production operations); Claude proposed P3. Agreed.
+**Triage:** close — grooming 2026-11-12, operator.
 **Filed:** 2026-10-13, operator request
 **Release:** unscheduled (triage 2026-10-15, operator-approved placement)
 **Approval:** explicit operator request to file a P3 bug; no implementation authorized

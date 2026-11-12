@@ -1,8 +1,10 @@
 # Bug: OfflineSuiteRunIncomplete and OfflineSuiteFailing on ubuntu-hostinger
 
-**Status:** ROOT CAUSE FOUND 2026-11-06 — still firing; fix spec `docs/bugs/2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md`
+**Status:** LANDED — fix `2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md` is VERIFIED; live check that the nightly suite is green owed (grooming 2026-11-12, operator); was: ROOT CAUSE FOUND 2026-11-06 — still firing; fix spec `docs/bugs/2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md`
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-06
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Nightly offline test suite failing on `ubuntu-hostinger` due to missing `pyyaml` (test-only failure, no production outage or data loss)); Claude proposed P2. Claude's higher P2 stands until the operator decides.
+**Triage:** status corrected — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
+**Waiting on:** live check — since 2026-11-12
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
 **Branch:** k3d-manager-v1.43.14

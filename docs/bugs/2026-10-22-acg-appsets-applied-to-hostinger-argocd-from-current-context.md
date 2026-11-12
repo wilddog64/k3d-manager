@@ -3,7 +3,9 @@
 **Filed:** 2026-10-22 (Claude, found during GitHub branch pruning)
 **Status:** OPEN
 **Priority:** P3 — the stray sets generate no Applications; they only pin a release branch and log errors
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (deploy_observability_acg` applies hub ApplicationSets to the ambient kube context instead of `k3d-k3d-cluster`, misrouting deployments and leaving stray errored resources when run from a non-hub context, with switchin…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "and file stale Hostinger ApplicationSets"
 **Release:** v1.43.5 (bug; exempt from the plan cap)

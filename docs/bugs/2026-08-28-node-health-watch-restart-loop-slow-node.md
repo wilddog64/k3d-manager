@@ -5,7 +5,9 @@
 **Status:** MITIGATED LIVE (watchdog `launchctl bootout` 2026-08-28 ~04:20 PDT — the forced
 restarts stopped; agent-0 holds Ready on its own). Durable fix below NOT yet in git.
 **Priority:** P3 — mitigated live (watchdog booted out)
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The node restart loop and resulting DNS/Prometheus outage are mitigated live by unloading the `node-health-watch` launchd service (`launchctl bootout`), leaving the cluster stable with automated node recovery degraded…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 
 ## Symptom
 

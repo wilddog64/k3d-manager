@@ -5,7 +5,9 @@
 Option A (read the live Deployment label) on 2026-07-30; source fix `699da11b` is
 awaiting deployment through `make platform-ops`.
 **Priority:** P3 — source fix `699da11b` waits only on `make platform-ops`
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The `environment=infra` selector collision blocks hub self-management and CVE auto-patching, but ArgoCD is healthy and the deployed Option A workaround reads the chart version directly from the `argocd-server` Deployment); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Supersedes:** the "Phase 2 — Claude-only" section of
 `docs/bugs/2026-07-18-argocd-cve-scan-silent-exit-missing-infra-secret.md`
 

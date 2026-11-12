@@ -2,7 +2,9 @@
 
 **Status:** OPEN — spec written; waiting for intent approval and the `k3d-manager-v1.43.16` branch
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Dashboard display and labeling issue in the Split work panel (`pending` shown instead of `n/a` when there are no build sub-agents, missing agent names, and ambiguous column title) with no functional impact on dispatch…); Claude proposed P3. Agreed.
+**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** v1.43.14 (`docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md:299` defines the `pending` value)
 **Should have been caught by:** spec
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-08); exact-slug glob found nothing

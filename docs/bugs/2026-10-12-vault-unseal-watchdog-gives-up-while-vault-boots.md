@@ -4,7 +4,9 @@
 **Branch:** `k3d-manager-v1.46.0`
 **Status:** OPEN
 **Priority:** P2 — Vault, and every secret read through it, stays sealed up to 5 minutes longer than needed after a restart; it recovers on its own
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Post-restart unsealing is delayed by one 5-minute CronJob interval when Vault is still booting, after which the next scheduled run automatically unseals it); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** medium

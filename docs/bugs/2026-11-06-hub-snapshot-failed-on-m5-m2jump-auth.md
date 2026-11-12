@@ -2,7 +2,9 @@
 
 **Status:** OPEN — one failure observed; next scheduled run Sunday 2026-11-08 02:30 local decides whether a fix is needed
 **Priority:** P2
-**Waiting on:** scheduled run — since 2026-11-06
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unattended LaunchAgent snapshot failed once on SSH auth, but SSH from a login shell succeeds and `hub-data-export` continues to work); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (next scheduled run, no code) — grooming 2026-11-12, operator.
+**Waiting on:** scheduled run — since 2026-11-12
 **Approval:** pending
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md`; `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md`

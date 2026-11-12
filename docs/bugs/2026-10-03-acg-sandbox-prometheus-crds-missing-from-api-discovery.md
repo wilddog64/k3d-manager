@@ -4,7 +4,9 @@
 **Branch:** `k3d-manager-v1.41.0`
 **Status:** MITIGATED — `3b789adf` + `98835aac` (Step 14 reads the CRD condition instead of watching it; WARN with recovery steps when kind `Prometheus` is unserved; Step 14b skips the port-forward when `svc/prometheus-operated` is missing). The apiserver CRD-watch stall itself is not fixed; recovery stays an operator k3s restart. Not reproduced on the 2026-10-06 sandbox (all 10 kinds served, Prometheus 1/1). Today's `federate-acg` TargetDown has a different cause: `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md`.
 **Priority:** P3 — mitigated (`3b789adf`, `98835aac`); sandbox-only
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Sandbox Prometheus fails to start and `make up` Step 14 stalls when the k3s apiserver CRD watch gets stuck, degrading sandbox metrics with a manual k3s restart and ArgoCD resync workaround); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Severity:** medium. The hub's `federate-acg` target is down for the whole sandbox lifetime, so
 `TargetDown` fires and no sandbox metrics reach the hub. `make up` exits 0 and does not notice.
 

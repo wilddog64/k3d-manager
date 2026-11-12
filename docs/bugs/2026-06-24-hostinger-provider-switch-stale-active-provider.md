@@ -1,8 +1,9 @@
 # Bug: `make status` can resolve the wrong provider after switching between ACG and Hostinger
 
-**Status:** Recurrence 4 FIXED 2026-10-05 (Codex, Claude-verified: BATS 45/45, pytest 35/35; Claude's mutations — webhook trusts the marker, old summary restored — turn 3 and 2 tests red; operator runs `make restart-webhook`). Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
+**Status:** LANDED — recurrence 4 fixed 2026-10-05 (grooming 2026-11-12, operator); was: Recurrence 4 FIXED 2026-10-05 (Codex, Claude-verified: BATS 45/45, pytest 35/35; Claude's mutations — webhook trusts the marker, old summary restored — turn 3 and 2 tests red; operator runs `make restart-webhook`). Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
 **Priority:** P3 — recurrence 4 fixed 2026-10-05; reopen at P2 on a fifth recurrence
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (make status` and unpinned health probes degrade by targeting stale/dead cluster contexts after provider switches or sandbox expiry, but can be worked around by manually updating `~/.local/share/k3d-manager/active-prov…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** status corrected — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  

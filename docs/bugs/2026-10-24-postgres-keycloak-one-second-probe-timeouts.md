@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3 — warnings only so far (0 restarts in 8 days); a run of three liveness misses would restart Keycloak's only database replica and stall logins for about a minute.
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Tight 1s exec probes cause transient readiness/liveness timeout events under CPU contention (degrading stability and risking false restarts), though the pod currently has 0 restarts and continues running); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Severity:** low
 **Release:** v1.43.6 (bug; exempt from the plan cap)
 **Filed:** 2026-10-24, by Claude, during the frontend-login live check

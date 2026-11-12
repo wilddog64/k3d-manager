@@ -2,7 +2,9 @@
 
 **Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude by reading
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage; can fold into the repo-sync dispatch)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Degraded fail-open fallback that only triggers if the `machine-role` config file is lost, with keeping or restoring the file serving as a simple workaround); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** carry → v1.44.0 (deploy/hub batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** review
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context missing)

@@ -3,7 +3,8 @@
 **Status:** OPEN — captured 2026-11-12
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (cost observability degraded; the gauge and raw metrics remain); Claude proposed P3. Higher stands until the operator decides.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** pre-existing (Fable 5.2 became the subagent default after the panel was written)
 **Should have been caught by:** none
 **Prior art:** not run

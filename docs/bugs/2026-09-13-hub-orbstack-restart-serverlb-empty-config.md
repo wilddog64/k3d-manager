@@ -2,9 +2,10 @@
 
 **Branch:** `k3d-manager-v1.33.0`
 **Filed:** 2026-09-13
-**Status:** RECOVERED LIVE — durable fixes specced: Defect 1 → `2026-09-13-hub-recovery-serverlb-empty-upstreams.md`, Defect 2 → `2026-09-13-node-health-watch-restarts-on-host-api-unreachable.md`
+**Status:** CLOSED — recovered live; durable fixes FIXED in `2026-09-13-hub-recovery-serverlb-empty-upstreams.md` (`8e6d84b2`) and `2026-09-13-node-health-watch-restarts-on-host-api-unreachable.md` (`2eb9c7cf`) (grooming 2026-11-12, operator); was: RECOVERED LIVE — durable fixes specced: Defect 1 → `2026-09-13-hub-recovery-serverlb-empty-upstreams.md`, Defect 2 → `2026-09-13-node-health-watch-restarts-on-host-api-unreachable.md`
 **Priority:** P3 — recovered live; the durable fixes are tracked in their own docs
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The live outage is already recovered and every underlying defect triggered by restarts or container recreation has a working manual workaround until the durable fixes land); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** status corrected — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Related:** `2026-08-28-node-health-watch-restart-loop-slow-node.md`, `2026-09-11-hub-control-plane-readoption.md`
 
 ## Trigger

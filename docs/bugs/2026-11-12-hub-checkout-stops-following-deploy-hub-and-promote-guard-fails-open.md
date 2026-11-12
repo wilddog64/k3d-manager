@@ -3,7 +3,8 @@
 **Status:** OPEN — captured 2026-11-12 from the Fable pre-merge review of v1.43.15
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (degraded, nothing broken live today, manual reset and promote-tag recovery work around both); Claude proposed P2. Agreed.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** carry → v1.44.0 (deploy/hub batch, first in the dispatch queue) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** v1.43.15 (checkout auto-sync and deploy/hub promote plans)
 **Should have been caught by:** offline test
 **Prior art:** docs/bugs/2026-11-10-repo-sync-reports-zero-behind-for-diverged-checkout.md (not scored) — read, different root cause (that one is the behind metric for non-hub repos); find-similar-docs not run

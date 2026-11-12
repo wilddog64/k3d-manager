@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (make hub-promote-status` reports a misleading ahead-count when the local release branch is stale, but moves no refs and has simple workarounds (`git pull`, `git rev-list` against `origin`, or `state.json`'s `promote_b…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** carry → v1.44.0 (deploy/hub batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** v1.44.0 hub-deploy-ref work (`bin/k3dm-hub-promote` `status()`), landed in v1.43.15
 **Should have been caught by:** offline test (status is tested only in a fixture where local and origin agree)
 **Prior art:** `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` absent on the M4, 2026-11-10); exact-slug glob: none

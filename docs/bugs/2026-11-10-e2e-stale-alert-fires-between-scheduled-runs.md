@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (False-positive staleness alert and cosmetic label collision on scheduled E2E test runs with no service outage or functional breakage); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** `978ea60f` (v1.34.0, Hermes e2e schedule `wed,sat@02:00`), against the 3-day threshold from `d48e465f` (v1.25.0)
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store context missing on the M4, 2026-11-10). Read `docs/bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md` (different root cause: grouping by runner; fixed and live-verified 2026-10-24)

@@ -3,7 +3,9 @@
 **Filed:** 2026-10-21 (Codex, after the operator could not locate the MinIO KubeJobFailed resolution notification)
 **Status:** OPEN — observability gap confirmed by code review and live Hermes screenshot
 **Priority:** P3 — MinIO may be healthy, but operators cannot determine whether the product-image PostSync upload succeeded from the current health view
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Observability is degraded because Hermes omits the `minio-image-upload` PostSync hook outcome, though the MinIO uploader itself is working and verifiable outside Hermes); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Severity:** low
 **Type:** Observability bug (no known current MinIO service failure)
 **Approval:** pending — implementation/dispatch not yet authorized

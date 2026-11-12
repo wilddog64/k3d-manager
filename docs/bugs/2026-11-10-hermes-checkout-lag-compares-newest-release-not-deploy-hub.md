@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Only a non-alerting Grafana dashboard tile is misleading after `deploy/hub` auto-sync, with `make hub-promote-status` and `make hub-sync` available as a workaround); Claude proposed P3. Agreed.
+**Triage:** carry → v1.44.0 (deploy/hub batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** `897cfe72` (v1.43.15 hub deploy-ref change: the hub reads `deploy/hub`); shows once `checkout-auto-sync` is installed on the hub
 **Should have been caught by:** spec (the deploy-ref plan's Contract readers did not list `bin/k3dm-hermes:624-733`)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run (vector store context missing on the M4, 2026-11-10). Related: `docs/bugs/2026-11-06-hub-code-lag-invisible-and-no-catch-up-step.md` (added this check, before deploy/hub existed); `docs/bugs/2026-11-07-hub-code-behind-tile-unknown-matcher-crashes-bugs-dashboard.md` (tile rendering, different root cause)

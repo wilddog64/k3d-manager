@@ -550,7 +550,9 @@ Bugs moved from v1.43.14 on 2026-11-07 (bugs do not count toward the plan cap): 
 
 **v1.43.15 plan 5:** [`hub-deploy-ref-and-live-write-guard`](plans/v1.43.15-hub-deploy-ref-and-live-write-guard.md) (operator, 2026-11-07: "how we prevent working on live system directly"; chose "a separate ref so we are at least to make hub stable"). The hub's ApplicationSets read only `deploy/hub`. It moves only through `make hub-promote` (commit on origin, CI green, typed confirmation, `hub-promote/<UTC>` tag) or `make hub-rollback`. `make platform-ops` applies a `git archive` of `deploy/hub`, never the working tree. **Supersedes the 2026-07-24 decision** that ApplicationSets track the release branch; CLAUDE.md's reapply and platform-ops release rules change once it lands. Hub spec: dispatch waits for the operator's go. Follow-up candidate (v1.45.0): preview Grafana in `platform-ops-preview` for branch live checks, and read-only hub credentials for agents. Moved from v1.44.0 by Claude on 2026-11-07 after the operator's dispatch go, so the P1 goes out first.
 
-### Patch release — v1.43.16
+### Patch release — v1.43.16 (not cut)
+
+**Not cut (operator, grooming 2026-11-12: "Skip, carry to v1.44.0").** The three Hermes P3s ride in the v1.44.0 Hermes relay batch; the other seven were passed over without counting as a pass-over, since they had been picked. See `docs/grooming/2026-11-12.md`.
 
 Bug-fix only (operator, 2026-11-09). Cut from `main` after v1.43.15 merges. This is not the old v1.43.16, which became v1.44.0 in the 2026-11-07 renumbering. Holds 10 P3s, the limit:
 

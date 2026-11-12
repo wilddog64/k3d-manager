@@ -2,7 +2,9 @@
 
 **Status:** OPEN — parent filed 2026-11-09; child specs C1–C4 written and intents approved; children dispatch on `k3d-manager-v1.43.16`
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Offline `make test-all` is degraded on the M4 with 35 failing cases across four root causes (including an unstubbed test attempting to act on the live host's launchctl agent), though mitigated by the tripwire, CI, and…); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** unknown (four root causes, each with its own origin; see the table)
 **Should have been caught by:** unknown
 **Prior art:** `docs/bugs/2026-10-28-offline-test-all-grep-guard-and-e2e-dispatch-regressions.md` (found by grep, not

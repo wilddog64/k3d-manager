@@ -1,8 +1,9 @@
 # Hub Kine compaction stall causes control-plane saturation
 
-**Status:** RECURRED 2026-10-28 — last successful compaction17:45:03Z, transaction failure17:50:14Z; current alert firing. See the new October28 recurrence filing below. Controlled recovery pending; no K3s restart. Earlier October24 history and invalidated close-out retained below.
+**Status:** CLOSED — duplicate: the live recurrence is tracked in `2026-10-28-hub-kine-compaction-recurred-after-transaction-rollback.md` (grooming 2026-11-12, operator); was: RECURRED 2026-10-28 — last successful compaction17:45:03Z, transaction failure17:50:14Z; current alert firing. See the new October28 recurrence filing below. Controlled recovery pending; no K3s restart. Earlier October24 history and invalidated close-out retained below.
 **Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
-**Waiting on:** investigation
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Kine compaction permanently stalls after a single unretried transaction rollback, causing unbounded database growth and eventual control-plane saturation, though the cluster remains operational with a small DB and has…); Claude proposed P2. Agreed.
+**Triage:** status corrected — grooming 2026-11-12, operator.
 **Release:** v1.43.6 — verification-only; close-out check 2026-10-26 (14 clean days). Moved from v1.43.5 on 2026-10-24 (operator: "you can move those P2s to v1.43.6")
 
 ## What was observed

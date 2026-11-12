@@ -2,7 +2,9 @@
 
 **Status:** OPEN — live recurrence confirmed 2026-10-28; recovery = M5 new-hub build (operator decision 2026-10-29)
 **Priority:** P2 — retention is stalled with a controlled rebuild workaround; API remains ready
-**Waiting on:** investigation
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Kine compaction and retention are degraded while the cluster API and nodes remain ready (no current outage), and a documented recovery workaround exists via rebuilding the hub from backup/snapshot); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (investigation) — grooming 2026-11-12, operator.
+**Waiting on:** investigation — since 2026-11-12
 **Filed:** 2026-10-28
 **Release:** v1.43.9 bug; no new enhancement plan
 **Branch:** `k3d-manager-v1.43.9`

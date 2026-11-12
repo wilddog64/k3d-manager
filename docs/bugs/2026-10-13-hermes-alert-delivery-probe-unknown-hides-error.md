@@ -4,7 +4,9 @@
 **Branch:** `k3d-manager-v1.46.0` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — cause confirmed live on the M5 2026-11-08: no PyYAML for the probe's `python3`; fix not specced
 **Priority:** P2 — alert delivery monitoring unavailable; manual read-only probe is a workaround
-**Waiting on:** operator decision — since 2026-11-08
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The `alert_delivery` health sensor is degraded (`unknown` status with masked probe errors due to missing `PyYAML` in launchd `PATH` and broad exception handling), while actual alert delivery is unaffected and operator…); Claude proposed P2. Agreed.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
 **Severity:** Medium — blind spot in monitoring the alert delivery path; **not evidence of an actual alert blackout**
 **Component:** `scripts/lib/hermes/sensors.py` (`alert_delivery`); `bin/k3dm-alert-delivery-status`; Hermes dashboard

@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (CI job hygiene/test-only issue where offline test suites are bundled into the `lint` job, delaying lint feedback without breaking functionality); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** unknown (the test steps accreted into `lint` over several releases)
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10). Related, not a duplicate: `docs/plans/v1.44.0-parallel-offline-tests.md` (local runner speed; leaves CI unchanged, line 62)

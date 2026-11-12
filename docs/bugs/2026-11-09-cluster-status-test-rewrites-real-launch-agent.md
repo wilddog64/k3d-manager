@@ -2,7 +2,9 @@
 
 **Status:** OPEN — child C3 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The unisolated test fails `make test-bin` on offline hosts and overwrites the operator's real LaunchAgent plist, though no active service is down now and the plist can be removed or regenerated as a workaround); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (test-hygiene batch, before plan 1) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** unknown (the restore call in `bin/cluster-status:431` and the test predate this audit; not bisected)
 **Should have been caught by:** review
 **Prior art:** none above threshold — exact-slug glob empty; `make find-similar-docs` not run to a result (vector

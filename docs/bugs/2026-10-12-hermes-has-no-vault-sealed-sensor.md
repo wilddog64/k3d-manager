@@ -4,7 +4,9 @@
 **Branch:** `k3d-manager-v1.46.0`
 **Status:** OPEN
 **Priority:** P3 — a visibility gap; the watchdog unseals Vault today, but nothing reports when it does not
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Hermes status observability is degraded by not surfacing sealed Vault state on the dashboard, with a workaround of inspecting the `vault-sealed` pod label directly or observing downstream ExternalSecrets status); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 

@@ -2,7 +2,9 @@
 
 **Status:** OPEN — filed; batch with other P3s into the release
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Pending GitHub Actions dependency bumps and version pinning are CI maintenance/hygiene with no current breakage or degradation); Claude proposed P3. Agreed.
+**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** pre-existing (pins set before the upstream majors: checkout v5 2025-08-11, setup-kubectl v5 2026-03-25, wrangler-action v4 2026-05-12)
 **Should have been caught by:** none
 **Severity:** low — nothing is broken today; the pins age, and #158 as opened would replace a pinned Wrangler with `latest`

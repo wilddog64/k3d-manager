@@ -3,9 +3,10 @@
 **Date:** 2026-06-25
 **Provider:** `k3s-hostinger`
 **Files:** `scripts/lib/providers/k3s-hostinger.sh`, `scripts/etc/argocd/projects/platform.yaml.tmpl`, `bin/k3dm-webhook`, `scripts/tests/lib/provider_contract.bats`
-**Status:** OPEN — no fix recorded; not re-verified since v1.8.0
+**Status:** CLOSED — stale: a June report not re-verified since v1.8.0, and Hostinger refresh has been rewritten since; Argon's P1 not upheld; reopen on recurrence (grooming 2026-11-12, operator); was: no fix recorded; not re-verified since v1.8.0
 **Priority:** P3 — status-report drift; no outage. Not re-verified since v1.8.0
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P1 by gemini-4-argon-medium, 2026-11-12 (k3s-hostinger` cluster registration and refresh are broken without a workaround, leaving apps pinned to the old cluster, platform destinations rejected by ArgoCD, and local listeners pointing to stale endpoints); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** close — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P1.
 
 ## What failed
 

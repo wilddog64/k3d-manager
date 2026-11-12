@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Coordinator attribution telemetry is degraded (recording `unreported` by default), but a functional workaround exists by explicitly passing `--coordinator VENDOR/MODEL` and adding commit trailers manually); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Severity:** medium — dispatch, cost and quality metrics describe almost all recent work as coming from an unknown coordinator, so the Opus-vs-Sol/Terra comparison the operator needs cannot be made
 **Release:** v1.43.10 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-29, operator: "we need to consider other models like OpenAI Sol6.1 and Terra 6.1 as primary coordinators as we are not capturing their work like yours"

@@ -2,6 +2,8 @@
 
 **Status:** OPEN — captured 2026-11-12
 **Priority:** P3
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The dashboard's per-bug table silently truncates older entries past 1,000 rows, which degrades visibility, though aggregate metrics remain accurate, no open bugs are currently hidden, and raw `docs/bugs/` files or the…); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** pre-existing (the 1000-row cap in `bin/k3dm-vectordb-metrics`)
 **Should have been caught by:** none

@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage with the other P3s; or fold into the next `hub_promote.bats` dispatch)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only issue in `hub_promote.bats` where non-TTY test cases omit `< /dev/null` and hang waiting for interactive confirmation when run under a PTY); Claude proposed P3. Agreed.
+**Triage:** carry → v1.44.0 (deploy/hub batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Severity:** test-only. Under CI or `make test` stdin is not a terminal and the tests pass. Run from an interactive shell or an agent that holds a pty, the test blocks on the typed-confirmation `read` and never returns. Workaround: `bats scripts/tests/bin/hub_promote.bats < /dev/null`.
 **Introduced by:** unknown (the N2 test and the unguarded `run` calls in `hub_promote.bats`)
 **Should have been caught by:** review

@@ -2,7 +2,9 @@
 
 **Status:** OPEN — child C2 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only issue where `promtool`-dependent tests fail or skip on local Macs while CI still runs them and runtime behavior is unaffected); Claude proposed P2. Claude's higher P2 stands until the operator decides.
+**Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` fix (v1.43.5), which
 installed promtool in the CI `lint` job only
 **Should have been caught by:** spec (the 2026-10-24 fix covered one environment; its 2026-10-30 Recurrence named

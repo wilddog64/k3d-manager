@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic wording fix renaming a dashboard panel title, description, and related documentation without changing underlying queries or behavior); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** pre-existing (the panel title and description since the reason bars; see CHANGELOG "Agent Dispatch Human continuation prompts")
 **Should have been caught by:** review
 **Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `docs/plans/v1.45.0-human-operator-turns.md` covers the same panel (read: this doc takes only its rename step; the plan keeps the real turn counting)

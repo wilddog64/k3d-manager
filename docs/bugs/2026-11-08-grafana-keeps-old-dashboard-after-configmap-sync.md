@@ -2,7 +2,9 @@
 
 **Status:** OPEN — filed; root cause unknown
 **Priority:** P3
-**Waiting on:** investigation — since 2026-11-08
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Dashboard updates fail to hot-reload automatically after ConfigMap sync, but restarting the Grafana deployment works around the issue immediately); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Severity:** low — a dashboard fix looks unfixed until Grafana restarts; the operator can misread a deployed fix as a failed one. Workaround: `kubectl -n monitoring rollout restart deploy/kube-prometheus-stack-grafana`.

@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P2 — `/cluster-up aws` from Slack fails at step 1 whenever the Pluralsight session lapses; workaround: sign in by hand on the M5's CDP Chrome (:9222) and rerun
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unattended ACG auto-login fails without diagnostic logging when the session expires, but operators can work around it by signing in manually on the host's CDP Chrome); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Severity:** medium — unattended cluster-up depends on a human at the M5's screen every few days; each recurrence of this flow is diagnosed by guessing

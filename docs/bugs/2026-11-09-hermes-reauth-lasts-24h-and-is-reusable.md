@@ -2,7 +2,9 @@
 
 **Status:** OPEN — filed 2026-11-09
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Security hygiene hardening to shorten re-auth confirmation window from 24h to 10m and single-use while existing allowlist and Slack signature checks still protect access); Claude proposed P3. Agreed.
+**Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** spec
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-09: context

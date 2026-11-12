@@ -3,7 +3,9 @@
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/etc/argocd/applicationsets/istio-ambient.yaml`
 **Priority:** P3 — the live hub was fixed 2026-09-13; only the code default remains
-**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (istio-cni-node` fails readiness and blocks ambient mesh enrollment on mismatched default CNI paths, but has a verified workaround via manual override or `AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` environment variables); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 
 ---
 

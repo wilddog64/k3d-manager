@@ -2,7 +2,9 @@
 
 **Status:** OPEN — specced 2026-11-07; queued for a P3 batch under the dispatch WIP limit
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Pre-commit lint gap for required metadata lines on new bug documentation is repository hygiene with no runtime or functional impact); Claude proposed P3. Agreed.
+**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** pre-existing (the rule is new on 2026-11-07; nothing enforces it yet)
 **Should have been caught by:** none
 **Severity:** low — without enforcement, the new `Introduced by` and `Should have been caught by` lines will be skipped, and the per-release escape counts in the retro will be incomplete

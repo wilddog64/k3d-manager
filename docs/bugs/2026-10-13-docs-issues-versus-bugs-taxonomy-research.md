@@ -1,9 +1,10 @@
 # Bug: Research required: clarify docs/issues versus docs/bugs lifecycle and migration
 
-**Status:** OPEN — RESEARCH REQUIRED; documentation taxonomy defect/ambiguity, solution not decided
+**Status:** CLOSED — research, not a bug: moved to `docs/ideas.md` (grooming 2026-11-12, operator); was: RESEARCH REQUIRED; documentation taxonomy defect/ambiguity, solution not decided
 **Branch:** `k3d-manager-v1.61.1` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 (tracking and retrieval reliability)
-**Waiting on:** investigation
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Documentation taxonomy and workflow hygiene research issue with no runtime failure and an existing filing workaround); Claude proposed P2. Claude's higher P2 stands until the operator decides.
+**Triage:** close — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
 **Filed:** 2026-10-13, operator request
 **Release:** v1.61.1 (triage 2026-10-15, operator-approved placement)
 **Approval:** explicit operator request to file research bug; no bulk rename or migration authorized
