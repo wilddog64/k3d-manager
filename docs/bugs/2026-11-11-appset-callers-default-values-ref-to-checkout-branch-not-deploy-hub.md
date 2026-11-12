@@ -1,8 +1,8 @@
 # Bug: three ApplicationSet appliers still default the values ref to the checkout branch, undoing deploy/hub
 
-**Status:** OPEN — found 2026-11-11 from a Hermes values_branch incident
+**Status:** LANDED `37bf2b5f` 2026-11-11 (Luna, 2 rounds; independent verifier pass, red on `8f9b33ed`; Flash 3.8 review: land after fixes, test-only finding open below; Claude 8/8 red/green) — found 2026-11-11 from a Hermes values_branch incident
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11 (E3 after promote)
 **Severity:** after any cluster-up/preflight/observability deploy run from a release-branch checkout, hub Applications track that branch instead of `deploy/hub`, so unpromoted config deploys and promote is bypassed. Workaround: approve Hermes repair `deploy_argocd_applicationsets --confirm` or run `make appsets-reapply` afterwards.
 **Introduced by:** `897cfe72` (v1.43.15, hub deploy ref `deploy/hub`) — these writers were not in its Contract readers list
 **Should have been caught by:** spec (Contract readers grep)
@@ -92,3 +92,9 @@ Before your last message, do all of these and paste the evidence:
 5. Never run `git config --global`, `make install-*`, or anything against a real cluster; set git identity through env
    vars or the scratch repo's own config.
 
+
+## Review findings carried (Flash 3.8, 2026-11-11)
+
+- should-fix, test only: the preflight `kubectl get applications.argoproj.io` stub omits `spec.destination.name`, so
+  tests 1 and 2 reach the wait timeout and do not assert exit status. Their YAML assertions still hold. For triage.
+- nit: an explicitly empty `K3D_MANAGER_BRANCH` falls back to `deploy/hub` (same as `scripts/plugins/argocd.sh:1289`). No change.
