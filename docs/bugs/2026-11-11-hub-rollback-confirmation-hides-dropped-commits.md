@@ -2,11 +2,12 @@
 
 **Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude (scratch repo + reading)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-11 (intent approval of the Acceptance below)
+**Waiting on:** fix running — since 2026-11-11
 **Introduced by:** `897cfe72` (v1.43.15, deploy/hub with hub-promote and hub-rollback)
 **Should have been caught by:** review
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` — read, different case (that fix guards commits on top of the stack top; it states a rollback "drops the latest promotion's commits by design"); `docs/bugs/2026-11-08-hub-promote-no-op-promote-tags-and-breaks-rollback.md` — read, different root cause
-**Approval:** operator, 2026-11-11 (semantics: "return to the state live just before last promote"); intent approval pending
+**Approval:** operator, 2026-11-11 (semantics: "return to the state live just before last promote")
+**Intent approved:** operator, 2026-11-11
 
 ## Symptom
 
