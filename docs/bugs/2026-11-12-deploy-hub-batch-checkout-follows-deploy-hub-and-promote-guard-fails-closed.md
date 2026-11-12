@@ -2,12 +2,14 @@
 
 **Status:** OPEN — batch fix spec, written 2026-11-12
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12 (intent approval)
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** v1.43.15 (checkout auto-sync and deploy/hub promote plans)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — this is a batch spec over six captured docs; each doc carries its own Prior art line
 **Approval:** operator, 2026-11-12 ("dispatch as you suggest": deploy/hub batch first, in the bug slot)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-12
+**Intent approval source:** "aporved" (operator, 2026-11-12), from https://claude.ai/artifact/JJJykdXexdKzfdoQ5cKXcm; every decision at its default
+**Decisions:** operator, 2026-11-12, all Accept: missing role file exits 1; backup ref is the only copy kept; containment failure warns in status and refuses promote/rollback even with BREAK_GLASS; new result words; Part G regression test only; Claude edits `.github/copilot-instructions.md:42,139` at land
 **Filed:** 2026-11-12
 **Branch:** `k3d-manager-v1.44.0`
 **Agent:** Codex `gpt-6-luna`; cross-vendor diff review Flash 3.8 (`gemini-3.8-flash-medium`)

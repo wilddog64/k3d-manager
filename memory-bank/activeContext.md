@@ -510,3 +510,10 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - **lib-foundation PR #83** (`feat/run-parallel`: `_install_promtool` + `_run_parallel`) opened 2026-11-12; after merge tag v0.5.5 and subtree-pull (needed by plan 1 Part B and C2 Part B).
 - **Post-merge 7b** committed `3ef2c0f9` (projectbrief, copilot-instructions, functions.md; CLAUDE.md 248 → 150 with history in `docs/process/rules.md`). **7c:** MEMORY.md 156 → 153 (8 stale memories removed).
 - **Live checks owed by operator:** cost E3 needs a 30d-window screenshot of the Cost row; auto-sync E6 needs a dashboard-touching promote then 30 min without platform-ops; control-node-linux E3/E4 wait on the fresh-linux P3 (test-hygiene batch).
+
+## SESSION 2026-11-12 (afternoon) — approvals in, wave 1 dispatching
+- Intents approved (operator, 2026-11-12) on deploy/hub batch, test-hygiene batch, dev-hub (A then B), plan 2.
+- Dispatching now: deploy/hub batch, test-hygiene batch (Luna + Flash diff-review child each). Plan 2 and dev-hub A
+  wait on test-hygiene landing (shared Makefile). Claude still has to write the dev-hub A/B split into the spec.
+- lib-foundation PR #83: Copilot fixed in b3a9351d; CI re-run pending; test 157 flake unexplained if it recurs.
+- Plan 5 Slack config token: operator creates it when home.

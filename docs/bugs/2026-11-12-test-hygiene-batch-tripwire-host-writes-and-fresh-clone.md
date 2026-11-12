@@ -2,12 +2,14 @@
 
 **Status:** OPEN — batch fix spec, written 2026-11-12
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** per part: unknown (A); `bd68d6ff` v1.43.12 (B); `82c1d9c8` v1.43.14 (C), pre-existing `945018ee` v1.36.0 (D), `76446d6e` v1.43.15 (E); unknown (F)
 **Should have been caught by:** review (A, B, C); offline test (D, E); unknown (F, filed before the line was required)
 **Prior art:** none above threshold — this is a batch spec over four captured docs; each doc carries its own Prior art line
 **Approval:** operator, 2026-11-12 ("dispatch as you suggest": test-hygiene batch, prerequisite for plan 1 Part B)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-12
+**Intent approval source:** "aporved" (operator, 2026-11-12), from https://claude.ai/artifact/JJJykdXexdKzfdoQ5cKXcm; every decision at its default
+**Decisions:** operator, 2026-11-12: N3, N7, N10 shown red by mutation only (Accept); possible false red on a concurrent real plist rewrite (Accept); add `test-host` to `NEVER_EXPOSED` in `scripts/tests/bin/test_cloud_bridge.py:935` (Yes)
 **Filed:** 2026-11-12
 **Branch:** `k3d-manager-v1.44.0`
 **Agent:** Codex `gpt-6-luna`; cross-vendor diff review Flash 3.8 (`gemini-3.8-flash-medium`)
@@ -98,7 +100,7 @@ restated below with new IDs so one verifier can work from one block. Checked aga
 `Makefile` target `test-host` runs `bats scripts/tests/host` on macOS with no tripwire, is not part of `test`,
 `test-bin`, `test-python` or `test-all`, and gets a help line saying it touches the real Keychain tool and the user's
 search list and restores the list. Add it to `.PHONY` (`Makefile:110`). `test_test_tripwire.py` gains an assertion
-that `test-host` is *not* wrapped. No change to `bin/k3dm-machine-secrets`. `make test-bin` loses exactly these two
+that `test-host` is *not* wrapped. Add `"test-host"` to `NEVER_EXPOSED` in `scripts/tests/bin/test_cloud_bridge.py:935` (operator, 2026-11-12). No change to `bin/k3dm-machine-secrets`. `make test-bin` loses exactly these two
 cases, by design.
 
 Decided details for B:
@@ -227,6 +229,7 @@ Unchanged and re-checked: `bin/cluster-status:431`, `observability.sh:589`, `mac
 | `scripts/tests/bin/machine_secrets.bats` | B (remove the two cases) |
 | `scripts/tests/host/machine_secrets_real_keychain.bats` (new) | B |
 | `Makefile` | B (`test-host`, `.PHONY`, help line) |
+| `scripts/tests/bin/test_cloud_bridge.py` | B (`test-host` in `NEVER_EXPOSED`) |
 | `scripts/tests/core/suite_discovery.bats` | B (accept `scripts/tests/host/`) |
 | `scripts/tests/plugins/agent_dispatch_dashboard.bats` | C, F |
 | `scripts/tests/fixtures/agent-dispatch-dashboard-028b898f.yaml` (new) | C |
