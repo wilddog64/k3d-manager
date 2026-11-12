@@ -20,10 +20,10 @@ New ideas land here first, as one line each. They are not plans, not bugs, and n
   new row.
 - No row cap: grooming is what forces the decisions.
 
-**Bug triage (operator, 2026-11-08; effective from v1.44.0; full rule in `CLAUDE.md`, Versioning and release scope):**
+**Bug triage (operator, 2026-11-08; capture-first 2026-11-11; full rule in `CLAUDE.md`, Versioning and release scope):**
 after `/post-merge`, `/release-groom` gives every open bug one word: `patch` (cut `X.Y.N+1`), `carry` (into
-`X.(Y+1).0`) or `close`. Patches are optional. P1s block the release. A P2 the release introduced can move only with a
-stated workaround and the operator's decision. At most 10 P3s per release, counting every P3 assigned to that release whether open or already fixed; unassigned backlog P3s do not count (operator, 2026-11-09); a P3 passed over at two groomings is closed
+`X.(Y+1).0`) or `close`. Patches are optional. P1s block the release. P2s and P3s are captured, then triaged; they never block a release PR
+by themselves. At most 10 P3s per release, counting every P3 assigned to that release whether open or already fixed; unassigned backlog P3s do not count (operator, 2026-11-09); a P3 passed over at two groomings is closed
 as won't-fix unless the operator gives a reason to keep it.
 
 **Status words:** `inbox`, `promoted` (plan path), `kept` (count of weeks and reason, e.g. `kept (2×, waits on D1)`),
