@@ -1,8 +1,7 @@
 # repo-sync's launchd job has no PATH, so the hub's appsets-check is always unknown
 
-**Status:** LANDED `21acd3ca` 2026-11-11 (Flash 3.8, 4 rounds; Luna + Fable review; Claude 3/3) — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude on the M4 (launchd PATH) and the M5 (live state)
+**Status:** LANDED `21acd3ca` 2026-11-11, live E3 met 2026-11-12 (Flash 3.8, 4 rounds; Luna + Fable review; Claude 3/3) — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude on the M4 (launchd PATH) and the M5 (live state)
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-11 (E3 on the M5: promote, make install-repo-sync, state.json without appsets-reapply unknown)
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** live check
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context missing); `grep -lE 'launchd.*PATH|EnvironmentVariables' docs/bugs` found only older PyYAML/port-forward docs, different root cause
@@ -82,3 +81,7 @@ Before your last message, do all of these and paste the evidence:
    the changed code once that way and paste what it printed. Otherwise say "no read-only real-data run possible" and
    why.
 4. List every place where you chose something the spec did not decide (a default, a path, a mode, an edge case).
+
+## Live verification 2026-11-12 (Claude, M5 over ssh)
+
+After the promote, repo-sync fast-forwarded the hub checkout `64e98c62` -> `9f5f0d89` at 04:03 on its own (`promote_backlog: 1`). The operator ran `make install-repo-sync`; `launchctl print gui/501/com.k3d-manager.repo-sync` shows `PATH => /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`. The job's first run (state.json `run_time` 04:10:00) wrote `deploy_unknown: []`, `deploy_pending: []`; the run before it (04:09:01, old job) still read `deploy_unknown: ['appsets-reapply']`.

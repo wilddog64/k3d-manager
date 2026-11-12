@@ -1,3 +1,4 @@
+- 2026-11-12 04:10: hub promoted 9f5f0d89 (tag hub-promote/20261112T120123Z). Live: appset fix E3 met (appsets-check 21 refs deploy/hub) -> VERIFIED; repo-sync PATH E3 met (deploy_unknown [] after install-repo-sync); auto-sync followed promote 64e98c62->9f5f0d89. Next: v1.43.15 release PR.
 - 2026-11-12: 22 open bug docs relabelled Waiting on dispatch -> operator decision (capture-first; nothing dispatched). disk-metrics (LANDED, waiting independent verifier) left as is.
 - 2026-11-11 late: triage trigger raised 10 -> 20 captured (or oldest 7 days), operator; logged in docs/process-metrics.md tuning log.
 - 2026-11-11 late: triage trigger set (operator 'sounds good'): 10 captured since last triage or oldest 7 days, from v1.44.0; Wednesday slot dropped. Shared rule block, release-groom, process-metrics (triage sessions metric, tuning log) updated.
