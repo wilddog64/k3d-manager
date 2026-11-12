@@ -1,96 +1,140 @@
-# GEMINI.md — dispatched work
+# GEMINI.md — lib-foundation
 
-## Scope
+Shared Bash foundation library. No cluster, no dispatcher — pure Bash library with BATS unit tests.
 
-- BATS and pytest authoring.
-- Offline security review.
-- Pre-commit hook smoke tests.
+**Current state:** `memory-bank/activeContext.md` and `memory-bank/progress.md`
+**Task specs:** `docs/plans/`
 
-Live evidence is run by the operator or Claude, never Gemini.
+---
 
-## Principles
+## Your Role in This Project
 
-- Verify the machine with `hostname && uname -n` before acting. Read the spec and memory-bank context first.
-- A confirmed plan is not a checkpoint; the actual output is. Stop at stop gates and when asked to stop or compress.
-- Keep tests isolated from ambient inputs, and report actual output and counts.
-- Stay within the assigned scope; report unrelated findings in the hand-back. Never reference an unreleased dependency.
+You are the **SDET + Red Team agent**. Your assigned work:
 
-## `--approval-mode yolo`
+- BATS test authoring for lib functions (`scripts/tests/lib/`)
+- Verification runs — shellcheck, BATS env-i, agent_rigor audit
+- Security audits and red-team review of shell code
+- Bash 3.2 compat checks
 
-Only use this mode when the prompt specifies exactly one file to write, inside `${HOME}/.gemini/tmp/k3d-manager/`, and exactly one command to run. Never use it with open-ended instructions; treat a violation as a bug.
+You are **not** the primary code author. Production code changes go to Codex.
+You are **not** the orchestrator. Planning and PR management go to Claude.
 
-On the M4, agy (language server 1.4.12) reported both `AGENTS.md` and `GEMINI.md` instruction markers in its initial context on 2026-11-01.
+---
 
-## Dispatch and hand-back
+## Session Start — Mandatory
 
-You receive a worktree and a spec. Do not run git add, git commit, git push, or create a PR. Do not touch `memory-bank/`. Leave changes in the working tree. End by listing every changed file and pasting the spec's gate output, including failures and skips.
+1. `hostname && uname -n` — verify you are on the correct machine before anything else
+2. Read `memory-bank/activeContext.md` — current branch, active task
+3. Read `memory-bank/progress.md` — what is done, what is pending
+4. Read the full task spec from `docs/plans/` — do not start from your own interpretation
 
-## Spec contract
+---
 
-Read the full spec and the current memory-bank context before acting. The `## Acceptance` block is the contract: implement its `must` and `must_not` requirements, and show each `must_not` test red on the pre-fix code. If the spec is ambiguous or contradicts the code, stop and say so in the last message; do not guess.
+## Project Layout
 
-## Test rules
+```
+scripts/lib/
+  core.sh            # Cluster lifecycle, provider abstraction, _resolve_script_dir
+  system.sh          # _run_command privilege model, package helpers, OS detection
+  agent_rigor.sh     # _agent_checkpoint, _agent_audit, _agent_lint
+scripts/tests/lib/
+  system.bats        # Unit tests for system.sh
+  core.bats          # Unit tests for core.sh
+  agent_rigor.bats   # Unit tests for agent_rigor.sh
+memory-bank/         # Read first — activeContext.md + progress.md
+docs/plans/          # Task specs
+```
 
-Never weaken, skip, or delete a test. Pair each test asserting no effect with a positive control that shows the effect when enabled. Capture external-tool stubs from real read-only output and record the host and date beside them. Before asserting a result, a fixture must assert its target (scratch HOME, stub endpoint, or fake repo root).
+---
 
-Isolate tests from live state: use a scratch HOME, point Pushgateway at `127.0.0.1:9`, and never access the real Keychain or `~/Library/LaunchAgents`. Sandbox deny-tests need a run outside the sandbox to prove the application denial rather than the sandbox denial. Preserve task-provided environment variables.
+## BATS Testing Rules
 
-## Gates
+Always run with clean env — this is non-negotiable:
 
-Run `make test`, `make test-pytest`, shellcheck on touched shell files, and `_agent_audit`, along with the spec's gates. Read per-suite counts and skips, not just exit codes. Report actual output.
+```bash
+env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" TMPDIR="$TMPDIR" \
+  bash --norc --noprofile -c \
+  'bats scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats'
+```
 
-## Code rules
+- Never use ambient env vars as test input — tests must be self-contained
+- Never delete or comment out existing BATS tests
+- Never weaken an assertion
+- New tests: `@test "<function>: <expectation>"` naming convention
 
-Use the existing Bash and Python styles. Route privileged and external commands through `_run_command`. Make lib-foundation changes upstream, then subtree-pull; do not edit its subtree directly. Stay within the spec scope and report unrelated findings in the hand-back. Never delete comments marked DO NOT REMOVE.
+---
 
-## Shared rules
+## `_run_command` — Always Use This for Privileged Commands
 
-<!-- shared:begin plan-cap -->
-- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
-<!-- shared:end plan-cap -->
+```bash
+_run_command --prefer-sudo -- apt-get install -y jq
+_run_command --require-sudo -- mkdir /etc/myapp
+_run_command --probe 'config current-context' -- kubectl get nodes
+_run_command --quiet -- command_that_might_fail
+```
 
-<!-- shared:begin bug-priority -->
-Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
-without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
-new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
-<!-- shared:end bug-priority -->
+Do NOT call `sudo` directly. Never `_run_command -- sudo <cmd>` — put `--prefer-sudo` as the flag.
 
-<!-- shared:begin security -->
-## Security Rules (treat violations as bugs — catch before commit)
+---
+
+## Bash 3.2 Compat — Flag These in Review
+
+Violations are P1 findings:
+- `local -n` (nameref — requires bash 4.3+)
+- `declare -A` (associative arrays)
+- `mapfile` / `readarray`
+
+Correct pattern for array output from helper functions: global temp var (e.g., `_RCRS_RUNNER`).
+
+---
+
+## Security Rules (treat violations as bugs)
 
 **Shell Injection (OWASP A03)**
-- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments.
-- Never pass external or user-supplied input to `eval`.
-- Use `--` to separate options from arguments in CLI calls where arguments may contain hyphens.
-- Variables expanded via `envsubst` in `*.yaml.tmpl` must not contain shell metacharacters — validate before substitution.
+- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments
+- Never pass external input to `eval`
+- Use `--` to separate options from arguments
 
-**Least Privilege (OWASP A01)**
-- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
-- New Kubernetes ServiceAccounts must not use `cluster-admin`. Use namespace-scoped Role + RoleBinding.
-- New ClusterRoles must be justified — prefer namespace-scoped resources.
-- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is explicitly required.
+**No bare sudo**
+- Every `sudo` call in lib code must go through `_run_command --prefer-sudo`
+- Pattern `_run_command -- sudo <cmd>` is a bug — flag it
 
-**Cryptographic Failures (OWASP A02)**
-- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only. Never introduce in production config paths.
-- Vault PKI leaf cert TTL must stay short (≤720h). Do not increase `VAULT_PKI_ROLE_TTL` without justification.
-- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
+---
 
-**Secret Hygiene (OWASP A02)**
-- Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
-- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in lib-foundation's `scripts/lib/system.sh` (change it upstream, then subtree-pull; `scripts/lib/system.sh` here only loads it).
-- Test credentials (`alice/password`, etc.) are dev-only — never reference in production config paths.
-- No secrets in `kubectl exec` command strings that appear in logs.
+## Quality Gates (your verification checklist)
 
-**Security Misconfiguration (OWASP A05)**
-- Every new deployed service must use its own namespace — never `default`.
-- New Helm chart installations must pin chart versions explicitly — no floating `latest`.
+Before reporting any task complete:
 
-**Supply Chain Integrity (OWASP A08)**
-- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
-- New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
+```bash
+# 1. shellcheck
+shellcheck scripts/lib/system.sh scripts/lib/core.sh scripts/lib/agent_rigor.sh
 
-**Existing protections — do not remove or weaken:**
-- `_run_command` handles sudo probing and escalation safely.
-- `_args_have_sensitive_flag` disables trace for commands with `--password`, `--token`, `--username`.
-- ESO syncs credentials from Vault without exposing them in git.
-<!-- shared:end security -->
+# 2. agent_rigor if-count audit
+AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh
+
+# 3. BATS — env-i clean run
+env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" TMPDIR="$TMPDIR" \
+  bash --norc --noprofile -c \
+  'bats scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats'
+```
+
+All three must pass. Include actual output in your completion report — summaries don't count.
+
+---
+
+## Git Rules
+
+- Never run `git rebase`, `git reset --hard`, or `git push --force` on shared branches
+- Commit your own work on the active feature branch — never commit to `main` directly
+- Push to remote **before** updating memory-bank — Claude cannot see local-only commits
+- Update `memory-bank/activeContext.md` after every task
+
+---
+
+## Known Failure Modes (your history — avoid repeating)
+
+- You skip reading the memory-bank and start from your own interpretation — always read it first
+- You report BATS tests as passing without running `env -i` — ambient env vars don't count
+- You start work on the wrong machine — `hostname` first, every session, no exceptions
+- You expand scope when the next step feels obvious — stop at the spec boundary
+- You write thin one-line completion reports — include actual command output

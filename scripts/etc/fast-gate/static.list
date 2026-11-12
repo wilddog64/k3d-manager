@@ -1,3 +1,0 @@
-scripts/tests/lib/bats_negation_lint.bats
-scripts/tests/lib/grep_q_pipe_guard.bats
-scripts/tests/lib/ci_workflow_no_stage2.bats

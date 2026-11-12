@@ -5,7 +5,7 @@
 **Approval:** operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** Claude, k3d-manager jobs `87c78389` and `e7a0ecfb` on the M5
-**Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14). Fix branch: lib-foundation `fix/acg-hub-ec2-key-and-extend-profile` (dispatched from k3d-manager with `--repo`; upstream copy: lib-foundation `docs/bugs/2026-11-01-acg-new-hub-ec2-key-import-and-extend-profile.md`)
+**Branch:** `fix/acg-hub-ec2-key-and-extend-profile`
 **Consumer specs (full evidence):** k3d-manager `docs/bugs/2026-11-01-hub-has-no-ec2-ssh-key-acg-up-fails.md`
 (the `acg_provision` half), k3d-manager `docs/bugs/2026-11-01-acg-extend-guard-reads-stale-profile-dir.md`
 
