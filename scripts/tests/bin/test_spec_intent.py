@@ -133,8 +133,12 @@ def test_all_existing_specs_are_exempt_as_of_this_commit():
     ).stdout.splitlines()
     assert len(existing) > 500
     specs = [path for path in specs if str(path.relative_to(repo)) in existing]
+    baseline_date = spec_intent.dt.date.fromisoformat(subprocess.run(
+        ["git", "-C", str(repo), "log", "-1", "--format=%cs", "c5d28596"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip())
     for path in specs:
-        result = check(path)
+        result = check(path, first_commit_date=baseline_date)
         if result:
             gaps[str(path.relative_to(repo))] = result
     assert gaps == {}

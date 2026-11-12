@@ -716,8 +716,15 @@ rollback: yes"
 
 @test "G regression: non-TTY promoter test completes when suite stdin is a terminal" {
   clean_path="${PATH#"$BATS_TEST_TMPDIR/stubs:"}"
-  run env -u SCRATCH_REPO -u TEST_ORIGIN -u REAL_GIT_PATH -u CALLS PATH="$clean_path" \
-    perl -e 'alarm 60; exec @ARGV' script -q /dev/null bats -f 'N2: non-TTY' "$BATS_TEST_FILENAME"
+  clean_path="$(printf '%s' "$clean_path" | tr ':' '\n' | grep -v '/libexec/bats-core$' | paste -sd: -)"
+  if script --version 2>/dev/null | grep -q util-linux; then
+    inner="$(printf '%q ' bats --tap -f 'N2: non-TTY' "$BATS_TEST_FILENAME")"
+    run env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH="$clean_path" \
+      perl -e 'alarm 60; exec @ARGV' script -qec "$inner" /dev/null
+  else
+    run env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH="$clean_path" \
+      perl -e 'alarm 60; exec @ARGV' script -q /dev/null bats -f 'N2: non-TTY' "$BATS_TEST_FILENAME"
+  fi
   [ "$status" -eq 0 ]
 }
 
