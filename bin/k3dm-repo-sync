@@ -16,6 +16,7 @@ STATE_DIR = pathlib.Path(os.environ.get("K3DM_REPO_SYNC_STATE_DIR", pathlib.Path
 STATE = STATE_DIR / "state.json"
 LOCK = STATE_DIR / "lock"
 TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_TIMEOUT", "60"))
+UPSTREAM_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_UPSTREAM_TIMEOUT", "15"))
 APPSETS_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_APPSETS_TIMEOUT", "15"))
 
 
@@ -120,6 +121,7 @@ def result_for(path, is_hub):
         rec["result"] = "skipped:detached"
         return rec
     rec["branch"] = branch.stdout.strip()
+    is_hub_root = is_hub and path.resolve() == ROOT.resolve()
     gitdir = pathlib.Path(git(path, "rev-parse", "--git-dir").stdout.strip())
     if not gitdir.is_absolute():
         gitdir = path / gitdir
@@ -128,23 +130,32 @@ def result_for(path, is_hub):
         return rec
     up = git(path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
     if up.returncode:
-        rec["result"] = "skipped:no-upstream"
-        return rec
-    upstream = up.stdout.strip()
-    remote, _, ref = upstream.partition("/")
-    if is_hub and path.resolve() == ROOT.resolve():
+        if not is_hub_root:
+            rec["result"] = "skipped:no-upstream"
+            return rec
+        remote_config = git(path, "config", "--get", f"branch.{rec['branch']}.remote")
+        merge_config = git(path, "config", "--get", f"branch.{rec['branch']}.merge")
+        remote = remote_config.stdout.strip() if remote_config.returncode == 0 else ""
+        if not remote:
+            remote = "origin"
+        merge_ref = merge_config.stdout.strip() if merge_config.returncode == 0 else ""
+        ref = merge_ref[len("refs/heads/"):] if merge_ref.startswith("refs/heads/") else ""
+        rec["promote_backlog_unknown"] = True
+    else:
+        upstream = up.stdout.strip()
+        remote, _, ref = upstream.partition("/")
+    if is_hub_root:
         fetch_args = [
             "fetch",
             "--no-tags",
             remote,
             f"+refs/heads/deploy/hub:refs/remotes/{remote}/deploy/hub",
-            f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}",
         ]
         target = f"{remote}/deploy/hub"
     else:
         fetch_args = ["fetch", "--no-tags", remote, f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}"]
         target = upstream
-    comparison_ref = f"{remote}/deploy/hub" if is_hub and path.resolve() == ROOT.resolve() else upstream
+    comparison_ref = f"{remote}/deploy/hub" if is_hub_root else upstream
     counts = git(path, "rev-list", "--left-right", "--count", f"HEAD...{comparison_ref}")
     if counts.returncode == 0:
         vals = counts.stdout.split()
@@ -155,6 +166,8 @@ def result_for(path, is_hub):
             return rec
     if os.environ.get("K3DM_REPO_SYNC_CHECK") == "1":
         rec["result"] = "would-update" if rec["behind_before"] else "current"
+        if is_hub_root:
+            rec["promote_backlog_unknown"] = True
         return rec
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
@@ -167,6 +180,17 @@ def result_for(path, is_hub):
     if fetched.returncode:
         rec["result"] = "fetch_failed"
         return rec
+    if is_hub_root and ref:
+        try:
+            upstream_fetched = run(
+                ["git", "-C", str(path), "fetch", "--no-tags", remote,
+                 f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}"],
+                timeout=UPSTREAM_TIMEOUT, env=env)
+            rec["promote_backlog_unknown"] = upstream_fetched.returncode != 0
+        except subprocess.TimeoutExpired:
+            rec["promote_backlog_unknown"] = True
+    elif is_hub_root:
+        rec["promote_backlog_unknown"] = True
     fresh_counts = git(path, "rev-list", "--left-right", "--count", f"HEAD...{target}")
     if fresh_counts.returncode == 0:
         fresh_ahead, rec["behind_before"] = map(int, fresh_counts.stdout.split()[:2])
@@ -324,7 +348,8 @@ def main():
                 state["deploy_unknown"].append("appsets-reapply")
             try:
                 root_rec = next((r for r in records if pathlib.Path(r["path"]).resolve() == ROOT.resolve()), None)
-                if root_rec and root_rec.get("result") != "fetch_failed":
+                if (root_rec and root_rec.get("result") != "fetch_failed"
+                        and not root_rec.get("promote_backlog_unknown", False)):
                     upstream_ref = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip()
                     backlog = git(ROOT, "rev-list", "--count", f"origin/deploy/hub..{upstream_ref}")
                     state["promote_backlog"] = int(backlog.stdout.strip()) if backlog.returncode == 0 else None
