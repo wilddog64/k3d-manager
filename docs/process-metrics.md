@@ -65,3 +65,5 @@ Judged after 2–3 releases.
 |---|---|---|---|---|---|---|---|---|
 | 2026-11-12 | dev-hub-vcluster-b (1) | Fable | 107,610 | 13 | 11 (2 low pending) | 0 | 1 | 3 |
 | 2026-11-12 | dev-hub-vcluster-b (1) | Claude | — | 2 | 2 | 0 | 1 | 1 |
+| 2026-11-12 | dev-hub-vcluster-b (2) | Fable | 135,495 | 5 + 7 low | 5 checked (H1 reproduced by both; M3 read by Claude), rest plausible | 0 | 1 | 2 (M2 teardown advice, M3 silent exit) |
+| 2026-11-12 | dev-hub-vcluster-b (2) | Claude | — | 1 | 1 | 0 | 1 | 0 |
