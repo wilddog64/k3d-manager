@@ -2,7 +2,7 @@
 
 **Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; reproduced by Claude in a scratch repo
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-11
+**Waiting on:** fix running — since 2026-11-11
 **Introduced by:** `d06c0340` (v1.43.15, hub-sync promote backlog fix)
 **Should have been caught by:** spec (the backlog fix spec said "second refspec in the same `git fetch`")
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing); `grep "couldn't find remote ref" docs/bugs` no match
