@@ -16,7 +16,10 @@ triage; P2/P3 are captured and triaged at `/release-groom`.
 | Triage outcome | of captured P2/P3: `patch` / `carry` / `close` at the post-merge grooming | some `close`: work we never needed |
 | **Safety: escalations** | captured P2/P3 later raised to P1/P0, or that caused an incident before triage | **0** |
 | Escaped bugs | filed after the merge with `**Introduced by:**` this release | not higher than baseline |
+| Triage sessions | per session: trigger (count or age), bugs triaged, minutes, share closed | under ~15 min; some closed |
 | Classification agreement | bugs where Claude's Priority equals the second agent's; disagreements by direction | high agreement; disagreements reviewed |
+
+**Tuning:** the operator expects these rules to change as data comes in; record each change here with its date and reason.
 
 **Revert trigger:** any escalation that the wait made worse. Claude reports it at once, not at the review.
 
