@@ -459,7 +459,7 @@ REF: $promoted"
 
 @test "M1 N1 E1: rollback preserves a promoter commit present before the last promotion" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   _prepare_kept_pin_promotion
   [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$B_WITH_X" ]
 
@@ -577,7 +577,7 @@ REF: $promoted"
   _promote_sha "$A_SHA"
   _promote_sha "$B_SHA"
   missing=1111111111111111111111111111111111111111
-  ! git -C "$WORK" cat-file -e "$missing^{commit}" 2>/dev/null
+  if git -C "$WORK" cat-file -e "$missing^{commit}" 2>/dev/null; then false; fi
   git -C "$WORK" tag -a hub-promote/20261107T211500Z "$B_SHA" -m "action: promote
 old: $missing
 new: $B_SHA
@@ -593,13 +593,13 @@ REF: $B_SHA"
 
 @test "M4: rollback replay warns and continues when old SHA cannot be fetched" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   _prepare_promotion_history
   _promote_sha "$A_SHA"
   _promote_sha "$B_SHA"
   _promote_sha "$C_SHA"
   missing=1111111111111111111111111111111111111111
-  ! git -C "$WORK" cat-file -e "$missing^{commit}" 2>/dev/null
+  if git -C "$WORK" cat-file -e "$missing^{commit}" 2>/dev/null; then false; fi
   printf '4\n' > "$DATE_COUNTER"
   git -C "$WORK" tag -a hub-promote/20261107T210004Z "$B_SHA" -m "action: rollback
 old: $missing
@@ -745,7 +745,7 @@ _prepare_kept_pin_promotion() {
 
 @test "N1: promote refuses when deploy/hub contains uncontained promoter commit (E1)" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   _make_candidate
   _create_promoter_commit_on_hub
   promoter_sha="$PROMOTER_SHA"
@@ -774,7 +774,7 @@ _prepare_kept_pin_promotion() {
 
 @test "M1: promote succeeds when target contains promoter commit by cherry-pick" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   _make_candidate
   _create_promoter_commit_on_hub
   promoter_sha="$PROMOTER_SHA"
@@ -792,7 +792,7 @@ _prepare_kept_pin_promotion() {
 
 @test "M1 positive control: promote succeeds when target contains deploy/hub by ancestry" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   git -C "$WORK" checkout -q deploy/hub
   git -C "$WORK" checkout -qb feature/ancestor-candidate
   printf 'feature on deploy/hub\n' > "$WORK/anc.txt"
@@ -808,7 +808,7 @@ _prepare_kept_pin_promotion() {
 
 @test "N2: rollback refuses promoter commits not in stack top; BREAK_GLASS=1 permits (E3)" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   _prepare_promotion_history
   _promote_sha "$A_SHA"
   _promote_sha "$B_SHA"
@@ -841,7 +841,7 @@ _prepare_kept_pin_promotion() {
 
 @test "status reports uncontained commits on deploy/hub" {
   [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
-  [ "$ORIGIN" != *"github.com"* ]
+  [[ "$ORIGIN" != *"github.com"* ]]
   _make_candidate
   _create_promoter_commit_on_hub "fix(cve): pin shopping-cart to sha256:abcd"
   promoter_sha="$PROMOTER_SHA"
