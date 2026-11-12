@@ -77,28 +77,3 @@ Before your last message, do all of these and paste the evidence:
    the changed code once that way and paste what it printed. Otherwise say "no read-only real-data run possible" and
    why.
 4. List every place where you chose something the spec did not decide (a default, a path, a mode, an edge case).
-```
-
-### 2. Cross-vendor diff review before Claude's review
-
-When the worker exits successfully, a reviewer from the other vendor reviews the diff against the spec: Flash
-reviews Luna's work, and Luna reviews Flash's. It is linked to the task:
-
-`bin/k3dm-codex-dispatch start --spec <review brief> --slug <slug>-review --parent <slug> --role review --agent <other>`
-
-- The brief gives the reviewer the spec and the worker's diff, and asks for findings only, with file:line, the input
-  that breaks it, and the spec line it violates. The reviewer changes no files.
-- Findings are advisory. Claude checks each one, sends the real ones back to the worker by `resume`, and records the
-  rest as noise.
-- Claude still reviews last, before `codex-land`.
-- The diff goes inline in the brief, `docs/reviews/<slug>-review.md`, committed before `start` (settled on first use,
-  2026-11-08). Untracked new files are included with `git add -N` before `git diff`, then unstaged again.
-- `start` runs the intent gate for review children too. The operator approves each brief, and the brief carries
-  `**Intent approved:**` (operator, 2026-11-08, choosing this over exempting `--role review` from the gate).
-- `start` also needs a `## Files` section with a backticked path: list the files under review, marked read-only.
-
-### 3. Spec review by a second agent before intent approval
-
-Before Claude shows the operator the intents of a trial spec, an agent that did not write it runs `/spec-review`
-against it. The agent also answers: what does the spec leave undecided that a worker would have to guess (paths,
-modes, platforms, defaults)? Claude fixes the spec, and then asks for intent approval.
