@@ -45,3 +45,9 @@ under the new rule.
 |---|---|---|---|---|---|---|
 | v1.44.0 | | | | | | |
 | v1.45.0 | | | | | | |
+
+## Triage sessions
+
+| Date | Trigger | Bugs triaged | Outcome | Classification agreement | Notes |
+|---|---|---|---|---|---|
+| 2026-11-12 | post-merge `/release-groom` (v1.43.15) | 79 | carry 26, close 6, status corrected 6, out at P3 cap 9, passed over 31 (7 of them v1.43.16 picks, not counted) | Argon on 76: 43 equal, 29 higher, 4 lower; operator kept Claude's P on all 33 | Argon read "degraded with a workaround" as P2 for hygiene and test-only bugs: one systematic difference, not 29 separate ones. 869,027 Argon tokens, uncounted by any dashboard. Claude first computed the P3 cap with Argon's raises standing (17 vs 10) and corrected it before recording. `docs/grooming/2026-11-12.md` |
