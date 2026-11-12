@@ -4,6 +4,7 @@
 **Filed:** 2026-09-13
 **Status:** RECOVERED LIVE — durable fixes specced: Defect 1 → `2026-09-13-hub-recovery-serverlb-empty-upstreams.md`, Defect 2 → `2026-09-13-node-health-watch-restarts-on-host-api-unreachable.md`
 **Priority:** P3 — recovered live; the durable fixes are tracked in their own docs
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Related:** `2026-08-28-node-health-watch-restart-loop-slow-node.md`, `2026-09-11-hub-control-plane-readoption.md`
 
 ## Trigger

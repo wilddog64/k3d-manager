@@ -3,6 +3,7 @@
 **Filed:** 2026-10-22 (Claude, from the operator's HubDataExportFailed email)
 **Status:** OPEN
 **Priority:** P3 — cosmetic; the alert state is reachable at `https://alertmanager.3ai-talk.org`
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes" (file as P3)
 **Release:** v1.43.5 (bug; exempt from the plan cap)

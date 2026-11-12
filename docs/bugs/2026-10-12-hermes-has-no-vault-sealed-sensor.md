@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.46.0`
 **Status:** OPEN
 **Priority:** P3 — a visibility gap; the watchdog unseals Vault today, but nothing reports when it does not
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 

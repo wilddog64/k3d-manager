@@ -5,6 +5,7 @@
 **Status:** MITIGATED LIVE (watchdog `launchctl bootout` 2026-08-28 ~04:20 PDT — the forced
 restarts stopped; agent-0 holds Ready on its own). Durable fix below NOT yet in git.
 **Priority:** P3 — mitigated live (watchdog booted out)
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 
 ## Symptom
 

@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 — the Verified vs Live-verified gap overstates outstanding live work; no fix is wrong, and the list can be read by hand.
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Severity:** low
 **Release:** v1.43.6 (bug; exempt from the plan cap)
 **Filed:** 2026-10-24, by Claude, during the verified-not-live sweep the operator approved ("go ahead")

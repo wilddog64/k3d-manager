@@ -3,6 +3,7 @@
 **Filed:** 2026-10-22 (Claude, found during GitHub branch pruning)
 **Status:** OPEN
 **Priority:** P3 — the stray sets generate no Applications; they only pin a release branch and log errors
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "and file stale Hostinger ApplicationSets"
 **Release:** v1.43.5 (bug; exempt from the plan cap)

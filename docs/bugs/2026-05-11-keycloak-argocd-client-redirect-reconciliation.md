@@ -1,5 +1,7 @@
 # Bug: `acg-up` does not reconcile the existing Keycloak `argocd` client redirect URIs
 
+**Status:** LANDED — marked Fixed in the doc; fix commit not recorded
+
 ## Status
 Fixed
 

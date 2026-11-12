@@ -5,6 +5,7 @@
 **Component:** `scripts/plugins/signing.sh`, `scripts/etc/signing/cluster-policy-verify-images.yaml.tmpl`
 **Status:** ROOT-CAUSED + fixed live (Audit) on the app cluster (hostinger). Template codified.
 **Priority:** P3 — fixed live (Audit) and codified
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 
 ## Symptom
 

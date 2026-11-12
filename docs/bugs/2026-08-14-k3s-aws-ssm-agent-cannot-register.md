@@ -2,6 +2,7 @@
 
 **Status:** OPEN — mitigated (SSH fallback); not a bring-up blocker
 **Priority:** P3 — the sandbox comes up over the autossh tunnel; SSM is optional
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Discovered:** 2026-08-14
 **Component:** `scripts/lib/providers/k3s-aws.sh` SSM tunnel bring-up
 

@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Severity:** low — a false red from the documented `make fast-gate BASE=...` form; the pre-push hook and `land` pass the base positionally and are unaffected; workaround `scripts/ci/fast_gate.sh <sha>`
 **Approval:** operator, 2026-11-01 ("let's get the reminding items complete so we can create-pr"; found while running E4 of the fast-gate bug)
 **Filed:** 2026-11-01

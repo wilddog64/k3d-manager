@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Approval:** operator, 2026-10-30 ("go ahead to file P3 bug", after proposing the merged table)
 **Filed:** 2026-10-30
 **Detected by:** operator (reading Agent Cost on the hub)

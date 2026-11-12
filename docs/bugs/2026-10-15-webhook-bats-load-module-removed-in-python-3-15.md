@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.43.2`
 **Status:** OPEN
 **Priority:** P3 — test-only; it fails only where `python3` resolves to 3.15, and the operator's pyenv 3.13 still passes
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Approval:** explicit 2026-10-15 "go ahead" (operator, to "should I file the Python 3.15 `load_module` issue as a P3 bug?")
 **Severity:** low — no runtime code is affected; the four tests go red as soon as the shell's `python3` is 3.15
 

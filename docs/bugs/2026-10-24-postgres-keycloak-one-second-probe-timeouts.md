@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 — warnings only so far (0 restarts in 8 days); a run of three liveness misses would restart Keycloak's only database replica and stall logins for about a minute.
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Severity:** low
 **Release:** v1.43.6 (bug; exempt from the plan cap)
 **Filed:** 2026-10-24, by Claude, during the frontend-login live check

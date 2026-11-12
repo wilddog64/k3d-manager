@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2
+**Waiting on:** operator decision — since 2026-11-12 (awaits capture-first triage)
 **Severity:** medium — dispatch, cost and quality metrics describe almost all recent work as coming from an unknown coordinator, so the Opus-vs-Sol/Terra comparison the operator needs cannot be made
 **Release:** v1.43.10 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-29, operator: "we need to consider other models like OpenAI Sol6.1 and Terra 6.1 as primary coordinators as we are not capturing their work like yours"
