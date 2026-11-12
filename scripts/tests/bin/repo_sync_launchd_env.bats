@@ -262,8 +262,26 @@ _run_sync_with_path() {
   [ ! -s "$CALLS_LOG" ]
 }
 
+_no_brew_system_dir() {
+  local sys_dir="$SCRATCH/system_no_brew" d f name
+  mkdir -p "$sys_dir"
+  for d in /usr/bin /bin /usr/sbin /sbin; do
+    [ -d "$d" ] || continue
+    for f in "$d"/*; do
+      name="${f##*/}"
+      case "$name" in kubectl|gh) continue ;; esac
+      [ -e "$sys_dir/$name" ] || ln -s "$f" "$sys_dir/$name"
+    done
+  done
+  printf '%s\n' "$sys_dir"
+}
+
 @test "N1 positive control: default launchd PATH without Homebrew invokes installer for kubectl" {
-  local default_launchd_path="$SPIES_DIR:$REAL_TOOLS_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
+  local sys_dir default_launchd_path
+  sys_dir="$(_no_brew_system_dir)"
+  default_launchd_path="$SPIES_DIR:$REAL_TOOLS_DIR:$sys_dir"
+  if PATH="$default_launchd_path" command -v kubectl >/dev/null; then false; fi
+  if PATH="$default_launchd_path" command -v gh >/dev/null; then false; fi
 
   : > "$CALLS_LOG"
   _run_sync_with_path "$default_launchd_path"
