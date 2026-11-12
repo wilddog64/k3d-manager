@@ -7,8 +7,8 @@
 **Introduced by:** `897cfe72` (v1.43.15, hub deploy ref `deploy/hub`) — these writers were not in its Contract readers list
 **Should have been caught by:** spec (Contract readers grep)
 **Prior art:** exact-slug glob: none; related `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (different reader). `make find-similar-docs` not run (M4).
-**Approval:** Claude, 2026-11-11; dispatch go: operator, 2026-11-11 ("go ahead to dispatch task. you can pick up agent this time")
-**Intent approved:** operator, 2026-11-11 (same message, on Claude's recommendation to fix before the v1.43.15 PR)
+**Approval:** Claude, 2026-11-11; dispatch go: operator, 2026-11-11 ("go ahead to dispatch task. you can pick up agent this time"), on Claude's recommendation to fix before the v1.43.15 PR; intents shown in the dispatch report
+**Intent approved:** operator, 2026-11-11
 **Filed:** 2026-11-11
 
 ## What happened
