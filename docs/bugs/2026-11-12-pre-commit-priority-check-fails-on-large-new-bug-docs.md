@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-12
 **Priority:** P3
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The pre-commit hook falsely blocks committing large new bug documentation files with a valid Priority line due to SIGPIPE under `pipefail`, degrading the commit workflow with a two-step commit workaround.)
 **Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** `edfc9a5c` (2026-10-11, the Priority check in `.githooks/pre-commit`)
 **Should have been caught by:** offline test

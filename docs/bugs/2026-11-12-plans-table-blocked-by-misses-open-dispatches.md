@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-12
 **Priority:** P3 (proposed: the column says "ready to dispatch" for plans that share files with a running dispatch; Claude checks `dispatch open` before dispatching, so no wrong dispatch has happened)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The dashboard's dispatch overlap reporting is degraded due to missing hub ledger visibility and incorrect lifecycle state parsing, but a workaround exists by running the exporter directly on `m4-air` or checking `bin/k3dm-codex-dispatch open`.)
 **Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** unknown (overlap check from `docs/plans/v1.43.8-plans-table-dispatch-waves-and-file-overlaps.md`)
 **Should have been caught by:** spec
