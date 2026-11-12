@@ -890,7 +890,7 @@ function _hostinger_refresh_frontend_dns() {
 function _hostinger_reapply_gitops_applicationsets() {
   _hostinger_load_argocd_plugin || return 1
 
-  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-deploy/hub}"
   export K3D_MANAGER_BRANCH
   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_HOSTINGER_KUBE_CONTEXT}}"
   export APP_CLUSTER_NAME
