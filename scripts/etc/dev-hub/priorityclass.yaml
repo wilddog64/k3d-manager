@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: k3dm-dev-preemptible
+value: -100
+preemptionPolicy: Never
+globalDefault: false
+description: Development hub pods yield scheduler priority to hub workloads.

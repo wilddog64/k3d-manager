@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dev-hub-budget
+spec:
+  hard:
+    limits.memory: 3Gi
+    requests.memory: 1Gi
+    limits.cpu: "3"
+    requests.cpu: 1500m
+    pods: "30"

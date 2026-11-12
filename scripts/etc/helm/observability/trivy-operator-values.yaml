@@ -1,4 +1,4 @@
-excludeNamespaces: "vclusters"
+excludeNamespaces: "vclusters,dev-hub"
 
 image:
   registry: mirror.gcr.io

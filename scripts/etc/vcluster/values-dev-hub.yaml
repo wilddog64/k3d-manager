@@ -1,0 +1,38 @@
+controlPlane:
+  statefulSet:
+    scheduling:
+      priorityClassName: k3dm-dev-preemptible
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
+    persistence:
+      volumeClaim:
+        enabled: true
+        size: 2Gi
+        storageClass: local-path
+
+coredns:
+  deployment:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+sync:
+  toHost:
+    priorityClasses:
+      enabled: false
+    configMaps:
+      all: false
+    pods:
+      priorityClassName: k3dm-dev-preemptible
+  fromHost:
+    priorityClasses:
+      enabled: false

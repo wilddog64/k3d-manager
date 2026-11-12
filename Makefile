@@ -51,6 +51,11 @@ hub-migrate:
 hub-new:
 	@bin/hub-new
 
+.PHONY: dev-hub-up dev-hub-down dev-hub-status
+dev-hub-up dev-hub-down dev-hub-status:
+	@bin/k3dm-require-role hub
+	@./scripts/k3d-manager $(@:dev-hub-%=dev_hub_%)
+
 .PHONY: hub-sync
 hub-sync:
 	@if { [ "$(origin BRANCH)" = "command line" ] || [ "$(origin BRANCH)" = "environment" ]; } && [ -n "$$BRANCH" ]; then \
@@ -1530,7 +1535,7 @@ check-bug-evidence:
 ## Validate Kubernetes manifests, CRDs included, with kubeconform (installed if missing; needs network):
 ## make validate-manifests [FILES="path/a.yaml path/b.yaml"]
 KUBECONFORM_CRD_CATALOG := https://raw.githubusercontent.com/datreeio/CRDs-catalog/d373c2da9702bc9509a004db83e57263fe3bdfc1/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
-VALIDATE_MANIFESTS_DEFAULT := scripts/etc/argocd/platform-ops/*.yaml scripts/etc/prometheus/rules/*.yaml scripts/etc/grafana/dashboards/*.yaml scripts/etc/argocd/applicationsets/*.yaml
+VALIDATE_MANIFESTS_DEFAULT := scripts/etc/argocd/platform-ops/*.yaml scripts/etc/prometheus/rules/*.yaml scripts/etc/grafana/dashboards/*.yaml scripts/etc/argocd/applicationsets/*.yaml scripts/etc/dev-hub/*.yaml
 validate-manifests:
 	@set -euo pipefail; \
 	 SCRIPT_DIR="$(CURDIR)/scripts" bash -c 'source "$$SCRIPT_DIR/lib/system.sh"; _ensure_kubeconform'; \
@@ -1797,6 +1802,9 @@ help:
 	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
 	@echo "    make hub-rollback          Return deploy/hub to the state before the last promotion"
 	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"
+	@echo "    make dev-hub-up             Create the isolated development vCluster (hub role only)"
+	@echo "    make dev-hub-down           Remove the isolated development vCluster (hub role only)"
+	@echo "    make dev-hub-status         Show development vCluster and quota status (hub role only)"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo "    make fleet-render          Render count-driven ACG fleet (offline)"
