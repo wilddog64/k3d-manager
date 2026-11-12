@@ -429,7 +429,7 @@ run_sync() {
   [ "$(git -C "$HUB_ROOT" write-tree)" = "$before_index" ]
   [ "$(git -C "$HUB_ROOT" status --porcelain)" = "$before_status" ]
   grep -q 'skipped:not-ff-to-deploy-hub' "$SCRATCH/state/state.json"
-  if grep -Eq ' push |hub-promote|hub-rollback' "$GIT_LOG" "$MAKE_LOG"; then
+  if grep -Eq '(^|[[:space:]])(push|hub-promote|hub-rollback)([[:space:]]|$)' "$GIT_LOG" "$MAKE_LOG"; then
     return 1
   fi
 }
