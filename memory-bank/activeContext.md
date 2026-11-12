@@ -318,6 +318,31 @@
 **2026-11-07 — TRIAGE (7 v1.43.15 bugs on the Bugs dashboard):** export, e2e F1 and the tokens chart are implemented by their agents (uncommitted), so Claude verify and land next. The machine_setup TTY fix is running (Luna). Window dropdown LANDED, but its live check is blocked: hub ApplicationSets still read k3d-manager-v1.43.14, so `make appsets-reapply` is needed from v1.43.15 (operator; the dashboard lags the repo for the same reason). Host Disk recurrence: cause and fix d70047d5 are in v1.43.15, but the M5 checkout 8e483765 predates it; no k3dm_disk series in Prometheus. The live check needs the M5 on v1.43.15. ACG key/extend: unchanged, live E3 waits on operator acg-up.
 **2026-11-07 — FILED + DISPATCHED (bug, P3, Luna):** `docs/bugs/2026-11-07-machine-setup-tests-inherit-caller-tty.md`. The cost-attribution Flash gate hung 3h41m: machine_setup.bats `run_machine` passes the caller stdin, agy gives a real tty, so the "without a TTY" test prompts on /dev/tty forever. Killed PID 72927 (operator approved). Fix: run_machine uses </dev/null. Depends on the e2e publish-back fix (same bats file): land after it.
 - **2026-11-10 control-node:** r2 landed `1c990581`; E2 rerun found a 3rd defect (Ansible ssh to localhost), fix proven live, r3 dispatched (Flash). Next: review/land r3, rerun E2 (provision twice, brew as k3dm-control), then setup + make test, then Hostinger E4, then operator verifies.
+## HANDOFF 2026-11-12 (session end at the v1.43.15 release cut; branch k3d-manager-v1.44.0) — START HERE
+
+**State:** v1.43.15 merged (PR #160, `aa1196ed`), tagged and released; retro written; enforce_admins restored to true. Grooming 2026-11-12 recorded (`27a5c453`, `docs/grooming/2026-11-12.md`); memory-bank and the process-metrics triage row in `816f0a16`. Working tree clean. No open dispatches except 3 stale v1.43.15 review-child ledger rows (appset-callers, hub-rollback, repo-sync-launchd reviews): abandon only with the operator's go. Open PR: #158 only (Dependabot wrangler-action 3→4, deferred: its workflow re-uploads the relay's WEBHOOK_TOKEN and SLACK_SIGNING_SECRET).
+
+**Waiting on the operator (asked 2026-11-12, no answer yet; do not dispatch before it):**
+1. Queue order. Recorded order is deploy/hub batch → test-hygiene batch → plan 1 → Hermes batch. Claude recommended splitting WIP 3 into 2 plan slots + 1 bug slot: slot 1 deploy/hub batch (the one costly P2: rollback leaves the hub on old code; promote guard can fail open), slot 2 plan 1 parallel-offline-tests, slot 3 plan 2; test-hygiene folds into plan 1 or waits if they share test-runner files (check overlap first).
+2. WIP limit. Claude's view: keep 3. Ledger 11-01..06 vs 11-07..12: started 64→76, landed 60→67, resumes/task 0.62→0.42, refusals/task 0.94→0.62, exit→land median 0.3h→0.5h but p90 0.8h→4.0h, open WIP median 2 (over 3 in 38/140 hours), up to 16 exited-not-landed. Bottleneck is landing/verification, not slots. Optional proposal: no new dispatch while 2 exited dispatches await landing.
+On the answer: update `docs/grooming/2026-11-12.md` (and CLAUDE.md if the rule changes), then write the first two specs (Acceptance, Contract readers incl. writers, `**Intent approved:** pending`) and ask for intent approval.
+
+**Next dispatch candidates:** deploy/hub batch = `docs/bugs/2026-11-12-hub-checkout-stops-following-deploy-hub-and-promote-guard-fails-open.md` (P2, Fable repro script in transcript; `bin/k3dm-repo-sync:200-204`, `bin/k3dm-hub-promote:26`) + hub-promote-status-ahead, repo-sync-zero-behind, hermes-checkout-lag, repo-sync-role, hub-promote-non-tty P3s. Full carry list (26) and caps in `docs/grooming/2026-11-12.md`.
+
+**Owed, not started:**
+- /post-merge Step 7b standing-docs audit (projectbrief, copilot-instructions, functions.md) for v1.43.15.
+- /post-merge Step 7c: MEMORY.md 156 lines (target well under 170); CLAUDE.md 248 lines → move precedent/history into `docs/process/rules.md`, keep every rule as 1–2 lines + link (commit on this branch for operator review).
+- Step 9 summary table for v1.43.15.
+- Live checks owed: auto-sync E6; cost E3; control-node-linux E3/E4.
+- dev-hub-vcluster waits on the operator raising M5 OrbStack memory to 24576 MiB.
+- Carry-overs: Dependabot alert #16 (low); PACKAGES_TOKEN rotation (deploy-PR step 401 since 2026-10-31).
+
+**Ideas inbox for Sunday 2026-11-15 grooming:** Argon/Flash token chart like Fable's (needs a ledger for ad-hoc `agy` runs: today's 869,027 Argon tokens appear nowhere), plus 4 docs moved from bugs. Step 1.7 Fable ideas review runs that day; check the Fable gauge first.
+
+**Writing:** tech-articles `1200fde` — `ai-agents/ai-bottleneck-draft.md` rewritten as "AI Moved My Bottleneck Twice" and `ai-agents/ai-bottleneck-linkedin.md` added (no dev.to link). Unpublished; operator decides when.
+
+**Triage trigger:** next triage at 20 bugs captured since 2026-11-12 or the oldest 7 days old (2026-11-19), whichever first; say "triage due" at session start.
+
 ## 2026-11-12 release grooming (post-merge v1.43.15) — commit 27a5c453
 
 - Operator decisions: v1.43.16 not cut (folded into v1.44.0, milestone `state: folded`); triage accepted as shown; on the 33 Argon disagreements Claude's P kept; hostinger-refresh-status closed as stale; P3 cap of 10 filled from the deploy/hub, test-hygiene and Hermes batches.
