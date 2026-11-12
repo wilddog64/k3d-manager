@@ -9,7 +9,7 @@ import socket
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATE_DIR = pathlib.Path(os.environ.get("K3DM_REPO_SYNC_STATE_DIR", pathlib.Path.home() / ".local/share/k3d-manager/repo-sync"))
@@ -83,9 +83,10 @@ def repo_label(path):
 def role():
     p = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")) / "k3d-manager/machine-role"
     try:
-        return p.read_text().strip()
+        value = p.read_text().strip()
+        return value or "missing"
     except OSError:
-        return "worker"
+        return "missing"
 
 
 def repositories():
@@ -145,6 +146,7 @@ def result_for(path, is_hub):
         upstream = up.stdout.strip()
         remote, _, ref = upstream.partition("/")
     if is_hub_root:
+        rec["remote"] = remote
         fetch_args = [
             "fetch",
             "--no-tags",
@@ -161,11 +163,17 @@ def result_for(path, is_hub):
         vals = counts.stdout.split()
         ahead, behind = map(int, vals[:2])
         rec["behind_before"] = behind
-        if ahead and not (is_hub and path.resolve() == ROOT.resolve()):
-            rec["result"] = "skipped:ahead"
-            return rec
     if os.environ.get("K3DM_REPO_SYNC_CHECK") == "1":
-        rec["result"] = "would-update" if rec["behind_before"] else "current"
+        if is_hub_root and counts.returncode == 0 and ahead:
+            dirty = git(path, "status", "--porcelain", "--untracked-files=no").stdout.strip()
+            additions = git(path, "diff", "--name-only", "--diff-filter=A", "HEAD", target).stdout.splitlines()
+            collision = any(os.path.lexists(path / item) for item in additions)
+            rec["result"] = "skipped:dirty" if dirty or collision else "would-reset-to-deploy-hub"
+        elif counts.returncode == 0 and ahead:
+            rec["result"] = "skipped:diverged" if rec["behind_before"] else "skipped:ahead"
+        else:
+            rec["result"] = "would-update" if rec["behind_before"] else "current"
+        rec["behind_after"] = rec["behind_before"]
         if is_hub_root:
             rec["promote_backlog_unknown"] = True
         return rec
@@ -176,9 +184,11 @@ def result_for(path, is_hub):
         fetched = run(["git", "-C", str(path), *fetch_args], timeout=TIMEOUT, env=env)
     except subprocess.TimeoutExpired:
         rec["result"] = "fetch_failed"
+        rec["behind_after"] = rec["behind_before"]
         return rec
     if fetched.returncode:
         rec["result"] = "fetch_failed"
+        rec["behind_after"] = rec["behind_before"]
         return rec
     if is_hub_root and ref:
         try:
@@ -194,21 +204,49 @@ def result_for(path, is_hub):
     fresh_counts = git(path, "rev-list", "--left-right", "--count", f"HEAD...{target}")
     if fresh_counts.returncode == 0:
         fresh_ahead, rec["behind_before"] = map(int, fresh_counts.stdout.split()[:2])
-        if fresh_ahead and not (is_hub and path.resolve() == ROOT.resolve()):
-            rec["result"] = "skipped:ahead"
+        ahead = fresh_ahead
+        if fresh_ahead and not is_hub_root:
+            rec["result"] = "skipped:diverged" if rec["behind_before"] else "skipped:ahead"
+            rec["behind_after"] = rec["behind_before"]
             return rec
-    if is_hub and path.resolve() == ROOT.resolve():
-        ff = git(path, "merge-base", "--is-ancestor", "HEAD", "origin/deploy/hub")
+    if is_hub_root:
+        ff = git(path, "merge-base", "--is-ancestor", "HEAD", target)
         if ff.returncode:
-            rec["result"] = "skipped:not-ff-to-deploy-hub"
+            dirty = git(path, "status", "--porcelain", "--untracked-files=no").stdout.strip()
+            additions = git(path, "diff", "--name-only", "--diff-filter=A", "HEAD", target).stdout.splitlines()
+            collision = any(os.path.lexists(path / item) for item in additions)
+            if dirty or collision:
+                rec["result"] = "skipped:dirty"
+                rec["behind_after"] = rec["behind_before"]
+                return rec
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup_ref = f"refs/k3dm/repo-sync-backup/{stamp}"
+            saved = git(path, "update-ref", backup_ref, rec["old_head"], "")
+            if saved.returncode:
+                rec["result"] = "blocked"
+                rec["behind_after"] = rec["behind_before"]
+                return rec
+            reset = git(path, "reset", "--hard", target)
+            if reset.returncode:
+                rec["result"] = "blocked"
+                rec["behind_after"] = rec["behind_before"]
+                return rec
+            rec["new_head"] = git(path, "rev-parse", "HEAD").stdout.strip()
+            rec["result"] = "reset-to-deploy-hub"
+            rec["backup_ref"] = backup_ref
+            after = git(path, "rev-list", "--left-right", "--count", f"HEAD...{comparison_ref}")
+            if after.returncode == 0:
+                rec["behind_after"] = int(after.stdout.split()[1])
             return rec
     try:
         merged = run(["git", "-C", str(path), "merge", "--ff-only", target], timeout=TIMEOUT, env=env)
     except subprocess.TimeoutExpired:
         rec["result"] = "fetch_failed"
+        rec["behind_after"] = rec["behind_before"]
         return rec
     if merged.returncode:
         rec["result"] = "blocked"
+        rec["behind_after"] = rec["behind_before"]
         return rec
     rec["new_head"] = git(path, "rev-parse", "HEAD").stdout.strip()
     rec["result"] = "updated" if rec["new_head"] != rec["old_head"] else "current"
@@ -245,6 +283,11 @@ def main():
     check = args == ["--check"]
     if args and not check:
         print("usage: k3dm-repo-sync [--check] [--remote HOST]", file=sys.stderr); return 2
+    machine_role = role()
+    if machine_role == "missing":
+        role_path = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")) / "k3d-manager/machine-role"
+        print(f"[repo-sync] ERROR: machine-role file missing or empty: {role_path}", file=sys.stderr)
+        return 1
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     try:
         LOCK.mkdir()
@@ -264,7 +307,7 @@ def main():
         raise
     try:
         os.environ["K3DM_REPO_SYNC_CHECK"] = "1" if check else "0"
-        is_hub = role() == "hub"
+        is_hub = machine_role == "hub"
         previous = {}
         previous_state = {}
         try:
@@ -275,7 +318,7 @@ def main():
             pass
         records = [result_for(p, is_hub) for p in repositories()]
         for rec in records:
-            rec["last_success_timestamp_seconds"] = (rec["run_time"] if rec["result"] in ("current", "updated")
+            rec["last_success_timestamp_seconds"] = (rec["run_time"] if rec["result"] in ("current", "updated", "reset-to-deploy-hub")
                                                        else previous.get(rec["path"], 0))
         run_time = int(time.time())
         state = {"run_time": run_time, "repositories": records,
@@ -291,7 +334,7 @@ def main():
                 state["webhook_restart_pending"] = True
                 state["webhook_restart_pending_recorded_at"] = pending_recorded_at
         for rec in records:
-            if pathlib.Path(rec["path"]).resolve() != ROOT.resolve() or rec["result"] != "updated":
+            if pathlib.Path(rec["path"]).resolve() != ROOT.resolve() or rec["result"] not in ("updated", "reset-to-deploy-hub"):
                 continue
             changed = git(ROOT, "diff", "--name-only", f"{rec['old_head']}..{rec['new_head']}").stdout.splitlines()
             mapping = [line.split("\t", 1) for line in (ROOT / "scripts/etc/machine/deploy-paths.tsv").read_text().splitlines()
@@ -315,7 +358,8 @@ def main():
                 rec = next((r for r in records if pathlib.Path(r["path"]).resolve() == ROOT.resolve()), None)
                 if rec and rec["old_head"]:
                     sha = marker.read_text().strip()
-                    diff = git(ROOT, "diff", "--name-only", f"{sha}..origin/deploy/hub", "--", "scripts/etc/argocd/platform-ops")
+                    remote = rec.get("remote") or "origin"
+                    diff = git(ROOT, "diff", "--name-only", f"{sha}..{remote}/deploy/hub", "--", "scripts/etc/argocd/platform-ops")
                     changed = diff.stdout.splitlines()
                     if diff.returncode:
                         state["deploy_unknown"].append("platform-ops")
@@ -351,14 +395,19 @@ def main():
                 if (root_rec and root_rec.get("result") != "fetch_failed"
                         and not root_rec.get("promote_backlog_unknown", False)):
                     upstream_ref = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip()
-                    backlog = git(ROOT, "rev-list", "--count", f"origin/deploy/hub..{upstream_ref}")
+                    remote = root_rec.get("remote") or "origin"
+                    backlog = git(ROOT, "rev-list", "--count", f"{remote}/deploy/hub..{upstream_ref}")
                     state["promote_backlog"] = int(backlog.stdout.strip()) if backlog.returncode == 0 else None
-                state["deploy_hub_sha"] = git(ROOT, "rev-parse", "origin/deploy/hub").stdout.strip()
+                remote = root_rec.get("remote") or "origin"
+                state["deploy_hub_sha"] = git(ROOT, "rev-parse", f"{remote}/deploy/hub").stdout.strip()
             except Exception:
                 pass
         STATE.write_text(json.dumps(state, indent=2) + "\n")
         for rec in records:
-            print(f"{pathlib.Path(rec['path']).name}: {rec['branch'] or '-'} {rec['result']} ({rec['behind_before']} behind before, {rec['behind_after']} after)")
+            line = f"{pathlib.Path(rec['path']).name}: {rec['branch'] or '-'} {rec['result']} ({rec['behind_before']} behind before, {rec['behind_after']} after)"
+            if rec["result"] == "reset-to-deploy-hub":
+                line += f" old={rec['old_head']} new={rec['new_head']} backup={rec['backup_ref']}"
+            print(line)
         if is_hub:
             metrics = [f'k3dm_repo_sync_behind_commits{{repo="{repo_label(r["path"])}"}} {r["behind_after"]}' for r in records]
             metrics += [f'k3dm_repo_sync_last_success_timestamp_seconds{{repo="{repo_label(r["path"])}"}} {r["last_success_timestamp_seconds"]}' for r in records]

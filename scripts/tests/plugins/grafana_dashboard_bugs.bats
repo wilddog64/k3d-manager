@@ -31,13 +31,13 @@ assert hub["fieldConfig"]["defaults"]["thresholds"]["steps"] == [
 targets={t["refId"]:t for t in hub["targets"]}
 assert targets["A"]["expr"] == "k3dm_hub_checkout_code_commits_behind and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
 assert targets["A"]["legendFormat"] == "{{branch}}"
-assert targets["B"]["expr"] == "k3dm_hub_checkout_on_newest_release and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
-assert targets["B"]["legendFormat"] == "{{newest_branch}}"
-override=hub["fieldConfig"]["overrides"][0]
-assert override["matcher"] == {"id":"byFrameRefID","options":"B"}
-mapping=override["properties"][0]["value"][0]["options"]
-assert mapping["1"] == {"text":"current release","color":"green"}
-assert mapping["0"] == {"text":"older release","color":"orange"}
+assert set(targets) == {"A"}
+assert hub["fieldConfig"]["overrides"] == []
+assert "older release" not in hub["description"].lower()
+assert "BRANCH=" not in hub["description"]
+assert "deploy/hub" in hub["description"]
+assert "older release" not in json.dumps(hub).lower()
+assert "BRANCH=" not in json.dumps(hub)
 occupied=set()
 for p in d["panels"]:
     pos=p["gridPos"]

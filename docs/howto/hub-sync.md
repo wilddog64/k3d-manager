@@ -8,12 +8,9 @@ The hub receives changes through three routes, with different delays:
 | Host tools in `bin/` and `scripts/` | M5 checkout auto-sync; `make hub-sync` nudges and reports it | About five minutes |
 | Dashboards and CronJobs | ArgoCD's ApplicationSet branch or `make platform-ops` | Until synced |
 
-The **Hub code behind** tile shows code commits on the hub's checked-out branch
-that have not been pulled. Documentation commits are excluded because Hermes
-can read them from the release ref without moving the checkout. The second
-value says whether the hub is reading the newest release branch. `unknown`
-means the metric check is stale or unavailable.
-The count stays accurate while a newer release exists, at the cost of a second fetch on those cycles.
+The **Hub code behind** tile shows code commits promoted to `deploy/hub` that
+the hub checkout has not pulled. Documentation commits are excluded because
+Hermes can read them from the release ref without moving the checkout.
 
 The hub checkout follows `deploy/hub`, the promoted ref. Use `make hub-sync`
 to nudge the hub's checkout sync and print its current commit and pending

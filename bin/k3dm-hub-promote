@@ -23,7 +23,7 @@ uncontained_commits() {
   if [[ "$old" =~ ^0+$ || -z "$target" || -z "$old" ]]; then
     return 0
   fi
-  git_cmd cherry "$target" "$old" 2>/dev/null | awk '$1 == "+" {print $2}' || true
+  git_cmd cherry "$target" "$old" | awk '$1 == "+" {print $2}'
 }
 
 print_uncontained_list() {
@@ -135,25 +135,39 @@ record_move() {
 }
 
 status() {
-  local sha tags release ahead
+  local sha tags release ahead local_sha origin_sha counts local_ahead local_behind
   sha="$(remote_sha)"
   printf '[hub-promote] deploy/hub: %s\n' "$sha"
   tags="$(git_cmd ls-remote --tags "$REMOTE" "refs/tags/${TAG_PREFIX}*" | awk '$2 !~ /\^\{\}$/ {print}' | sort -k2 -r | head -3 || true)"
   printf '[hub-promote] last three hub-promote tags:\n%s\n' "${tags:-  (none)}"
   release="${RELEASE_BRANCH:-$(git_cmd branch --show-current)}"
   if [[ ! "$release" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    release="$(git_cmd for-each-ref --sort=-committerdate --format='%(refname:short)' 'refs/remotes/origin/k3d-manager-v*' | head -1)"
+    release="$(git_cmd for-each-ref --sort=-committerdate --format='%(refname:lstrip=3)' 'refs/remotes/origin/k3d-manager-v*' | head -1)"
   fi
   if [[ -z "$release" ]]; then release=main; fi
-  ahead="$(git_cmd rev-list --count "$sha..$release" 2>/dev/null || printf '?')"
+  if ! git_cmd fetch --quiet --no-tags "$REMOTE" "+refs/heads/$release:refs/remotes/$REMOTE/$release" "+refs/heads/$BRANCH:refs/remotes/$REMOTE/$BRANCH"; then
+    printf '[hub-promote] WARNING: fetch failed; counts may be stale\n' >&2
+  fi
+  ahead="$(git_cmd rev-list --count "$sha..refs/remotes/$REMOTE/$release" 2>/dev/null || printf '?')"
   printf '[hub-promote] %s ahead of deploy/hub: %s\n' "$release" "$ahead"
+  local_sha="$(git_cmd rev-parse --verify "refs/heads/$release^{commit}" 2>/dev/null || true)"
+  origin_sha="$(git_cmd rev-parse --verify "refs/remotes/$REMOTE/$release^{commit}" 2>/dev/null || true)"
+  if [[ -n "$local_sha" && -n "$origin_sha" && "$local_sha" != "$origin_sha" ]]; then
+    counts="$(git_cmd rev-list --left-right --count "refs/heads/$release...refs/remotes/$REMOTE/$release")" || counts='? ?'
+    if [[ "$counts" == *$'\t'* ]]; then
+      read -r local_ahead local_behind <<< "$counts"
+      printf '[hub-promote] local %s is %s behind / %s ahead of origin\n' "$release" "$local_behind" "$local_ahead"
+    else
+      printf '[hub-promote] local %s is ? behind / ? ahead of origin\n' "$release"
+    fi
+  fi
   local rel_sha
-  rel_sha="$(git_cmd rev-parse --verify "refs/remotes/$REMOTE/$release^{commit}" 2>/dev/null || git_cmd rev-parse --verify "$release^{commit}" 2>/dev/null || true)"
+  rel_sha="$origin_sha"
   if [[ -n "$rel_sha" ]]; then
     local -a uncontained=()
-    while IFS= read -r c; do
-      [[ -n "$c" ]] && uncontained+=("$c")
-    done < <(uncontained_commits "$rel_sha" "$sha")
+    local uncontained_text
+    uncontained_text="$(uncontained_commits "$rel_sha" "$sha")" || printf '[hub-promote] WARNING: cannot check deploy/hub containment\n' >&2
+    [[ -z "${uncontained_text:-}" ]] || mapfile -t uncontained <<< "$uncontained_text"
     if (( ${#uncontained[@]} > 0 )); then
       printf '[hub-promote] uncontained commits on deploy/hub:\n'
       print_uncontained_list "${uncontained[@]}"
@@ -218,9 +232,9 @@ rollback() {
     fi
   fi
   local -a uncontained=()
-  while IFS= read -r c; do
-    [[ -n "$c" ]] && uncontained+=("$c")
-  done < <(uncontained_commits "$live_sha" "$old")
+  local uncontained_text
+  uncontained_text="$(uncontained_commits "$live_sha" "$old")" || die "cannot check deploy/hub containment ($old against $live_sha)"
+  [[ -z "$uncontained_text" ]] || mapfile -t uncontained <<< "$uncontained_text"
   if (( ${#uncontained[@]} > 0 )); then
     if [[ "$break_glass" != 1 ]]; then
       printf '[hub-promote] ERROR: deploy/hub has uncontained commits not in promotion stack top %s:\n' "$top" >&2
@@ -254,10 +268,14 @@ main() {
         printf '[hub-promote] deploy/hub is already at %s; nothing to promote\n' "$new"
         exit 0
       fi
+      if [[ ! "$old" =~ ^0+$ ]]; then
+        git_cmd fetch --no-tags "$REMOTE" "+refs/heads/$BRANCH:refs/remotes/$REMOTE/$BRANCH" || die "cannot fetch $REMOTE $BRANCH"
+        git_cmd cat-file -e "$old^{commit}" || die "deploy/hub commit $old is not available locally; refusing to promote"
+      fi
       local -a uncontained=()
-      while IFS= read -r c; do
-        [[ -n "$c" ]] && uncontained+=("$c")
-      done < <(uncontained_commits "$new" "$old")
+      local uncontained_text
+      uncontained_text="$(uncontained_commits "$new" "$old")" || die "cannot check deploy/hub containment ($old against $new)"
+      [[ -z "$uncontained_text" ]] || mapfile -t uncontained <<< "$uncontained_text"
       if (( ${#uncontained[@]} > 0 )); then
         if [[ "$break_glass" != 1 ]]; then
           printf '[hub-promote] ERROR: deploy/hub contains %d commit(s) not in %s:\n' "${#uncontained[@]}" "$ref" >&2

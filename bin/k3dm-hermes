@@ -627,22 +627,19 @@ def _newest_release_branch(current, env):
         return current
 
 
-def _push_checkout_lag(upstream_ref, upstream_branch, newest_branch):
+def _push_checkout_lag(lag_ref):
     """Publish code-only checkout lag. Failures are intentionally non-fatal."""
     try:
-        if not (_METRIC_LABEL.fullmatch(upstream_branch or "") and
-                _METRIC_LABEL.fullmatch(newest_branch or "")):
+        if not _METRIC_LABEL.fullmatch(lag_ref or ""):
             return
         result = subprocess.run(
-            ["git", "rev-list", "--count", f"HEAD..{upstream_ref}", "--", ".",
+            ["git", "rev-list", "--count", f"HEAD..{lag_ref}", "--", ".",
              ":!docs", ":!memory-bank", ":!CHANGELOG.md"], cwd=ROOT,
             capture_output=True, text=True, timeout=60, check=False)
         if result.returncode != 0 or not result.stdout.strip().isdigit():
             return
         count = int(result.stdout.strip())
-        newest = int(upstream_branch == newest_branch)
-        body = (f'k3dm_hub_checkout_code_commits_behind{{branch="{upstream_branch}"}} {count}\n'
-                f'k3dm_hub_checkout_on_newest_release{{newest_branch="{newest_branch}"}} {newest}\n'
+        body = (f'k3dm_hub_checkout_code_commits_behind{{branch="deploy/hub"}} {count}\n'
                 f'k3dm_hub_checkout_last_check_timestamp_seconds {time.time()}\n').encode()
         base = os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
         request = urllib.request.Request(f"{base}/metrics/job/k3dm-hub-checkout", data=body,
@@ -720,23 +717,18 @@ def _refresh_index(state, now=None):
                                  env=fetch_env)
         if fetched.returncode != 0:
             raise RuntimeError(f"git fetch failed: {(fetched.stderr or '').strip()}")
-        lag_ref_fetched = True
-        if (not os.environ.get("K3DM_INDEX_REF", "").strip() and
-                newest_branch != upstream_branch):
-            try:
-                upstream_fetch = subprocess.run(
-                    ["git", "fetch", "--quiet", "origin",
-                     f"+refs/heads/{upstream_branch}:refs/remotes/origin/{upstream_branch}"],
-                    cwd=ROOT, capture_output=True, text=True, timeout=60, check=False,
-                    env=fetch_env)
-                if upstream_fetch.returncode != 0:
-                    lag_ref_fetched = False
-            except Exception:
-                lag_ref_fetched = False
-            if not lag_ref_fetched:
-                print("hub checkout lag skipped: upstream ref fetch failed", file=sys.stderr)
-        if lag_ref_fetched:
-            _push_checkout_lag(upstream_ref, upstream_branch, newest_branch)
+        try:
+            lag_fetch = subprocess.run(
+                ["git", "fetch", "--quiet", "origin",
+                 "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub"],
+                cwd=ROOT, capture_output=True, text=True, timeout=60, check=False,
+                env=fetch_env)
+        except Exception:
+            lag_fetch = None
+        if lag_fetch is None or lag_fetch.returncode != 0:
+            print("hub checkout lag skipped: deploy/hub fetch failed", file=sys.stderr)
+        else:
+            _push_checkout_lag("origin/deploy/hub")
         paused_until = float(state.get("index_paused_until", 0) or 0)
         if paused_until and now < paused_until:
             metrics["result"] = "paused"

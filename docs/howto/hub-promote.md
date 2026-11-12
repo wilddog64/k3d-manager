@@ -50,7 +50,9 @@ git cherry-pick -x <commit-sha>
 ```
 
 Cherry-pick the commits onto the release branch, push to `origin`, wait for CI
-checks to pass, and re-run `make hub-promote`.
+checks to pass, and re-run `make hub-promote`. The hub checkout follows the
+promoted `deploy/hub` ref automatically, including when a carried commit has a
+new SHA after cherry-picking.
 
 If GitHub checks are unavailable during an outage or you must intentionally
 discard uncontained commits, `BREAK_GLASS=1` skips the check-run gate and the
@@ -71,6 +73,9 @@ commits that will be added. After promoting A, B and C without intervening
 commits, successive rollbacks move to B and then A. When you want to move
 forward again, promote that commit explicitly with
 `make hub-promote REF=<commit-ish>`.
+The hub checkout follows the rollback on its next repo-sync run. A clean
+non-fast-forward checkout is reset to `deploy/hub` after a create-only backup
+ref is recorded; dirty checkouts are left in place and reported for attention.
 If `deploy/hub` holds commits added after the last promotion (not in the
 promotion stack top), `make hub-rollback` refuses and lists them unless
 overridden with `BREAK_GLASS=1`:

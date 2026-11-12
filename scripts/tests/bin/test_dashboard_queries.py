@@ -160,7 +160,7 @@ def fixture_metrics(tmp_path):
     # producer output is appended; the patched HTTP client never sends it.
     assert hermes.ROOT == repo
     with patch.object(hermes.urllib.request, "urlopen", side_effect=capture_push):
-        hermes._push_checkout_lag("HEAD", "k3d-manager-v1.43.14", "k3d-manager-v1.43.14")
+        hermes._push_checkout_lag("HEAD")
     metric_text += "".join(captured)
     return metric_text, set(texts)
 

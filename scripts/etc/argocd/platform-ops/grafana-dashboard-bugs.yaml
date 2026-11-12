@@ -385,17 +385,16 @@ data:
           "id": 19,
           "type": "stat",
           "title": "Hub code behind",
-          "description": "Commits with code changes on the hub's branch that the hub's checkout has not pulled. Doc text does not need a pull: it appears within about 5 minutes. If a fix is not showing, run make hub-sync in a shell on the hub. The count is for the branch the hub is on.",
+          "description": "Code commits promoted to deploy/hub that the hub's checkout has not pulled yet. repo-sync pulls them within about 5 minutes. Commits not yet promoted are not counted: see make hub-promote-status. Doc text does not need a pull.",
           "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
-            {"refId": "A", "expr": "k3dm_hub_checkout_code_commits_behind and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)", "instant": true, "legendFormat": "{{branch}}"},
-            {"refId": "B", "expr": "k3dm_hub_checkout_on_newest_release and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)", "instant": true, "legendFormat": "{{newest_branch}}"}
+            {"refId": "A", "expr": "k3dm_hub_checkout_code_commits_behind and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)", "instant": true, "legendFormat": "{{branch}}"}
           ],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {
             "defaults": {"noValue": "unknown", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}]}},
-            "overrides": [{"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"1": {"text": "current release", "color": "green"}, "0": {"text": "older release", "color": "orange"}}}]}]}]
+            "overrides": []
           }
         },
         {
