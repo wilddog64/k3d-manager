@@ -63,16 +63,26 @@ make hub-promote REF=<commit-ish> BREAK_GLASS=1
 
 ## Roll back and inspect
 
-`make hub-rollback` uses the promotion tags as a stack: after promoting A, B and
-C, successive rollbacks move to B and then A. When you want to move forward
-again, promote that commit explicitly with `make hub-promote REF=<commit-ish>`.
-If `deploy/hub` holds promoter commits added after the last promotion (not in
-the promotion stack top), `make hub-rollback` refuses and lists them unless
+`make hub-rollback` returns `deploy/hub` to the state recorded in the latest
+promotion tag's `old:` field. This keeps commits that were already live before
+that promotion, including CVE image pins committed directly to `deploy/hub`.
+The confirmation lists every commit that will be removed and, when applicable,
+commits that will be added. After promoting A, B and C without intervening
+commits, successive rollbacks move to B and then A. When you want to move
+forward again, promote that commit explicitly with
+`make hub-promote REF=<commit-ish>`.
+If `deploy/hub` holds commits added after the last promotion (not in the
+promotion stack top), `make hub-rollback` refuses and lists them unless
 overridden with `BREAK_GLASS=1`:
 
 ```sh
 make hub-rollback BREAK_GLASS=1
 ```
+
+A break-glass rollback records and replays the actual pre-rollback SHA, even
+when it includes uncontained commits. A commit kept by one rollback, such as a
+CVE pin that was live before the latest promotion, can be removed by the next
+rollback; that confirmation lists it with the other commits being removed.
 
 `make hub-promote-status` prints the current hub SHA, the last three promotion
 tags, the current release branch's ahead count, and any uncontained commits on

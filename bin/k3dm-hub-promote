@@ -83,8 +83,20 @@ show_and_confirm() {
   if [[ "$old" =~ ^0+$ ]]; then
     printf '[hub-promote] bootstrap: deploy/hub does not exist yet\n'
   else
-    subjects="$(git_cmd log --format='%h %s' -30 "$old..$new" 2>/dev/null || true)"
-    if [[ -n "$subjects" ]]; then printf '%s\n' "$subjects"; else printf '[hub-promote] no commits between refs\n'; fi
+    if [[ "$action" == rollback ]]; then
+      if ! subjects="$(git_cmd log --format='%h %s' "$new..$old" 2>/dev/null)"; then
+        die "cannot list rollback commits in range $new..$old"
+      fi
+      printf '[hub-promote] will be removed from deploy/hub:\n'
+      if [[ -n "$subjects" ]]; then printf '%s\n' "$subjects"; else printf '  (none)\n'; fi
+      if ! subjects="$(git_cmd log --format='%h %s' "$old..$new" 2>/dev/null)"; then
+        die "cannot list rollback commits in range $old..$new"
+      fi
+      if [[ -n "$subjects" ]]; then printf '[hub-promote] will be added to deploy/hub:\n%s\n' "$subjects"; fi
+    else
+      subjects="$(git_cmd log --format='%h %s' -30 "$old..$new" 2>/dev/null || true)"
+      if [[ -n "$subjects" ]]; then printf '%s\n' "$subjects"; else printf '[hub-promote] no commits between refs\n'; fi
+    fi
   fi
   [[ -z "$ref" ]] || printf '[hub-promote] REF: %s\n' "$ref"
   [[ -t 0 ]] || die 'confirmation requires a TTY'
@@ -151,43 +163,64 @@ status() {
 
 rollback() {
   local break_glass="${1:-0}"
-  local old target tag tag_data action sha top
+  local old target tag tag_data action sha tag_old top live_sha
   local -a tags=()
-  local -a stack=()
+  local -a stack_old=()
+  local -a stack_new=()
+  live_sha=""
   git_cmd fetch "$REMOTE" --prune
   old="$(remote_sha)"
   mapfile -t tags < <(git_cmd ls-remote --tags "$REMOTE" "refs/tags/${TAG_PREFIX}*" | awk '$2 !~ /\^\{\}$/ {print $2}' | sort -k1,1)
   for tag in "${tags[@]}"; do
     tag_data="$(git_cmd fetch --no-tags "$REMOTE" "$tag" >/dev/null && git_cmd cat-file -p FETCH_HEAD)" || die "promotion tag $tag is not available"
     action="$(sed -n 's/^action: //p' <<< "$tag_data" | head -1)"
+    tag_old="$(sed -n 's/^old: //p' <<< "$tag_data" | head -1)"
     sha="$(sed -n 's/^new: //p' <<< "$tag_data" | head -1)"
-    [[ "$sha" =~ ^[0-9a-f]{40,64}$ ]] || die "promotion tag $tag has no valid new SHA"
+    [[ "$sha" =~ ^[0-9a-f]{40,64}$ && "$tag_old" =~ ^[0-9a-f]{40,64}$ ]] || die "promotion tag $tag has no valid old/new SHA"
     case "$action" in
       promote)
-        if (( ${#stack[@]} == 0 )) || [[ "${stack[${#stack[@]}-1]}" != "$sha" ]]; then
-          stack+=("$sha")
+        live_sha="$sha"
+        if [[ "$tag_old" != "$sha" ]]; then
+          stack_old+=("$tag_old")
+          stack_new+=("$sha")
         fi
         ;;
       rollback)
-        (( ${#stack[@]} >= 2 )) || die "rollback tag $tag has no earlier promotion to pop"
-        top="${stack[${#stack[@]}-2]}"
-        [[ "$sha" == "$top" ]] || die "rollback tag $tag does not match the promotion stack"
-        unset 'stack[${#stack[@]}-1]'
+        (( ${#stack_new[@]} >= 1 )) || die "rollback tag $tag has no earlier promotion to pop"
+        top="${stack_new[${#stack_new[@]}-1]}"
+        if [[ "$tag_old" != "$top" ]]; then
+          if ! git_cmd cat-file -e "$tag_old^{commit}" 2>/dev/null; then
+            git_cmd fetch --no-tags "$REMOTE" "$tag_old" >/dev/null 2>&1 || true
+          fi
+          if ! git_cmd cat-file -e "$tag_old^{commit}" 2>/dev/null; then
+            printf '[hub-promote] WARNING: rollback tag %s old SHA %s is unavailable locally; accepting its recorded target\n' "$tag" "$tag_old" >&2
+          elif ! git_cmd merge-base --is-ancestor "$top" "$tag_old" 2>/dev/null; then
+            die "rollback tag $tag does not match the promotion stack"
+          fi
+        fi
+        [[ "$sha" == "${stack_old[${#stack_old[@]}-1]}" ]] || die "rollback tag $tag does not match the promotion stack"
+        live_sha="$sha"
+        unset 'stack_old[${#stack_old[@]}-1]'
+        unset 'stack_new[${#stack_new[@]}-1]'
         ;;
       *) die "promotion tag $tag has an unknown action" ;;
     esac
   done
-  (( ${#stack[@]} >= 2 )) || die 'there is no earlier promotion to return to'
-  top="${stack[${#stack[@]}-1]}"
-  if [[ "$old" != "$top" ]]; then
-    if ! git_cmd merge-base --is-ancestor "$top" "$old" 2>/dev/null; then
+  (( ${#stack_new[@]} > 0 )) || die 'there is no earlier promotion to return to'
+  top="${stack_new[${#stack_new[@]}-1]}"
+  if [[ "${stack_old[${#stack_old[@]}-1]}" =~ ^0+$ ]]; then
+    die 'the promotion stack only contains the bootstrap; there is no earlier state to return to'
+  fi
+  [[ -n "$live_sha" ]] || die 'promotion history has no live SHA'
+  if [[ "$old" != "$live_sha" ]]; then
+    if ! git_cmd merge-base --is-ancestor "$live_sha" "$old" 2>/dev/null; then
       die 'deploy/hub does not match the promotion stack top'
     fi
   fi
   local -a uncontained=()
   while IFS= read -r c; do
     [[ -n "$c" ]] && uncontained+=("$c")
-  done < <(uncontained_commits "$top" "$old")
+  done < <(uncontained_commits "$live_sha" "$old")
   if (( ${#uncontained[@]} > 0 )); then
     if [[ "$break_glass" != 1 ]]; then
       printf '[hub-promote] ERROR: deploy/hub has uncontained commits not in promotion stack top %s:\n' "$top" >&2
@@ -195,7 +228,7 @@ rollback() {
       die 'deploy/hub does not match the promotion stack top'
     fi
   fi
-  target="${stack[${#stack[@]}-2]}"
+  target="${stack_old[${#stack_old[@]}-1]}"
   show_and_confirm "$old" "$target" rollback
   record_move "$old" "$target" rollback "" "$break_glass"
 }
