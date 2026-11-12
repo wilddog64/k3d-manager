@@ -7,6 +7,127 @@ setup() {
   source "$SYSTEM_LIB"
 }
 
+promtool_fixture() {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  export PROMTOOL_INSTALL_DIR="${BATS_TEST_TMPDIR}/install"
+  export PROMTOOL_FIXTURE="${BATS_TEST_TMPDIR}/fixture"
+  export PROMTOOL_STUB_BIN="${BATS_TEST_TMPDIR}/bin"
+  export PROMTOOL_CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
+  export PROMTOOL_SUDO_LOG="${BATS_TEST_TMPDIR}/sudo.log"
+  export PROMTOOL_WORK_LOG="${BATS_TEST_TMPDIR}/work.log"
+  export PROMTOOL_REAL_MKTEMP="$(command -v mktemp)"
+  mkdir -p "$HOME" "$PROMTOOL_INSTALL_DIR" "$PROMTOOL_FIXTURE/prometheus-3.1.0.darwin-arm64" "$PROMTOOL_STUB_BIN"
+  printf '#!/usr/bin/env bash\nprintf "promtool, version 3.1.0 (branch: HEAD, revision: fixture)\\n"\n' > "$PROMTOOL_FIXTURE/prometheus-3.1.0.darwin-arm64/promtool"
+  chmod 0755 "$PROMTOOL_FIXTURE/prometheus-3.1.0.darwin-arm64/promtool"
+  tar -czf "$PROMTOOL_FIXTURE/fixture.tar.gz" -C "$PROMTOOL_FIXTURE" prometheus-3.1.0.darwin-arm64
+  export PROMTOOL_FIXTURE_SHA="$(shasum -a 256 "$PROMTOOL_FIXTURE/fixture.tar.gz" | awk '{print $1}')"
+  cat > "$PROMTOOL_STUB_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == -o ]]; then out="$2"; shift 2; else printf '%s\n' "$1" >> "$PROMTOOL_CURL_LOG"; shift; fi
+done
+cp "$PROMTOOL_FIXTURE/fixture.tar.gz" "$out"
+EOF
+  cat > "$PROMTOOL_STUB_BIN/uname" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == -s ]]; then printf '%s\n' "${FIXTURE_UNAME_S:-Darwin}"; else printf '%s\n' "${FIXTURE_UNAME_M:-arm64}"; fi
+EOF
+  cat > "$PROMTOOL_STUB_BIN/mktemp" <<'EOF'
+#!/usr/bin/env bash
+path="$("$PROMTOOL_REAL_MKTEMP" "$@")" || exit $?
+printf '%s\n' "$path" >> "$PROMTOOL_WORK_LOG"
+printf '%s\n' "$path"
+EOF
+  cat > "$PROMTOOL_STUB_BIN/sudo" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$PROMTOOL_SUDO_LOG"
+exit 99
+EOF
+  chmod 0755 "$PROMTOOL_STUB_BIN/curl" "$PROMTOOL_STUB_BIN/uname" "$PROMTOOL_STUB_BIN/mktemp" "$PROMTOOL_STUB_BIN/sudo"
+  PATH="$PROMTOOL_STUB_BIN:$PATH"
+  export PATH
+  [ "$(command -v curl)" = "$PROMTOOL_STUB_BIN/curl" ]
+  [[ "$PROMTOOL_INSTALL_DIR" == "$BATS_TEST_TMPDIR"/* ]]
+  _promtool_pinned_sha256() { printf '%s\n' "$PROMTOOL_FIXTURE_SHA"; }
+}
+
+@test "_promtool_pinned_sha256 returns the four pinned checksums" {
+  [ "$(_promtool_pinned_sha256 3.1.0 darwin amd64)" = de958826f9ca20003b30c48fa3f2fcfa67b2a3aebcabd6230e90bb94f92d86e8 ]
+  [ "$(_promtool_pinned_sha256 3.1.0 darwin arm64)" = 8ebe1d60d8864ae3e10a359c3b543563e972505e5ef6fe1d00586d86a7e813fc ]
+  [ "$(_promtool_pinned_sha256 3.1.0 linux amd64)" = 9a9d1e115d1745826b13aec3f1409780b9fcf1d4206746cb4faee46ca5add70c ]
+  [ "$(_promtool_pinned_sha256 3.1.0 linux arm64)" = c12b9e368006873df0c8865771af0434a3edfc8c8eaeea62b73d3974bff7f2a1 ]
+  run _promtool_pinned_sha256 9.9.9 linux amd64
+  [ "$status" -eq 1 ]
+  run _promtool_pinned_sha256 3.1.0 freebsd amd64
+  [ "$status" -eq 1 ]
+}
+
+@test "_install_promtool installs verified archive and skips matching version" {
+  promtool_fixture
+  run _install_promtool
+  [ "$status" -eq 0 ]
+  [ -x "$PROMTOOL_INSTALL_DIR/promtool" ]
+  [[ "$("$PROMTOOL_INSTALL_DIR/promtool" --version)" == 'promtool, version 3.1.0 '* ]]
+  cp "$PROMTOOL_INSTALL_DIR/promtool" "$BATS_TEST_TMPDIR/original"
+  run _install_promtool
+  [ "$status" -eq 0 ]
+  cmp -s "$BATS_TEST_TMPDIR/original" "$PROMTOOL_INSTALL_DIR/promtool"
+  [ "$(grep -c 'prometheus-3.1.0.darwin-arm64.tar.gz' "$PROMTOOL_CURL_LOG")" -eq 1 ]
+  [ ! -s "$PROMTOOL_SUDO_LOG" ]
+  while IFS= read -r work_path; do [ ! -e "$work_path" ]; done < "$PROMTOOL_WORK_LOG"
+}
+
+@test "_install_promtool maps supported platforms and replaces old version" {
+  promtool_fixture
+  for mapping in 'Darwin arm64 darwin-arm64' 'Darwin x86_64 darwin-amd64' 'Linux x86_64 linux-amd64' 'Linux aarch64 linux-arm64'; do
+    set -- $mapping
+    export FIXTURE_UNAME_S="$1" FIXTURE_UNAME_M="$2"
+    mkdir -p "$PROMTOOL_FIXTURE/prometheus-3.1.0.$3"
+    if [[ "$3" != darwin-arm64 ]]; then cp "$PROMTOOL_FIXTURE/prometheus-3.1.0.darwin-arm64/promtool" "$PROMTOOL_FIXTURE/prometheus-3.1.0.$3/promtool"; fi
+    tar -czf "$PROMTOOL_FIXTURE/fixture.tar.gz" -C "$PROMTOOL_FIXTURE" "prometheus-3.1.0.$3"
+    export PROMTOOL_FIXTURE_SHA="$(shasum -a 256 "$PROMTOOL_FIXTURE/fixture.tar.gz" | awk '{print $1}')"
+    platform_asset="$3"
+    PROMTOOL_INSTALL_DIR="$BATS_TEST_TMPDIR/install-$1-$2"; export PROMTOOL_INSTALL_DIR
+    mkdir -p "$PROMTOOL_INSTALL_DIR"
+    if [[ ! -e "$PROMTOOL_INSTALL_DIR/promtool" ]]; then
+      printf '#!/bin/sh\necho old\n' > "$PROMTOOL_INSTALL_DIR/promtool"
+      chmod 0755 "$PROMTOOL_INSTALL_DIR/promtool"
+    fi
+    run _install_promtool
+    [ "$status" -eq 0 ]
+    [[ "$("$PROMTOOL_INSTALL_DIR/promtool" --version)" == 'promtool, version 3.1.0 '* ]]
+    grep -F "prometheus-3.1.0.$platform_asset.tar.gz" "$PROMTOOL_CURL_LOG"
+  done
+  [ ! -s "$PROMTOOL_SUDO_LOG" ]
+}
+
+@test "_install_promtool refuses checksum and platform failures without leftovers" {
+  promtool_fixture
+  _promtool_pinned_sha256() { printf '%s\n' wrong; }
+  run _install_promtool
+  [ "$status" -eq 1 ]
+  [ ! -e "$PROMTOOL_INSTALL_DIR/promtool" ]
+  [ -z "$(find "$PROMTOOL_INSTALL_DIR" -name promtool -print)" ]
+  [ -z "$(find "$BATS_TEST_TMPDIR" -maxdepth 1 -name 'tmp.*' -print)" ]
+  while IFS= read -r work_path; do [ ! -e "$work_path" ]; done < "$PROMTOOL_WORK_LOG"
+  : > "$PROMTOOL_CURL_LOG"
+  _promtool_pinned_sha256() { return 1; }
+  run env PROMTOOL_VERSION=9.9.9 SYSTEM_LIB="$SYSTEM_LIB" HOME="$HOME" PROMTOOL_INSTALL_DIR="$PROMTOOL_INSTALL_DIR" PATH="$PATH" bash -c 'set -e; source "$SYSTEM_LIB"; if _install_promtool; then exit 77; else echo caller-survived; fi'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *caller-survived* ]]
+  [ ! -s "$PROMTOOL_CURL_LOG" ]
+  export FIXTURE_UNAME_S=Plan9
+  run _install_promtool
+  [ "$status" -eq 1 ]
+  [ ! -s "$PROMTOOL_CURL_LOG" ]
+  export FIXTURE_UNAME_S=Linux FIXTURE_UNAME_M=sparc
+  run _install_promtool
+  [ "$status" -eq 1 ]
+  [ ! -s "$PROMTOOL_CURL_LOG" ]
+  [ ! -s "$PROMTOOL_SUDO_LOG" ]
+}
+
 foundation_vcluster_fixture() {
   export HOME="${BATS_TEST_TMPDIR}/home"
   export XDG_DATA_HOME="${BATS_TEST_TMPDIR}/data"
@@ -548,7 +669,7 @@ EOF
   run foundation_ensure_vcluster_cli 0.20.0
   [ "$status" -ne 0 ]
   [[ "$("${managed}" --version)" == *"0.19.0"* ]]
-  [ ! -e "${managed%/*}/.vcluster.$$" ]
+  [ -z "$(find "${managed%/*}" -name '.vcluster.*' 2>/dev/null)" ]
 }
 
 @test "foundation_ensure_vcluster_cli: failed download preserves prior binary" {
@@ -562,6 +683,21 @@ EOF
   run foundation_ensure_vcluster_cli 0.20.0
   [ "$status" -ne 0 ]
   [[ "$("${managed}" --version)" == *"0.19.0"* ]]
+}
+
+@test "foundation_ensure_vcluster_cli: holds the lock through the download under functrace" {
+  foundation_vcluster_fixture
+  [[ "$-" == *T* ]]
+  mv "${VCLUSTER_STUB_BIN}/curl" "${VCLUSTER_STUB_BIN}/curl.real"
+  cat > "${VCLUSTER_STUB_BIN}/curl" <<'EOF'
+#!/usr/bin/env bash
+if [[ -d "${XDG_DATA_HOME}/lib-foundation/vcluster/0.20.0.lock" ]]; then echo held >> "${BATS_TEST_TMPDIR}/lock.log"; else echo dropped >> "${BATS_TEST_TMPDIR}/lock.log"; fi
+exec "${VCLUSTER_STUB_BIN}/curl.real" "$@"
+EOF
+  chmod 0755 "${VCLUSTER_STUB_BIN}/curl"
+  foundation_ensure_vcluster_cli 0.20.0 > /dev/null
+  [ "$(sort -u "${BATS_TEST_TMPDIR}/lock.log")" = "held" ]
+  [ ! -e "${XDG_DATA_HOME}/lib-foundation/vcluster/0.20.0.lock" ]
 }
 
 @test "foundation_ensure_vcluster_cli: concurrent callers leave one binary and no lock" {

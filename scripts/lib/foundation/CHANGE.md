@@ -2,12 +2,17 @@
 
 ## [Unreleased]
 
+## [v0.5.5] — 2026-11-12
+
 ### Added
+- `_run_parallel` runs NUL-separated items with bounded concurrency and per-item logs, results and optional retry.
 - `_install_macmon` installs the macmon sensor reader with Homebrew on Apple Silicon macOS.
 - `_install_virtualbox` and `_install_vagrant` install their Homebrew casks on macOS when their binaries are missing.
+- `_install_promtool` installs pinned Prometheus promtool 3.1.0 with platform-specific SHA-256 verification.
 
 ### Fixed
 - ACG provisioning validates the hub SSH key and its AWS fingerprint before deployment, using the matching imported-key algorithm for RSA and Ed25519; sandbox extend and restart use the active Playwright profile.
+- `foundation_ensure_vcluster_cli` holds its install lock until it returns: under `set -T` the RETURN trap fired when the first helper returned and dropped the lock early; staging now uses `mktemp` instead of `.vcluster.$$`, which concurrent subshells shared.
 - ACG duplicate-key checks accept AWS's unprefixed, padded Ed25519 SHA-256 fingerprint while rejecting malformed trailing data.
 - ACG dev dependency `brace-expansion` 1.1.18 → 1.1.21 (lockfile only; jest → glob → minimatch) clears three high DoS advisories: GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p.
 

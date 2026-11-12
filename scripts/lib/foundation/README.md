@@ -191,6 +191,7 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.5](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.5) | 2026-11-12 | `_run_parallel` (bounded-concurrency NUL-item runner with per-item logs, results and retry) and `_install_promtool` (pinned 3.1.0, SHA-256 verified), plus `_install_macmon`, `_install_virtualbox`, `_install_vagrant`; ACG hub SSH key and fingerprint validation; vCluster CLI lock held under functrace; `brace-expansion` 1.1.21 |
 | [v0.5.4](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.4) | 2026-10-17 | `acg_teardown` reports failure instead of success: returns 2 when the stack lookup fails (anything but "does not exist") and 3 when delete-stack or the delete wait fails, rather than reporting "nothing to tear down" or exiting the caller's shell |
 | [v0.5.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.3) | 2026-10-16 | `_secret_store_data` (macOS) keeps the secret off argv: hex value sent over `security -i` stdin; a failed Keychain write now returns non-zero and keeps the existing item (`-U` update instead of delete-then-add); service/key names with whitespace, quotes or a backslash are rejected |
 | [v0.5.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.2) | 2026-10-11 | `_agent_audit`: a replaced Python assertion can be committed with a per-file `# agent-audit: allow assert-removed <reason>` marker on an added line; unmarked removals now name the file and the removed lines; the test-count check keeps no escape |

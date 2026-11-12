@@ -792,6 +792,186 @@ function _install_vagrant() {
   _install_mac_cask Vagrant vagrant vagrant
 }
 
+function _promtool_pinned_sha256() {
+  local version="$1" os="$2" arch="$3"
+  [[ "$version" == "3.1.0" ]] || return 1
+  case "${os}-${arch}" in
+    darwin-amd64) printf '%s\n' 'de958826f9ca20003b30c48fa3f2fcfa67b2a3aebcabd6230e90bb94f92d86e8' ;;
+    darwin-arm64) printf '%s\n' '8ebe1d60d8864ae3e10a359c3b543563e972505e5ef6fe1d00586d86a7e813fc' ;;
+    linux-amd64) printf '%s\n' '9a9d1e115d1745826b13aec3f1409780b9fcf1d4206746cb4faee46ca5add70c' ;;
+    linux-arm64) printf '%s\n' 'c12b9e368006873df0c8865771af0434a3edfc8c8eaeea62b73d3974bff7f2a1' ;;
+    *) return 1 ;;
+  esac
+}
+
+function _install_promtool() {
+  local version="${PROMTOOL_VERSION:-3.1.0}" os arch target work tarball url expected actual extracted tmp_target rc=0
+  target="${PROMTOOL_INSTALL_DIR:-${HOME}/.local/bin}/promtool"
+  mkdir -p "${target%/*}" || return 1
+  if [[ -x "$target" ]] && "$target" --version 2>/dev/null | head -n 1 | grep -Fq "promtool, version ${version} "; then
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin) os="darwin" ;;
+    Linux) os="linux" ;;
+    *) _warn "Cannot install promtool: unsupported platform '$(uname -s)'"; return 1 ;;
+  esac
+  case "$(uname -m)" in
+    arm64|aarch64) arch="arm64" ;;
+    x86_64|amd64) arch="amd64" ;;
+    *) _warn "Cannot install promtool: unsupported architecture '$(uname -m)'"; return 1 ;;
+  esac
+  expected="$(_promtool_pinned_sha256 "$version" "$os" "$arch")" || {
+    _warn "No pinned promtool checksum for ${version}-${os}-${arch}"
+    return 1
+  }
+  tarball="prometheus-${version}.${os}-${arch}.tar.gz"
+  url="${PROMTOOL_BASE_URL:-https://github.com/prometheus/prometheus/releases/download}/v${version}/${tarball}"
+  work="$(mktemp -d 2>/dev/null)" || return 1
+  if [[ -z "$work" ]]; then return 1; fi
+  if ! ( _run_command -- curl -fsSL -o "${work}/${tarball}" "$url" ); then
+    rm -rf "$work"
+    return 1
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "${work}/${tarball}" | awk '{print $1}')" || rc=1
+  elif command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "${work}/${tarball}" | awk '{print $1}')" || rc=1
+  else
+    _warn "Cannot verify promtool: shasum or sha256sum is required"
+    rm -rf "$work"
+    return 1
+  fi
+  if (( rc != 0 )) || [[ "$actual" != "$expected" ]]; then
+    _warn "promtool checksum mismatch: expected ${expected}, actual ${actual}"
+    rm -rf "$work"
+    return 1
+  fi
+  if ! tar -xzf "${work}/${tarball}" -C "$work" "prometheus-${version}.${os}-${arch}/promtool"; then
+    rm -rf "$work"
+    return 1
+  fi
+  extracted="${work}/prometheus-${version}.${os}-${arch}/promtool"
+  tmp_target="${target}.tmp.$$"
+  if ! cp "$extracted" "$tmp_target" || ! chmod 0755 "$tmp_target" || ! mv -f "$tmp_target" "$target"; then
+    rm -f "$tmp_target"
+    rm -rf "$work"
+    return 1
+  fi
+  rm -rf "$work"
+  return 0
+}
+
+# _run_parallel_worker <out> <cmd...> <item>
+function _run_parallel_worker() {
+  local out="$1" item key base n start end rc
+  shift
+  item="${!#}"
+  set -- "${@:1:$(($# - 1))}"
+  base="$(printf '%s' "$item" | sed 's/[^A-Za-z0-9._-]/_/g')"
+  [[ -n "$base" ]] || base="_"
+  key="$base"
+  n=1
+  while ! mkdir "${out}/.${key}.lock" 2>/dev/null; do
+    n=$((n + 1)); key="${base}-${n}"
+  done
+  start="$(date +%s)"
+  if "$@" "$item" >"${out}/${key}.log" 2>&1; then rc=0; else rc=$?; fi
+  end="$(date +%s)"
+  printf '%s\n' "$rc" >"${out}/${key}.rc"
+  printf '%s\n' "$((end - start))" >"${out}/${key}.sec"
+  printf '%s\n' "$item" >"${out}/${key}.item"
+  # Keep the claim lock until the next run so sanitized keys cannot be reused.
+  return 0
+}
+
+# _run_parallel [--jobs N] --out DIR [--order-by FILE] [--retry-failed] [--flaky-ok] -- CMD [ARG...]
+function _run_parallel() {
+  local jobs="" out="" order="" retry=0 flaky_ok=0 arg tmp started ended key item rc sec retry_start retry_end retry_sec status overall=0 slow_item="" slow_sec=-1 idx seconds known
+  local -a items=() ordered=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --jobs) [[ $# -ge 2 ]] || return 2; jobs="$2"; shift 2 ;;
+      --out) [[ $# -ge 2 ]] || return 2; out="$2"; shift 2 ;;
+      --order-by) [[ $# -ge 2 ]] || return 2; order="$2"; shift 2 ;;
+      --retry-failed) retry=1; shift ;;
+      --flaky-ok) flaky_ok=1; shift ;;
+      --) shift; break ;;
+      *) return 2 ;;
+    esac
+  done
+  [[ -n "$out" && $# -gt 0 ]] || return 2
+  [[ -z "$order" || -r "$order" ]] || return 2
+  if [[ -n "$jobs" ]]; then
+    [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || return 2
+  elif jobs="$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null)" && [[ "$jobs" =~ ^[1-9][0-9]*$ ]]; then :
+  elif jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null)" && [[ "$jobs" =~ ^[1-9][0-9]*$ ]]; then :
+  else jobs=1
+  fi
+  mkdir -p "$out" || return 1
+  rm -f "$out"/*.log "$out"/*.rc "$out"/*.sec "$out"/*.item "$out"/times.txt "$out"/*.try1.log 2>/dev/null || true
+  rm -rf "$out"/.*.lock 2>/dev/null || true
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/run-parallel.XXXXXX")" || return 1
+  started="$(date +%s)"
+  while IFS= read -r -d '' item || [[ -n "$item" ]]; do items+=("$item"); done
+  if (( ${#items[@]} == 0 )); then printf 'TOTAL 0s\n'; rm -rf "$tmp"; return 0; fi
+  if [[ -n "$order" ]]; then
+    idx=0
+    for item in "${items[@]}"; do
+      known=0
+      while IFS=' ' read -r seconds arg; do [[ "$arg" == "$item" ]] && known=1; done <"$order"
+      (( known )) || ordered+=("$idx")
+      idx=$((idx + 1))
+    done
+    while IFS=' ' read -r seconds arg; do
+      [[ "$seconds" =~ ^[0-9]+$ ]] || continue
+      idx=0
+      for item in "${items[@]}"; do
+        if [[ "$arg" == "$item" ]]; then printf '%s\t%s\n' "$seconds" "$idx" >>"$tmp/ranks"; fi
+        idx=$((idx + 1))
+      done
+    done <"$order"
+    if [[ -s "$tmp/ranks" ]]; then
+      while IFS="$(printf '\t')" read -r seconds idx; do ordered+=("$idx"); done < <(sort -t "$(printf '\t')" -k1,1nr "$tmp/ranks")
+    fi
+    for idx in "${ordered[@]}"; do printf '%s\0' "${items[$idx]}" >>"$tmp/input"; done
+  else
+    printf '%s\0' "${items[@]}" >"$tmp/input"
+  fi
+  # shellcheck disable=SC2016
+  xargs -0 -n 1 -P "$jobs" bash -c 'source "$1"; shift; out="$1"; shift; _run_parallel_worker "$out" "$@"' _ "${BASH_SOURCE[0]}" "$out" "$@" <"$tmp/input"
+  rc=$?
+  (( rc == 0 )) || { rm -rf "$tmp"; return 1; }
+  : >"$out/times.txt"
+  for arg in "$out"/*.item; do
+    [[ -e "$arg" ]] || continue
+    item="$(cat "$arg")"; key="${arg##*/}"; key="${key%.item}"
+    rc="$(cat "$out/$key.rc")"; sec="$(cat "$out/$key.sec")"
+    if (( rc != 0 )) && (( retry )); then
+      cp "$out/$key.log" "$out/$key.try1.log"
+      retry_start="$(date +%s)"
+      if "$@" "$item" >"$out/$key.log" 2>&1; then rc=0; else rc=$?; fi
+      retry_end="$(date +%s)"
+      retry_sec=$((retry_end - retry_start))
+      sec=$((sec + retry_sec))
+      printf '%s\n' "$sec" >"$out/$key.sec"
+      printf '%s\n' "$rc" >"$out/$key.rc"
+      if (( rc == 0 )); then status=FLAKY; else status=FAIL; fi
+    elif (( rc == 0 )); then status=PASS; else status=FAIL; fi
+    printf '%s\t%s\t%s\t%s\n' "$item" "$status" "$sec" "$rc" >>"$tmp/results"
+    if [[ "$status" == FAIL ]]; then overall=1
+    else [[ "$status" != FLAKY || $flaky_ok -eq 1 ]] || overall=1; fi
+    if (( sec > slow_sec )); then slow_sec="$sec"; slow_item="$item"; fi
+  done
+  sort -t "$(printf '\t')" -k1,1 "$tmp/results" | while IFS="$(printf '\t')" read -r item status sec rc; do
+    if [[ "$status" == FAIL ]]; then printf 'FAIL %s %ss (rc %s)\n' "$item" "$sec" "$rc"; else printf '%s %s %ss\n' "$status" "$item" "$sec"; fi
+    printf '%s %s\n' "$sec" "$item" >>"$out/times.txt"
+  done
+  ended="$(date +%s)"; printf 'SLOWEST %s %ss\nTOTAL %ss\n' "$slow_item" "$slow_sec" "$((ended-started))"
+  rm -rf "$tmp"
+  return "$overall"
+}
+
 function _is_linux() {
    if [[ "$(uname -s)" == "Linux" ]]; then
       return 0
@@ -2033,7 +2213,7 @@ function foundation_ensure_vcluster_cli() {
     _foundation_vcluster_release
     _err "${message}"
   }
-  trap _foundation_vcluster_release RETURN
+  trap '[[ "${FUNCNAME[0]:-}" != foundation_ensure_vcluster_cli ]] || _foundation_vcluster_release' RETURN
   if _foundation_vcluster_matches_version "${managed_binary}" "${version}"; then
     printf '%s\n' "${managed_binary}"
     return 0
@@ -2047,7 +2227,7 @@ function foundation_ensure_vcluster_cli() {
   [[ "${expected}" =~ ^[0-9a-fA-F]{64}$ ]] || _foundation_vcluster_abort "checksum manifest has no SHA-256 entry for ${asset_name}"
   _foundation_vcluster_checksum "${asset_file}" "${expected}" || _foundation_vcluster_abort "checksum verification failed for ${asset_name}"
   mkdir -p -- "${managed_dir}" || _foundation_vcluster_abort "unable to create managed vCluster directory"
-  staged_binary="${managed_dir}/.vcluster.$$"
+  staged_binary="$(mktemp "${managed_dir}/.vcluster.XXXXXX")" || _foundation_vcluster_abort "unable to stage vCluster CLI"
   cp -- "${asset_file}" "${staged_binary}" || _foundation_vcluster_abort "unable to stage vCluster CLI"
   chmod 0755 "${staged_binary}" || _foundation_vcluster_abort "unable to mark vCluster CLI executable"
   mv -f -- "${staged_binary}" "${managed_binary}" || _foundation_vcluster_abort "unable to activate vCluster CLI"
