@@ -1,7 +1,8 @@
 # Bug Tracking: "Target forecast (earliest/latest)" tiles only say "no date — see table"
 
 **Status:** OPEN — captured 2026-11-11 from the operator's report; not investigated (capture-first rule)
-**Priority:** P3
+**Priority:** P2
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-11 ("degraded, and the Remaining releases table is the workaround"); Claude proposed P3 (cosmetic: the tiles duplicate the table). Higher stands until the operator decides.
 **Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage)
 **Introduced by:** unknown (tiles from `401e4eca`, v1.43.5; when they stopped showing a date is not established)
 **Should have been caught by:** unknown
