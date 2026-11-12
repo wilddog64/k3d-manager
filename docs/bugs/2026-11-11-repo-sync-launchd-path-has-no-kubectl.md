@@ -2,11 +2,12 @@
 
 **Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude on the M4 (launchd PATH) and the M5 (live state)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-11 (intent approval, then dispatch in v1.43.15 with the fetch bug, same file)
+**Waiting on:** dispatch — since 2026-11-11
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** live check
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context missing); `grep -lE 'launchd.*PATH|EnvironmentVariables' docs/bugs` found only older PyYAML/port-forward docs, different root cause
-**Approval:** pending
+**Approval:** operator, 2026-11-11 ("approve two P2s")
+**Intent approved:** operator, 2026-11-11
 
 ## Symptom
 
@@ -67,3 +68,42 @@ interface:
 ## Live corroboration 2026-11-11 (Claude, M5)
 
 After the operator ran `make appsets-reapply`, an interactive `make appsets-check` on the hub printed `All Applications reference values branch deploy/hub` (0 Apps on `k3d-manager-v1.43.15`), yet the launchd-written state.json still read `deploy_unknown: ['appsets-reapply']`. The check passes from a shell with Homebrew on PATH and fails from the job.
+
+## Definition of done (worker)
+
+Before your last message, do all of these and paste the evidence:
+1. Run every test suite that covers a file you changed, not only the new tests. For each, give the command, the exit
+   code and every error line. An error you can't explain is a failure, not a pass. If the sandbox blocks a test, say
+   so and name it; don't skip it silently.
+2. For each `must_not` item: break the guard that enforces it (comment out the check, invert the condition), run its
+   test, show it red, then restore the guard and show it green. List any `must_not` whose test stayed green with the
+   guard broken.
+3. Where the spec allows a read-only run against real data (a real file, a real ledger, a real container image), run
+   the changed code once that way and paste what it printed. Otherwise say "no read-only real-data run possible" and
+   why.
+4. List every place where you chose something the spec did not decide (a default, a path, a mode, an edge case).
+```
+
+### 2. Cross-vendor diff review before Claude's review
+
+When the worker exits successfully, a reviewer from the other vendor reviews the diff against the spec: Flash
+reviews Luna's work, and Luna reviews Flash's. It is linked to the task:
+
+`bin/k3dm-codex-dispatch start --spec <review brief> --slug <slug>-review --parent <slug> --role review --agent <other>`
+
+- The brief gives the reviewer the spec and the worker's diff, and asks for findings only, with file:line, the input
+  that breaks it, and the spec line it violates. The reviewer changes no files.
+- Findings are advisory. Claude checks each one, sends the real ones back to the worker by `resume`, and records the
+  rest as noise.
+- Claude still reviews last, before `codex-land`.
+- The diff goes inline in the brief, `docs/reviews/<slug>-review.md`, committed before `start` (settled on first use,
+  2026-11-08). Untracked new files are included with `git add -N` before `git diff`, then unstaged again.
+- `start` runs the intent gate for review children too. The operator approves each brief, and the brief carries
+  `**Intent approved:**` (operator, 2026-11-08, choosing this over exempting `--role review` from the gate).
+- `start` also needs a `## Files` section with a backticked path: list the files under review, marked read-only.
+
+### 3. Spec review by a second agent before intent approval
+
+Before Claude shows the operator the intents of a trial spec, an agent that did not write it runs `/spec-review`
+against it. The agent also answers: what does the spec leave undecided that a worker would have to guess (paths,
+modes, platforms, defaults)? Claude fixes the spec, and then asks for intent approval.
