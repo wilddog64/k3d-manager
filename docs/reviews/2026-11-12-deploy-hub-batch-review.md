@@ -1,7 +1,8 @@
 # Review brief: deploy/hub batch: checkout follows deploy/hub, promote guard fails closed (Luna) — cross-vendor diff review
 
 **Role:** review child of `deploy-hub-batch`.
-**Intent approved:** operator, 2026-11-12 ("dispatch as you suggest"; first-pass quality trial: cross-vendor diff review)
+**Intent approved:** operator, 2026-11-12
+**Approval basis:** "dispatch as you suggest"; first-pass quality trial: cross-vendor diff review
 **Spec under review:** `docs/bugs/2026-11-12-deploy-hub-batch-checkout-follows-deploy-hub-and-promote-guard-fails-closed.md` (read it in full first).
 
 ## Files

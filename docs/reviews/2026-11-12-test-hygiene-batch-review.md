@@ -1,7 +1,8 @@
 # Review brief: test-hygiene batch: tripwire catches host writes, fresh-clone fixes (Luna) — cross-vendor diff review
 
 **Role:** review child of `test-hygiene-batch`.
-**Intent approved:** operator, 2026-11-12 ("dispatch as you suggest"; first-pass quality trial: cross-vendor diff review)
+**Intent approved:** operator, 2026-11-12
+**Approval basis:** "dispatch as you suggest"; first-pass quality trial: cross-vendor diff review
 **Spec under review:** `docs/bugs/2026-11-12-test-hygiene-batch-tripwire-host-writes-and-fresh-clone.md` (read it in full first).
 
 ## Files
