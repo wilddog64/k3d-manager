@@ -41,6 +41,8 @@ moved and are not copied here.
   numbers; work further out is an ordered backlog with themes (v2.0.0, v3.0.0), numbered when groomed in. Rules in
   `docs/ideas.md`.
 
+**Blocked on (operator, 2026-11-12):** each grooming records, per open-release plan and queued bug batch, what it is blocked on (`nothing`, `intent`, `dependency`, `file overlap`, `operator input`, `review`) and batches every operator ask into one list, so asks are answered at grooming instead of mid-week. Steps in `/release-groom`.
+
 <a id="dispatch-wip-limit"></a>
 ### Dispatch WIP limit and P3 batching
 

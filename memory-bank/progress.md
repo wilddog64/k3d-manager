@@ -534,5 +534,9 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - [x] dev-hub plan evidence intents written (intent pending; Argon review)
 - [x] lib-foundation PR #83 opened (run-parallel + install-promtool)
 - [x] Post-merge 7b committed 3ef2c0f9; 7c MEMORY.md 156 → 153
-- [ ] Test-hygiene batch spec (agent running)
+- [x] Test-hygiene batch spec written (Parts A–F; Flash spec review running; E14–E15 fast-gate intents need first approval)
 - [ ] Operator intent approval: deploy/hub batch, test-hygiene, dev-hub → dispatch wave 1
+- [x] Cost E3 operator 30d dashboard read matches (92.7%, $1.76/13); ledger gap explanation still Claude-owned
+- [x] E6 helper /tmp/k3dm-e6-check.sh copied to M5 (rewinds deployed-platform-ops marker; logs /tmp/k3dm-e6-*.log)
+- [x] Spec reviews back (Argon deploy/hub + dev-hub, Flash test-hygiene); 3 agents verifying findings and revising specs (no commit)
+- [ ] E6 running on M5 since 14:11Z (log /tmp/k3dm-e6-20261112T141106Z.log; Claude watching over ssh)
