@@ -52,9 +52,9 @@ and two functions — nothing else changes.
 ### Plugin System
 
 Feature modules live in `scripts/plugins/` and are **lazy-loaded** — sourced only when
-a matching function is invoked. Plugins are independent — each of the 28 lives in its own file:
+a matching function is invoked. Plugins are independent — each of the 29 lives in its own file:
 ACG, ArgoCD, AWS, Azure, Cert-Manager, Copilot, E2E Tier 1 (`e2e.sh`), E2E Tier 2
-(`e2e_remote.sh`), ESO, GCP, Gemini, Hello, Hub Recovery, Hub Snapshot, Istio Ambient, Jenkins
+(`e2e_remote.sh`), ESO, GCP, Gemini, Hello, Hub Data, Hub Recovery, Hub Snapshot, Istio Ambient, Jenkins
 (**deprecated** — disabled by default, not deployed; code retained but unsupported), Keycloak,
 LDAP, Loadtest, Observability, Shopping Cart, Signing, SMB-CSI, Smoke, SSM, Tunnel, Vault,
 vCluster.
@@ -100,6 +100,13 @@ directory integration plugin, mirroring the same pattern as cluster providers.
   **rebuildable cache, not a system of record** — losing it costs one re-index — and every path is
   advisory, exiting 0 on a missing credential, an unreachable store or an empty index, because a
   dedup aid must never become a new way for filing a bug to fail.
+- Promoted hub deployment (v1.43.15+): the hub runs only code promoted to the `deploy/hub` ref.
+  `make hub-promote REF=<commit>` moves it (green check runs, typed confirmation,
+  `hub-promote/<UTC>` tag, `BREAK_GLASS=1` override), `make hub-rollback` reverts the last move,
+  and ApplicationSets plus `make platform-ops` read the promoted tree, not the checkout. A
+  five-minute repo-sync LaunchAgent (`bin/k3dm-repo-sync`) fast-forwards each machine's
+  configured checkouts by machine role and reports hub sync lag and pending deploy steps
+  without running them.
 
 **Out of scope:**
 - Production cluster management.
@@ -124,6 +131,9 @@ Each component exists because of a real gap, reasoned through sequentially — n
 - **pgvector store** → the exact-slug dedup check only ever matched a slug someone had already
   guessed correctly, and this repo refiled the same ESO defect under a name the glob could not
   match; similarity search over `docs/` gives the check a memory
+- **`deploy/hub` promotion** → config committed to a release branch reached the hub as soon as
+  ApplicationSets were reapplied; a separate promoted ref makes "what the hub runs" an explicit,
+  checked, reversible step
 - **Blackbox exporter** → the seven Cloudflare public hostnames had no external liveness signal;
   in-cluster health says nothing about whether the tunnel actually serves them
 
