@@ -36,7 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
-.PHONY: promote hub-promote hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
+.PHONY: promote hub-promote hub-deploy hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -467,6 +467,11 @@ appsets-check:
 ## Promote an origin commit to the live hub after checks and typed confirmation
 hub-promote:
 	@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}"
+
+## Promote REF and reconcile the hub, verifying the exporter rollout
+hub-deploy:
+	@[ -n "$${REF:-}" ] || { echo 'usage: make hub-deploy REF=<commit-ish>' >&2; exit 2; }
+	@bin/k3dm-hub-deploy "$$REF"
 
 ## Roll back deploy/hub to the previous recorded promotion
 hub-rollback:
@@ -1788,6 +1793,7 @@ help:
 	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
 	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
 	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 optional)"
+	@echo "    make hub-deploy REF=...    Promote, reconcile and verify the hub (typed confirmation required)"
 	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
 	@echo "    make hub-rollback          Return deploy/hub to the state before the last promotion"
 	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"

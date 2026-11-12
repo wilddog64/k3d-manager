@@ -21,7 +21,31 @@ The content the hub reads must not change during this ref switch. The first
 check confirms the old release ref; after reapplying, the second check confirms
 `deploy/hub`.
 
-## Promote
+## Everyday promote
+
+For a normal release, run the end-to-end hub deployment on the hub:
+
+```sh
+make hub-deploy REF=<commit-ish>
+```
+
+It keeps the typed `promote` confirmation, reapplies ApplicationSets only when
+their manifests changed, checks their values branch, applies platform resources,
+and waits for the vulnerability exporter rollout. If a step fails, fix it and
+rerun the same command; an already-current `deploy/hub` ref continues with the
+remaining steps.
+
+The individual commands remain available as a manual fallback:
+
+```sh
+make hub-promote REF=<commit-ish>
+make appsets-reapply  # only when ApplicationSet manifests changed
+make appsets-check
+make platform-ops
+kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter --timeout=180s
+```
+
+## Promote (manual sequence)
 
 Promote a commit that is reachable from an `origin` branch and has completed
 successfully in GitHub Actions:
