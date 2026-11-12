@@ -7,10 +7,10 @@
 ## Files
 
 Read-only: review these, change none of them.
-- `Makefile
-bin/k3dm-hub-promote
-docs/howto/hub-promote.md
-scripts/tests/bin/hub_promote.bats`
+- `Makefile`
+- `bin/k3dm-hub-promote`
+- `docs/howto/hub-promote.md`
+- `scripts/tests/bin/hub_promote.bats`
 
 ## Task
 

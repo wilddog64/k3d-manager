@@ -7,8 +7,8 @@
 ## Files
 
 Read-only: review these, change none of them.
-- `scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl
-scripts/tests/bin/repo_sync_launchd_env.bats`
+- `scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl`
+- `scripts/tests/bin/repo_sync_launchd_env.bats`
 
 ## Task
 
