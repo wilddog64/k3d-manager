@@ -1,8 +1,8 @@
 # repo-sync's launchd job has no PATH, so the hub's appsets-check is always unknown
 
-**Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude on the M4 (launchd PATH) and the M5 (live state)
+**Status:** LANDED `21acd3ca` 2026-11-11 (Flash 3.8, 4 rounds; Luna + Fable review; Claude 3/3) — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude on the M4 (launchd PATH) and the M5 (live state)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11 (E3 on the M5: promote, make install-repo-sync, state.json without appsets-reapply unknown)
 **Introduced by:** `f310b4d4` (v1.43.15 checkout-auto-sync)
 **Should have been caught by:** live check
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context missing); `grep -lE 'launchd.*PATH|EnvironmentVariables' docs/bugs` found only older PyYAML/port-forward docs, different root cause
