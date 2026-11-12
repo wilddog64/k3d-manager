@@ -82,6 +82,35 @@ setup() {
   [[ "$output" != *'ok 1 '* && "$output" == *'SLOWEST scripts/tests/lib/'* ]]
 }
 
+@test "fast gate: excludes host suites and removes caller BASE from workers" {
+  mkdir -p "$fixture/scripts/tests/host"
+  printf '#!/usr/bin/env bats\n# thing.txt\n@test "host probe" { touch %s; }\n' "$fixture/host-ran" > "$fixture/scripts/tests/host/probe.bats"
+  git -C "$fixture" add scripts/tests/host/probe.bats
+  git -C "$fixture" commit -qm host-probe
+  base=$(git -C "$fixture" rev-parse HEAD^)
+  printf 'new\n' >> "$fixture/thing.txt"
+  git -C "$fixture" add thing.txt
+  git -C "$fixture" commit -qm change-and-host-file
+  run env BASE=deadbeef bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'scripts/tests/host/'* ]]
+  [ ! -e "$fixture/host-ran" ]
+  run bats "$fixture/scripts/tests/host/probe.bats"
+  [ "$status" -eq 0 ]
+  [ -e "$fixture/host-ran" ]
+  rm -f "$fixture/host-ran"
+
+  printf '#!/usr/bin/env bats\n@test "base is absent" { [ -z "${BASE+x}" ]; }\n' > "$fixture/scripts/tests/lib/base-env.bats"
+  git -C "$fixture" add scripts/tests/lib/base-env.bats
+  git -C "$fixture" commit -qm base-env-test
+  base=$(git -C "$fixture" rev-parse HEAD^)
+  printf 'another\n' >> "$fixture/thing.txt"
+  git -C "$fixture" commit -qam trigger-base-env
+  run env BASE=deadbeef bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS scripts/tests/lib/base-env.bats'* ]]
+}
+
 @test "fast gate: managed venv python leads PATH and supplies suite modules" {
   local scratch="$BATS_TEST_TMPDIR/scratch" caller_bin="$BATS_TEST_TMPDIR/caller-bin"
   mkdir -p "$scratch/home" "$scratch/data/k3d-manager/venv/bin" "$caller_bin"

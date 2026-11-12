@@ -19,6 +19,7 @@ setup() {
   envsubst_log="${BATS_TEST_TMPDIR}/envsubst.log"
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl.log"
   export ENVSTUB_LOG="${envsubst_log}" KUBE_STUB_LOG="${kubectl_log}"
+  export HTPASSWD_STUB_LOG="${BATS_TEST_TMPDIR}/htpasswd.log"
   run bash -c '
     set -e
     REPO_ROOT="$(pwd)"
@@ -69,12 +70,17 @@ EOF
     launchctl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
+    htpasswd() {
+      cat >/dev/null
+      printf "%s\n" "$*" >> "${HTPASSWD_STUB_LOG}"
+      printf "admin:\$2y\$12\$abcdefghijklmnopqrstuu0123456789ABCDEFGHIJKLMNOPQRSTU\n"
+    }
     _is_mac() { return 0; }
     _observability_seed_grafana_if_absent() { :; }
     _vault_login() { :; }
     _observability_ensure_argocd_servicemonitors() { :; }
     _observability_ensure_apiserver_scrape_timeout() { :; }
-    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent _vault_login \
+    export -f envsubst _kubectl curl kubectl launchctl htpasswd _is_mac _observability_seed_grafana_if_absent _vault_login \
       _observability_ensure_argocd_servicemonitors _observability_ensure_apiserver_scrape_timeout
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability

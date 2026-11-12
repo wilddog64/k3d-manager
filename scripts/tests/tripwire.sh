@@ -54,10 +54,33 @@ _tripwire_dir="$(mktemp -d "${TMPDIR:-/tmp}/k3dm-tripwire.XXXXXX")"
 trap 'rm -rf "$_tripwire_dir"' EXIT
 _tripwire_bin="$_tripwire_dir/bin"
 _tripwire_log="$_tripwire_dir/blocked.log"
+_tripwire_watch_dir="${K3DM_TRIPWIRE_WATCH_DIR:-${HOME:+$HOME/Library/LaunchAgents}}"
 mkdir -p "$_tripwire_bin"
 : > "$_tripwire_log"
 
+_tripwire_snapshot() {
+  local output="$1" file
+  : > "$output"
+  [[ -n "$_tripwire_watch_dir" && -d "$_tripwire_watch_dir" ]] || return 0
+  while IFS= read -r file; do
+    printf '%s\t' "$file" >> "$output"
+    cksum < "$file" >> "$output"
+  done < <(find "$_tripwire_watch_dir" -maxdepth 1 -type f -name 'com.k3d-manager.*.plist' -print | sort)
+}
+
+_tripwire_newer() {
+  local output="$1"
+  : > "$output"
+  [[ -n "$_tripwire_watch_dir" && -d "$_tripwire_watch_dir" ]] || return 0
+  find "$_tripwire_watch_dir" -maxdepth 1 -type f -name 'com.k3d-manager.*.plist' -newer "$_tripwire_dir/watch.marker" -print | sort > "$output"
+}
+
+_tripwire_snapshot "$_tripwire_dir/watch.before"
+touch "$_tripwire_dir/watch.marker"
+_tripwire_newer "$_tripwire_dir/watch.newer.before"
+
 for _tool in "${TRIPWIRE_TOOLS[@]}"; do
+  type -P -- "$_tool" >/dev/null || continue
   cat > "$_tripwire_bin/$_tool" <<SHIM
 #!/usr/bin/env bash
 case "$_tool \${1:-} \${2:-}" in
@@ -89,4 +112,27 @@ if [[ -s "$_tripwire_log" ]]; then
     [[ $_rc -eq 0 ]] && _rc=1
   fi
 fi
+
+_tripwire_snapshot "$_tripwire_dir/watch.after"
+_tripwire_newer "$_tripwire_dir/watch.newer.after"
+_watch_changed=0
+while IFS=$'\t' read -r _path _checksum; do
+  [[ -n "$_path" ]] || continue
+  if ! grep -Fq "$_path" "$_tripwire_dir/watch.after"; then
+    printf '[tripwire] FAIL: %s removed during the run — isolate HOME and stub launchctl in the test.\n' "$_path" >&2
+    _watch_changed=1
+  fi
+done < "$_tripwire_dir/watch.before"
+while IFS=$'\t' read -r _path _checksum; do
+  [[ -n "$_path" ]] || continue
+  _before=$(grep -F "$_path" "$_tripwire_dir/watch.before" || true)
+  if [[ -z "$_before" ]]; then
+    printf '[tripwire] FAIL: %s created during the run — isolate HOME and stub launchctl in the test.\n' "$_path" >&2
+    _watch_changed=1
+  elif [[ "$_before" != "$_path"$'\t'"$_checksum" ]] || { grep -Fxq "$_path" "$_tripwire_dir/watch.newer.after" && ! grep -Fxq "$_path" "$_tripwire_dir/watch.newer.before"; }; then
+    printf '[tripwire] FAIL: %s modified during the run — isolate HOME and stub launchctl in the test.\n' "$_path" >&2
+    _watch_changed=1
+  fi
+done < "$_tripwire_dir/watch.after"
+if (( _watch_changed )); then [[ $_rc -eq 0 ]] && _rc=1; fi
 exit "$_rc"

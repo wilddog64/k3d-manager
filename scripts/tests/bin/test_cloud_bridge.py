@@ -933,6 +933,7 @@ TEST_SUITE_ACTIONS = {
     "make-test-all": ("test-all", 1800),
 }
 NEVER_EXPOSED = {
+    "test-host",
     "up", "down", "cluster", "cluster-up", "cluster-down", "fix-delete-pod", "fix-force-sync",
     "e2e-sandbox", "e2e-sandbox-provision", "e2e-replay", "e2e-runner-unlock", "cleanup-stale-sandbox",
     "argocd-upgrade", "index-docs", "sync-apps",

@@ -372,66 +372,6 @@ SH
   grep -Fq "this Mac's login Keychain password if that Keychain is locked" "$ROOT/docs/howto/machine-setup.md"
 }
 
-@test "machine secrets: real throwaway keychain round trip is macOS only" {
-  require_macos
-  rm -f "$TMP/bin/security"
-  [ "$(command -v security)" = /usr/bin/security ]
-  project="$TMP/project"
-  mkdir -p "$project/bin" "$project/scripts/etc/machine"
-  cp "$SCRIPT" "$project/bin/k3dm-machine-secrets"
-  printf 'svc-roundtrip|*|fixture|operator: fixture\n' > "$project/scripts/etc/machine/secrets.hub.list"
-  source_keychain="$TMP/source.keychain-db"
-  target_keychain="$TMP/target.keychain-db"
-  if ! security create-keychain -p fixture-pass "$source_keychain"; then skip 'throwaway Keychain creation unavailable in this environment'; fi
-  if ! security create-keychain -p fixture-pass "$target_keychain"; then security delete-keychain "$source_keychain" >/dev/null 2>&1 || true; skip 'throwaway Keychain creation unavailable in this environment'; fi
-  security unlock-keychain -p fixture-pass "$source_keychain"
-  security unlock-keychain -p fixture-pass "$target_keychain"
-  security add-generic-password -s svc-roundtrip -a account-one -X 7370616365202271756f746564220a6e65776c696e65 "$source_keychain"
-  security add-generic-password -s svc-roundtrip -a account-two -X 73617920226869220a "$source_keychain"
-  security add-generic-password -s svc-roundtrip -a account-three -X 7361792022686922 "$source_keychain"
-  security add-generic-password -s svc-other -a account-four -X 6e6f74206c6973746564 "$source_keychain"
-  encrypted="$TMP/roundtrip.enc"
-  run "$project/bin/k3dm-machine-secrets" export --role hub --out "$encrypted" --keychain "$source_keychain"
-  [ "$status" -eq 0 ]
-  run "$project/bin/k3dm-machine-secrets" import --in "$encrypted" --keychain "$target_keychain"
-  [ "$status" -eq 0 ]
-  source_one="$(security find-generic-password -s svc-roundtrip -a account-one -g "$source_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  target_one="$(security find-generic-password -s svc-roundtrip -a account-one -g "$target_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  source_two="$(security find-generic-password -s svc-roundtrip -a account-two -g "$source_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  target_two="$(security find-generic-password -s svc-roundtrip -a account-two -g "$target_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  source_three="$(security find-generic-password -s svc-roundtrip -a account-three -g "$source_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  target_three="$(security find-generic-password -s svc-roundtrip -a account-three -g "$target_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  [ -n "$source_one" ] && [ -n "$source_two" ] && [ "$source_three" = '"say "hi""' ]
-  [ "$source_one" = "$target_one" ]
-  [ "$source_two" = "$target_two" ]
-  [ "$source_three" = "$target_three" ]
-  run security find-generic-password -s svc-other -a account-four "$target_keychain"
-  [ "$status" -ne 0 ]
-  security delete-keychain "$source_keychain"
-  security delete-keychain "$target_keychain"
-}
-
-@test "M6: stream unlock round trip uses throwaway keychains on macOS" {
-  require_macos
-  rm -f "$TMP/bin/security"
-  source_keychain="$TMP/stream-source.keychain-db"
-  target_keychain="$TMP/stream-target.keychain-db"
-  if ! security create-keychain -p fixture-pass "$source_keychain"; then skip 'throwaway Keychain creation unavailable in this environment'; fi
-  if ! security create-keychain -p fixture-pass "$target_keychain"; then security delete-keychain "$source_keychain" >/dev/null 2>&1 || true; skip 'throwaway Keychain creation unavailable in this environment'; fi
-  security unlock-keychain -p fixture-pass "$source_keychain"
-  security unlock-keychain -p fixture-pass "$target_keychain"
-  security add-generic-password -s k3dm-cloudflare-api-token -a k3dm -X 746f6b656e "$source_keychain"
-  security lock-keychain "$source_keychain"
-  run bash -c "printf 'fixture-pass\\n' | '$SCRIPT' export --role hub --stream --unlock --keychain '$source_keychain' | '$SCRIPT' import --in - --keychain '$target_keychain'"
-  [ "$status" -eq 0 ]
-  source_value="$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -g "$source_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  target_value="$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -g "$target_keychain" 2>&1 | sed -n 's/.*password: //p')"
-  [ -n "$source_value" ]
-  [ "$source_value" = "$target_value" ]
-  security delete-keychain "$source_keychain"
-  security delete-keychain "$target_keychain"
-}
-
 @test "machine secrets: export with no listed item fails and writes no file" {
   printf 'svc-other\tacct\t6869\n' > "$FIXTURE"
   project="$TMP/project"
