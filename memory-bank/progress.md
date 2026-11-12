@@ -527,3 +527,12 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 - 2026-11-11: job 40d0e3dd (cluster-up aws) succeeded with the Keycloak bootout workaround (proven, doc bef89132); fix 3b0e6534 still needs a post-promote cluster-up. Added `make promote REF=` (df0f7c22: hub-promote → appsets-check → platform-ops, stops at first failure). Operator to run `make promote REF=df0f7c22` on M5 tmux this afternoon once CI is green.
 - 2026-11-11: hub-promote keeps promoter commits LANDED `aa97c491` (Flash r4, Claude-reviewed). Live E2 pending next CVE promoter commit after a promote containing aa97c491. P3 filed: hub-promote non-TTY tests hang under a tty (601e5ffd).
+
+### 2026-11-12
+- [x] Abandoned 3 stale v1.43.15 review children
+- [x] deploy/hub batch spec written (intent pending; Argon review)
+- [x] dev-hub plan evidence intents written (intent pending; Argon review)
+- [x] lib-foundation PR #83 opened (run-parallel + install-promtool)
+- [x] Post-merge 7b committed 3ef2c0f9; 7c MEMORY.md 156 → 153
+- [ ] Test-hygiene batch spec (agent running)
+- [ ] Operator intent approval: deploy/hub batch, test-hygiene, dev-hub → dispatch wave 1

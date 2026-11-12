@@ -501,3 +501,12 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-11: dispatch-table P3 VERIFIED live (Worker model column; cost-attribution-coverage worker gemini-3.8-flash-medium). Agent-cost P3 waits only on a Fable-row gauge screenshot.
 
 - 2026-11-11: job 40d0e3dd (cluster-up aws) succeeded with the Keycloak bootout workaround (proven, doc bef89132); fix 3b0e6534 still needs a post-promote cluster-up. Added `make promote REF=` (df0f7c22: hub-promote → appsets-check → platform-ops, stops at first failure). Operator to run `make promote REF=df0f7c22` on M5 tmux this afternoon once CI is green.
+
+## SESSION 2026-11-12 (morning) — dispatch wave 1 prep, post-merge 7b/7c
+
+- **Operator decisions (2026-11-12):** "dispatch as you suggest"; first wave = 2 plans + 1 bug within WIP 3, next 3 as they land; Claude verifies first, operator verifies later (terminal or Claude.ai). Abandon the 3 stale v1.43.15 review children — done (appset-callers, hub-rollback-confirmation, repo-sync-launchd-path). Reminder at 3:30–4:00 for live checks (session cron, 3:32pm).
+- **Wave 1 (revised; plans 1/2/3/5 blocked):** deploy/hub batch bug spec `docs/bugs/2026-11-12-deploy-hub-batch-checkout-follows-deploy-hub-and-promote-guard-fails-closed.md` (written, Argon review running, intent pending); test-hygiene batch spec (agent writing; C3+C4+fresh-linux+fast-gate; unblocks plan 1 Part B); plan 4 dev-hub (intents written 2026-11-12, Argon review running, intent pending). P0 OrbStack memory confirmed done on M5 (`memory_mib: 24576`).
+- **Wave 2:** plan 1 Part B (after test-hygiene + lib v0.5.5), plan 3 (after deploy/hub batch — same files), plan 2 (intent pending). Plan 5 needs the Slack config token.
+- **lib-foundation PR #83** (`feat/run-parallel`: `_install_promtool` + `_run_parallel`) opened 2026-11-12; after merge tag v0.5.5 and subtree-pull (needed by plan 1 Part B and C2 Part B).
+- **Post-merge 7b** committed `3ef2c0f9` (projectbrief, copilot-instructions, functions.md; CLAUDE.md 248 → 150 with history in `docs/process/rules.md`). **7c:** MEMORY.md 156 → 153 (8 stale memories removed).
+- **Live checks owed by operator:** cost E3 needs a 30d-window screenshot of the Cost row; auto-sync E6 needs a dashboard-touching promote then 30 min without platform-ops; control-node-linux E3/E4 wait on the fresh-linux P3 (test-hygiene batch).
