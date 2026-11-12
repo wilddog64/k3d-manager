@@ -51,3 +51,17 @@ under the new rule.
 | Date | Trigger | Bugs triaged | Outcome | Classification agreement | Notes |
 |---|---|---|---|---|---|
 | 2026-11-12 | post-merge `/release-groom` (v1.43.15) | 79 | carry 26, close 6, status corrected 6, out at P3 cap 9, passed over 31 (7 of them v1.43.16 picks, not counted) | Argon on 76: 43 equal, 29 higher, 4 lower; operator kept Claude's P on all 33 | Argon read "degraded with a workaround" as P2 for hygiene and test-only bugs: one systematic difference, not 29 separate ones. 869,027 Argon tokens, uncounted by any dashboard. Claude first computed the P3 cap with Argon's raises standing (17 vs 10) and corrected it before recording. `docs/grooming/2026-11-12.md` |
+
+## Review findings log (side-by-side Fable trial)
+
+Started 2026-11-12 (operator: "we can try to experience this side by side workflow a bit"). Every dispatch diff,
+first run and each correction, gets a Fable review in parallel with Claude's own read, before land. Fable is briefed
+with the diff, spec and related files, never Claude's findings. Claude verifies every finding against the code.
+One row per reviewer per review. **Confirmed** = held up when checked; **Rejected** = wrong or not a defect;
+**Overlap** = also found by the other reviewer; **First-use** = would have failed on the first live run.
+Judged after 2–3 releases.
+
+| Date | Dispatch (run) | Reviewer | Tokens | Findings | Confirmed | Rejected | Overlap | First-use |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-12 | dev-hub-vcluster-b (1) | Fable | 107,610 | 13 | 11 (2 low pending) | 0 | 1 | 3 |
+| 2026-11-12 | dev-hub-vcluster-b (1) | Claude | — | 2 | 2 | 0 | 1 | 1 |
