@@ -1,8 +1,8 @@
 # hub-sync stops following deploy/hub once the hub checkout's upstream branch is deleted on origin
 
-**Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; reproduced by Claude in a scratch repo
+**Status:** LANDED `a9a350aa` 2026-11-11 (Luna, 2 rounds; Fable review findings applied; Claude review 39/39, E4/E6/E7/E8 red on `a3786d5f`) — found 2026-11-11 by the Fable pre-PR review of v1.43.15
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11 (E3 on the M5 after the v1.43.15 promote and the release branch deletion)
 **Introduced by:** `d06c0340` (v1.43.15, hub-sync promote backlog fix)
 **Should have been caught by:** spec (the backlog fix spec said "second refspec in the same `git fetch`")
 **Prior art:** none above threshold — exact-slug glob empty; `find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing); `grep "couldn't find remote ref" docs/bugs` no match
