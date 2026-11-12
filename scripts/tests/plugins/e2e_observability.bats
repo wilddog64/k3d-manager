@@ -1,5 +1,9 @@
 #!/usr/bin/env bats
 
+setup() {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+}
+
 EXPORTER="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
 DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-e2e.yaml"
 HERMES_DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-hermes.yaml"
@@ -61,7 +65,7 @@ AM_TMPL="${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl"
 }
 
 @test "exporter normalizes nested JSON and skips invalid E2E payloads" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -77,8 +81,7 @@ PY
 }
 
 @test "exporter labels e2e gauges with the runner dimension" {
-  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -98,7 +101,7 @@ PY
 }
 
 @test "exporter synthesizes one failure group for a test-less failed run" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import ast, sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -126,8 +129,7 @@ PY
 }
 
 @test "embedded exporter.py compiles cleanly" {
-  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml, tempfile, py_compile, os
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -145,7 +147,7 @@ PY
 }
 
 @test "exporter RBAC is not widened (still get,list on configmaps only)" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 role = next(d for d in docs if d and d.get("kind") == "Role"
@@ -162,7 +164,7 @@ PY
 }
 
 @test "exporter maps UNKNOWN Trivy severity from CVSS score" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -178,7 +180,7 @@ PY
 }
 
 @test "exporter exposes report creation timestamps without inventing missing values" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import ast, sys, yaml, textwrap
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
@@ -205,7 +207,7 @@ PY
 }
 
 @test "exporter preserves remediation cache when refresh fails" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -223,7 +225,7 @@ PY
 }
 
 @test "terminal remediation outcomes are excluded from current status" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
@@ -238,7 +240,7 @@ PY
 }
 
 @test "e2e dashboard CM parses and its embedded JSON references e2e_* metrics" {
-  run python3 - "${DASH}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${DASH}" <<'PY'
 import sys, yaml, json
 d = yaml.safe_load(open(sys.argv[1]))
 assert d["kind"] == "ConfigMap"
@@ -263,11 +265,11 @@ PY
 }
 
 @test "E2E failure metrics carry run provenance and matching current status" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml
 cm = next(d for d in yaml.safe_load_all(open(sys.argv[1])) if d and d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
 src = cm["data"]["exporter.py"]
-assert '"run_date": e2e_utc(event["event_seconds"]) or "N/A"' in src
+assert '"run_date": e2e_time(event["event_seconds"]) or "N/A"' in src
 assert src.count('"run_status": e2e_run_status(event, e2e_state)') == 2
 assert 'lines.append("e2e_run_info{" + info_body + "} " + num(event["run_seconds"]))' in src
 print("ok")
@@ -277,17 +279,24 @@ PY
 }
 
 @test "E2E fixed status requires a later pass with identical run dimensions" {
-  run python3 - "${EXPORTER}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" <<'PY'
 import sys, yaml, textwrap
 cm = next(d for d in yaml.safe_load_all(open(sys.argv[1])) if d and d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
 src = cm["data"]["exporter.py"]
-start = src.index("def e2e_utc(seconds):")
+start = src.index("def e2e_time(seconds):")
 end = src.index("def e2e_app_service", start)
-namespace = {"time": __import__("time")}
+time_module = __import__("time")
+import os
+os.environ["TZ"] = "PST8PDT,M3.2.0,M11.1.0"
+time_module.tzset()
+namespace = {"time": time_module}
 exec(textwrap.dedent(src[start:end]), namespace)
 status = namespace["e2e_run_status"]
 failed = {"passed": False, "tier": "2", "service": "basket", "project": "suite-a", "runner": "m4", "run_seconds": 100}
-assert status(failed, [failed, {**failed, "passed": True, "run_seconds": 200}]) == "fixed: passed 1970-01-01 00:03 UTC"
+assert namespace["e2e_time"](1794086678) == "2026-11-07 13:24 PST"
+assert namespace["e2e_time"](1783000000) == "2026-07-02 06:46 PDT"
+assert namespace["e2e_time"](0) == ""
+assert status(failed, [failed, {**failed, "passed": True, "run_seconds": 1794086678}]) == "fixed: passed 2026-11-07 13:24 PST"
 for key, value in (("tier", "1"), ("service", "payment"), ("project", "suite-b"), ("runner", "m2")):
     unrelated = {**failed, key: value, "passed": True, "run_seconds": 200}
     assert status(failed, [failed, unrelated]) == "still failing", key
@@ -299,7 +308,7 @@ PY
 }
 
 @test "E2E tables share owner-service filters and exact run ID selection" {
-  run python3 - "${DASH}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${DASH}" <<'PY'
 import sys, yaml, json
 obj = yaml.safe_load(open(sys.argv[1]))
 dash = json.loads(obj["data"]["e2e.json"])
@@ -320,7 +329,7 @@ PY
 }
 
 @test "prometheusrule defines the e2e alerts group and all alerts" {
-  run python3 - "${RULE}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${RULE}" <<'PY'
 import sys, yaml
 r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
 groups = {g["name"]: g for g in r["spec"]["groups"]}
@@ -340,7 +349,7 @@ PY
 }
 
 @test "e2e alerts aggregate away the scrape target and name the exported service" {
-  run python3 - "${RULE}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${RULE}" <<'PY'
 import sys, yaml
 r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
 groups = {g["name"]: g for g in r["spec"]["groups"]}
@@ -365,13 +374,13 @@ PY
   if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
   rules_file="${BATS_TEST_TMPDIR}/e2e-rules.yml"
   test_file="${BATS_TEST_TMPDIR}/e2e-staleness.test.yml"
-  python3 - "${RULE}" "${rules_file}" <<'PY'
+  "$(k3dm_python_yaml)" - "${RULE}" "${rules_file}" <<'PY'
 import sys, yaml
 document = next(d for d in yaml.safe_load_all(open(sys.argv[1]))
                 if d and d.get("kind") == "PrometheusRule")
 yaml.safe_dump({"groups": document["spec"]["groups"]}, open(sys.argv[2], "w"), sort_keys=False)
 PY
-  python3 - "${rules_file}" "${test_file}" <<'PY'
+  "$(k3dm_python_yaml)" - "${rules_file}" "${test_file}" <<'PY'
 import sys
 rules_file, test_file = sys.argv[1:]
 open(test_file, "w").write(f"""rule_files:
@@ -418,7 +427,7 @@ PY
   if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
   rules_file="${BATS_TEST_TMPDIR}/e2e-rules-missing.yml"
   test_file="${BATS_TEST_TMPDIR}/e2e-missing.test.yml"
-  python3 - "${RULE}" "${rules_file}" <<'PY'
+  "$(k3dm_python_yaml)" - "${RULE}" "${rules_file}" <<'PY'
 import sys, yaml
 document = next(d for d in yaml.safe_load_all(open(sys.argv[1]))
                 if d and d.get("kind") == "PrometheusRule")
@@ -459,8 +468,8 @@ PY
 }
 
 @test "e2e runs carry a run date and say whether a failure was fixed later" {
-  run python3 - "${EXPORTER}" "${DASH}" <<'PY'
-import ast, json, sys, time, yaml
+  run "$(k3dm_python_yaml)" - "${EXPORTER}" "${DASH}" <<'PY'
+import ast, json, os, sys, time, yaml
 docs = list(yaml.safe_load_all(open(sys.argv[1])))
 cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
           and d["metadata"]["name"] == "vulnerability-inventory-exporter")
@@ -468,7 +477,7 @@ src = cm["data"]["exporter.py"]
 tree = ast.parse(src)
 ns = {"time": time}
 for node in ast.walk(tree):
-    if isinstance(node, ast.FunctionDef) and node.name in ("e2e_utc", "e2e_run_status"):
+    if isinstance(node, ast.FunctionDef) and node.name in ("e2e_time", "e2e_run_status"):
         exec(compile(ast.Module(body=[node], type_ignores=[]), "exporter", "exec"), ns)
 def ev(seconds, passed, service="product-catalog"):
     return {"tier": "vcluster", "service": service, "project": "api+flows",
@@ -478,9 +487,12 @@ fix = ev(1791290881, True)
 open_fail = ev(1791400000, False)
 other = ev(1791500000, True, service="basket")
 events = [old_fail, fix, open_fail, other]
-assert ns["e2e_utc"](1791290346) == "2026-10-06 12:39 UTC", ns["e2e_utc"](1791290346)
+os.environ["TZ"] = "PST8PDT,M3.2.0,M11.1.0"
+time.tzset()
+assert ns["e2e_time"](1794086678) == "2026-11-07 13:24 PST", ns["e2e_time"](1794086678)
+assert ns["e2e_time"](1783000000) == "2026-07-02 06:46 PDT", ns["e2e_time"](1783000000)
 assert ns["e2e_run_status"](fix, events) == "passed"
-assert ns["e2e_run_status"](old_fail, events) == "fixed: passed 2026-10-06 12:48 UTC", ns["e2e_run_status"](old_fail, events)
+assert ns["e2e_run_status"](old_fail, events) == "fixed: passed 2026-10-06 05:48 PDT", ns["e2e_run_status"](old_fail, events)
 assert ns["e2e_run_status"](open_fail, events) == "still failing"
 assert 'info["run_date"]' in src and 'info["run_status"]' in src
 dash = json.loads(yaml.safe_load(open(sys.argv[2]))["data"]["e2e.json"])
@@ -489,6 +501,20 @@ org = panel["transformations"][0]["options"]
 assert org["indexByName"]["run_date"] == 0 and org["indexByName"]["run_status"] == 1
 assert org["renameByName"]["run_status"] == "Status now"
 assert panel["options"]["sortBy"][0] == {"displayName": "Run date", "desc": True}
+deploy = next(d for d in docs if d and d.get("kind") == "Deployment" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+container = deploy["spec"]["template"]["spec"]["containers"][0]
+assert container["name"] == "exporter", "fixture must target the exporter container"
+assert {item["name"]: item["value"] for item in container["env"]}["TZ"] == "PST8PDT,M3.2.0,M11.1.0"
+table_ids = (5, 6, 7)
+tables = [next(p for p in dash["panels"] if p["id"] == panel_id) for panel_id in table_ids]
+assert all("UTC" not in json.dumps(p) for p in tables), "E2E table includes UTC label"
+assert all(p["transformations"][0]["options"]["renameByName"]["run_date"] == "Run date" for p in tables)
+failure_groups = next(p for p in tables if p["id"] == 6)
+order = failure_groups["transformations"][0]["options"]["indexByName"]
+assert {name: order[name] for name in
+        ("run_id", "runner", "run_date", "tier", "target", "exported_service", "kind", "run_status")} == {
+            "run_id": 0, "runner": 1, "run_date": 2, "tier": 3,
+            "target": 4, "exported_service": 5, "kind": 6, "run_status": 7}
 print("ok")
 PY
   echo "$output"; [ "${status}" -eq 0 ]

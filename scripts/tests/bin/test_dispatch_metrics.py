@@ -372,6 +372,28 @@ def test_per_plan_dispatch_state_uses_latest_started_task():
     assert 'plan="legacy"' not in output
 
 
+def test_bug_dispatch_state_uses_latest_started_task_and_emits_bug_state():
+    events = [
+        event(1, "start", "plan-task", spec="docs/plans/v1.43.15-test-plan.md"),
+        event(2, "codex_exit", "plan-task", exit=0),
+        event(3, "start", "bug-exited-old", spec="docs/bugs/2026-11-01-exited-bug.md"),
+        event(4, "codex_exit", "bug-exited-old", exit=1),
+        event(5, "start", "bug-exited", spec="docs/bugs/2026-11-01-exited-bug.md"),
+        event(6, "codex_exit", "bug-exited", exit=0),
+        event(7, "start", "bug-running", spec="docs/bugs/2026-11-02-running-bug.md"),
+        event(8, "start", "outside-task", spec="docs/issues/2026-11-03-outside.md"),
+        event(9, "start", "bad-stem", spec="docs/bugs/invalid_stem.md"),
+    ]
+    output = dispatch_metrics.render(events, 0, 100)
+    assert 'k3dm_dispatch_plan_state{plan="v1.43.15-test-plan",version="9.9.9",slug="plan-task",dispatch_state="awaiting_land"} 1' in output
+    assert "k3dm_dispatch_plan_state_skipped 5" in output
+    assert 'k3dm_dispatch_bug_state{bug="2026-11-01-exited-bug",version="9.9.9",slug="bug-exited",dispatch_state="awaiting_land"} 1' in output
+    assert 'k3dm_dispatch_bug_state{bug="2026-11-02-running-bug",version="9.9.9",slug="bug-running",dispatch_state="running"} 1' in output
+    assert output.count("k3dm_dispatch_bug_state{") == 2
+    assert 'bug="2026-11-03-outside"' not in output
+    assert 'bug="invalid_stem"' not in output
+
+
 @pytest.mark.parametrize(("events", "expected"), [
     ([event(1,"start" )], "running"),
     ([event(1,"start"),event(2,"codex_exit",exit=1)], "codex_failed"),
@@ -1007,11 +1029,12 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     dashboard = load_dispatch_dashboard()
     window = dashboard["templating"]["list"][0]
     assert window["type"] == "query"
-    assert window["query"]["query"] == "label_values(k3dm_dispatch_landed, window)"
-    assert window["sort"] == 7 and window["current"]["value"] == "7d"
+    assert window["query"]["query"] == "query_result(sort_desc(k3dm_dispatch_window_order))"
+    assert window["regex"] == '/window="([^"]+)"/'
+    assert window["sort"] == 0 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed label_values and sort 8 replaced by query_result(sort_desc) and sort 0, bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 94  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets
+    assert sum("$window" in expr for expr in expressions) == 99  # agent-audit: allow assert-removed includes unpriced claude messages target
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1046,6 +1069,26 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert any(item.get("url") == "/d/k3dm-bugs" for item in dashboard["links"])
 
 
+def test_dispatch_window_order_metric_ranks_only_emitted_scopes():
+    versions = ("v1.43.0", "v1.43.2", "v1.43.9", "v1.43.10", "v1.43.15")
+    events = [event(index, "start", version=version) for index, version in enumerate(versions, start=1)]
+    output = dispatch_metrics.render(events, 0, now=100)
+    matches = list(re.finditer(r'k3dm_dispatch_window_order\{window="([^"]+)"\} (\d+)', output))
+    orders = {match.group(1): int(match.group(2)) for match in matches}
+    landed_windows = re.findall(r'k3dm_dispatch_landed\{window="([^"]+)"\}', output)
+    assert len(matches) == len(orders) == len(landed_windows)
+    assert set(orders) == set(landed_windows)
+    assert orders == {
+        "1d": 3, "7d": 2, "30d": 1,
+        "v1.43.0": 1_043_000, "v1.43.2": 1_043_002,
+        "v1.43.9": 1_043_009, "v1.43.10": 1_043_010,
+        "v1.43.15": 1_043_015,
+    }
+    assert sorted(orders, key=orders.get, reverse=True) == [
+        "v1.43.15", "v1.43.10", "v1.43.9", "v1.43.2", "v1.43.0", "1d", "7d", "30d"]
+    assert "v9.9.9" not in orders
+
+
 def test_api_cost_uses_last_session_event_and_counts_all_attempts(tmp_path):
     rates = {"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
     rows = [
@@ -1067,6 +1110,47 @@ def test_api_cost_uses_last_session_event_and_counts_all_attempts(tmp_path):
     output = dispatch_metrics.render(rows, 0, 20, prices=rates, codex_home=home)
     assert 'k3dm_dispatch_api_cost_usd{window="1d"} 1.22827696' in output
     assert 'k3dm_dispatch_api_cost_per_landed_usd{window="1d"} 1.22827696' in output
+
+
+def test_agy_run_api_cost_uses_start_model_and_deduplicates_usage():
+    prices = {
+        "gemini-3.8-flash": {"input": 0.75, "cached_input": 0.075, "output": 3.75},
+        "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
+    }
+    captured = {"input_tokens": 951876, "output_tokens": 54141, "thinking_tokens": 23889,
+                "cache_read_tokens": 51703491, "total_tokens": 1006017}
+    rows = [
+        event(10, "start", "agy-priced", run=1, agent="agy", model="gemini-3.8-flash-medium"),
+        event(11, "agent_exit", "agy-priced", run=1, exit=0, usage=captured),
+        event(11, "agent_usage", "agy-priced", run=1, usage=dict(captured)),
+        event(12, "land", "agy-priced"),
+        event(20, "start", "agy-unpriced", run=1, agent="agy", model="gemini-9-unknown-medium"),
+        event(21, "agent_exit", "agy-unpriced", run=1, exit=0, usage=captured),
+        event(21, "agent_usage", "agy-unpriced", run=1, usage=dict(captured)),
+        event(22, "land", "agy-unpriced"),
+        event(23, "start", "agy-malformed", run=1, agent="agy", model="gemini-3.8-flash-low"),
+        event(24, "agent_exit", "agy-malformed", run=1,
+              usage={"input_tokens": 10, "cache_read_tokens": 0, "output_tokens": 2}),
+        event(25, "land", "agy-malformed"),
+        event(30, "start", "codex-control", run=1, agent="codex"),
+        event(31, "codex_usage", "codex-control", session="codex-s", model="gpt-5.6-luna",
+              input=1_000_000, cached_input=0, output=0),
+        event(32, "land", "codex-control"),
+    ]
+    expected = (951876 * 0.75 + 51703491 * 0.075 + (54141 + 23889) * 3.75) / 1_000_000
+    priced_task = dispatch_metrics._task_metrics(rows[:4], rows[3], prices)
+    unpriced_task = dispatch_metrics._task_metrics(rows[4:8], rows[7], prices)
+    malformed_task = dispatch_metrics._task_metrics(rows[8:11], rows[10], prices)
+    assert priced_task["api_cost_usd"] == pytest.approx(expected)
+    assert unpriced_task["api_cost_usd"] is None
+    assert malformed_task["api_cost_usd"] is None
+    assert dispatch_metrics._cost(rows[12], prices) == pytest.approx(0.2)
+
+    output = dispatch_metrics.render(rows, 0, 40, prices=prices)
+    assert f'k3dm_dispatch_task_api_cost_usd{{window="1d",version="9.9.9",slug="agy-priced",agent="agy",repo="k3d-manager"}} {expected}' in output
+    assert 'k3dm_dispatch_task_api_cost_usd{window="1d",version="9.9.9",slug="agy-unpriced"' not in output
+    assert f'k3dm_dispatch_api_cost_usd{{window="1d"}} {expected}' in output
+    assert f'k3dm_dispatch_api_cost_per_landed_usd{{window="1d"}} {expected / 4}' in output
 
 
 def test_session_usage_splits_cumulative_totals_by_run_model_and_keeps_session_count(tmp_path):
@@ -1227,8 +1311,11 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
     dashboard = load_dispatch_dashboard()
     by_title = {panel["title"]: panel for panel in dashboard["panels"]}
     titles = {"Codex at API prices", "Per landed spec", "Cached input", "Subscriptions / month",
-              "Ledger coverage", "By model", "Projected / month"}
+              "Dispatch coverage (by cost)", "By model", "Projected / month",
+              "Codex spend by category", "Ledger gaps", "Spend outside dispatch"}
+    # agent-audit: allow assert-removed Ledger coverage replaced by Dispatch coverage (by cost), Codex spend by category, Ledger gaps and Spend outside dispatch
     assert titles <= by_title.keys()
+    assert "Ledger coverage" not in by_title
     assert 'window="7d"' in by_title["Projected / month"]["targets"][0]["expr"]
     assert by_title["Projected / month"]["targets"][0]["expr"] == (
         'k3dm_dispatch_api_cost_usd{window="7d"} / '
@@ -1237,8 +1324,8 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
         'k3dm_dispatch_claude_api_cost_observed_days{window="7d"} * 30')
     assert "by session start time" in by_title["Projected / month"]["description"]
     assert 'window="$window"' not in by_title["Projected / month"]["targets"][0]["expr"]
-    outside_override = next(item for item in by_title["Ledger coverage"]["fieldConfig"]["overrides"]
-                            if item["matcher"] == {"id": "byName", "options": "outside the ledger"})
+    outside_override = next(item for item in by_title["Ledger gaps"]["fieldConfig"]["overrides"]
+                            if item["matcher"] == {"id": "byName", "options": "cost"})
     properties = {prop["id"]: prop["value"] for prop in outside_override["properties"]}
     assert properties["unit"] == "currencyUSD"
     assert properties["decimals"] == 2
@@ -1287,9 +1374,13 @@ def test_by_model_target_is_instant_and_uses_model_legend():
 
 
 def test_ledger_coverage_targets_have_named_legends():
-    panel = next(panel for panel in load_dispatch_dashboard()["panels"] if panel["id"] == 24)
-    assert panel["targets"][0]["legendFormat"] == "in the ledger"
-    assert panel["targets"][1]["legendFormat"] == "outside the ledger"
+    # agent-audit: allow assert-removed Ledger coverage replaced with Ledger gaps and Codex spend by category
+    dashboard = load_dispatch_dashboard()
+    by_title = {p["title"]: p for p in dashboard["panels"]}
+    gaps = by_title["Ledger gaps"]
+    assert gaps["targets"][0]["legendFormat"] == "cost"
+    assert gaps["targets"][1]["legendFormat"] == "sessions"
+    assert "Ledger coverage" not in by_title
 
 
 @pytest.mark.external
@@ -2380,7 +2471,7 @@ def test_per_spec_identity_queries_give_one_row_per_task():
     assert "k3dm_dispatch_task_landing_actor" in exprs["R"]
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
-    assert organize["renameByName"]["worker"] == "Worker"
+    assert organize["renameByName"]["worker"] == "Worker model"  # agent-audit: allow assert-removed renamed Worker to Worker model per bug 2026-11-10-dispatch-table-shows-flash-and-fable-as-other
     assert organize["renameByName"]["coordinator"] == "Coordinator (legacy)"
     assert organize["renameByName"]["primary_coordinator"] == "Primary coordinator"
     assert organize["renameByName"]["acting_coordinator"] == "Acting coordinator"
@@ -3135,3 +3226,512 @@ def test_claude_context_metrics_follow_release_scoped_claude_turns():
                                      claude_context=context, repo_root=Path("/nonexistent"))
     assert 'k3dm_claude_context_tokens{window="v1.0.0",agent="main",quantile="0.5"} 123' in output
     assert 'k3dm_claude_context_turns{window="v1.0.0",agent="main"} 1' in output
+
+
+def test_claude_context_warm_cache_equals_cold_cache_and_drops_no_series(tmp_path, monkeypatch):
+    # Proves M1, N1 (E1): exporter run twice on fixed transcripts (cold, then warm with no new lines)
+    # gets identical context series, including floor, ceiling, quantiles, and turn counts.
+    # An old cache without context_turns is treated as cold and also yields identical context series.
+    scratch_home = tmp_path / "home"
+    scratch_home.mkdir()
+    monkeypatch.setenv("HOME", str(scratch_home))
+    assert Path(os.environ["HOME"]) == scratch_home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = scratch_home / ".claude/projects"
+    projects.mkdir(parents=True)
+    assert projects.is_dir()
+    fake_repo = tmp_path / "repo"
+    fake_repo.mkdir()
+    assert fake_repo.is_dir()
+
+    now = 1_800_000_000
+    t_turn1 = now - 7200
+    t_boundary = now - 5000
+    t_turn2 = now - 3600
+
+    def turn(mid, stamp, inp, write=0):
+        usage = {"input_tokens": inp, "cache_read_input_tokens": 10,
+                 "cache_creation": {"ephemeral_5m_input_tokens": write, "ephemeral_1h_input_tokens": 0}}
+        return {"type": "assistant", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stamp)),
+                "message": {"id": mid, "model": "m", "usage": usage}}
+    boundary = {"type": "system", "subtype": "compact_boundary", "compactMetadata": {"trigger": "auto", "preTokens": 160000},
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_boundary))}
+
+    transcript = projects / "session.jsonl"
+    transcript.write_text("\n".join(json.dumps(row) for row in [
+        turn("t1", t_turn1, 100),
+        boundary,
+        turn("t2", t_turn2, 200, 50001),
+    ]) + "\n")
+
+    cache = scratch_home / "rollup.json"
+
+    # Cold run
+    ctx_cold = {}
+    rec_cold = dispatch_metrics._claude_rollup(projects, cache, ctx_cold)
+    out_cold = dispatch_metrics.render([], 0, now, claude_records=rec_cold, claude_context=ctx_cold, repo_root=fake_repo)
+
+    # Warm run (second run, no new lines)
+    ctx_warm = {}
+    rec_warm = dispatch_metrics._claude_rollup(projects, cache, ctx_warm)
+    out_warm = dispatch_metrics.render([], 0, now, claude_records=rec_warm, claude_context=ctx_warm, repo_root=fake_repo)
+
+    cold_series = [l for l in out_cold.splitlines() if l.startswith("k3dm_claude_context_")]
+    warm_series = [l for l in out_warm.splitlines() if l.startswith("k3dm_claude_context_")]
+
+    assert len(cold_series) > 0
+    assert warm_series == cold_series
+
+    # Check key metrics explicitly
+    assert 'k3dm_claude_context_ceiling_tokens{window="1d"} 50211' in out_warm
+    assert 'k3dm_claude_context_floor_tokens{window="1d"} 50211' in out_warm
+    assert 'k3dm_claude_context_turns{window="1d",agent="main"} 2' in out_warm
+    assert 'k3dm_claude_context_tokens{window="1d",agent="main",quantile="0.5"} 110' in out_warm
+    assert 'k3dm_claude_context_tokens{window="1d",agent="main",quantile="0.9"} 50211' in out_warm
+
+    # Backward compatibility: old cache with only offsets and records (no context_turns key)
+    # must be treated as cold for context turns and yield identical series.
+    raw_cache = json.loads(cache.read_text())
+    old_cache_data = {"offsets": raw_cache["offsets"], "records": raw_cache["records"]}
+    old_cache = scratch_home / "old_rollup.json"
+    old_cache.write_text(json.dumps(old_cache_data))
+    ctx_old = {}
+    rec_old = dispatch_metrics._claude_rollup(projects, old_cache, ctx_old)
+    out_old = dispatch_metrics.render([], 0, now, claude_records=rec_old, claude_context=ctx_old, repo_root=fake_repo)
+    old_series = [l for l in out_old.splitlines() if l.startswith("k3dm_claude_context_")]
+    assert old_series == cold_series
+
+    # Survival across transcript deletion: persisted context_turns survive when transcripts are deleted
+    transcript.unlink()
+    ctx_del = {}
+    rec_del = dispatch_metrics._claude_rollup(projects, cache, ctx_del)
+    out_del = dispatch_metrics.render([], 0, now, claude_records=rec_del, claude_context=ctx_del, repo_root=fake_repo)
+    del_series = [l for l in out_del.splitlines() if l.startswith("k3dm_claude_context_")]
+    assert del_series == cold_series
+
+
+def test_claude_context_ceilings_differ_across_windows(tmp_path, monkeypatch):
+    # Proves M2 (E2): a test with turns at 2h, 3d and 20d ago gets three different ceilings for 1d, 7d and 30d
+    # asserting 1d ceiling <= 7d ceiling <= 30d ceiling.
+    scratch_home = tmp_path / "home"
+    scratch_home.mkdir()
+    monkeypatch.setenv("HOME", str(scratch_home))
+    assert Path(os.environ["HOME"]) == scratch_home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = scratch_home / ".claude/projects"
+    projects.mkdir(parents=True)
+    assert projects.is_dir()
+    fake_repo = tmp_path / "repo"
+    fake_repo.mkdir()
+    assert fake_repo.is_dir()
+
+    now = 1_800_000_000
+    t_2h = now - 2 * 3600
+    t_3d = now - 3 * 86400
+    t_20d = now - 20 * 86400
+
+    def turn(mid, stamp, inp):
+        usage = {"input_tokens": inp, "cache_read_input_tokens": 0,
+                 "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 0}}
+        return {"type": "assistant", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stamp)),
+                "message": {"id": mid, "model": "m", "usage": usage}}
+
+    transcript = projects / "session.jsonl"
+    transcript.write_text("\n".join(json.dumps(row) for row in [
+        turn("t_20d", t_20d, 30000),
+        turn("t_3d", t_3d, 20000),
+        turn("t_2h", t_2h, 10000),
+    ]) + "\n")
+
+    cache = scratch_home / "rollup.json"
+
+    # Cold run
+    ctx_cold = {}
+    rec_cold = dispatch_metrics._claude_rollup(projects, cache, ctx_cold)
+    out_cold = dispatch_metrics.render([], 0, now, claude_records=rec_cold, claude_context=ctx_cold, repo_root=fake_repo)
+
+    # Warm run
+    ctx_warm = {}
+    rec_warm = dispatch_metrics._claude_rollup(projects, cache, ctx_warm)
+    out_warm = dispatch_metrics.render([], 0, now, claude_records=rec_warm, claude_context=ctx_warm, repo_root=fake_repo)
+
+    for out in (out_cold, out_warm):
+        assert 'k3dm_claude_context_ceiling_tokens{window="1d"} 10000' in out
+        assert 'k3dm_claude_context_ceiling_tokens{window="7d"} 20000' in out
+        assert 'k3dm_claude_context_ceiling_tokens{window="30d"} 30000' in out
+
+    c_1d = 10000
+    c_7d = 20000
+    c_30d = 30000
+    assert c_1d < c_7d < c_30d
+
+
+def test_claude_quota_metrics_emitted_from_usage_cache(tmp_path, capsys):
+    cache = tmp_path / "statusline-usage-cache.json"
+    data = {
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-08T02:39:59.614566+00:00", "limit_dollars": None, "used_dollars": None, "remaining_dollars": None, "locked_reason": None},
+        "seven_day": {"utilization": 17.0, "resets_at": "2026-11-12T21:59:59.614590+00:00", "limit_dollars": None, "used_dollars": None, "remaining_dollars": None, "locked_reason": None},
+        "seven_day_opus": None,
+        "seven_day_sonnet": None,
+        "extra_usage": {"is_enabled": False, "monthly_limit": None, "used_credits": 0.0, "utilization": None, "currency": "USD", "disabled_reason": "out_of_credits"}
+    }
+    cache.write_text(json.dumps(data))
+    mtime = 1794000000.0
+    os.utime(cache, (mtime, mtime))
+
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(cache),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    output = capsys.readouterr().out
+
+    assert f"k3dm_claude_quota_sample_timestamp_seconds {mtime}" in output
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output
+    assert 'k3dm_claude_quota_resets_at_seconds{limit="five_hour",window_minutes="300"} 1794105599.614566' in output
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output
+    assert 'k3dm_claude_quota_resets_at_seconds{limit="seven_day",window_minutes="10080"} 1794520799.61459' in output
+    assert "extra_usage" not in output
+    assert "locked_reason" not in output
+    assert "limit_dollars" not in output
+
+
+def test_claude_quota_missing_unreadable_or_invalid_json(tmp_path, capsys):
+    missing = tmp_path / "missing-cache.json"
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(missing),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    assert "k3dm_claude_quota_" not in capsys.readouterr().out
+
+    invalid = tmp_path / "invalid-cache.json"
+    invalid.write_text("not json {{{")
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(invalid),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    assert "k3dm_claude_quota_" not in capsys.readouterr().out
+
+
+def test_claude_quota_null_or_non_numeric_utilization(tmp_path, capsys):
+    cache = tmp_path / "statusline-usage-cache.json"
+    data = {
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-08T02:39:59.614566+00:00"},
+        "seven_day": None
+    }
+    cache.write_text(json.dumps(data))
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(cache),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    output = capsys.readouterr().out
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output
+    assert 'limit="seven_day"' not in output
+
+    data["five_hour"]["utilization"] = True
+    data["seven_day"] = {"utilization": 17.0, "resets_at": "2026-11-12T21:59:59.614590+00:00"}
+    cache.write_text(json.dumps(data))
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(cache),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    output = capsys.readouterr().out
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output
+    assert 'limit="five_hour"' not in output
+
+
+def test_codex_quota_series_byte_identical_before_and_after(tmp_path):
+    from datetime import datetime, timezone
+    now = time.time()
+    day = time.strftime("%Y/%m/%d", time.gmtime(now))
+    home = tmp_path / "codex"
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    path = folder / "rollout-one.jsonl"
+    path.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid", "timestamp": datetime.fromtimestamp(now - 10, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": datetime.fromtimestamp(now - 2, timezone.utc).isoformat(), "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": {"primary": {"used_percent": 30, "window_minutes": 300, "resets_at": now + 10}, "secondary": {"used_percent": 40, "window_minutes": 10080, "resets_at": now + 20}}}}),
+        json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "duration_ms": 1500}}),
+    ]) + "\n")
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.3' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
+
+
+def test_cost_attribution_coverage_and_guardian_assignment(tmp_path, monkeypatch):
+    now = int(time.time())
+    codex_home = tmp_path / "fake-codex"
+    worktree_root = tmp_path / "worktrees"
+    assert codex_home != Path.home() / ".codex"
+    assert worktree_root != Path.home() / ".local/share/k3d-manager/worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(worktree_root))
+
+    rates = {
+        "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
+        "gpt-6-luna": {"input": 0.30, "cached_input": 0.03, "output": 1.50},
+    }
+    # Note: codex-auto-review is unpriced (not in rates).
+
+    def make_session(sid, started, originator, thread_source, parent_id, cwd, model, usage, prompt="SECRET PROMPT"):
+        folder = codex_home / "sessions/2026/11/01"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"rollout-{sid}.jsonl"
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
+        meta_payload = {
+            "id": sid,
+            "timestamp": stamp,
+            "originator": originator,
+            "thread_source": thread_source,
+            "source": "exec" if originator == "codex_exec" else "tui",
+        }
+        if parent_id is not None:
+            meta_payload["parent_thread_id"] = parent_id
+        if cwd is not None:
+            meta_payload["cwd"] = str(cwd)
+        lines = [
+            json.dumps({"type": "session_meta", "payload": meta_payload}),
+            json.dumps({"type": "turn_context", "payload": {"model": model}}),
+            json.dumps({"type": "event_msg", "payload": {"user_prompt": prompt}}),
+        ]
+        if usage is not None:
+            lines.append(json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {
+                "model": model, "total_token_usage": usage}}}))
+        path.write_text("\n".join(lines) + "\n")
+        os.utime(path, (started, started))
+
+    # 1. Dispatch session (in ledger, cwd under worktree root)
+    make_session("s_dispatch", now - 100, "codex_exec", "user", None,
+                 worktree_root / "v1.43.15/task-dispatch", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 2. Dispatch unrecorded session (not in ledger, cwd under worktree root)
+    make_session("s_unrecorded", now - 100, "codex_exec", "user", None,
+                 worktree_root / "v1.43.15/task-unrecorded", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 3. Interactive session (originator codex-tui, outside worktree root)
+    make_session("s_interactive", now - 100, "codex-tui", "user", None,
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 2_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 4. Exec untracked session (originator codex_exec, outside worktree root)
+    make_session("s_exec", now - 100, "codex_exec", "user", None,
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 5. Guardian session with dispatch parent (unpriced codex-auto-review)
+    make_session("g_dispatch_unpriced", now - 90, "codex_exec", "guardian_review", "s_dispatch",
+                 worktree_root / "v1.43.15/task-dispatch", "codex-auto-review",
+                 {"input_tokens": 500_000, "cached_input_tokens": 100_000, "output_tokens": 50_000})
+    # 6. Guardian session with dispatch parent (priced gpt-5.6-luna)
+    make_session("g_dispatch_priced", now - 90, "codex_exec", "guardian_review", "s_dispatch",
+                 worktree_root / "v1.43.15/task-dispatch", "gpt-5.6-luna",
+                 {"input_tokens": 100_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 7. Guardian session with interactive parent (priced gpt-5.6-luna)
+    make_session("g_interactive_priced", now - 80, "codex-tui", "guardian_review", "s_interactive",
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 200_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 8. Guardian session with missing parent (priced gpt-5.6-luna)
+    make_session("g_missing_parent", now - 70, "codex_exec", "guardian_review", "parent_not_scanned",
+                 worktree_root / "v1.43.15/task-other", "gpt-5.6-luna",
+                 {"input_tokens": 300_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 9. Other session (originator neither codex-tui nor codex_exec)
+    make_session("s_other", now - 60, "codex_vscode", "user", None,
+                 tmp_path / "other-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0})
+    corrupt_path = codex_home / "sessions/2026/11/01" / "rollout-s_corrupt.jsonl"
+    corrupt_path.write_text("not json at all\n")
+    os.utime(corrupt_path, (now - 60, now - 60))
+
+    total_sessions = 9
+
+    ledger = [
+        event(now - 95, "codex_usage", session="s_dispatch", model="gpt-5.6-luna",
+              input=1_000_000, cached_input=0, output=0)
+    ]
+
+    output = dispatch_metrics.render(ledger, 0, now, prices=rates, codex_home=codex_home)
+
+    # M1: each fixture session lands in exactly one category from session_meta alone,
+    # and k3dm_codex_sessions sums to the total session count
+    assert 'k3dm_codex_sessions{window="1d",category="dispatch"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="dispatch_unrecorded"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="guardian"} 4' in output
+    assert 'k3dm_codex_sessions{window="1d",category="interactive"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="exec_untracked"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="other"} 1' in output
+
+    session_metric_lines = [line for line in output.splitlines()
+                            if line.startswith('k3dm_codex_sessions{window="1d",category=')]
+    assert len(session_metric_lines) == 6
+    assert sum(int(line.split()[-1]) for line in session_metric_lines) == total_sessions
+
+    # M2 & N2: guardian assignment and costs
+    # Base costs (at $0.20 per 1M input tokens):
+    # s_dispatch: $0.20
+    # g_dispatch_priced (100k tokens = $0.02) added to dispatch -> dispatch = $0.22
+    # s_interactive: $0.40
+    # g_interactive_priced (200k tokens = $0.04) added to interactive -> interactive = $0.44
+    # s_unrecorded: $0.20
+    # s_exec: $0.20
+    # g_missing_parent: 300k tokens = $0.06 -> stays guardian with parent="missing"
+    # s_other: $0.00
+    # g_dispatch_unpriced: unpriced codex-auto-review -> $0.00
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch"} 0.22' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="interactive"} 0.44' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch_unrecorded"} 0.2' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="exec_untracked"} 0.2' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="other"} 0' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="guardian",parent="missing"} 0.06' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="guardian"} ' not in output  # N2: never counted twice
+
+    cost_lines = [line for line in output.splitlines()
+                  if line.startswith('k3dm_codex_api_cost_usd{window="1d",category=')]
+    total_priced = sum(float(line.split()[-1]) for line in cost_lines)
+    # Total priced = 0.22 + 0.44 + 0.20 + 0.20 + 0.00 + 0.06 = 1.12
+    assert total_priced == pytest.approx(1.12)
+
+    # M3: unpriced tokens of model with no price row appear in k3dm_codex_unpriced_tokens
+    assert 'k3dm_codex_unpriced_tokens{window="1d",model="codex-auto-review",kind="input"} 500000' in output
+    assert 'k3dm_codex_unpriced_tokens{window="1d",model="codex-auto-review",kind="cached_input"} 100000' in output
+    assert 'k3dm_codex_unpriced_tokens{window="1d",model="codex-auto-review",kind="output"} 50000' in output
+
+    # M4: coverage calculation: dispatch / (dispatch + dispatch_unrecorded + exec_untracked)
+    # Baseline dispatch = 0.22, dispatch_unrecorded = 0.20, exec_untracked = 0.20
+    # Base coverage = 0.22 / (0.22 + 0.20 + 0.20) = 0.22 / 0.62 = 0.354838...
+    # Adding interactive cost:
+    make_session("s_interactive_2", now - 50, "codex-tui", "user", None,
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 5_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    output_interactive = dispatch_metrics.render(ledger, 0, now, prices=rates, codex_home=codex_home)
+    # Interactive cost increased:
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="interactive"} 1.44' in output_interactive
+    # But dispatch coverage by cost terms remain identical:
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch"} 0.22' in output_interactive
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch_unrecorded"} 0.2' in output_interactive
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="exec_untracked"} 0.2' in output_interactive
+
+    # Adding dispatch_unrecorded cost:
+    make_session("s_unrecorded_2", now - 40, "codex_exec", "user", None,
+                 worktree_root / "v1.43.15/task-unrecorded-2", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    output_unrecorded = dispatch_metrics.render(ledger, 0, now, prices=rates, codex_home=codex_home)
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch_unrecorded"} 0.4' in output_unrecorded
+    # Denominator increases (0.22 / (0.22 + 0.40 + 0.20) = 0.22 / 0.82 < 0.22 / 0.62), lowering coverage
+
+    # M6: deprecated metrics still emitted with previous values
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="true"} 1' in output
+    # Non-ledgered sessions = 8 (s_unrecorded, s_interactive, s_exec, 4 guardians, s_other)
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="false"} 8' in output
+    assert 'k3dm_dispatch_unledgered_api_cost_usd{window="1d"}' in output
+
+    # N1: no metric line or label contains a prompt, cwd, session ID or parent ID
+    assert "SECRET PROMPT" not in output
+    assert "s_dispatch" not in output
+    assert "s_interactive" not in output
+    assert "g_dispatch_unpriced" not in output
+    assert "parent_not_scanned" not in output
+    assert str(worktree_root) not in output
+    assert str(tmp_path) not in output
+
+
+def test_parent_limit_matches_dispatcher_slug_limit():
+    assert dispatch_metrics.PARENT_RE.fullmatch("p" * 120)
+    assert not dispatch_metrics.PARENT_RE.fullmatch("p" * 121)
+
+
+def test_claude_cost_prices_fable_at_published_rates_and_preserves_opus():
+    price_file = dispatch_metrics._repo_root() / "scripts/etc/agent/codex-model-prices.json"
+    _, _, _, claude_models = dispatch_metrics._prices(price_file)
+    now = 1_800_000_000
+    fable_rec = _claude_message("fable-1", now, model="claude-fable-5-1",
+                                input=10_000, output=1_000, cache_read=5_000,
+                                cache_5m=2_000, cache_1h=1_000)
+    opus_rec = _claude_message("opus-1", now, model="claude-opus-5-5",
+                               input=10_000, output=1_000, cache_read=5_000,
+                               cache_5m=2_000, cache_1h=1_000)
+    cost_fable = dispatch_metrics._claude_cost(fable_rec, claude_models)
+    cost_opus = dispatch_metrics._claude_cost(opus_rec, claude_models)
+    assert cost_opus == pytest.approx(0.079)
+    assert cost_fable is not None
+    assert cost_fable == pytest.approx(0.19625)
+
+
+def test_claude_quota_exports_weekly_fable_limit_and_preserves_five_hour_seven_day(tmp_path):
+    cache_path = tmp_path / "statusline-usage-cache.json"
+    cache_data = {
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-10T19:00:00+00:00"},
+        "seven_day": {"utilization": 17.0, "resets_at": "2026-11-15T19:00:00+00:00"},
+        "limits": [
+            {"kind": "session", "group": "session", "percent": 5},
+            {"kind": "weekly_all", "group": "weekly", "percent": 17},
+            {
+                "kind": "weekly_scoped",
+                "group": "weekly",
+                "percent": 1,
+                "scope": {"model": {"id": None, "display_name": "Fable"}},
+                "resets_at": "2026-11-12T22:00:00.023023+00:00",
+                "is_active": False,
+            },
+        ],
+    }
+    cache_path.write_text(json.dumps(cache_data), encoding="utf-8")
+    lines = []
+    dispatch_metrics._claude_quota(lines, str(cache_path))
+    output = "\n".join(lines)
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output
+    assert 'k3dm_claude_quota_used_ratio{limit="weekly_fable",window_minutes="10080"} 0.01' in output
+    assert 'k3dm_claude_quota_resets_at_seconds{limit="weekly_fable",window_minutes="10080"}' in output
+
+    cache_path_no_limits = tmp_path / "cache_no_limits.json"
+    cache_path_no_limits.write_text(json.dumps({
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-10T19:00:00+00:00"},
+        "seven_day": {"utilization": 17.0, "resets_at": "2026-11-15T19:00:00+00:00"},
+    }), encoding="utf-8")
+    lines2 = []
+    dispatch_metrics._claude_quota(lines2, str(cache_path_no_limits))
+    output2 = "\n".join(lines2)
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output2
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output2
+    assert "weekly_fable" not in output2
+
+
+def test_model_identity_allowlists_flash_fable_and_normalizes_unknown_models():
+    output = dispatch_metrics.render([
+        event(1, "start", "flash-run", agent="agy",
+              worker_identity={"vendor": "google", "model": "gemini-3.8-flash-medium", "source": "explicit", "status": "selected"}),
+        event(2, "agent_exit", "flash-run", usage={"total_tokens": 100}),
+        event(3, "land", "flash-run"),
+        event(4, "start", "fable-run", agent="agy",
+              worker_identity={"vendor": "anthropic", "model": "claude-fable-5-1", "source": "explicit", "status": "selected"}),
+        event(5, "agent_exit", "fable-run", usage={"total_tokens": 100}),
+        event(6, "land", "fable-run"),
+        event(7, "start", "luna-run", agent="codex",
+              worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "explicit", "status": "selected"}),
+        event(8, "codex_exit", "luna-run", tokens=100),
+        event(9, "land", "luna-run"),
+        event(10, "start", "madeup-run", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unreal-ai-model-x", "source": "explicit", "status": "selected"}),
+        event(11, "codex_exit", "madeup-run", tokens=100),
+        event(12, "land", "madeup-run"),
+    ], 0, 100)
+    lines = [line for line in output.splitlines() if line.startswith('k3dm_dispatch_model_identity{window="1d",') and 'role="worker"' in line]
+    by_slug = {}
+    for line in lines:
+        for slug in ("flash-run", "fable-run", "luna-run", "madeup-run"):
+            if f'slug="{slug}"' in line:
+                by_slug[slug] = line
+    assert 'model="gemini-3.8-flash-medium"' in by_slug["flash-run"]
+    assert 'display="google/gemini-3.8-flash-medium (selected)"' in by_slug["flash-run"]
+    assert 'model="claude-fable-5-1"' in by_slug["fable-run"]
+    assert 'display="anthropic/claude-fable-5-1 (selected)"' in by_slug["fable-run"]
+    assert 'model="gpt-6-luna"' in by_slug["luna-run"]
+    assert 'display="openai/gpt-6-luna (selected)"' in by_slug["luna-run"]
+    assert 'model="other"' in by_slug["madeup-run"]
+    assert 'display="openai/other (selected)"' in by_slug["madeup-run"]

@@ -249,6 +249,6 @@ The GitHub `k3dm-hub-data` `snapshots` branch showed no newer snapshot directory
 - [ ] Add regression tests starting from a fresh/rebuilt hub without `hub-data-export`; verify setup creates it *before* the scheduled export starts, and that an initializer failure produces a visible non-success outcome. Ensure no use of static long-lived ServiceAccount tokens.
 - [ ] Validate daily LaunchAgent installation and scheduled-path execution (`launchctl kickstart gui/$(id -u)/com.k3d-manager.hub-data-export` plus exporter log), not only a manually launched export.
 - [ ] Live-verify on M5: `make hub-data-export-setup` → `make hub-data-export` creates a fresh encrypted snapshot, then on M2 `make dr-drill` succeeds, followed on M5 by `make dr-drill-publish`; confirm results branch freshness and the GitHub Actions check. A recovery drill must not be invoked automatically merely to turn the workflow green.
-- [ ] Cross-reference the already-queued `docs/plans/v1.46.0-scheduled-dr-drill.md`; do not duplicate its unattended drill/publishing work or relax the 26-hour export / 8-day drill thresholds.
+- [ ] Cross-reference the already-queued `docs/plans/v1.55.0-scheduled-dr-drill.md`; do not duplicate its unattended drill/publishing work or relax the 26-hour export / 8-day drill thresholds.
 
 **Disposition:** Reopened for M5 migration recurrence / live verification. Existing October 15 fixes for Steps 6–7 may be correct independently; this addendum tracks the unclosed post-provisioning readiness contract. No PR; do not apply the fix directly to `main`.

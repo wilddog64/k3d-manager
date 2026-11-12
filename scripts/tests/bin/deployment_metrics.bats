@@ -87,3 +87,66 @@ run_publisher() {
   [ "${status}" -eq 0 ]
   [ ! -s "${CURL_LOG}" ]
 }
+
+@test "N1/M1: acg-up cleanup skips trust-only runs and publishes normal outcomes" {
+  local cleanup="${TEST_ROOT}/cleanup.sh"
+  local trust_branch="${TEST_ROOT}/trust-branch.sh"
+  sed -n '/^function _acg_up_cleanup()/,/^}/p' "${REPO}/bin/cluster-up" > "${cleanup}"
+  sed -n '/^login_prompt=0$/,/^sandbox_url=.*ACG_SANDBOX_URL/p' "${REPO}/bin/cluster-up" > "${trust_branch}"
+  export METRIC_CALLS="${TEST_ROOT}/metric-calls.log" STATE_DIR="${TEST_ROOT}/state"
+  [ -f "${REPO}/bin/cluster-up" ]
+  [ -f "${cleanup}" ]
+  [ -f "${trust_branch}" ]
+  [ "${K3DM_DEPLOYMENT_PUSHGATEWAY_URL}" = "http://127.0.0.1:9" ]
+  [ "${METRIC_CALLS}" = "${TEST_ROOT}/metric-calls.log" ]
+  [ "${STATE_DIR}" = "${TEST_ROOT}/state" ]
+  : > "${METRIC_CALLS}"
+  run bash -c '
+    source "$1"
+    _k3dm_push_deployment_metrics() { printf "%s\n" "$*" >> "$METRIC_CALLS"; }
+    _acg_export_and_trust_vault_ca() { return "${TRUST_RC:-0}"; }
+    _warn() { :; }
+    _info() { :; }
+    _ACG_STATE_DIR="$STATE_DIR"
+    _cluster_provider=k3s-aws
+    _k3dm_deployment_start_epoch=100
+    trap _acg_up_cleanup EXIT
+    source "$2" --trust-vault-ca
+  ' _ "${cleanup}" "${trust_branch}"
+  [ "${status}" -eq 0 ]
+  [ ! -s "${METRIC_CALLS}" ]
+  TRUST_RC=1 run bash -c '
+    source "$1"
+    _k3dm_push_deployment_metrics() { printf "%s\n" "$*" >> "$METRIC_CALLS"; }
+    _acg_export_and_trust_vault_ca() { return "${TRUST_RC:-0}"; }
+    _warn() { :; }
+    _info() { :; }
+    _ACG_STATE_DIR="$STATE_DIR"
+    _cluster_provider=k3s-aws
+    _k3dm_deployment_start_epoch=100
+    trap _acg_up_cleanup EXIT
+    source "$2" --trust-vault-ca
+  ' _ "${cleanup}" "${trust_branch}"
+  [ "${status}" -eq 1 ]
+  [ ! -s "${METRIC_CALLS}" ]
+  run bash -c '
+    source "$1"
+    _k3dm_push_deployment_metrics() { printf "%s\n" "$*" >> "$METRIC_CALLS"; }
+    _warn() { :; }
+    _info() { :; }
+    _ACG_STATE_DIR="$STATE_DIR"
+    _cluster_provider=k3s-aws
+    _k3dm_deployment_start_epoch=100
+    _exit_code=0
+    _ACG_UP_SKIP_DEPLOYMENT_METRIC=1
+    _acg_up_cleanup
+    _ACG_UP_SKIP_DEPLOYMENT_METRIC=0
+    _acg_up_cleanup
+    false
+    _acg_up_cleanup || :
+  ' _ "${cleanup}"
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l < "${METRIC_CALLS}")" -eq 2 ]
+  grep -q '^up k3s-aws success ' "${METRIC_CALLS}"
+  grep -q '^up k3s-aws failed ' "${METRIC_CALLS}"
+}

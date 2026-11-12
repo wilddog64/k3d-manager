@@ -84,12 +84,16 @@ SH
   mkdir -p "$fixture/bin" "$fixture/scripts"
   cp "$ROOT/Makefile" "$fixture/Makefile"
   cp "$ROOT/bin/k3dm-require-role" "$fixture/bin/"
+  mkdir -p "$fixture/scripts/lib/foundation/scripts/lib"
+  cp "$ROOT/scripts/lib/foundation/scripts/lib/system.sh" "$fixture/scripts/lib/foundation/scripts/lib/"
   cat > "$fixture/scripts/k3d-manager" <<'SH'
 #!/bin/sh
 printf 'dispatcher %s\n' "$*" >> "$LOG"
 exit 1
 SH
   chmod +x "$fixture/scripts/k3d-manager"
+  printf '#!/bin/sh\nprintf "git %%s\\n" "$*" >> "$LOG"\nexit 1\n' > "$BATS_TEST_TMPDIR/bin/git"
+  chmod +x "$BATS_TEST_TMPDIR/bin/git"
   printf 'hub\n' > "$XDG_CONFIG_HOME/k3d-manager/machine-role"
   cd "$fixture"
   for target in appsets-reapply platform-ops restart-webhook; do

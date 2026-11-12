@@ -11,7 +11,7 @@
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator 2026-10-28 requested review/dispatch to Luna; offline implementation authorized, separate explicit go still required for live zone setting changes
 **Component:** Cloudflare zone `3ai-talk.org`, edge TLS/redirect settings; affected names: alertmanager, argocd, frontend, grafana, keycloak, prometheus, webhook
-**Related:** `docs/howto/public-endpoint-alerts.md`; `docs/howto/tunnel.md`; `docs/plans/v1.43.10-hostinger-public-path-on-node.md`; `docs/plans/v1.45.0-autonomous-incident-investigation.md`
+**Related:** `docs/howto/public-endpoint-alerts.md`; `docs/howto/tunnel.md`; `docs/plans/v1.43.10-hostinger-public-path-on-node.md`; `docs/plans/v1.50.0-autonomous-incident-investigation.md`
 
 ## Symptom / evidence
 

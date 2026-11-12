@@ -8,7 +8,7 @@
 **Approval:** Operator approved filing a proposal/roadmap item, NOT implementation, merge, or deployment
 **Component (proposed):** `bin/k3dm-agent-dispatch`, dispatcher adapter/contract modules (paths TBD), dispatch ledger and metrics, `docs/howto/codex-dispatch.md` (migration), dispatcher tests, optional MCP/A2A adapter (deferred)
 **Depends on:** `docs/bugs/2026-10-20-codex-dispatch-background-process-lost-no-terminal-status.md` (P1: detached worker lifecycle and real caller-environment verification)
-**Related:** `docs/plans/v1.43.0-worktree-isolated-codex-dispatch.md`; `docs/plans/v1.43.5-dispatch-api-cost.md`; `docs/plans/v1.48.0-human-effort-per-release.md`
+**Related:** `docs/plans/v1.43.0-worktree-isolated-codex-dispatch.md`; `docs/plans/v1.43.5-dispatch-api-cost.md`; `docs/plans/v1.58.0-human-effort-per-release.md`
 
 ## Problem
 

@@ -9,7 +9,7 @@ metadata:
 data:
   k3dm-bugs.json: |
     {
-      "title": "k3dm Bug Tracking",
+      "title": "k3dm Release Tracking",
       "uid": "k3dm-bugs",
       "links": [
         {
@@ -385,7 +385,7 @@ data:
           "id": 19,
           "type": "stat",
           "title": "Hub code behind",
-          "description": "Commits with code changes on the hub's branch that the hub's checkout has not pulled. Doc text does not need a pull: it appears within about 5 minutes. If a fix is not showing, run make hub-sync in a shell on the hub. The count is for the branch the hub is on. If the second value says older release, run make hub-sync BRANCH=<the branch it names>.",
+          "description": "Commits with code changes on the hub's branch that the hub's checkout has not pulled. Doc text does not need a pull: it appears within about 5 minutes. If a fix is not showing, run make hub-sync in a shell on the hub. The count is for the branch the hub is on.",
           "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
@@ -1095,7 +1095,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))",
+              "expr": "((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_join((((k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))) * on(bug) group_left(dispatch_state) k3dm_dispatch_bug_state) or on(bug) label_replace(((k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))), \"dispatch_state\", \"none\", \"\", \"\"), \"_check\", \";\", \"waiting_on\", \"dispatch_state\"), \"state_check\", \"ok\", \"\", \"\"), \"state_check\", \"no worker running ($1)\", \"_check\", \"fix running;(.+)\"), \"state_check\", \"no dispatch recorded\", \"_check\", \"fix running;none\"), \"state_check\", \"ok\", \"_check\", \"fix running;running\"), \"state_check\", \"already dispatched ($1)\", \"_check\", \"dispatch;(.+)\"), \"state_check\", \"ok\", \"_check\", \"dispatch;none\") and on() (time() - k3dm_dispatch_ledger_timestamp_seconds <= 1800)) or on(bug) label_replace(((k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))), \"state_check\", \"unchecked\", \"\", \"\"))",
               "instant": true,
               "format": "table"
             }
@@ -1130,7 +1130,8 @@ data:
                   "verified_at": 11,
                   "live_verified": 12,
                   "live_verified_at": 13,
-                  "live_evidence": 14
+                  "live_evidence": 14,
+                  "state_check": 15
                 },
                 "excludeByName": {
                   "sort_key": true,
@@ -1140,7 +1141,9 @@ data:
                   "instance": true,
                   "Time": true,
                   "repo": true,
-                  "waiting_since": true
+                  "waiting_since": true,
+                  "dispatch_state": true,
+                  "_check": true
                 },
                 "renameByName": {
                   "priority": "Priority",
@@ -1157,7 +1160,8 @@ data:
                   "verified_at": "Verified at",
                   "live_verified": "Live-verified",
                   "live_verified_at": "Live-verified at",
-                  "live_evidence": "Live evidence"
+                  "live_evidence": "Live evidence",
+                  "state_check": "State check"
                 }
               }
             }
@@ -1527,6 +1531,56 @@ data:
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "-": {"text": "—", "color": "#8e8e8e", "index": 0}
                   }}]}
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "State check"
+                },
+                "properties": [
+                  {
+                    "id": "custom.filterable",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "no dispatch recorded": {
+                            "color": "orange",
+                            "index": 0
+                          },
+                          "unchecked": {
+                            "color": "#8e8e8e",
+                            "index": 1
+                          },
+                          "ok": {
+                            "color": "text",
+                            "index": 2
+                          }
+                        }
+                      },
+                      {
+                        "type": "regex",
+                        "options": {
+                          "pattern": "^(no worker running.*|already dispatched.*)$",
+                          "result": {
+                            "color": "orange",
+                            "index": 3
+                          }
+                        }
+                      }
+                    ]
+                  }
                 ]
               }
             ]
@@ -2123,7 +2177,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
-          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; Dispatch task comes from the dispatch ledger. Execution, Verified, and Live verified are status indicators from plan Status only; they do not identify a verifier or evidence record. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
+          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; orange means the plan waits on the operator's dispatch go or decision; Dispatch task comes from the dispatch ledger. Execution, Verified, and Live verified are status indicators from plan Status only; they do not identify a verifier or evidence record. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains dispatch state and pre-dispatch requirements.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -2137,7 +2191,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "label_replace(label_replace(label_replace(label_replace((label_replace((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) and on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))), \"blocked_by\", \"landed; documentation stale\", \"blocked_by\", \".*\") or ((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) unless on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))))), \"verified\", \"-\", \"\", \"\"), \"live_verified\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified)\"), \"live_verified\", \"$1\", \"verification\", \"(live_verified)\")",
+              "expr": "label_replace(label_replace(label_replace(label_replace(label_replace((label_replace((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) and on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))), \"blocked_by\", \"landed; documentation stale\", \"blocked_by\", \".*\") or ((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) unless on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))))), \"verified\", \"-\", \"\", \"\"), \"live_verified\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified)\"), \"live_verified\", \"$1\", \"verification\", \"(live_verified)\"), \"blocked_by\", \"dispatched\", \"dispatch_state\", \"(running|awaiting_land|refused|codex_failed)\")",
               "instant": true,
               "format": "table"
             }
@@ -2278,7 +2332,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
+                    "value": 175
                   }
                 ]
               },
@@ -2378,7 +2432,13 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 125
+                    "value": 155
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
                   },
                   {
                     "id": "mappings",
@@ -2387,8 +2447,34 @@ data:
                         "type": "value",
                         "options": {
                           "unknown": {
-                            "text": "not recorded",
-                            "color": "gray"
+                            "text": "⚠ needs your decision",
+                            "color": "orange",
+                            "index": 0
+                          },
+                          "needed": {
+                            "text": "⚠ needs your go",
+                            "color": "orange",
+                            "index": 1
+                          },
+                          "go": {
+                            "text": "approved",
+                            "color": "text",
+                            "index": 2
+                          },
+                          "not required": {
+                            "text": "not gated",
+                            "color": "text",
+                            "index": 3
+                          },
+                          "n/a": {
+                            "text": "-",
+                            "color": "text",
+                            "index": 4
+                          },
+                          "approved": {
+                            "text": "approved",
+                            "color": "text",
+                            "index": 5
                           }
                         }
                       }

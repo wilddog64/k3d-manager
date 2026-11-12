@@ -1,11 +1,11 @@
 # Bug: Hermes alert_delivery reports UNKNOWN with no diagnostic reason
 
 **Filed:** 2026-10-13, operator screenshot
-**Branch:** `k3d-manager-v1.44.0` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — observed in Hermes/Grafana screenshot; exact live probe failure **not yet verified**
+**Branch:** `k3d-manager-v1.46.0` (triage 2026-10-15, operator-approved placement)
+**Status:** OPEN — cause confirmed live on the M5 2026-11-08: no PyYAML for the probe's `python3`; fix not specced
 **Priority:** P2 — alert delivery monitoring unavailable; manual read-only probe is a workaround
-**Waiting on:** investigation
-**Release:** v1.44.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
+**Waiting on:** operator decision — since 2026-11-08
+**Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
 **Severity:** Medium — blind spot in monitoring the alert delivery path; **not evidence of an actual alert blackout**
 **Component:** `scripts/lib/hermes/sensors.py` (`alert_delivery`); `bin/k3dm-alert-delivery-status`; Hermes dashboard
 **Related:** `docs/bugs/2026-09-23-hostinger-alertmanager-discards-every-alert.md`
@@ -79,3 +79,14 @@ this one. Their extra evidence and scope carry over here:
     ModuleNotFoundError: No module named 'yaml'
 
 The script's route-shape step (`bin/k3dm-alert-delivery-status:50`) does `import yaml` under `python3`, Homebrew 3.15 on the M5, which has no PyYAML. Machine setup does not provide it, and the sensor's bare `except` hides the reason, as this bug said. Fix should drop the dependency or provide it through machine setup, and surface the stderr line. Live check: the Hermes record shows `alert_delivery healthy`.
+
+## Cause confirmed on the M5 (m5-air.local, 2026-11-08, operator-run)
+
+- Run with Hermes's plist `PATH` and nothing else: `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin bin/k3dm-alert-delivery-status --json` printed `ModuleNotFoundError: No module named 'yaml'`, then `{"available":false}`, rc 1.
+- The installed plist's `PATH` is that value (`plutil -extract`, rc 0). `/opt/homebrew/bin/python3` and `/usr/bin/python3` both fail `import yaml`. `/opt/homebrew/bin/bash` exists.
+- A hand run inside the repo fails the same way, but through the direnv Python 3.15 environment, which is a different interpreter.
+- Ruled out: `mapfile: command not found` (rc 127) came once, from an `env -i` command that built its variables with a zsh expansion. The literal-`PATH` run got past line 8, so it was most likely that command's fault, not Hermes's.
+- Not established: why October's M4 failed. This cause is proven on the M5 only.
+- `bin/k3dm-machine-setup:109,264` installs PyYAML only into a virtualenv this probe does not use. Homebrew has no `pyyaml` formula. Fix specced in `docs/bugs/2026-11-08-hermes-alert-delivery-probe-uses-python-without-pyyaml.md`: the probe puts that virtualenv first on its own PATH.
+- Not an observed delivery failure: the probe never reached its route check, so delivery is unknown, not broken.
+- The reason-code work under Required behavior is still open and separate.

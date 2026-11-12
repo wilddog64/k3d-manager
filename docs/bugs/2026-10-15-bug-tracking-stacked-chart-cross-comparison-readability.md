@@ -1,9 +1,9 @@
 # P3 — Bug Tracking stacked charts are hard to compare without visible values and legends
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.44.0` (triage 2026-10-15, operator-approved placement)
+**Branch:** `k3d-manager-v1.46.0` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Grafana presentation/readability; no data-integrity defect established
-**Waiting on:** dispatch
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Status:** OPEN — operator screenshots reviewed, configuration inspected; implementation not started
 **Approval:** operator explicitly requested P3 bug filing; no code or dashboard changes authorized
 

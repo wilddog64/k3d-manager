@@ -2,9 +2,8 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
+**Status:** CLOSED — won't fix: upstream behaviour (Grafana 11.4 always renders the stack, collapsed). Cause fixed `73120c90` and guarded by a test. Re-check during the observability stack upgrade (`docs/ideas.md` row 2026-11-10). Operator, 2026-11-10
 **Priority:** P3 — information exposure of low value; nothing secret was shown, but the operator does not want internals on the page
-**Waiting on:** operator decision — since 2026-11-07
 **Approval:** explicit 2026-11-07 "can you file grafana error page showing a stack trace bug, and dispatch it" (operator); concern first raised 2026-11-07: "the exception should not explore on the page ... that's security concern"
 **Severity:** low
 **Related:** `docs/bugs/2026-11-07-hub-code-behind-tile-unknown-matcher-crashes-bugs-dashboard.md`

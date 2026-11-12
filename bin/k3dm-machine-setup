@@ -9,6 +9,7 @@ source "${REPO_ROOT}/scripts/lib/core.sh"
 
 usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console|control [--from HOST] [--secrets ask|skip] [--agents install|skip] [--check|--dry-run]\n       bin/k3dm-machine-setup --check-shell HOST\n'; }
 role='' shell_host='' from_host='' secrets_mode=ask agents_mode=install mode=setup failed=0 brew_available=0
+platform=unknown
 while (($#)); do
   case "$1" in
     --role) (($# >= 2)) || { usage >&2; exit 2; }; role="$2"; shift 2 ;;
@@ -51,12 +52,80 @@ sys.exit(1 if status or lines else 0)
 PYTHON
   exit $?
 fi
-case "$role" in hub|worker|console|control) ;; *) usage >&2; exit 2 ;; esac
+case "$(uname -s)" in Darwin) platform=darwin ;; Linux) platform=linux ;; esac
+if [[ "$platform" == linux ]]; then
+  [[ "$role" == control ]] || { printf 'role %s is macOS-only; use --role control on Linux\n' "$role" >&2; exit 2; }
+  case "$(uname -m)" in x86_64|aarch64) ;; *) printf 'unsupported Linux architecture: %s\n' "$(uname -m)" >&2; exit 2 ;; esac
+  [[ "$(id -u)" != 0 ]] || { printf 'machine setup must not run as root on Linux\n' >&2; exit 2; }
+else
+  case "$role" in hub|worker|console|control) ;; *) usage >&2; exit 2 ;; esac
+fi
 case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
 case "$agents_mode" in install|skip) ;; *) printf 'Invalid --agents value: %s (expected install or skip)\n' "$agents_mode" >&2; usage >&2; exit 2 ;; esac
+if [[ -n "$from_host" && ! "$from_host" =~ ^[A-Za-z0-9.-]+$ ]]; then printf 'Invalid --from host: %s\n' "$from_host" >&2; exit 2; fi
 manifest_dir="${REPO_ROOT}/scripts/etc/machine"
 sudoers_file="${K3DM_SUDOERS_FILE:-/etc/sudoers.d/k3d-manager}"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
+report() { printf '%-32s %s\n' "$1" "$2"; }
+
+if [[ "$platform" == linux ]]; then
+  linux_control() {
+    local prefix=/home/linuxbrew/.linuxbrew pin commit expected actual installer raw kind name path target item
+    if [[ ! -d "$prefix" || ! -w "$prefix" ]] || ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1 || ! command -v gcc >/dev/null 2>&1 || ! command -v file >/dev/null 2>&1 || ! command -v pgrep >/dev/null 2>&1; then
+      printf '%s\n' 'Homebrew Linux prerequisites are missing. Run these commands as an administrator:' 'sudo apt-get update' 'sudo apt-get install -y build-essential procps curl file git' 'sudo install -d -o "'"$(id -un)"'" -g "'"$(id -gn)"'" -m 0755 /home/linuxbrew/.linuxbrew'
+      return 1
+    fi
+    pin="${manifest_dir}/homebrew-install.linux.pin"
+    commit="$(sed -n 's/^commit=//p' "$pin")"; expected="$(sed -n 's/^sha256=//p' "$pin")"
+    [[ "$commit" =~ ^[0-9a-f]{40}$ && "$expected" =~ ^[0-9a-f]{64}$ ]] || { report homebrew 'invalid installer pin'; return 1; }
+    path="$prefix/bin/brew"
+    if [[ ! -x "$path" ]]; then
+      if [[ "$mode" != setup ]]; then report homebrew missing; return 1; fi
+      installer="$(mktemp "${TMPDIR:-/tmp}/homebrew-install.XXXXXX")" || return 1
+      if ! _run_command -- curl -fL "https://raw.githubusercontent.com/Homebrew/install/${commit}/install.sh" -o "$installer"; then rm -f "$installer"; report homebrew 'installer download failed'; return 1; fi
+      if command -v sha256sum >/dev/null 2>&1; then actual="$(_run_command -- sha256sum "$installer" | awk '{print $1}')"
+      elif command -v shasum >/dev/null 2>&1; then actual="$(_run_command -- shasum -a 256 "$installer" | awk '{print $1}')"
+      else rm -f "$installer"; report homebrew 'no sha256 utility'; return 1; fi
+      if [[ "$actual" != "$expected" ]]; then rm -f "$installer"; report homebrew 'installer checksum mismatch'; return 1; fi
+      if ! _run_command -- env NONINTERACTIVE=1 HOMEBREW_NO_SUDO=1 bash "$installer"; then rm -f "$installer"; report homebrew 'installer failed'; return 1; fi
+      rm -f "$installer"
+    fi
+    PATH="$prefix/bin:$prefix/sbin:$PATH"; export PATH
+    if ! command -v brew >/dev/null 2>&1; then report homebrew missing; return 1; fi
+    _run_command -- brew shellenv >/dev/null || { report homebrew 'shellenv failed'; return 1; }
+    report homebrew ok
+    while IFS= read -r raw <&3 || [[ -n "$raw" ]]; do
+      raw="${raw%%#*}"; raw="${raw//[$'\t\r ']/}"; [[ -n "$raw" ]] || continue
+      kind=formula; name="$raw"; case "$raw" in cask:*) kind=cask; name="${raw#cask:}" ;; formula:*) name="${raw#formula:}" ;; esac
+      if [[ "$kind" == cask ]]; then report "cask:${name}" 'skipped (linux)'; continue; fi
+      grep -Fqx "formula:${name}" "${manifest_dir}/brew.control.linux-skip.list" && { report "brew:${name}" 'skipped (linux; no formula build)'; continue; }
+      if _run_command --soft --quiet -- brew list --formula "$name" >/dev/null 2>&1; then report "brew:${name}" ok
+      elif [[ "$mode" == setup ]] && _run_command --soft --quiet -- brew install "$name"; then report "brew:${name}" installed
+      else report "brew:${name}" missing; failed=1; fi
+    done 3< "${manifest_dir}/brew.control.list"
+    local venv="${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv"
+    if [[ "$mode" == setup ]]; then
+      if [[ ! -x "$venv/bin/python" ]]; then _run_command -- python3 -m venv "$venv" || return 1; fi
+      _run_command -- "$venv/bin/python" -m pip install 'pytest==9.1.1' 'ruff==0.15.8' 'PyYAML==6.0.3' >/dev/null || return 1
+    fi
+    report python-tools "$([[ -x "$venv/bin/python" ]] && printf ok || printf missing)"
+    while IFS='|' read -r repo remote branch roles <&3; do
+      [[ -n "$repo" && "$repo" != \#* ]] || continue
+      case ",$roles," in *,control,*) ;; *) continue ;; esac
+      case "$remote" in https://*) ;; *) report "repo:${repo}" 'skipped (non-HTTPS remote)'; failed=1; continue ;; esac
+      target="$HOME/src/$repo"
+      if [[ -e "$target/.git" ]]; then report "repo:${repo}" ok
+      elif [[ "$mode" != setup ]]; then report "repo:${repo}" missing; failed=1
+      elif mkdir -p "$(dirname "$target")" && _run_command -- git clone --branch "$branch" --single-branch "$remote" "$target"; then report "repo:${repo}" installed
+      else report "repo:${repo}" missing; failed=1
+      fi
+    done 3< "${manifest_dir}/repos.list"
+    for item in 'macOS Homebrew package' 'Keychain and secrets' 'LaunchAgents' 'FROM= file copy' 'operator include' 'shell links and agent-settings repos' 'smartcd'; do report "$item" 'skipped (linux)'; done
+    return "$failed"
+  }
+  linux_control
+  exit $?
+fi
 
 setup_log="${XDG_STATE_HOME:-$HOME/.local/state}/k3d-manager/machine-setup.log"
 display_path() {
@@ -66,7 +135,6 @@ display_path() {
     *) printf '%s' "$1" ;;
   esac
 }
-report() { printf '%-32s %s\n' "$1" "$2"; }
 log_install() {
   if [[ ! -e "$setup_log" ]]; then mkdir -p "$(dirname "$setup_log")" && (umask 077 && : > "$setup_log"); fi
   printf '== %s\n' "$*" >> "$setup_log"
@@ -455,6 +523,115 @@ copy_files() {
   done 3< "$list"
 }
 
+install_e2e_publish_back() {
+  [[ "$role" == hub ]] || return 0
+  local user host value conf="$HOME/.config/k3d-manager/e2e-remote.env" ssh_dir="$HOME/.ssh" auth="$HOME/.ssh/authorized_keys"
+  if ! user="$(id -un 2>/dev/null)" || ! host="$(scutil --get LocalHostName 2>/dev/null)"; then
+    record_failure e2e-publish-back 'missing (cannot determine local identity)'; return
+  fi
+  value="${user}@${host}.local"
+  if [[ ! "$value" =~ ^[A-Za-z0-9._@-]+$ ]]; then record_failure e2e-publish-back 'missing (invalid publish-back host)'; return; fi
+
+  local remote_line='' key_type='' key_blob='' comment='' from_value=''
+  if [[ -n "$from_host" ]]; then
+    remote_line="$(ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$from_host" 'grep e2e-m2-publisher "$HOME/.ssh/authorized_keys"' 2>/dev/null | head -n 1 || true)"
+    if [[ -z "$remote_line" ]]; then record_failure e2e-publish-back-key 'missing (old hub key unavailable)'; return; fi
+    if [[ "$remote_line" =~ (^|,)from=\"([0-9./,]+)\" ]]; then from_value="${BASH_REMATCH[2]}"; else record_failure e2e-publish-back-key 'invalid old hub publisher entry'; return; fi
+    if [[ "$remote_line" =~ (^|[[:space:]])(ssh-ed25519)[[:space:]]+([A-Za-z0-9+/]+=*)[[:space:]]+(e2e-m2-publisher@[A-Za-z0-9._-]+) ]]; then
+      key_type="${BASH_REMATCH[2]}"; key_blob="${BASH_REMATCH[3]}"; comment="${BASH_REMATCH[4]}"
+    else record_failure e2e-publish-back-key 'invalid old hub publisher entry'; return
+    fi
+  elif [[ -e "$auth" ]]; then
+    if [[ -r "$auth" ]] && grep -q 'e2e-m2-publisher' "$auth"; then
+      remote_line="$(grep -m1 'e2e-m2-publisher' "$auth")"
+    fi
+  fi
+  if [[ -n "$remote_line" && -z "$from_host" ]]; then
+    if [[ "$remote_line" =~ (^|[[:space:]])(ssh-ed25519)[[:space:]]+([A-Za-z0-9+/]+=*)[[:space:]]+(e2e-m2-publisher@[A-Za-z0-9._-]+) ]]; then
+      key_type="${BASH_REMATCH[2]}"; key_blob="${BASH_REMATCH[3]}"; comment="${BASH_REMATCH[4]}"
+      if [[ "$remote_line" =~ (^|,)from=\"([0-9./,]+)\" ]]; then from_value="${BASH_REMATCH[2]}"; else from_value=''; fi
+    else record_failure e2e-publish-back-key 'invalid local publisher entry'; return
+    fi
+  fi
+
+  local conf_status=missing
+  if [[ -f "$conf" ]]; then
+    if grep -Fqx "E2E_M2_PUBLISH_BACK_HOST=$value" "$conf"; then conf_status=ok
+    elif grep -q '^E2E_M2_PUBLISH_BACK_HOST=' "$conf"; then conf_status=wrong
+    else conf_status=missing; fi
+  fi
+  local auth_status=missing new_entry=''
+  if [[ -n "$key_blob" && -n "$from_value" ]]; then
+    new_entry="from=\"$from_value\",command=\"$REPO_ROOT/scripts/k3d-manager e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding $key_type $key_blob $comment"
+    if [[ -f "$auth" ]] && grep -Fqx "$new_entry" "$auth"; then auth_status=ok; else auth_status=wrong; fi
+  fi
+  if [[ "$auth_status" == missing && -z "$from_host" ]]; then
+    record_failure e2e-publish-back-key 'missing (rerun with FROM=<old hub> to copy the e2e publisher key)'
+    return
+  fi
+  if [[ "$mode" == check ]]; then
+    if [[ "$conf_status" == ok ]]; then report e2e-publish-back-conf ok; else record_failure e2e-publish-back-conf "$conf_status"; fi
+    if [[ "$auth_status" == ok ]]; then report e2e-publish-back-key ok; else record_failure e2e-publish-back-key "$auth_status"; fi
+    return
+  fi
+  if [[ "$mode" == dry-run ]]; then
+    if [[ "$conf_status" == ok ]]; then report e2e-publish-back-conf ok
+    elif [[ "$conf_status" == wrong ]]; then report e2e-publish-back-conf 'would update'
+    else report e2e-publish-back-conf 'would write'; fi
+    if [[ "$auth_status" == ok ]]; then report e2e-publish-back-key ok
+    elif [[ "$auth_status" == wrong ]]; then report e2e-publish-back-key 'would update'
+    else report e2e-publish-back-key 'would write'; fi
+    return
+  fi
+  if [[ "$conf_status" != ok ]]; then
+    local previous='' tmp
+    if [[ -f "$conf" ]]; then previous="$(sed -n 's/^E2E_M2_PUBLISH_BACK_HOST=//p' "$conf" | head -n1)"; fi
+    if ! mkdir -p "${conf%/*}" || ! chmod 700 "${conf%/*}"; then record_failure e2e-publish-back-conf missing; return; fi
+    tmp="$(mktemp "${conf%/*}/.e2e-remote.XXXXXX")" || { record_failure e2e-publish-back-conf missing; return; }
+    chmod 600 "$tmp"
+    if [[ -f "$conf" ]]; then
+      python3 - "$conf" "$tmp" "E2E_M2_PUBLISH_BACK_HOST=" "E2E_M2_PUBLISH_BACK_HOST=$value" <<'PYTHON'
+import os, sys
+source, target, prefix, replacement = sys.argv[1:]
+with open(source, 'rb') as stream: lines = stream.readlines()
+prefix = prefix.encode(); replacement = replacement.encode()
+found = False; output = []
+for line in lines:
+    if not found and line.startswith(prefix):
+        ending = b'\r\n' if line.endswith(b'\r\n') else b'\n' if line.endswith(b'\n') else b''
+        output.append(replacement + ending); found = True
+    else: output.append(line)
+if not found: output.append(replacement + (b'' if output and not output[-1].endswith(b'\n') else b'\n'))
+with open(target, 'wb') as stream: stream.write(b''.join(output))
+PYTHON
+    else printf 'E2E_M2_PUBLISH_BACK_HOST=%s\n' "$value" > "$tmp"; fi
+    if ! chmod 600 "$tmp" || ! mv "$tmp" "$conf"; then rm -f "$tmp"; record_failure e2e-publish-back-conf missing; return; fi
+    if [[ "$conf_status" == wrong ]]; then report e2e-publish-back-conf "updated (was $previous)"; else report e2e-publish-back-conf installed; fi
+  else report e2e-publish-back-conf ok; fi
+  if [[ "$auth_status" != ok ]]; then
+    if ! mkdir -p "$ssh_dir" || ! chmod 700 "$ssh_dir"; then record_failure e2e-publish-back-key missing; return; fi
+    local tmp_auth; tmp_auth="$(mktemp "$ssh_dir/.authorized_keys.XXXXXX")" || { record_failure e2e-publish-back-key missing; return; }
+    if [[ -f "$auth" ]]; then
+      python3 - "$auth" "$tmp_auth" "$new_entry" <<'PYTHON'
+import sys
+source, target, replacement = sys.argv[1:]
+with open(source, 'rb') as stream: lines = stream.readlines()
+replacement = replacement.encode(); marker = b'e2e-m2-publisher'
+found = False; output = []
+for line in lines:
+    if not found and marker in line:
+        ending = b'\r\n' if line.endswith(b'\r\n') else b'\n' if line.endswith(b'\n') else b''
+        output.append(replacement + ending); found = True
+    else: output.append(line)
+if not found: output.append(replacement + (b'' if output and not output[-1].endswith(b'\n') else b'\n'))
+with open(target, 'wb') as stream: stream.write(b''.join(output))
+PYTHON
+    else printf '%s\n' "$new_entry" > "$tmp_auth"; fi
+    if ! chmod 600 "$tmp_auth" || ! mv "$tmp_auth" "$auth"; then rm -f "$tmp_auth"; record_failure e2e-publish-back-key missing; return; fi
+    report e2e-publish-back-key installed
+  else report e2e-publish-back-key ok; fi
+}
+
 is_hub_agent() {
   case "$1" in install-token-rotator|install-cleanup|install-node-health-watch|install-sandbox-reaper|install-vault-port-forward|install-prometheus-port-forward|install-hub-pushgateway-port-forward|install-hub-loki-port-forward|install-alertmanager-port-forward|install-alertmanager-auth-proxy|install-cloud-bridge|bin/k3dm-webhook-setup|bin/k3dm-hermes-setup|bin/k3dm-heartbeat-setup) return 0 ;; *) return 1 ;; esac
 }
@@ -563,5 +740,6 @@ check_completion_dirs
 install_state_chain
 check_secrets
 copy_files
+install_e2e_publish_back
 run_agents
 exit "$failed"

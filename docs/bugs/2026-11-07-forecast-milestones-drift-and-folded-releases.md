@@ -16,7 +16,7 @@
 
 1. **Drift goes unnoticed.** `docs/release-milestones.json` listed releases only up to v1.43.12 while the
    release branch was `k3d-manager-v1.43.14`. Remaining releases showed "No data" until Claude added
-   v1.43.13–v1.43.17 by hand (`5bc19ecc`). `test_release_milestones_drift.py` should have caught it, but it
+   v1.43.13–v1.45.0 by hand (`5bc19ecc`). `test_release_milestones_drift.py` should have caught it, but it
    reads only `### Candidate milestone — vX.Y.Z` headings. Patch releases are headed
    `### Patch release — vX.Y.Z` in `docs/roadmap.md`, so no patch release is ever checked. It also ignores
    `docs/plans/vX.Y.Z-*.md` file names, and it runs only in CI, after the commit.

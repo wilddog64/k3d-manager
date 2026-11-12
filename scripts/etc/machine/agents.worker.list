@@ -1,3 +1,4 @@
 # Ordered actions; make target or setup command, one per line.
+install-repo-sync
 smartcd-install
 install-sudoers

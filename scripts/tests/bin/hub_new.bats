@@ -86,6 +86,12 @@ case "$(basename "$0")" in
       *'get clustersecretstore'*'-o json'*) echo '{"status":{"conditions":[{"type":"Ready","status":"True"}]}}' ;;
       *'get application shopping-cart-identity -o json'*) [[ "${STUB_NO_IDENTITY:-0}" == 1 ]] && exit 1; echo '{"status":{"health":{"status":"Healthy"}}}' ;;
       *'describe secret platform-ops-notifications'*) echo 'slack-incoming-webhook-url:  120 bytes' ;;
+      *'get serviceaccount hub-data-export'*)
+        if [[ "${STUB_NO_EXPORT_SA:-0}" == 1 ]]; then
+          # Captured read-only from m5-air.local, kubectl -n secrets get serviceaccount does-not-exist, 2026-11-07.
+          echo 'Error from server (NotFound): serviceaccounts "hub-data-export" not found' >&2
+          exit 1
+        fi ;;
     esac ;;
   launchctl)
     if [[ "${1:-}" == list && -n "${LOADED_LABEL:-}" ]]; then printf -- '- 0 com.k3d-manager.%s\n' "$LOADED_LABEL"; fi ;;
@@ -99,6 +105,7 @@ case "$(basename "$0")" in
       install-test-metrics) plist test-metrics ;;
       snapshot-schedule) plist hub-snapshot ;;
       hub-data-export-schedule) plist hub-data-export ;;
+      hub-data-export-setup) [[ "${STUB_FAIL_EXPORT_SETUP:-0}" != 1 ]] || exit 1 ;;
     esac ;;
 esac
 exit 0
@@ -405,11 +412,12 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
 
 @test "M5: Makefile singleton installers write the plist and never load it with K3DM_AGENT_LOAD=0" {
   local target label
+  touch "$CALLS"
   for target in cleanup node-health-watch sandbox-reaper test-metrics; do
     K3DM_AGENT_LOAD=0 /usr/bin/make -s -C "$REPO" "install-${target}" >/dev/null
     [ -s "$AGENTS_DIR/com.k3d-manager.${target}.plist" ] || { echo "no plist for $target" >&2; return 1; }
   done
-  run grep -E '^launchctl (bootstrap|load|kickstart)' "$CALLS"
+  run grep -E '^launchctl (bootout|unload|bootstrap|load|kickstart)' "$CALLS"
   [ "$status" -eq 1 ]
 }
 
@@ -481,4 +489,53 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
 @test "N3: hub tools contain no literal Slack channel IDs" {
   run grep -Eo 'C[A-Z0-9]{8,}' "$HUB_NEW_BIN" "$REPO/bin/k3dm-webhook-doctor"
   [ "$status" -eq 1 ]
+}
+
+@test "hub-data-export M1: a full hub-new run calls make hub-data-export-setup after make hub-data-recover and before make hub-data-export-schedule" {
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  grep -q '^make hub-data-recover ' "$CALLS"
+  grep -q '^make hub-data-export-setup ' "$CALLS"
+  grep -q '^make hub-data-export-schedule ' "$CALLS"
+  recover_line="$(grep -n '^make hub-data-recover ' "$CALLS" | head -1 | cut -d: -f1)"
+  setup_line="$(grep -n '^make hub-data-export-setup ' "$CALLS" | head -1 | cut -d: -f1)"
+  schedule_line="$(grep -n '^make hub-data-export-schedule ' "$CALLS" | head -1 | cut -d: -f1)"
+  [ -n "$recover_line" ] && [ -n "$setup_line" ] && [ -n "$schedule_line" ]
+  [ "$setup_line" -gt "$recover_line" ]
+  [ "$schedule_line" -gt "$setup_line" ]
+}
+
+@test "hub-data-export M2: verify_hub checks that secrets/hub-data-export exists and reports hub_data_export_sa pass" {
+  export HUB_NEW_FROM=verify
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  jq -e '.checks.hub_data_export_sa == "pass"' "$HUB_NEW_STATE_DIR/hub-new-report.json" >/dev/null
+  grep -q 'get serviceaccount hub-data-export' "$CALLS"
+}
+
+@test "hub-data-export M3: not-installed.list names the data-stage setup with unchanged label and installer" {
+  line="$(grep '^install-hub-data-export|' "$ROOT/scripts/etc/machine/not-installed.list")"
+  [ -n "$line" ]
+  [ "$line" = 'install-hub-data-export|installed by the cluster deploy (hub build: data stage runs make hub-data-export-setup, prepare-singletons installs the job)' ]
+}
+
+@test "hub-data-export N1: when make hub-data-export-setup fails, data stage fails and export job is not scheduled" {
+  export STUB_FAIL_EXPORT_SETUP=1
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'make hub-data-export-setup failed'* ]]
+  [[ "$output" == *'make hub-data-export-setup, then HUB_NEW_FROM=data make hub-new'* ]]
+  grep -q '^data=fail ' "$HUB_NEW_STATE_DIR/state"
+  run grep -q '^make hub-data-export-schedule' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "hub-data-export N2: verify_hub exits non-zero and writes no pass report when secrets/hub-data-export is missing" {
+  export HUB_NEW_FROM=verify STUB_NO_EXPORT_SA=1
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'hub-data-export ServiceAccount secrets/hub-data-export is missing'* ]]
+  [[ "$output" == *'make hub-data-export-setup'* ]]
+  grep -q '^verify=fail ' "$HUB_NEW_STATE_DIR/state"
+  [ ! -f "$HUB_NEW_STATE_DIR/hub-new-report.json" ]
 }

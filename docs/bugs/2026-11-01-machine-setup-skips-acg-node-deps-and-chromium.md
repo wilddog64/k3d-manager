@@ -1,13 +1,15 @@
 # Bug: `make machine-setup` installs no ACG Node packages or Playwright Chromium, so a new hub cannot run the ACG browser automation
 
-**Status:** OPEN
+**Status:** OPEN — redo on v1.43.16 (operator, 2026-11-09; was v1.43.15). The 2026-11-01 Codex run exited 0 but was never landed; its base fell ~200 changed lines behind `bin/k3dm-machine-setup`, so the task was abandoned and the fix is to be redispatched fresh. The old function is kept below as a reference.
 **Priority:** P3
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Intent approved:** operator, 2026-11-08 ("approve machine-setup intents")
 **Severity:** low — one manual `npm install` per checkout clears it; found on the M5 hub
 **Approval:** operator, 2026-11-01 (hub migration gap, filed as found)
 **Filed:** 2026-11-01
 **Detected by:** operator + Claude, `make credential-test` in lib-foundation on the M5 (`m5-air.local`)
 **Affected:** `bin/k3dm-machine-setup`
-**Branch:** `k3d-manager-v1.43.13`
+**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 
 ## Observed failure
 
@@ -67,4 +69,29 @@ evidence:
 interface:
   - bin/k3dm-machine-setup --role hub [--check]
   - scripts/lib/acg/node_modules (playwright chromium.executablePath)
+```
+
+## Prior attempt (2026-11-01, abandoned 2026-11-08)
+
+Reference only: the Codex run's `bin/k3dm-machine-setup` addition, written against base `15549a06`. Re-check it against the current script before reusing any of it; its tests were not reviewed.
+
+```bash
+ensure_acg_chromium() {
+  [[ "$role" == hub ]] || return 0
+  local dir label browser
+  for dir in "$REPO_ROOT/scripts/lib/foundation/scripts/lib/acg" "$REPO_ROOT/../lib-foundation/scripts/lib/acg"; do
+    label=acg:chromium
+    [[ "$dir" == "$REPO_ROOT/scripts/lib/foundation/scripts/lib/acg" ]] || { label=acg:lib-foundation-chromium; [[ -d "$REPO_ROOT/../lib-foundation" ]] || continue; }
+    if [[ "$mode" == dry-run ]]; then report "$label" 'planned (npm ci; npx playwright install chromium)'; continue; fi
+    if [[ "$mode" == setup ]]; then
+      if (cd "$dir" && log_install npm ci && log_install npx playwright install chromium); then report "$label" installed
+      else record_failure "$label" 'missing (see machine-setup.log)'; fi
+    else
+      browser="$(cd "$dir" && node -e 'console.log(require("playwright").chromium.executablePath())' 2>/dev/null)" || browser=''
+      if [[ -n "$browser" && -f "$browser" ]]; then report "$label" ok; else record_failure "$label" missing; fi
+    fi
+  done
+}
+
+ensure_acg_chromium
 ```

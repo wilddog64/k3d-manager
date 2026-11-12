@@ -1,10 +1,10 @@
 # Bug: Hermes has no sensor for a sealed Vault
 
 **Filed:** 2026-10-12
-**Branch:** `k3d-manager-v1.44.0`
+**Branch:** `k3d-manager-v1.46.0`
 **Status:** OPEN
 **Priority:** P3 — a visibility gap; the watchdog unseals Vault today, but nothing reports when it does not
-**Approval:** explicit 2026-10-12 "let's get those two to v1.44.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
+**Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 
 ## Symptom

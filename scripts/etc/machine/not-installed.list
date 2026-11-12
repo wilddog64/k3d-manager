@@ -1,7 +1,7 @@
 # LaunchAgents installed during the hub build rather than machine setup.
 install-token-rotator|not installed by setup: rotation updates only the Cloudflare relay and Keychain, not the cicd Secret or GitHub secret (docs/bugs/2026-10-30-machine-setup-installs-hub-agents-before-cutover.md)
 install-hub-snapshot|installed by the cluster deploy (hub build, v1.43.12 plan 2)
-install-hub-data-export|installed by the cluster deploy (hub build, v1.43.12 plan 2)
+install-hub-data-export|installed by the cluster deploy (hub build: data stage runs make hub-data-export-setup, prepare-singletons installs the job)
 install-vault-failover|installed by the cluster deploy (hub build, v1.43.12 plan 2)
 install-prometheus-auth-proxy|installed by the cluster deploy (hub build, v1.43.12 plan 2)
 install-prometheus-credential-rotator|available to hub-new; not installed by generic machine setup because it is a singleton

@@ -36,6 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
+.PHONY: promote hub-promote hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -52,7 +53,29 @@ hub-new:
 
 .PHONY: hub-sync
 hub-sync:
-	@bin/k3dm-hub-sync
+	@if { [ "$(origin BRANCH)" = "command line" ] || [ "$(origin BRANCH)" = "environment" ]; } && [ -n "$$BRANCH" ]; then \
+	  echo 'The hub follows deploy/hub. To move it, run: make hub-promote REF=<commit-ish>' >&2; exit 2; \
+	fi
+	@bin/k3dm-repo-sync --remote "$${K3DM_HUB_HOST:-m5-air.local}"
+
+install-repo-sync:
+	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.local/share/k3d-manager/logs"
+	@sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist" || { echo "install-repo-sync: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist" >&2; exit 1; }
+	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
+	  echo "install-repo-sync: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
+	else \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true; \
+	  if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"; then \
+	    echo "install-repo-sync: OK, com.k3d-manager.repo-sync loaded; log: $(HOME)/.local/share/k3d-manager/logs/repo-sync.log"; \
+	  else \
+	    echo "install-repo-sync: FAILED, launchctl bootstrap of com.k3d-manager.repo-sync did not load the agent" >&2; exit 1; \
+	  fi; \
+	fi
+
+uninstall-repo-sync:
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
+	@rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
+	@echo "uninstall-repo-sync: OK, com.k3d-manager.repo-sync unloaded and plist removed"
 
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:
@@ -78,8 +101,11 @@ install-test-metrics:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.test-metrics" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" \
+	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; \
+	fi
 
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
@@ -429,20 +455,33 @@ sync-main:
 	done
 	@echo "[make] Refresh triggered — run 'make status' to confirm"
 
-## Reapply every ApplicationSet pinned to a release branch (BRANCH=, default: current branch)
+## Reapply every ApplicationSet pinned to deploy/hub (APPSETS_STAGE=hub|all)
 appsets-reapply:
 	@bin/k3dm-require-role hub
-	@_b='$(BRANCH)'; \
-	if ! printf '%s\n' "$$_b" | grep -Eq '^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
-	  echo "[appsets-reapply] ERROR: '$$_b' is not a release branch (k3d-manager-vX.Y.Z)." >&2; \
-	  echo "[appsets-reapply] Check out the release branch or pass BRANCH=k3d-manager-vX.Y.Z." >&2; \
-	  exit 1; \
-	fi; \
-	K3D_MANAGER_BRANCH="$$_b" K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+	@K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 
-## Report Applications whose k3d-manager values source is not on BRANCH (read-only)
+## Report Applications whose k3d-manager values source is not on deploy/hub (read-only)
 appsets-check:
-	@./scripts/k3d-manager argocd_check_values_branch '$(BRANCH)' '$(INFRA_CONTEXT)'
+	@./scripts/k3d-manager argocd_check_values_branch deploy/hub '$(INFRA_CONTEXT)'
+
+## Promote an origin commit to the live hub after checks and typed confirmation
+hub-promote:
+	@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}"
+
+## Roll back deploy/hub to the previous recorded promotion
+hub-rollback:
+	@bin/k3dm-hub-promote rollback
+
+## Show the current hub ref and promotion history (read-only)
+hub-promote-status:
+	@bin/k3dm-hub-promote status
+
+## Promote REF to the hub, then appsets-check and platform-ops; stops at the first failure
+promote:
+	@[ -n "$${REF:-}" ] || { echo 'usage: make promote REF=<commit-ish>' >&2; exit 2; }
+	@$(MAKE) --no-print-directory hub-promote REF="$$REF"
+	@$(MAKE) --no-print-directory appsets-check
+	@$(MAKE) --no-print-directory platform-ops
 
 ## Count bug docs per release by status and priority (RELEASE=vX.Y.Z, JSON=1)
 bug-tally:
@@ -624,9 +663,11 @@ install-cleanup:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" \
+	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"; \
+	fi
 	@echo "Cleanup agent installed — fires daily at 03:00"
 
 ## Install the bounded k3d agent health/recovery watchdog (restarts after 3 failures)
@@ -634,8 +675,10 @@ install-node-health-watch:
 	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.node-health-watch.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"; \
+	fi
 	@echo "Node health watchdog installed — recovery is bounded to agent-0 with a 5-minute cooldown"
 
 uninstall-node-health-watch:
@@ -648,8 +691,10 @@ install-sandbox-reaper:
 	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.sandbox-reaper" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.sandbox-reaper" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"; \
+	fi
 	@echo "Expired-sandbox reaper installed — fires every 10 minutes"
 
 uninstall-sandbox-reaper:
@@ -784,9 +829,11 @@ install-cloud-bridge:
 	  scripts/etc/launchd/com.k3d-manager.cloud-bridge.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"; fi
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true; \
+	  launchctl bootstrap "gui/$$(id -u)" \
+	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"; \
+	fi
 	@echo "Cloud bridge installed — polling origin/cloud-requests every 60s; log: $(HOME)/Library/Logs/k3dm-cloud-bridge.log"
 
 ## Revoke cloud-session access — stop and remove the bridge LaunchAgent
@@ -1289,7 +1336,18 @@ observability:
 ## Reconcile Hub platform-ops resources (CVE scanner, retry limits, and dashboards)
 platform-ops:
 	@bin/k3dm-require-role hub
-	./scripts/k3d-manager deploy_argocd_platform_ops --confirm
+	@set -eo pipefail; \
+	 source "$(CURDIR)/scripts/lib/foundation/scripts/lib/system.sh"; \
+	 _tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/k3dm-platform-ops.XXXXXX"); \
+	 _cleanup() { _run_command --soft -- rm -rf -- "$$_tmp" || true; }; \
+	 trap _cleanup EXIT; \
+	 _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
+	 _sha=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
+	 _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
+	 (cd "$$_tmp" && _run_command --soft -- ./scripts/k3d-manager deploy_argocd_platform_ops --confirm); \
+	 mkdir -p "$(HOME)/.local/share/k3d-manager/repo-sync"; \
+	 printf '%s\n' "$$_sha" > "$(HOME)/.local/share/k3d-manager/repo-sync/deployed-platform-ops"; \
+	 echo "[platform-ops] applied deploy/hub $$_sha"
 
 ## Apply hub PrometheusRules only (scripts/etc/prometheus/rules) — no full observability redeploy
 prometheus-rules:
@@ -1508,6 +1566,11 @@ check-repo-root:
 fast-gate:
 	@scripts/ci/fast_gate.sh $(BASE)
 
+.PHONY: check-spec-intent
+check-spec-intent:
+	@test -n "$(SPEC)" || { echo "usage: make check-spec-intent SPEC=<path>" >&2; exit 2; }
+	@python3 scripts/lib/spec_intent.py "$(SPEC)"
+
 check-agent-docs:
 	@./bin/k3dm-check-agent-docs
 
@@ -1713,8 +1776,12 @@ help:
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
 	@echo "    make sync-main             Revert services-git to main and refresh"
-	@echo "    make appsets-reapply       Reapply all ApplicationSets on the release branch (BRANCH= optional; required each release)"
-	@echo "    make appsets-check         Report Applications not reading BRANCH's values (read-only)"
+	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
+	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
+	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 optional)"
+	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
+	@echo "    make hub-rollback          Return deploy/hub to the state before the last promotion"
+	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo "    make fleet-render          Render count-driven ACG fleet (offline)"

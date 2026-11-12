@@ -28,6 +28,9 @@ You receive a worktree and a spec. Do not run git add, git commit, git push, or 
 ## Spec contract
 
 Read the full spec and the current memory-bank context before acting. The `## Acceptance` block is the contract: implement its `must` and `must_not` requirements, and show each `must_not` test red on the pre-fix code. If the spec is ambiguous or contradicts the code, stop and say so in the last message; do not guess.
+<!-- shared:begin intent-approval -->
+Every evidence item carries an operator-facing `intent`, and the spec carries `**Intent approved:**` before dispatch.
+<!-- shared:end intent-approval -->
 
 ## Test rules
 
@@ -46,13 +49,17 @@ Use the existing Bash and Python styles. Route privileged and external commands 
 ## Shared rules
 
 <!-- shared:begin plan-cap -->
-- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
+- **Versioning and release scope (operator, 2026-11-07; supersedes the 2026-10-10 split-early-into-a-patch rule)** — `X.0.0` is a breaking change. `X.Y.0` is a feature release, a sprint story of at most 5 plan docs in `docs/plans/`. A 6th plan, or a release growing too big or too fast, splits into the next minor `X.(Y+1).0`, never into a patch. `X.Y.N` (N ≥ 1) is **bug-fix only**: specs from `docs/bugs/`, no `docs/plans/`, branch `k3d-manager-vX.Y.N` cut from `main` after the previous release merges. **Bugs before features (operator, 2026-11-07).** A P0 is fixed at once, whatever the release: a hotfix `X.Y.N` from `main` if the open release is not about to merge. A P1 blocks the open release's PR. **Capture first, triage later (operator, 2026-11-11; supersedes the 2026-11-08 P2 rules, effective now incl. v1.43.15).** A bug found live or anywhere else is captured as a short `docs/bugs/` doc (symptom, evidence, Priority, `**Introduced by:**`, `**Waiting on:** operator decision`): no fix spec, Acceptance block or dispatch yet. **Second-agent classification (operator, 2026-11-11):** Claude's Priority is a proposal; Gemini 4.0 Argon (`gemini-4-argon-medium`, cross-vendor) reads only the bug doc, not Claude's reasoning, and gives a Priority with one line of reason, recorded as `**Classified:** <P> by <agent>, YYYY-MM-DD`. When they differ the higher Priority stands until the operator decides; Fable breaks a P1/P2 tie when asked. Only P0 and P1 are fixed without triage. P2 and P3 wait for triage and never block a release PR by themselves. **Triage trigger (operator, 2026-11-11; from v1.44.0, after v1.43.15's post-merge grooming clears the backlog):** triage runs when 20 bugs have been captured since the last triage, or when the oldest of them is 7 days old, whichever comes first, and at each post-merge `/release-groom`. Claude checks at session start and says "triage due"; it brings a one-line recommendation per bug. Related bugs from one live session are captured as one doc. The rules here are expected to be tuned as data comes in. If Claude judges a P2 costly to leave (e.g. it bypasses a safety gate), Claude says why and the operator decides. The full spec rigor (Acceptance, Contract readers, independent verifier, cross-vendor review) applies once a bug is chosen for a fix. Measured in docs/process-metrics.md. Patches are optional: after `/post-merge`, `/release-groom` triages every open bug as `patch` (cut `X.Y.N+1`), `carry` (into `X.(Y+1).0`) or `close`, and the operator decides. A P2 goes to the patch if its workaround costs something now, otherwise it carries; a carried P2 lands in that release and is not carried twice without the operator saying so. P3s are batched into a release or a patch, at most 10 per release; a P3 passed over at two groomings is closed as won't-fix unless the operator gives a reason to keep it, the doc stays, and a recurrence reopens it. When bug work crowds a release, the lowest-priority plan not yet started moves to the next minor: plans move out, bugs stay. Bug specs never count toward the 5-plan cap. Claude decides splits, records them in `docs/roadmap.md`, and tells the operator. The queue after v1.43.15 was renumbered to this scheme on 2026-11-07 (old → new table in `docs/roadmap.md`).
 <!-- shared:end plan-cap -->
 
 <!-- shared:begin bug-priority -->
 Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
 without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
 new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+**Escape origin (operator, 2026-11-07).** Every bug filed from 2026-11-07 also carries
+`**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**`
+one of `spec`, `offline test`, `review`, `deploy step`, `live check` or `none`: the first safety net that
+should have stopped it. Write `unknown` rather than guess. Each retro counts them by release and by net.
 <!-- shared:end bug-priority -->
 
 <!-- shared:begin security -->
@@ -88,6 +95,13 @@ new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directl
 **Supply Chain Integrity (OWASP A08)**
 - GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
 - New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
+- **Pins get reviewed, not only set (operator, 2026-11-07).** A pinned chart or image never moves by itself: the
+  observability stack sat at kube-prometheus-stack `67.9.0` (Grafana 11.4.0) for nearly two years. Severity sets the
+  response. A critical or high CVE in a pinned image calls for a patch release. An upstream bug that hurts us and has a
+  cheap workaround gets the workaround, with `**Fixed upstream in:** <component> <version>` in its bug doc. An upstream
+  bug with no workaround, or several fixed-upstream bugs piling up, calls for an upgrade release. Absent any of those,
+  review the pinned stack versions once a quarter and plan an upgrade when one is more than about two minor versions
+  behind.
 
 **Existing protections — do not remove or weaken:**
 - `_run_command` handles sudo probing and escalation safely.

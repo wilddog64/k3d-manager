@@ -1,4 +1,6 @@
+import copy
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -14,6 +16,14 @@ def record(name, status, evidence="source unavailable", data=None):
 
 def state(history=None):
     return {"correlation_history": history or []}
+
+
+def next_cycle(records):
+    updated = copy.deepcopy(records)
+    for item in updated:
+        item["sampled_at"] = "2026-09-06T12:01:00Z"
+        item["evidence"] += "; updated age 1m"
+    return updated
 
 
 def r2_records(verdict="single-service"):
@@ -61,6 +71,103 @@ def test_r2_command_uses_the_ingress_label_mapping():
     finally:
         repairs.PORT_FORWARD_LABELS[host] = original
     assert proposal["command"] == f"launchctl kickstart -k gui/{os.getuid()}/com.test.ingress-agent"
+
+
+def test_r2_refuses_changed_command_and_runs_unchanged_proposal(monkeypatch):
+    current, calls = state(), []
+    proposed_records = r2_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    host = "changed.example.test"
+    monkeypatch.setitem(repairs.PORT_FORWARD_LABELS, host, "com.test.changed-agent")
+    changed = copy.deepcopy(proposed_records)
+    changed[0]["data"]["failed_hosts"] = [host]
+    outcome = repairs.approve(proposal["action_id"], current, changed,
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: command changed since proposal"
+    assert calls == []
+
+    current, calls = state(), []
+    proposed_records = r2_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "executed" and len(calls) == 1
+
+
+def test_r4_refuses_changed_run_target(monkeypatch):
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda _service: "token")
+    current, calls = state(), []
+    proposed_records = r4_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    outcome = repairs.approve(proposal["action_id"], current,
+                              [record("ci", "degraded", data={"repo": "wilddog64/k3d-manager",
+                               "run_id": 456, "conclusion": "timed_out"})],
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: command changed since proposal"
+    assert calls == []
+
+    current, calls = state(), []
+    proposed_records = r4_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "executed" and len(calls) == 1
+
+
+def test_approval_expiry_and_revision_binding(monkeypatch):
+    current = state()
+    proposal = repairs.propose(r2_records(), current)[0]
+    proposal["expires_at"] = "2000-01-01T00:00:00Z"
+    assert repairs.approve(proposal["action_id"], current, r2_records(), lambda *_: (0, ""))["outcome"] == "refused: proposal expired"
+
+    current = state()
+    proposal = repairs.propose(r2_records(), current)[0]
+    monkeypatch.setattr(repairs, "_git_revision", lambda ref: "different" if ref == "HEAD" else "")
+    assert repairs.approve(proposal["action_id"], current, r2_records(), lambda *_: (0, ""))["outcome"] == "refused: Hermes code revision changed"
+
+
+def test_r9_deploy_ref_is_read_from_module_root_and_movement_refused(monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    assert repairs.ROOT == Path(repairs.__file__).resolve().parents[3]
+    monkeypatch.setattr(repairs, "ROOT", root)
+    git = lambda *args: subprocess.run(["git", "-C", str(root), *args], check=True,
+                                      capture_output=True, text=True).stdout.strip()
+    git("config", "user.email", "test@example.invalid")
+    git("config", "user.name", "test")
+    (root / "file").write_text("one")
+    git("add", "file")
+    git("commit", "-qm", "one")
+    first = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/deploy/hub", first)
+    real_revision = repairs._git_revision
+    monkeypatch.setattr(repairs, "_git_revision",
+                        lambda ref: first if ref == "HEAD" else real_revision(ref))
+    current = state()
+    proposal = repairs.propose(r9_records(), current)[0]
+    assert proposal["deploy_hub_revision"] == first
+    (root / "file").write_text("two")
+    git("commit", "-qam", "two")
+    second = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/deploy/hub", second)
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(r9_records()),
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: deploy-ref-moved"
+    assert calls == []
+
+
+def test_r9_fails_closed_when_deploy_ref_is_unresolvable(monkeypatch):
+    monkeypatch.setattr(repairs, "_git_revision", lambda ref: "code-revision" if ref == "HEAD" else "")
+    current = state()
+    proposal = repairs.propose(r9_records(), current)[0]
+    assert proposal["deploy_hub_revision"] == ""
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(r9_records()),
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: deploy-ref-unknown"
+    assert calls == []
 
 
 def test_r2_ignores_unrelated_eso_failure_but_not_node_pressure():
@@ -137,28 +244,32 @@ def test_r8_ignores_drift_without_daemonset_owner():
 
 
 def r9_records(status="degraded", stale=True):
-    data = {"expected": "k3d-manager-v1.40.0",
-            "stale": [{"app": "loki", "revision": "k3d-manager-v1.39.0"}] if stale else []}
-    return [record("values_branch", status, "2 apps not on k3d-manager-v1.40.0", data)]
+    data = {"expected": "deploy/hub",
+            "stale": [{"app": "loki", "revision": "k3d-manager-v1.43.15"}] if stale else []}
+    return [record("values_branch", status, "2 apps not on deploy/hub", data)]
 
 
-def test_r9_requires_stale_values_branch_and_pins_release_env():
+def test_r9_requires_stale_values_branch_and_pins_deploy_hub():
     current = state()
-    proposal = repairs.propose(r9_records(), current)[0]
+    proposed_records = r9_records()
+    proposal = repairs.propose(proposed_records, current)[0]
     assert proposal["key"] == "r9"
+    assert proposal["name"] == "Reapply ApplicationSets pinned to deploy/hub"
     assert proposal["command"] == "./scripts/k3d-manager deploy_argocd_applicationsets --confirm"
     assert repairs.REPAIRS["r9"]["reversible"] is False
     calls = []
-    outcome = repairs.approve(proposal["action_id"], current, r9_records(),
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
                               lambda *args: calls.append(args) or (0, "done"))
     assert outcome["outcome"] == "executed"
-    assert calls[0][1] == {"K3D_MANAGER_BRANCH": "k3d-manager-v1.40.0"}
+    assert calls[0][1] == {"K3D_MANAGER_BRANCH": "deploy/hub"}  # agent-audit: allow assert-removed spec fixes r9 env to deploy/hub
 
 
 def test_r9_ignores_unknown_healthy_or_empty_stale():
     assert repairs.propose(r9_records("unknown"), state()) == []
     assert repairs.propose(r9_records("healthy"), state()) == []
     assert repairs.propose(r9_records("degraded", False), state()) == []
+    assert repairs.propose([record("values_branch", "degraded", data={
+        "expected": "k3d-manager-v1.43.15", "stale": [{"app": "loki"}]})], state()) == []
 
 
 def r10_records(names=("job-b", "job-a"), context="ctx"):
@@ -170,12 +281,13 @@ def r10_records(names=("job-b", "job-a"), context="ctx"):
 
 def test_r10_pins_sorted_targets_and_is_not_automatic():
     current = state()
-    proposal = repairs.propose(r10_records(), current)[0]
+    proposed_records = r10_records()
+    proposal = repairs.propose(proposed_records, current)[0]
     assert proposal["key"] == "r10"
     assert proposal["command"] == "kubectl --context ctx -n monitoring delete job --wait=false -- job-a job-b"
     assert repairs.REPAIRS["r10"]["reversible"] is False
     calls = []
-    outcome = repairs.approve(proposal["action_id"], current, r10_records(),
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
                               lambda *args: calls.append(args) or (0, "done"))
     assert outcome["outcome"] == "executed"
     assert calls[0][0] == ["kubectl", "--context", "ctx", "-n", "monitoring", "delete", "job",
@@ -191,7 +303,8 @@ def test_r10_drops_invalid_names_and_refuses_target_changes():
     calls = []
     outcome = repairs.approve(proposal["action_id"], current, r10_records(("job-a", "job-b")),
                               lambda *args: calls.append(args) or (0, "done"))
-    assert outcome["outcome"] == "refused: target set changed since proposal"
+    # agent-audit: allow assert-removed r10 refusal renamed to the general command-changed refusal; approval tests now use next-cycle records
+    assert outcome["outcome"] == "refused: command changed since proposal"
     assert calls == []
 
 
@@ -262,14 +375,15 @@ def test_approve_refuses_unknown_or_non_allowlist_action():
 
 def test_approve_runs_lever_and_records_audit():
     current = state()
-    proposal = repairs.propose(r2_records(), current)[0]
+    proposed_records = r2_records()
+    proposal = repairs.propose(proposed_records, current)[0]
     calls = []
 
     def runner(argv, env, cwd):
         calls.append((argv, env, cwd))
         return 0, "done"
 
-    outcome = repairs.approve(proposal["action_id"], current, r2_records(), runner)
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records), runner)
     assert outcome["outcome"] == "executed"
     assert calls == [(["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/com.k3d-manager.prometheus-auth-proxy"], {}, None)]
     assert current["repair_audit"][0]["action_id"] == proposal["action_id"]
@@ -279,8 +393,9 @@ def test_approve_runs_lever_and_records_audit():
 def test_r4_degrades_to_skipped_on_permission_error(monkeypatch):
     monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "token")
     current = state()
-    proposal = repairs.propose(r4_records(), current)[0]
-    outcome = repairs.approve(proposal["action_id"], current, r4_records(),
+    proposed_records = r4_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
                               lambda *_: (1, "Resource not accessible by personal access token"))
     assert outcome["outcome"] == "skipped: token lacks actions:write"
 
@@ -288,9 +403,10 @@ def test_r4_degrades_to_skipped_on_permission_error(monkeypatch):
 def test_r4_refuses_when_hermes_token_missing_no_ambient_auth(monkeypatch):
     monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "")
     current = state()
-    proposal = repairs.propose(r4_records(), current)[0]
+    proposed_records = r4_records()
+    proposal = repairs.propose(proposed_records, current)[0]
     calls = []
-    outcome = repairs.approve(proposal["action_id"], current, r4_records(),
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
                               lambda *a: calls.append(a) or (0, ""))
     assert outcome["outcome"] == "skipped: hermes GitHub token unavailable"
     assert not calls
@@ -300,16 +416,18 @@ def test_r4_refuses_when_hermes_token_missing_no_ambient_auth(monkeypatch):
 def test_r4_business_logic_403_is_not_misclassified_as_missing_scope(monkeypatch):
     monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "token")
     current = state()
-    proposal = repairs.propose(r4_records(), current)[0]
-    outcome = repairs.approve(proposal["action_id"], current, r4_records(),
+    proposed_records = r4_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    outcome = repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
                               lambda *_: (1, "This workflow run cannot be retried (HTTP 403)"))
     assert outcome["outcome"] == "failed"
 
 
 def test_approve_refuses_second_action_for_already_attempted_key():
     current = state()
-    proposal = repairs.propose(r2_records(), current)[0]
-    assert repairs.approve(proposal["action_id"], current, r2_records(),
+    proposed_records = r2_records()
+    proposal = repairs.propose(proposed_records, current)[0]
+    assert repairs.approve(proposal["action_id"], current, next_cycle(proposed_records),
                            lambda *_: (0, "done"))["outcome"] == "executed"
     current["pending_repairs"]["r2-stale"] = {**proposal, "action_id": "r2-stale"}
     outcome = repairs.approve("r2-stale", current, r2_records(), lambda *_: (0, "done"))
@@ -331,9 +449,10 @@ def test_r4_precondition_requires_repo_to_avoid_keyerror():
 
 def test_approve_pops_pending_proposal():
     current = state()
-    proposal = repairs.propose(r2_records(), current)[0]
+    proposed_records = r2_records()
+    proposal = repairs.propose(proposed_records, current)[0]
     assert proposal["action_id"] in current["pending_repairs"]
-    repairs.approve(proposal["action_id"], current, r2_records(), lambda *_: (0, "done"))
+    repairs.approve(proposal["action_id"], current, next_cycle(proposed_records), lambda *_: (0, "done"))
     assert proposal["action_id"] not in current["pending_repairs"]
 
 
@@ -394,3 +513,26 @@ def test_data_layer_none_is_healthy_only_when_not_deployed():
     ungraded = data_layer(fetch_with("cluster unreachable (kube context unusable)"), {}, token="x")
     assert ungraded["status"] == "unknown"
     assert "source unavailable" not in ungraded["evidence"]
+
+
+def test_r5_approval_survives_kine_counters_moving_between_cycles(monkeypatch):
+    monkeypatch.setattr(repairs, "_git_revision", lambda ref: "code-revision" if ref == "HEAD" else "")
+    monkeypatch.setattr(repairs, "_hub_kubeconfig_present", lambda: True, raising=False)
+    current = state()
+    proposal = repairs.propose(r5_records(), current)[0]
+    assert proposal["key"] == "r5"
+    later = next_cycle(r5_records())
+    later[0]["data"]["state_db_bytes"] += 4096
+    later[0]["data"]["slow_sql_count"] += 3
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], copy.deepcopy(current), later,
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] != "refused: sensor records changed since proposal"
+    assert len(calls) == 1
+    flipped = next_cycle(r5_records())
+    flipped[0]["data"]["compaction_recent"] = True
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], copy.deepcopy(current), flipped,
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: sensor records changed since proposal"
+    assert calls == []

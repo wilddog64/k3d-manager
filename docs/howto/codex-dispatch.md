@@ -44,7 +44,7 @@ git push origin k3d-manager-v1.43.0
 
 Use `NO_TEST=1` for a docs-only task; otherwise exactly one of `TEST` or `NO_TEST=1` is required. The landing lock serializes land operations. A `--network` task is exclusive: another networked task cannot start until its `exit` file exists, while non-networked tasks may still run. Tests must not bind fixed local ports because task tests can run in parallel.
 
-Codex never commits: Claude or the operator verifies the diff, gates, and scope before creating the one commit. Landing refuses any changed path not listed in the spec's `## Files` table, and always refuses `memory-bank/**`, even when the spec lists it. The scope comes from the spec as dispatched, and editing the spec itself is out of scope. For an intentional scope exception, run `bin/k3dm-codex-dispatch land --slug <slug> --allow-out-of-scope` only after review; otherwise fix or remove the extra change in the worktree and retry.
+Codex never commits: Claude or the operator verifies the diff, gates, and scope before creating the one commit. Landing refuses any changed path not listed in the spec's `## Files` table, and always refuses `memory-bank/**`, even when the spec lists it. The scope comes from the spec as dispatched, and editing the spec itself is out of scope. For an intentional scope exception, run `bin/k3dm-codex-dispatch land --slug <slug> --allow-out-of-scope` only after review; otherwise fix or remove the extra change in the worktree and retry. Instruction and hook files require the separate `--allow-instruction-files` flag because they change what later agent sessions read or execute; `--allow-out-of-scope` does not authorize them.
 
 Everything for a task lives under `~/.local/share/k3d-manager/worktrees/<version>/` (override with `K3DM_WORKTREE_ROOT`): the worktree `<slug>/` on branch `task/<version>/<slug>`, and the run folder `<slug>.run/` holding `prompt.md`, `codex.log`, `supervisor.log`, `last-message.md`, `start`, `pid`, `exit`, `codex-exit-ts` and a private `state/` directory. The worker is launched in a detached session, so an agent-launched dispatch no longer requires the launching command to stay alive. `start` is written by the worker itself and records its PID and process start identity; `exit` and `codex-exit-ts` are written before Git, ledger or metrics bookkeeping. Startup and bookkeeping diagnostics go to `supervisor.log`; Codex's own output remains in `codex.log`.
 
@@ -256,7 +256,7 @@ agy runs inside the task worktree and can write its `.git` directory. The dispat
 
 Resume an agy task with `bin/k3dm-codex-dispatch resume --slug <slug> --prompt-file <path>`. The dispatcher resumes only with the conversation ID stored from that task's JSON output; if agy did not return one, start a new task. It never selects the latest conversation implicitly. `--network` is unavailable for agy.
 
-For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace an already landed implementation, name that slug with `land --superseding <landed-slug>`.
+For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace already landed implementations, name each slug with a repeated `--superseding <landed-slug>` flag; one flag still works when replacing a single landing.
 
 ### Record local agy activity
 

@@ -34,18 +34,20 @@ RUN_CAP = 20
 VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 PLAN_STEM_RE = re.compile(r"^v\d+\.\d+\.\d+-[a-z0-9][a-z0-9-]*$")
+BUG_SPEC_RE = re.compile(r"^docs/bugs/(\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*)\.md$")
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
 MODEL_IDENTITY_ALLOWLIST = {
     "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
-    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1",
     "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+    "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high",
 }
 RUNGS = ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed")
 STATUSES = ("done", "pending", "unknown")
 ROLES = ("build", "review", "verify")
 GATE_EVENTS = ("attempt_assessed", "stall_gate", "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared")
 COMBINE_RESULTS = ("pass", "fail", "pending")
-PARENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+PARENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 NEW_S1_EVENTS = {
     "gate_coverage_start", "combine", "attempt_assessed", "stall_gate",
     "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared",
@@ -166,8 +168,16 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
         pass
     compactions = []
     reads = []
-    context_turns = []
-    context_boundaries = []
+    cached_turns = cache.get("context_turns")
+    if isinstance(cached_turns, dict):
+        turns_by_id = dict(cached_turns)
+    elif isinstance(cached_turns, list):
+        turns_by_id = {t["id"]: t for t in cached_turns if isinstance(t, dict) and "id" in t}
+    else:
+        turns_by_id = {}
+    cached_boundaries = cache.get("context_boundaries")
+    boundaries_list = [b for b in cached_boundaries if isinstance(b, dict)] if isinstance(cached_boundaries, list) else []
+    seen_boundaries = {(b.get("session"), b.get("ts")) for b in boundaries_list}
     root = Path(projects_dir)
     if root.is_dir():
         for path in sorted(root.rglob("*.jsonl")):
@@ -209,7 +219,11 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                             pre_tokens = meta.get("preTokens")
                             pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
                             compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
-                            context_boundaries.append({"ts": item.get("timestamp"), "session": hashlib.sha256(key.encode()).hexdigest()})
+                            session_id = hashlib.sha256(key.encode()).hexdigest()
+                            b_key = (session_id, item.get("timestamp"))
+                            if b_key not in seen_boundaries:
+                                seen_boundaries.add(b_key)
+                                boundaries_list.append({"ts": item.get("timestamp"), "session": session_id})
                             before = {name: dict(ranges) for name, ranges in latest.items()}
                             segment_seen.clear()
                             continue
@@ -263,8 +277,6 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                             generation = edited[fpath]
                                             pending.setdefault(call_id, []).append((fpath, read_range, record, generation, previous))
                                             latest.setdefault(fpath, {})[read_range] = (None, generation)
-                            if line_pos < offset:
-                                continue
                             mid, model = message.get("id"), message.get("model")
                             usage = message.get("usage") or {}
                             if context_out is not None and isinstance(mid, str) and isinstance(model, str):
@@ -273,15 +285,15 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                 cache1 = creation.get("ephemeral_1h_input_tokens", 0)
                                 values = [usage.get("input_tokens", 0), usage.get("cache_read_input_tokens", 0), cache5, cache1]
                                 if all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0 for value in values):
-                                    context_turns.append({"id": mid, "ts": item.get("timestamp"), "context": sum(values),
+                                    turns_by_id[mid] = {"id": mid, "ts": item.get("timestamp"), "context": sum(values),
                                         "session": hashlib.sha256(key.encode()).hexdigest(), "subagent": "/subagents/" in key,
-                                        "model": model, "speed": usage.get("speed"), "cache_5m": cache5, "cache_1h": cache1})
+                                        "model": model, "speed": usage.get("speed"), "cache_5m": cache5, "cache_1h": cache1}
                                 if mid in cache["records"]:
                                     cached = cache["records"][mid]
                                     cached.setdefault("id", mid)
                                     cached.setdefault("subagent", "/subagents/" in key)
                                     cached.setdefault("session", hashlib.sha256(key.encode()).hexdigest())
-                            if not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
+                            if line_pos < offset or not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
                                 continue
                             creation = usage.get("cache_creation") or {}
                             cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
@@ -300,8 +312,10 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
     if context_out is not None:
         context_out["compactions"] = compactions
         context_out["reads"] = reads
-        context_out["turns"] = context_turns
-        context_out["boundaries"] = context_boundaries
+        context_out["turns"] = list(turns_by_id.values())
+        context_out["boundaries"] = boundaries_list
+        cache["context_turns"] = turns_by_id
+        cache["context_boundaries"] = boundaries_list
     target = Path(cache_path)
     temp = None
     try:
@@ -635,6 +649,7 @@ def _session_files(codex_home, now, repo_by_worktree=None):
             usage = None
             active = 0
             quota = None
+            originator = thread_source = parent_thread_id = cwd = None
             with open(name, encoding="utf-8") as stream:
                 for index, line in enumerate(stream):
                     try:
@@ -649,6 +664,9 @@ def _session_files(codex_home, now, repo_by_worktree=None):
                             continue
                         session, start = payload.get("id"), payload.get("timestamp")
                         origin = payload.get("originator")
+                        originator = origin
+                        thread_source = payload.get("thread_source")
+                        parent_thread_id = payload.get("parent_thread_id")
                         mode = "exec" if origin == "codex_exec" else "interactive" if origin == "codex-tui" else "other"
                         cwd = payload.get("cwd")
                         repo = _worktree_repo(cwd, repo_by_worktree)
@@ -684,7 +702,9 @@ def _session_files(codex_home, now, repo_by_worktree=None):
                             model = payload["model"]
             if isinstance(session, str) and session and isinstance(start, str):
                 yield {"session": session, "start": start, "model": model, "usage": usage,
-                       "mode": mode or "other", "repo": repo or "other", "active": active, "quota": quota}
+                       "mode": mode or "other", "repo": repo or "other", "active": active, "quota": quota,
+                       "originator": originator, "cwd": cwd, "thread_source": thread_source,
+                       "parent_thread_id": parent_thread_id}
         except (OSError, ValueError, TypeError):
             continue
 
@@ -701,8 +721,87 @@ def _cost(event, prices):
         return None
 
 
+def _agy_run_usage(events):
+    """Return one validated agy usage record per dispatch run."""
+    starts = {}
+    usage_events = defaultdict(list)
+    for index, event in enumerate(events):
+        if event.get("event") not in {"start", "agent_exit", "agent_usage"}:
+            continue
+        key = (event.get("version"), event.get("slug"), event.get("run"))
+        if not isinstance(key[0], str) or not isinstance(key[1], str) or type(key[2]) is not int:
+            continue
+        if event.get("event") == "start":
+            starts[key] = event
+        elif event.get("event") in {"agent_exit", "agent_usage"}:
+            usage = event.get("usage")
+            if isinstance(usage, dict):
+                usage_events[key].append((index, usage))
+    records = []
+    for key, start in starts.items():
+        if start.get("agent") != "agy":
+            continue
+        model = start.get("model")
+        if isinstance(model, str):
+            model = re.sub(r"-(?:low|medium|high)$", "", model)
+        candidates = usage_events.get(key, [])
+        # agent_exit and agent_usage carry the same per-run totals. Keep one copy.
+        usage = candidates[0][1] if candidates else {}
+        fields = ("input_tokens", "cache_read_tokens", "output_tokens", "thinking_tokens")
+        valid = all(type(usage.get(field)) is int and usage[field] >= 0 for field in fields)
+        records.append({"session": f"agy:{key[0]}:{key[1]}:{key[2]}", "version": key[0],
+                        "slug": key[1], "run": key[2], "ts": start.get("ts"), "model": model,
+                        "agy_usage": True,
+                        "input": usage.get("input_tokens") if valid else None,
+                        "cached_input": usage.get("cache_read_tokens") if valid else None,
+                        "output": (usage["output_tokens"] + usage["thinking_tokens"]) if valid else None})
+    return records
+
+
+def _agy_cost(event, prices):
+    rates = prices.get(event.get("model"))
+    if not isinstance(rates, dict):
+        return None
+    try:
+        if any(type(event.get(field)) is not int or event[field] < 0
+               for field in ("input", "cached_input", "output")):
+            return None
+        return (event["input"] * float(rates["input"])
+                + event["cached_input"] * float(rates["cached_input"])
+                + event["output"] * float(rates["output"])) / 1_000_000
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _root():
     return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
+
+
+def _is_under_worktree_root(cwd, root=None):
+    if not cwd or not isinstance(cwd, (str, Path)):
+        return False
+    try:
+        wt_root = (Path(root) if root else _root()).resolve()
+        cwd_path = Path(cwd).expanduser().resolve()
+        return cwd_path == wt_root or cwd_path.is_relative_to(wt_root)
+    except (ValueError, OSError, RuntimeError):
+        return False
+
+
+def _classify_session(session_item, ledgered, wt_root=None):
+    if session_item.get("thread_source") == "guardian_review":
+        return "guardian"
+    if session_item.get("session") in ledgered:
+        return "dispatch"
+    cwd = session_item.get("cwd")
+    if _is_under_worktree_root(cwd, wt_root):
+        return "dispatch_unrecorded"
+    origin = session_item.get("originator")
+    if origin == "codex-tui":
+        return "interactive"
+    if origin == "codex_exec":
+        return "exec_untracked"
+    return "other"
 
 
 def _display_path(path):
@@ -920,6 +1019,7 @@ def _task_metrics(task_events, land_event, prices=None):
     post_exit_land = max(0, land_ts - max(qualifying_exits)) if qualifying_exits else None
     usage = _session_records(task_events)
     session_costs = [_cost(item, prices or {}) for records in usage.values() for item in records]
+    session_costs.extend(_agy_cost(item, prices or {}) for item in _agy_run_usage(task_events))
     return {
         "tokens": token_events[-1]["tokens"] if token_events else None,
         "codex_seconds": codex_seconds,
@@ -1338,6 +1438,16 @@ def _normalize_version(value):
     return "v" + value.lstrip("v")
 
 
+def _window_order(window):
+    if window in WINDOWS:
+        return {"1d": 3, "7d": 2, "30d": 1}[window]
+    version = _normalize_version(window)
+    if version is None:
+        return None
+    major, minor, patch = (int(part) for part in version[1:].split("."))
+    return major * 1_000_000 + minor * 1_000 + patch
+
+
 def _releases(events):
     releases = {_normalize_version(event.get("version")) for event in events
                 if event.get("event") == "start"}
@@ -1448,6 +1558,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             lines.append(f'k3dm_dispatch_task_run_agent_tokens{{{labels}}} {row["agent_tokens"]}')
     lines.append(f'k3dm_dispatch_task_run_skipped{{window="{window}"}} {skipped_runs}')
     lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
+    lines.append(f'k3dm_dispatch_window_order{{window="{window}"}} {_window_order(window)}')
     for result in RESULTS:
         lines.append(f'k3dm_dispatch_land_attempts{{window="{window}",result="{result}"}} '
                      f'{metrics["attempts"][result]}')
@@ -1645,6 +1756,14 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     else:
         usage = {key: selected for key, records in usage.items()
                  if (selected := [item for item in records if item.get("version") == window])}
+    agy_records = _agy_run_usage(events or [])
+    if time_scope:
+        agy_records = [item for item in agy_records
+                       if _timestamp(item.get("ts")) >= now - WINDOWS[window]]
+    else:
+        agy_records = [item for item in agy_records if item.get("version") == window]
+    for item in agy_records:
+        usage[item["session"]] = [item]
     _render_cost(lines, window, usage, metrics["landed"], prices or {})
     if time_scope and coverage is not None:
         in_window = [item for item in coverage if _timestamp(item["start"]) >= now - WINDOWS[window]]
@@ -1660,6 +1779,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         unledgered = [item for item in in_window if item["session"] not in ledgered]
         cost = sum(_cost(_coverage_event(item), prices or {}) or 0 for item in unledgered)
         lines.append(f'k3dm_dispatch_unledgered_api_cost_usd{{window="{window}"}} {cost}')
+        _render_cost_attribution(lines, window, in_window, coverage, ledgered, prices)
     if claude_records is not None:
         all_tasks = []
         scoped_tasks = []
@@ -1710,12 +1830,13 @@ def _render_cost(lines, window, usage, landed, prices):
     for item in (record for records in usage.values() for record in records):
         model = item.get("model") or "unknown"
         inp, cache, output = (int(item.get(k, 0) or 0) for k in ("input", "cached_input", "output"))
-        total += inp
-        cached += cache
-        tokens_by_model[model]["uncached_input"] += inp - cache
-        tokens_by_model[model]["cached_input"] += cache
-        tokens_by_model[model]["output"] += output
-        amount = _cost(item, prices)
+        if not item.get("agy_usage"):
+            total += inp
+            cached += cache
+            tokens_by_model[model]["uncached_input"] += inp - cache
+            tokens_by_model[model]["cached_input"] += cache
+            tokens_by_model[model]["output"] += output
+        amount = _agy_cost(item, prices) if item.get("agy_usage") else _cost(item, prices)
         if amount is None:
             unpriced_sessions.add(item.get("session"))
         else:
@@ -1732,6 +1853,70 @@ def _render_cost(lines, window, usage, landed, prices):
     if total:
         lines.append(f'k3dm_dispatch_cached_input_ratio{{window="{window}"}} {cached / total}')
     lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {len(unpriced_sessions)}')
+
+
+def _render_cost_attribution(lines, window, in_window, all_scanned_list, ledgered, prices):
+    categories = ("dispatch", "dispatch_unrecorded", "guardian", "interactive", "exec_untracked", "other")
+    session_counts = {c: 0 for c in categories}
+    category_costs = {c: 0.0 for c in ("dispatch", "dispatch_unrecorded", "interactive", "exec_untracked", "other")}
+    guardian_missing_cost = 0.0
+    has_missing_guardian = False
+    unpriced_tokens = defaultdict(lambda: {"input": 0, "cached_input": 0, "output": 0})
+
+    all_scanned = {item["session"]: item for item in (all_scanned_list or []) if item.get("session")}
+
+    for item in in_window:
+        cat = _classify_session(item, ledgered)
+        session_counts[cat] += 1
+
+        usage = item.get("usage") or {}
+        inp = int(usage.get("input_tokens") or 0)
+        cached = int(usage.get("cached_input_tokens") or 0)
+        out = int(usage.get("output_tokens") or 0)
+        model = item.get("model")
+        if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", model):
+            model = "unknown"
+
+        rates = (prices or {}).get(model)
+        if isinstance(rates, dict):
+            cost = _cost({"model": model, "input": inp, "cached_input": cached, "output": out}, prices or {}) or 0.0
+        else:
+            cost = 0.0
+            if inp or cached or out:
+                unpriced_tokens[model]["input"] += inp
+                unpriced_tokens[model]["cached_input"] += cached
+                unpriced_tokens[model]["output"] += out
+
+        if cat != "guardian":
+            category_costs[cat] += cost
+        else:
+            parent_id = item.get("parent_thread_id")
+            parent = all_scanned.get(parent_id) if parent_id else None
+            if parent is None or parent.get("thread_source") == "guardian_review":
+                has_missing_guardian = True
+                guardian_missing_cost += cost
+            else:
+                parent_cat = _classify_session(parent, ledgered)
+                category_costs[parent_cat] += cost
+
+    def _fmt_cost(val):
+        rounded = round(val, 6)
+        if abs(rounded) < 1e-9:
+            return "0"
+        return f"{rounded:g}"
+
+    for cat in categories:
+        lines.append(f'k3dm_codex_sessions{{window="{window}",category="{cat}"}} {session_counts[cat]}')
+
+    for cat in ("dispatch", "dispatch_unrecorded", "interactive", "exec_untracked", "other"):
+        lines.append(f'k3dm_codex_api_cost_usd{{window="{window}",category="{cat}"}} {_fmt_cost(category_costs[cat])}')
+    if has_missing_guardian or guardian_missing_cost > 0:
+        lines.append(f'k3dm_codex_api_cost_usd{{window="{window}",category="guardian",parent="missing"}} {_fmt_cost(guardian_missing_cost)}')
+
+    for model, kinds in sorted(unpriced_tokens.items()):
+        for kind in ("input", "cached_input", "output"):
+            lines.append(f'k3dm_codex_unpriced_tokens{{window="{window}",model="{model}",kind="{kind}"}} {kinds[kind]}')
+
 
 def _activity_metrics(lines, events, files, now, prices):
     associated = {e.get("session") for e in events if e.get("event") == "codex_usage"}
@@ -1799,6 +1984,73 @@ def _activity_metrics(lines, events, files, now, prices):
                 lines.append(f"k3dm_codex_quota_used_ratio{{{label}}} {used / 100}")
                 if isinstance(data.get("resets_at"), (int, float)):
                     lines.append(f"k3dm_codex_quota_resets_at_seconds{{{label}}} {data['resets_at']}")
+
+
+def _claude_quota(lines, cache_path):
+    if not cache_path:
+        return
+    path = Path(cache_path)
+    try:
+        if not path.is_file():
+            return
+        mtime = path.stat().st_mtime
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return
+    except (OSError, ValueError, TypeError):
+        return
+
+    lines.append(f"k3dm_claude_quota_sample_timestamp_seconds {mtime}")
+    for limit, minutes in (("five_hour", "300"), ("seven_day", "10080")):
+        obj = data.get(limit)
+        if not isinstance(obj, dict):
+            continue
+        util = obj.get("utilization")
+        if not isinstance(util, (int, float)) or isinstance(util, bool):
+            continue
+        label = f'limit="{limit}",window_minutes="{minutes}"'
+        lines.append(f"k3dm_claude_quota_used_ratio{{{label}}} {util / 100}")
+        resets_at = obj.get("resets_at")
+        if isinstance(resets_at, str):
+            try:
+                from datetime import datetime
+                stamp = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
+                lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {stamp}")
+            except (ValueError, TypeError, AttributeError):
+                pass
+
+    limits = data.get("limits")
+    if isinstance(limits, list):
+        for item in limits:
+            if not isinstance(item, dict):
+                continue
+            if item.get("kind") != "weekly_scoped":
+                continue
+            scope = item.get("scope")
+            if not isinstance(scope, dict):
+                continue
+            model = scope.get("model")
+            if not isinstance(model, dict):
+                continue
+            display_name = model.get("display_name")
+            if not isinstance(display_name, str) or not display_name.strip():
+                continue
+            percent = item.get("percent")
+            if not isinstance(percent, (int, float)) or isinstance(percent, bool):
+                continue
+            limit_name = f"weekly_{display_name.strip().lower()}"
+            label = f'limit="{limit_name}",window_minutes="10080"'
+            lines.append(f"k3dm_claude_quota_used_ratio{{{label}}} {percent / 100}")
+            resets_at = item.get("resets_at")
+            if isinstance(resets_at, str):
+                try:
+                    from datetime import datetime
+                    stamp = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
+                    lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {stamp}")
+                except (ValueError, TypeError, AttributeError):
+                    pass
+            elif isinstance(resets_at, (int, float)) and not isinstance(resets_at, bool):
+                lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {resets_at}")
 
 
 def _quota_efficiency(lines, events, quota, now):
@@ -2395,7 +2647,8 @@ def _render_dispatch_gates(lines, events):
 
 
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
-           codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None):
+           codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None,
+           claude_usage_cache=None):
     now = time.time() if now is None else now
     doc_root = Path(repo_root) if repo_root is not None else _repo_root()
     prices = prices or {}
@@ -2459,6 +2712,25 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         version, slug = key
         lines.append(f'k3dm_dispatch_plan_state{{plan="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
+    bug_tasks = {}
+    for key, task_events in _task_states(events).items():
+        starts = [event for event in task_events if event.get("event") == "start" and event.get("spec")]
+        if not starts:
+            continue
+        start = max(starts, key=lambda event: event.get("ts", 0))
+        spec = start.get("spec")
+        if not isinstance(spec, str):
+            continue
+        m = BUG_SPEC_RE.fullmatch(spec)
+        if not m:
+            continue
+        stem = m.group(1)
+        candidate = (start.get("ts", 0), key, task_events)
+        if stem not in bug_tasks or candidate[0] > bug_tasks[stem][0]:
+            bug_tasks[stem] = candidate
+    for stem, (_, key, task_events) in sorted(bug_tasks.items()):
+        version, slug = key
+        lines.append(f'k3dm_dispatch_bug_state{{bug="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     if claude_context is not None or repo_root is not None:
         if claude_context is not None:
             claude_context["rates"] = claude_prices or {}
@@ -2490,6 +2762,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         _quota_efficiency(lines, events, newest_quota, now)
     else:
         _quota_efficiency(lines, events, None, now)
+    _claude_quota(lines, claude_usage_cache)
     _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now, events=events)
     _render_dispatch_gates(lines, events)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
@@ -2505,6 +2778,7 @@ def main(argv=None):
     repo_key = str(_repo_root()).replace("/", "-")
     parser.add_argument("--claude-projects", default=str(Path.home() / ".claude" / "projects" / repo_key))
     parser.add_argument("--claude-cache", default=str(Path.home() / ".local/share/k3d-manager/claude-usage/rollup.json"))
+    parser.add_argument("--claude-usage-cache", default=os.path.join(os.environ.get("STATUSLINE_CACHE_DIR") or "/tmp/claude", "statusline-usage-cache.json"))
     args = parser.parse_args(argv)
     if args.spec_stats is not None:
         print(json.dumps(_spec_stats(args.spec_stats), separators=(",", ":")))
@@ -2515,7 +2789,8 @@ def main(argv=None):
     claude_records = _claude_rollup(args.claude_projects, args.claude_cache, claude_context) if claude_context is not None else None
     payload = render(events, bad_lines, prices=model_prices, subscriptions=subscriptions,
                      checked=checked, codex_home=args.codex_home, claude_records=claude_records,
-                     claude_prices=claude_prices, claude_context=claude_context, repo_root=_repo_root())
+                     claude_prices=claude_prices, claude_context=claude_context, repo_root=_repo_root(),
+                     claude_usage_cache=args.claude_usage_cache)
     if args.dry_run:
         print(payload, end="")
         return 0

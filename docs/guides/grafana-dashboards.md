@@ -18,7 +18,7 @@ This guide is the entry point for the Grafana dashboards shipped by this reposit
 | k3dm Agent Run Log | `k3dm-agent-run-log` | `platform-ops/grafana-dashboard-agent-run-log.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-agent-run-log.md) |
 | k3dm Agent Cost | `k3dm-agent-cost` | `platform-ops/grafana-dashboard-agent-cost.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-agent-cost.md) |
 | k3dm Agent Activity | `k3dm-agent-activity` | `platform-ops/grafana-dashboard-agent-activity.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-agent-activity.md) |
-| k3dm Bug Tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `grafana-dashboards-hub` ApplicationSet; `make platform-ops` | hub | [Reference](grafana-dashboards/k3dm-bugs.md) |
+| k3dm Release Tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `grafana-dashboards-hub` ApplicationSet; `make platform-ops` | hub | [Reference](grafana-dashboards/k3dm-bugs.md) |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | ACG | [Reference](grafana-dashboards/k3dm-deployments.md) |
 | k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `grafana-dashboards-hub` and `grafana-dashboards-acg` ApplicationSets | hub + ACG | [Reference](grafana-dashboards/k3dm-tests.md) |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | ACG | [Reference](grafana-dashboards/trivy-security.md) |

@@ -62,15 +62,6 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 
 ---
 
-## How-To guides
-
-- [Fast local gate](docs/howto/fast-gate.md) — check changed files before push and landing.
-
-- [One-command machine setup](docs/howto/machine-setup.md) — prepare hub, worker and console Macs from role manifests.
-- [M5 hub migration](docs/howto/m5-hub-migration.md) — build, cut over and roll back the single-instance hub agents.
-- [Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)
-- [Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)
-
 ## Usage
 
 ```bash
@@ -271,8 +262,10 @@ docs/
 
 ### How-To
 
-**Workstations**
-- **[One-command machine setup](docs/howto/machine-setup.md)** — bootstrap and check hub, worker and console Macs.
+**Workstations & dev workflow**
+- **[One-command machine setup](docs/howto/machine-setup.md)** — Prepare hub, worker and console Macs from role manifests
+- **[M5 hub migration](docs/howto/m5-hub-migration.md)** — Build, cut over and roll back the single-instance hub agents
+- **[Fast local gate](docs/howto/fast-gate.md)** — Check changed files before push and landing
 
 **Secrets & Identity**
 - **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
@@ -294,6 +287,7 @@ docs/
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
 - **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/ask-docs`, `/claude` / `/gemini` / `/codex`, `/cluster-up` / `/cluster-down` / `/cluster-status` / `/cluster-refresh` / `/cluster-resume`, and `/argocd-upgrade`
 - **[Webhook Operations](docs/howto/webhook-operations.md)** — Log levels, job logs, retention, and failed-job notes
+- **[Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)** — The two webhook values to replace when rotating it
 - **[Webhook Doctor](docs/howto/webhook-doctor.md)** — `make webhook-doctor`: read-only webhook diagnosis that tells a locked Keychain apart from missing credentials
 - **[Cloud Session Requests](docs/howto/cloud-session-requests.md)** — How an agent with only repo access asks the local webhook for read-only cluster state via the `cloud-requests` branch, the action allowlist, and the two-token (admin / reader) model
 - **[Codex dispatch](docs/howto/codex-dispatch.md)** — Run specs in isolated worktrees and land verified changes
@@ -302,29 +296,13 @@ docs/
 
 - **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
 - **[Hub Rebuild & Recovery](docs/howto/hub-rebuild-from-gitops-vault.md)** — Rebuild the hub, `make hub-recover`, unstick the identity sync, and what is not restored; use `make argocd-admin-resync` to revalidate and repair the Vault ArgoCD admin password without running full recovery; the weekly DR drill proves an export restores ([how-to](docs/howto/hub-dr-drill.md))
+- **[Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)** — `make snapshot` before a planned rebuild: copy cold hub state to the M2 store
 - **[Weekly Hub DR Drill](docs/howto/hub-dr-drill.md)** — Export encrypted hub data, restore it on the M2, and publish the verification result; `make hub-data-recover` / `make hub-recover-all` restore a real hub from the same export
 - **[Coordinated OrbStack Upgrade](docs/howto/orbstack-upgrade.md)** — Upgrade OrbStack in a planned window with hub preflight, Vault and network recovery, and health checks
 - **[Independent Heartbeats](docs/howto/independent-heartbeats.md)** — Optional outbound heartbeat probes for the M4 services and Hostinger, disabled by default
 
-| Script | Claude Skill | When to use |
-|---|---|---|
-| `bin/cluster-up [--login-prompt]` | `/cluster-up` | Start from scratch — full provision + ghcr-pull-secret |
-| `bin/cluster-down --confirm` | `/cluster-down` | Tear down cluster and tunnel |
-| `bin/cluster-refresh [--login-prompt]` | `/cluster-refresh` | Creds expired or tunnel dropped — daily driver |
-| `bin/cluster-status` | `/cluster-status` | Read-only health check — nodes, pods, ArgoCD, AWS |
-| `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
-
-| Slack command | Purpose |
-|---|---|
-| `/ask-docs <question>` | Reader-only, sourced Q&A over the documentation corpus |
-
-> `GHCR_PAT` env var must be set before `cluster-up` (used to create `ghcr-pull-secret`).
-> Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
-
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
-- **[vCluster E2E Harness — Tier 1](docs/guides/vcluster-e2e-harness.md#tier-1-per-candidate-vcluster-gate)** — `e2e_verify_vcluster`: throwaway-vCluster substrate + in-cluster Playwright Job + JSON pass/fail contract; blocking, per-candidate
-- **[vCluster E2E Harness — Tier 2](docs/guides/vcluster-e2e-harness.md#tier-2-acg-sandbox-stripe-verification)** — `e2e_verify_sandbox`: opt-in ACG sandbox Stripe flow with in-sandbox ArgoCD and non-blocking JSON reporting
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
@@ -337,6 +315,28 @@ docs/
 **AI Tooling**
 - **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
 
+### Convenience Scripts and Slack Commands
+
+Wrappers in `bin/` for the ACG app cluster and the hub, and the Slack commands the hub answers. The make targets are
+provider-aware ([Makefile Reference](docs/howto/makefile.md)); check `CLUSTER_PROVIDER` before running `make down`.
+
+| Script | Make target | When to use |
+|---|---|---|
+| `bin/cluster-up [--login-prompt]` | `make up` (k3s-aws, k3s-gcp) | Start from scratch — full provision + ghcr-pull-secret |
+| `bin/cluster-down --confirm` | `make down` (not k3s-oci) | Tear down cluster and tunnel |
+| `bin/cluster-refresh [--login-prompt]` | `make refresh` | Creds expired or tunnel dropped — daily driver |
+| `bin/cluster-status [--json] [--service NAME]` | `make status`, `make status-json` | Read-only health check — nodes, pods, ArgoCD, AWS |
+| `bin/cluster-sync-apps` | `make sync-apps` | Sync the ArgoCD data layer and show remote pod status |
+| `bin/cluster-preflight <name> [--auto\|--keep\|--reuse]` | `make preflight NAME=<name>` | Deploy the full stack into a throwaway vCluster before touching a real cluster |
+| `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
+
+> `GHCR_PAT` env var must be set before `cluster-up` (used to create `ghcr-pull-secret`).
+> Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
+
+| Slack command | Purpose |
+|---|---|
+| `/ask-docs <question>` | Reader-only, sourced Q&A over the documentation corpus |
+
 ---
 
 ## Issue Logs
@@ -347,11 +347,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-11-12 | [Copilot PR #160 review findings](docs/issues/2026-11-12-copilot-pr160-review-findings.md) | Test helpers / bash 3.2 |
 | 2026-11-07 | [Copilot PR #156 review findings and CI reds](docs/issues/2026-11-07-copilot-pr156-review-findings.md) | Webhook status / test portability |
 | 2026-11-06 | [P0 S1 spec: third check of review findings](docs/issues/2026-11-06-s1-spec-third-check-findings.md) | Dispatch gates |
 | 2026-11-06 | [P0 S1 spec: second independent review](docs/issues/2026-11-06-s1-spec-second-review-findings.md) | Dispatch gates |
 | 2026-11-06 | [P0 S1 spec: independent review](docs/issues/2026-11-06-s1-spec-review-findings.md) | Dispatch gates |
-| 2026-11-03 | [Phase B: headless CA trust containment](docs/issues/2026-11-03-ca-trust-phase-b-containment.md) | acg-up / Vault CA |
 
 [All issues →](docs/issues/)
 
@@ -361,14 +361,15 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.43.15](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.15) | 2026-11-12 | Hub-safety and process release. **Hub:** the hub runs only promoted code: `make hub-promote` / `hub-rollback` move `deploy/hub` behind green checks and a typed confirmation, `make platform-ops` applies the promoted tree, and every ApplicationSet applier defaults to `deploy/hub`. **Machines:** each machine fast-forwards its checkouts on a five-minute timer and reports hub lag and pending deploy steps; an Ubuntu Linux control-node path. **Agents:** operator-approved plain-language intents before every dispatch, answered by every verification; Codex spend attributed by category with Dispatch coverage on Agent Cost. **Bugs:** ~57 fixed (2 P1), including the CVE promoter, Hermes approval and rollback guards; from 2026-11-11 P2/P3 bugs are captured, classified by a second agent and triaged instead of fixed at once. Dashboard renamed **k3dm Release Tracking**. |
 | [v1.43.14](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.14) | 2026-11-07 | Agent-gates and machine-safety release. **Dispatch:** a verifier pass needs captured evidence (command, rc and a red run on the pre-fix commit); legacy claims show separately; resume reasons are recorded and open tasks listed (P0 stall-detection slice S1). **Cost:** Claude context per turn, compaction floor and cache-rebuild cost on Agent Cost. **Machines:** a `control` role for Macs without a cluster; passwordless sudoers cut to five macOS rules; browser listeners run as user agents behind root-owned launchd socket relays. **Bugs:** 30-day open-bug history from git, a Waiting on column, `make hub-sync` with hub code lag, forecasts that follow roadmap milestones. **Supply chain:** Dependabot for GitHub Actions; lib-foundation `brace-expansion` 1.1.21. |
 | [v1.43.13](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.13) | 2026-11-01 | Machine-setup and bug-fix release for the M5 hub. **Machines:** hub setup creates a per-node EC2 SSH key, lists the hub-read Keychain items and Slack role map, reports a locked login Keychain, installs `agy` (Gemini is optional), accepts azure-cli as a cask, switches managed remotes to SSH, and `make machine-check-shell HOST=<mac>` checks the SSH login shell. **Gate:** `make fast-gate` runs a local lint and test gate in pre-push and `codex-dispatch land`. **Slack:** channel `/cluster-up`/`/cluster-down` jobs post in a bot thread instead of `response_url`. **Dashboards:** Agent Dispatch splits unknown run outcomes into unrecorded, superseded, open and stale; Agent Activity counts Bash reads, shows a wasted re-read share and the observed compaction point, and caps repo gauges at eight plus other. **Ops:** `make platform-ops` reapplies the Grafana and LDAP rotators; acg-up warns about a billable stack only when it exists. v1.43.13's plans moved to v1.43.14. |
-| [v1.43.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.12) | 2026-10-31 | M5 hub release. **Hub:** `make hub-new` builds a fresh hub from the old one's data, and `make hub-cutover` moves the single-instance agents, the forwards and the Hostinger ArgoCD registration to it, with a verify and a rollback; the M5 became the hub on 2026-10-31. **Machines:** `make machine-setup`/`machine-check ROLE=hub|worker|console` set up a Mac from role lists, copying Keychain secrets and listed files from another Mac over SSH. **Cost:** Agent Cost shows whole-system Claude and Codex API cost, unit cost and monthly run rate. **Security:** webhook AI analysis fences untrusted log text and withholds commands outside a read-only allow-list. v1.43.10's plans stay queued. |
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.43.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.12) | 2026-10-31 | M5 hub release. **Hub:** `make hub-new` builds a fresh hub from the old one's data, and `make hub-cutover` moves the single-instance agents, the forwards and the Hostinger ArgoCD registration to it, with a verify and a rollback; the M5 became the hub on 2026-10-31. **Machines:** `make machine-setup`/`machine-check ROLE=hub|worker|console` set up a Mac from role lists, copying Keychain secrets and listed files from another Mac over SSH. **Cost:** Agent Cost shows whole-system Claude and Codex API cost, unit cost and monthly run rate. **Security:** webhook AI analysis fences untrusted log text and withholds commands outside a read-only allow-list. v1.43.10's plans stay queued. |
 | [v1.43.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.9) | 2026-10-29 | Diagnostics and visibility release. **Webhook:** `make webhook-doctor` diagnoses the webhook read-only and tells a locked Keychain apart from missing credentials; the webhook runs at interactive priority, so ask-docs bug counts finish in under a second instead of timing out. **Hub:** an operator-approved OrbStack upgrade command with Vault and network recovery, and optional outbound heartbeat probes. **CVE:** app CVE scans fail closed on Trivy or registry errors and report GHCR authentication failures separately. **Dispatch:** primary and acting coordinators, landing actors, spec size and change size are recorded per spec. **Dashboards:** the Host Pod IP Pool shows reservations held without a sandbox and alerts after an hour; VectorDB drift is shown by kind and age; Release Plans shows Verified and Live verified separately; the Grafana guide has one page per dashboard. |
 | [v1.43.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.8) | 2026-10-25 | Release-tracking and ops-routing release. **Dispatch:** Agent Dispatch shows each release's span from first dispatch to merge and its active time, with overlapping specs counted once. **Plans:** the Plans table shows dependency waves, timing notes, undeclared file overlaps between plans, separate spec and dispatch approval, and what blocks a dispatch. **Bugs:** the Release row follows Auto or Manual release selection. **Snapshots:** the hub snapshot runs every Sunday at 02:30 and keeps verified snapshots for 30 days, never fewer than three. **Slack:** alert analyses post to the status channel. The Hostinger public-path plan moved to v1.43.10. |
 | [v1.43.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.7) | 2026-10-25 | Dispatch identity and dashboard-fit release. **Dispatch:** specs can target another repository's branch, worker and coordinator models are recorded per run, and total dispatch-to-land time is split from the final exit-to-land gap with operator prompts counted. **Hub:** the Argo CD chart is pinned at 10.10.5 with a guarded in-place upgrade command, a rejected Vault unseal cache can no longer trigger a destructive reinit, and Hermes reports OrbStack version and pending updates. **Dashboards:** Bug Tracking and Agent Dispatch tables fit a laptop-width panel without horizontal scrolling, forecasts show dates only, and a landed plan no longer reads `awaiting land`. |

@@ -609,7 +609,7 @@ function _hostinger_refresh_browser_listener_files() {
   if ! _hostinger_load_argocd_plugin || ! ( _argocd_write_port_forward_wrapper \
     "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl 2>/dev/null || true)" \
     "$(command -v curl 2>/dev/null || true)" "istio-system" "k3d-k3d-cluster" \
-    "svc/istio-ingressgateway" "18080" "80" "http://127.0.0.1:18080/health/ready" \
+    "svc/istio-ingressgateway" "18080" "80" "http://keycloak.shopping-cart.local/health/ready" \
     "${HOME}/.kube/config" "127.0.0.1" "keycloak-browser-http" ); then
     _warn "[k3s-hostinger] ${_keycloak_browser_label}: failed to write wrapper"
     _browser_error=1
@@ -890,7 +890,7 @@ function _hostinger_refresh_frontend_dns() {
 function _hostinger_reapply_gitops_applicationsets() {
   _hostinger_load_argocd_plugin || return 1
 
-  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-deploy/hub}"
   export K3D_MANAGER_BRANCH
   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_HOSTINGER_KUBE_CONTEXT}}"
   export APP_CLUSTER_NAME

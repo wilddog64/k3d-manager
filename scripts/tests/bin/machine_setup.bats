@@ -23,6 +23,156 @@ manifest_disjoint() {
   done
 }
 
+@test "Linux rejects macOS roles and root before setup side effects" {
+  setup_machine_fixture
+  printf '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n' > "$STUBS/uname"
+  printf '#!/bin/sh\n[ "$1" = -u ] && echo "${FIXTURE_UID:-1001}" || echo k3dm-control\n' > "$STUBS/id"
+  printf '#!/bin/sh\necho called >> "$CALL_LOG.sudo"\nexit 99\n' > "$STUBS/sudo"
+  chmod +x "$STUBS/uname" "$STUBS/id" "$STUBS/sudo"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  run env HOME="$FIXHOME" FIXTURE_UID=1001 CALL_LOG="$CALL_LOG" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role hub
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'role hub is macOS-only; use --role control on Linux'* ]]
+  run env HOME="$FIXHOME" FIXTURE_UID=0 CALL_LOG="$CALL_LOG" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'must not run as root'* ]]
+  [ ! -e "$CALL_LOG.sudo" ]
+  [ ! -e "$FIXHOME/.config/k3d-manager/machine-role" ]
+}
+
+@test "Linux reports root prerequisite commands without setup mutations" {
+  setup_machine_fixture
+  : > "$FIXROOT/scripts/etc/machine/brew.control.list"
+  : > "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  : > "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/brew.control.linux-skip.list"
+  : > "$FIXROOT/scripts/etc/machine/repos.list"
+  printf '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n' > "$STUBS/uname"
+  printf '#!/bin/sh\n[ "$1" = -u ] && echo 1001 || echo k3dm-control\n' > "$STUBS/id"
+  chmod +x "$STUBS/uname" "$STUBS/id"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  FIX_PREFIX="$BATS_TEST_TMPDIR/missing-linuxbrew"
+  "$REAL_PYTHON3" - "$FIXROOT/bin/k3dm-machine-setup" "$FIX_PREFIX" <<'PY'
+import sys
+source, prefix = sys.argv[1:]
+text = open(source, encoding="utf-8").read()
+text = text.replace("local prefix=/home/linuxbrew/.linuxbrew", f"local prefix={prefix}")
+open(source, "w", encoding="utf-8").write(text)
+PY
+  run env HOME="$FIXHOME" CALL_LOG="$CALL_LOG" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'sudo apt-get update'* ]]
+  [[ "$output" == *'sudo apt-get install -y build-essential procps curl file git'* ]]
+  [[ "$output" == *'/home/linuxbrew/.linuxbrew'* ]]
+  [ ! -e "$FIX_PREFIX" ]
+  [ ! -e "$FIXHOME/.config/k3d-manager/machine-role" ]
+}
+
+@test "Linux runs only the checksum-pinned installer and records its environment" {
+  setup_linux_brew_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  [[ "$FIX_PREFIX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  : > "$CALL_LOG.installer"
+  : > "$CALL_LOG.curl"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  [ "$(cat "$CALL_LOG.installer")" = '1|1' ]
+  [ ! -e "$CALL_LOG.sudo" ]
+  grep -Fq 'https://raw.githubusercontent.com/Homebrew/install/7986efac25016e41eed7e471666140c06f9d97cf/install.sh' "$CALL_LOG.curl"
+  [ -d "$FIXHOME/src/gitrepo/personal/k3d-manager/.git" ]
+  [ -d "$FIXHOME/src/gitrepo/personal/lib-foundation/.git" ]
+  grep -Fq 'https://github.com/wilddog64/k3d-manager.git' "$CALL_LOG.git"
+  if grep -Fq 'worker-only' "$CALL_LOG.git"; then return 1; fi
+  for item in 'macOS Homebrew package' 'Keychain and secrets' 'LaunchAgents' 'FROM= file copy' 'operator include' 'shell links and agent-settings repos' 'smartcd'; do
+    printf '%s\n' "$output" | grep -Eq "^${item}[[:space:]]+skipped \(linux\)$"
+  done
+  while IFS= read -r item; do
+    item="${item%%#*}"; item="${item//[$'\t\r ']/}"; [[ -n "$item" ]] || continue
+    case "$item" in
+      cask:*) [[ "$output" == *"cask:${item#cask:}"*'skipped (linux)'* ]] ;;
+      formula:*) grep -Fq "brew install ${item#formula:}" "$CALL_LOG.brew" ;;
+      *) grep -Fq "brew install $item" "$CALL_LOG.brew" ;;
+    esac
+  done < "$MACHINE_DIR/brew.control.list"
+
+  rm -rf "$FIX_PREFIX/bin"
+  cp "$CALL_LOG.installer" "$CALL_LOG.installer.before"
+  printf 'commit=7986efac25016e41eed7e471666140c06f9d97cf\nsha256=0000000000000000000000000000000000000000000000000000000000000000\n' > "$FIXROOT/scripts/etc/machine/homebrew-install.linux.pin"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'installer checksum mismatch'* ]]
+  grep -Fq 'https://raw.githubusercontent.com/Homebrew/install/7986efac25016e41eed7e471666140c06f9d97cf/install.sh' "$CALL_LOG.curl"
+  [ ! -d "$FIX_PREFIX/bin" ]
+  [ "$(cat "$FIX_PREFIX/operator-marker")" = 'pre-existing prefix marker' ]
+  [ "$(cat "$CALL_LOG.installer")" = "$(cat "$CALL_LOG.installer.before")" ]
+
+  rm -rf "$FIX_PREFIX/bin"
+  printf 'CURL_RC=22\n' > "$CALL_LOG.curl-fail"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" CURL_RC=22 PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [ ! -d "$FIX_PREFIX/bin" ]
+  [ "$(cat "$FIX_PREFIX/operator-marker")" = 'pre-existing prefix marker' ]
+  [ "$(cat "$CALL_LOG.installer")" = "$(cat "$CALL_LOG.installer.before")" ]
+}
+
+@test "Linux check and dry-run do not download a missing Homebrew installer" {
+  setup_linux_brew_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  [[ "$FIX_PREFIX" == "$BATS_TEST_TMPDIR/"* ]]
+  for mode in --check --dry-run; do
+    run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control "$mode"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'homebrew                         missing'* ]]
+    [ ! -e "$FIX_PREFIX/bin/brew" ]
+    [ ! -s "$CALL_LOG.curl" ]
+  done
+}
+
+@test "Linux continues after missing formulas and failed installs with real command failure semantics" {
+  setup_linux_brew_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIX_PREFIX" == "$BATS_TEST_TMPDIR/"* ]]
+  mkdir -p "$FIX_PREFIX/bin"
+  printf '%s\n' formula:gh formula:broken formula:later > "$FIXROOT/scripts/etc/machine/brew.control.list"
+  printf '%s\n' 'fixture/control-repo|https://github.com/example/control-repo.git|main|control' > "$FIXROOT/scripts/etc/machine/repos.list"
+  cat > "$FIXROOT/scripts/lib/system.sh" <<'SH'
+_run_command() {
+  local soft=0
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --soft|--no-exit) soft=1; shift ;;
+      --quiet|--prefer-sudo|--require-sudo|--interactive-sudo) shift ;;
+      --) shift; break ;;
+      *) break ;;
+    esac
+  done
+  "$@" || { local rc=$?; (( soft )) || exit "$rc"; return "$rc"; }
+}
+SH
+  cat > "$FIX_PREFIX/bin/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG.brew"
+# Captured from the 2026-11-10 Ubuntu 24.04 aarch64 VM on the M4: missing gh exits 1.
+case "$1:$2" in
+  shellenv:) exit 0 ;;
+  list:--formula) exit 1 ;;
+  install:gh|install:later) exit 0 ;;
+  install:broken) exit 42 ;;
+esac
+exit 0
+SH
+  chmod +x "$FIX_PREFIX/bin/brew"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'brew:gh'*'installed'* ]]
+  [[ "$output" == *'brew:broken'*'missing'* ]]
+  [[ "$output" == *'brew:later'*'installed'* ]]
+  [[ "$output" == *'repo:fixture/control-repo'*'installed'* ]]
+  grep -Fq 'brew install gh' "$CALL_LOG.brew"
+  grep -Fq 'brew install broken' "$CALL_LOG.brew"
+  grep -Fq 'brew install later' "$CALL_LOG.brew"
+  grep -Fq 'git clone --branch main --single-branch https://github.com/example/control-repo.git' "$CALL_LOG.git"
+}
+
 @test "control role manifests stay limited to development tools and smartcd" {
   [ -r "$MACHINE_DIR/brew.control.list" ]
   [ -r "$MACHINE_DIR/secrets.control.list" ]
@@ -139,6 +289,7 @@ SH
 }
 
 setup_machine_fixture() {
+  REAL_PYTHON3="$(command -v python3)"
   FIXROOT="$BATS_TEST_TMPDIR/project"
   FIXHOME="$BATS_TEST_TMPDIR/home"
   STUBS="$BATS_TEST_TMPDIR/stubs"
@@ -154,7 +305,7 @@ printf 'secrets %s\n' "$*" >> "$CALL_LOG"
 exit "${SECRETS_STUB_RC:-0}"
 SH
   chmod +x "$FIXROOT/bin/k3dm-machine-secrets"
-  printf '%s\n' '_run_command() { return 1; }' > "$FIXROOT/scripts/lib/system.sh"
+  printf '%s\n' '_run_command() { [[ "${LINUX_SETUP_FIXTURE:-0}" == 1 ]] || return 1; while [[ "$#" -gt 0 ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }' > "$FIXROOT/scripts/lib/system.sh"
   : > "$FIXROOT/scripts/lib/core.sh"
   for role in hub worker console; do
     : > "$FIXROOT/scripts/etc/machine/brew.$role.list"
@@ -219,6 +370,7 @@ SH
   cat > "$STUBS/python3" <<'SH'
 #!/bin/sh
 printf 'python3 %s\n' "$*" >> "$CALL_LOG"
+if [ "$1" = - ]; then exec "$REAL_PYTHON3" "$@"; fi
 [ "$1" = -m ] && [ "$2" = venv ] || exit 1
 mkdir -p "$3/bin"
 cat > "$3/bin/python" <<'VENV'
@@ -265,11 +417,96 @@ printf '%s\n' 'PRIVATE-KEY-TEST-MATERIAL' > "$key"
 printf '%s\n' 'public-test-key' > "$key.pub"
 printf 'ssh-keygen called\n' >> "$CALL_LOG"
 SH
+  cat > "$STUBS/id" <<'SH'
+#!/bin/sh
+[ "$1" = -un ] && printf '%s\n' fixture-user
+SH
+  cat > "$STUBS/scutil" <<'SH'
+#!/bin/sh
+[ "$1" = --get ] && [ "$2" = LocalHostName ] && printf '%s\n' fixture-hub
+SH
+  cat > "$STUBS/ssh" <<'SH'
+#!/bin/sh
+printf 'ssh %s\n' "$*" >> "$CALL_LOG"
+exit 1
+SH
   chmod +x "$STUBS"/*
+  mkdir -p "$FIXHOME/.ssh" "$FIXHOME/.config/k3d-manager"
+  printf 'E2E_M2_PUBLISH_BACK_HOST=fixture-user@fixture-hub.local\n' > "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  printf 'from="192.168.39.0/24",command="%s/scripts/k3d-manager e2e_result_publish",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAA e2e-m2-publisher@m2-air-20260824\n' "$FIXROOT" > "$FIXHOME/.ssh/authorized_keys"
 }
 
 run_machine() {
-  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" REAL_PYTHON3="$REAL_PYTHON3" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@" </dev/null
+}
+
+setup_linux_brew_fixture() {
+  setup_machine_fixture
+  FIX_PREFIX="$BATS_TEST_TMPDIR/linuxbrew"
+  mkdir -p "$FIX_PREFIX" "$FIXROOT/scripts/etc/machine"
+  printf 'pre-existing prefix marker\n' > "$FIX_PREFIX/operator-marker"
+  cp "$MACHINE_DIR/brew.control.list" "$FIXROOT/scripts/etc/machine/brew.control.list"
+  cp "$MACHINE_DIR/secrets.control.list" "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  cp "$MACHINE_DIR/agents.control.list" "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/brew.control.linux-skip.list"
+  printf '%s\n' \
+    'gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|control' \
+    'gitrepo/personal/lib-foundation|https://github.com/wilddog64/lib-foundation.git|main|control' \
+    'fixture/worker-only|https://github.com/example/worker-only.git|main|worker' > "$FIXROOT/scripts/etc/machine/repos.list"
+  printf '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n' > "$STUBS/uname"
+  printf '#!/bin/sh\n[ "$1" = -u ] && echo 1001 || echo k3dm-control\n' > "$STUBS/id"
+  printf '#!/bin/sh\necho called >> "$CALL_LOG.sudo"\nexit 99\n' > "$STUBS/sudo"
+  cat > "$STUBS/curl" <<'SH'
+#!/bin/sh
+printf 'curl %s\n' "$*" >> "$CALL_LOG.curl"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -o ]; then destination="$2"; shift 2; else shift; fi
+done
+[ "${CURL_RC:-0}" = 0 ] || exit "$CURL_RC"
+cp "$FAKE_INSTALLER" "$destination"
+SH
+  cat > "$STUBS/fake-brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG.brew"
+case "$1" in shellenv) exit 0 ;; list) exit 1 ;; install) exit 0 ;; esac
+exit 0
+SH
+  cat > "$STUBS/git" <<'SH'
+#!/bin/sh
+printf 'git %s\n' "$*" >> "$CALL_LOG.git"
+if [ "$1" = clone ]; then
+  target=''
+  for arg do target="$arg"; done
+  mkdir -p "$target/.git"
+  exit 0
+fi
+exit 0
+SH
+  cat > "$STUBS/fake-installer" <<'SH'
+#!/bin/bash
+printf '%s|%s\n' "$NONINTERACTIVE" "$HOMEBREW_NO_SUDO" > "$INSTALL_LOG"
+mkdir -p "$FIX_PREFIX/bin"
+cp "$FAKE_BREW" "$FIX_PREFIX/bin/brew"
+chmod +x "$FIX_PREFIX/bin/brew"
+SH
+  cat > "$STUBS/python3" <<'SH'
+#!/bin/sh
+[ "$1" = -m ] && [ "$2" = venv ] || exit 1
+mkdir -p "$3/bin"
+printf '#!/bin/sh\nexit 0\n' > "$3/bin/python"
+chmod +x "$3/bin/python"
+SH
+  chmod +x "$STUBS/uname" "$STUBS/id" "$STUBS/sudo" "$STUBS/curl" "$STUBS/fake-brew" "$STUBS/git" "$STUBS/fake-installer" "$STUBS/python3"
+  REAL_PYTHON3="$(command -v python3)"
+  "$REAL_PYTHON3" - "$FIXROOT/bin/k3dm-machine-setup" "$FIX_PREFIX" <<'PY'
+import sys
+source, prefix = sys.argv[1:]
+text = open(source, encoding="utf-8").read()
+text = text.replace("/home/linuxbrew/.linuxbrew", prefix)
+open(source, "w", encoding="utf-8").write(text)
+PY
+  sha="$(shasum -a 256 "$STUBS/fake-installer" | awk '{print $1}')"
+  printf 'commit=7986efac25016e41eed7e471666140c06f9d97cf\nsha256=%s\n' "$sha" > "$FIXROOT/scripts/etc/machine/homebrew-install.linux.pin"
 }
 
 @test "N1: agents option rejects unsupported values" {
@@ -421,6 +658,97 @@ run_machine() {
   grep -Eq '^command-line-tools[[:space:]]+missing$' <<< "$output"
   grep -Eq '^brew:example[[:space:]]+ok$' <<< "$output"
   grep -Eq '^secret:fixture[[:space:]]+missing' <<< "$output"
+}
+
+publisher_fixture() {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]]
+  rm -f "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$FIXHOME/.ssh/authorized_keys"
+  ssh-keygen -q -t ed25519 -N '' -C e2e-m2-publisher@m2-air-20260824 -f "$BATS_TEST_TMPDIR/publisher"
+  local public
+  public="$(cat "$BATS_TEST_TMPDIR/publisher.pub")"
+  cat > "$STUBS/ssh" <<SH
+#!/bin/sh
+printf 'ssh %s\\n' "\$*" >> "\$CALL_LOG"
+# Captured authorized_keys format from m4-air.local, 2026-11-07; key generated for this test.
+printf '%s\\n' 'from="192.168.39.0/24",command="/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/k3d-manager e2e_result_publish",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding $public'
+SH
+  chmod +x "$STUBS/ssh"
+}
+
+@test "e2e publish-back: hub setup installs both items and second run is byte-identical" {
+  publisher_fixture
+  run_machine --role hub --from old-hub.local --secrets skip --agents skip
+  grep -Eq '^e2e-publish-back-conf +installed$' <<< "$output"
+  grep -Eq '^e2e-publish-back-key +installed$' <<< "$output"
+  grep -Fxq 'E2E_M2_PUBLISH_BACK_HOST=fixture-user@fixture-hub.local' "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  [ "$(ls -l "$FIXHOME/.config/k3d-manager/e2e-remote.env" | cut -c1-10)" = '-rw-------' ]
+  [ "$(grep -c 'e2e-m2-publisher' "$FIXHOME/.ssh/authorized_keys")" -eq 1 ]
+  grep -Fq "command=\"$FIXROOT/scripts/k3d-manager e2e_result_publish\"" "$FIXHOME/.ssh/authorized_keys"
+  cp "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$BATS_TEST_TMPDIR/conf.before"
+  cp "$FIXHOME/.ssh/authorized_keys" "$BATS_TEST_TMPDIR/keys.before"
+  run_machine --role hub --from old-hub.local --secrets skip --agents skip
+  grep -Eq '^e2e-publish-back-conf +ok$' <<< "$output"
+  grep -Eq '^e2e-publish-back-key +ok$' <<< "$output"
+  cmp "$BATS_TEST_TMPDIR/conf.before" "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  cmp "$BATS_TEST_TMPDIR/keys.before" "$FIXHOME/.ssh/authorized_keys"
+}
+
+@test "e2e publish-back: updates only its own lines and keeps unrelated authorized keys ordered" {
+  publisher_fixture
+  mkdir -p "$FIXHOME/.ssh" "$FIXHOME/.config/k3d-manager"
+  printf 'before\nE2E_M2_PUBLISH_BACK_HOST=cliang@m4-air.local\nafter\n' > "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  printf 'ssh-ed25519 AAAA unrelated-one\nfrom="192.0.2.1",no-pty ssh-ed25519 BBBB unrelated-two\nssh-rsa CCCC unrelated-three\nfrom="192.168.39.0/24",command="/old/k3d-manager e2e_result_publish" ssh-ed25519 DDDD e2e-m2-publisher@m2-air-old\n' > "$FIXHOME/.ssh/authorized_keys"
+  run_machine --role hub --from old-hub.local --secrets skip --agents skip
+  grep -Fxq before "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  grep -Fxq after "$FIXHOME/.config/k3d-manager/e2e-remote.env"
+  printf 'ssh-ed25519 AAAA unrelated-one\nfrom="192.0.2.1",no-pty ssh-ed25519 BBBB unrelated-two\nssh-rsa CCCC unrelated-three\n' > "$BATS_TEST_TMPDIR/unrelated.expected"
+  head -n 3 "$FIXHOME/.ssh/authorized_keys" > "$BATS_TEST_TMPDIR/unrelated.actual"
+  cmp "$BATS_TEST_TMPDIR/unrelated.expected" "$BATS_TEST_TMPDIR/unrelated.actual"
+  [ "$(grep -c 'e2e-m2-publisher' "$FIXHOME/.ssh/authorized_keys")" -eq 1 ]
+  grep -Fq "command=\"$FIXROOT/scripts/k3d-manager e2e_result_publish\"" "$FIXHOME/.ssh/authorized_keys"
+  [[ "$output" == *'updated (was cliang@m4-air.local)'* ]] || { printf '%s\n' "$output"; return 1; }
+}
+
+@test "e2e publish-back: check, dry-run, missing source, and other roles do not write publish files" {
+  publisher_fixture
+  rm -f "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$FIXHOME/.ssh/authorized_keys"
+  run_machine --role hub --check --from old-hub.local --secrets skip --agents skip
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  run_machine --role hub --dry-run --from old-hub.local --secrets skip --agents skip
+  [[ "$output" == *'would write'* ]]
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  : > "$CALL_LOG"
+  run_machine --role worker --from old-hub.local --secrets skip --agents skip
+  run ! grep -q '^ssh .*old-hub.local' "$CALL_LOG"
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  run_machine --role hub --secrets skip --agents skip
+  [[ "$output" == *'rerun with FROM=<old hub>'* ]]
+  [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+  [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+}
+
+@test "e2e publish-back: malformed old-host key or subnet writes neither item" {
+  publisher_fixture
+  rm -f "$FIXHOME/.config/k3d-manager/e2e-remote.env" "$FIXHOME/.ssh/authorized_keys"
+  local bad_line
+  for bad_line in \
+    'from="192.168.39.0/24",command="/old/k3d-manager e2e_result_publish" ssh-rsa AAAA e2e-m2-publisher@m2-air-old' \
+    'from="192.168.39.0/24;touch /tmp/nope",command="/old/k3d-manager e2e_result_publish" ssh-ed25519 AAAA e2e-m2-publisher@m2-air-old'; do
+    cat > "$STUBS/ssh" <<SH
+#!/bin/sh
+printf '%s\\n' '$bad_line'
+SH
+    chmod +x "$STUBS/ssh"
+    run_machine --role hub --from old-hub.local --secrets skip --agents skip
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'invalid old hub publisher entry'* ]]
+    [ ! -e "$FIXHOME/.config/k3d-manager/e2e-remote.env" ]
+    [ ! -e "$FIXHOME/.ssh/authorized_keys" ]
+  done
 }
 
 @test "machine setup: unprefixed brew packages accept either installation type" {
@@ -628,7 +956,7 @@ tty_machine() {
   run_machine --role console --from old-mac.local
   run_machine --role console --check --from old-mac.local
   run ! grep -q '^secrets pull' "$CALL_LOG"
-  run ! grep -q '^ssh ' "$CALL_LOG"
+  run ! grep -q '^ssh .*old-mac\.local' "$CALL_LOG"
 }
 
 @test "machine setup: safety N3 worker rejects hub installers" {
@@ -1186,18 +1514,18 @@ SH
   chmod +x "$STUBS/ssh"
   local message
   for message in "Username for 'https://github.com': " 'zsh compinit: insecure directories, run compaudit for list.' 'compdef: command not found' '_main_complete:412: _lastcomp: assignment to invalid subscript range'; do
-    run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="$message" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="$message" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
     [ "$status" -eq 1 ]
     [[ "$output" == *"$message"* || "$output" == *"${message% }"* ]]
     grep -Fxq -- '-tt -o BatchMode=yes fixture $SHELL -lic exit' "$CALL_LOG"
   done
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" HOME="$FIXHOME" SHELL_FIXTURE="command not found $FIXHOME/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" HOME="$FIXHOME" SHELL_FIXTURE="command not found $FIXHOME/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 1 ]
   [[ "$output" == *'~/secret'* && "$output" != *"$FIXHOME"* && "$output" != *'ghp_abc'* ]]
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 0 ]
   # zplug banner on a clean login, captured on m5-air.local and m2-air.local, 2026-10-31.
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE=$'[zplug] \e[33mRun compinit\e[00m' "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE=$'[zplug] \e[33mRun compinit\e[00m' "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 0 ]
   run env SSH_CALL="$CALL_LOG" "$STUBS/ssh" -tt -o BatchMode=yes fixture exit
   [ "$status" -eq 42 ]
@@ -1208,11 +1536,11 @@ SH
   rm "$STUBS/python3"
   printf '#!/bin/sh\nexec sleep 5\n' > "$STUBS/ssh"
   chmod +x "$STUBS/ssh"
-  run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT=2 "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT=2 "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
   [ "$status" -eq 1 ]
   [[ "$output" == *'timed out'* ]]
   for value in 0 -1 abc 1.5 ''; do
-    run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT="$value" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT="$value" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture </dev/null
     [ "$status" -eq 2 ]
   done
 }

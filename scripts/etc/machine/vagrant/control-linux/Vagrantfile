@@ -1,0 +1,39 @@
+Vagrant.configure("2") do |config|
+  repo_root = File.expand_path("../../../../..", __dir__)
+  role_dir = File.expand_path("../../../../../../provision-homebrew/provision-homebrew", __dir__)
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.synced_folder repo_root, "/vagrant/k3d-manager"
+  config.vm.synced_folder role_dir, "/vagrant/provision-homebrew"
+  config.vm.box = "bento/ubuntu-24.04"
+  config.vm.box_version = "202502.21.0"
+  config.vm.provider "virtualbox" do |vb|
+    vb.cpus = 4
+    vb.memory = 8192
+  end
+  config.vm.provision "shell" do |s|
+    s.inline = <<-SHELL
+      set -eu
+      if [ "$(uname -m)" = "aarch64" ]; then
+        if ! grep -q 'arm64.nosve' /etc/default/grub; then
+          if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub; then
+            sed -i -e 's/GRUB_CMDLINE_LINUX="\\(.*\\)"/GRUB_CMDLINE_LINUX="arm64.nosve arm64.nosme \\1"/' /etc/default/grub
+            sed -i -e 's/arm64.nosme "/arm64.nosme"/' /etc/default/grub
+          else
+            echo 'GRUB_CMDLINE_LINUX="arm64.nosve arm64.nosme"' >> /etc/default/grub
+          fi
+          update-grub
+        fi
+      fi
+    SHELL
+  end
+  config.vm.provision "ansible_local" do |ansible|
+    ansible.install = true
+    ansible.install_mode = "default"
+    ansible.provisioning_path = "/vagrant/provision-homebrew"
+    ansible.galaxy_roles_path = "/vagrant"
+    ansible.playbook = "tests/playbook-prereqs.yml"
+    ansible.inventory_path = "tests/inventory"
+    ansible.limit = "all"
+    ansible.extra_vars = { "homebrew_user" => "k3dm-control", "provision_homebrew_scope" => "prereqs", "ansible_connection" => "local" }
+  end
+end

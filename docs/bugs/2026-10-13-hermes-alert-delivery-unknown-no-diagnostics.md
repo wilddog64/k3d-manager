@@ -1,10 +1,10 @@
 # Bug: Hermes alert_delivery reports opaque unknown despite healthy manual probe (2026-10-13)
 
 **Status:** DUPLICATE 2026-10-15 — merged into `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (operator-approved); track and fix there
-**Branch:** `k3d-manager-v1.44.0` (follows the canonical doc)
+**Branch:** `k3d-manager-v1.46.0` (follows the canonical doc)
 **Priority:** P2 — observability diagnostic blind spot
 **Filed:** 2026-10-13 at operator request
-**Release:** v1.44.0 (follows the canonical doc)
+**Release:** v1.46.0 (follows the canonical doc)
 **Approval:** explicit operator 2026-10-13 "can you file a bug for this"
 **Component:** `scripts/lib/hermes/sensors.py` alert_delivery sensor, `bin/k3dm-alert-delivery-status`, Hermes findings exporter/Grafana
 **Type:** Confirmed diagnostic deficiency; underlying availability fault not confirmed

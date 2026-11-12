@@ -42,3 +42,14 @@ Earlier `KubeJobFailed` bugs include `docs/bugs/2026-10-02-ldap-password-rotator
 - Only `secrets/vault-unseal-watchdog-29889925` still fires, from 2026-10-30. It is a retained Job object; its fix is `dd248543`. Deleting it needs the operator's approval.
 - `platform-ops/acg-expiry-check` failed in bursts, its Job names decoding to about 2026-11-01 23:00Z to 2026-11-02 00:00Z and 2026-11-04 08:30Z to 12:30Z. It is not firing now and the latest three runs complete in 3s.
 - Those Jobs and their logs are gone, so the cause of the bursts is not established. Check the next burst while its pods exist.
+
+## Recurrence 2026-11-11 (operator email, KubeJobFailed `platform-ops/acg-expiry-check-29907000`)
+
+- Job name 29907000 = 2026-11-11 18:00Z (10:00 PST). Today's `/cluster-up aws` (job `40d0e3dd`) provisioned a new sandbox
+  this morning, so 18:00Z likely falls inside the script's POST window (3.5h–8h after `provisioned-at`), where the only
+  failing step is `curl -sf ... -X POST "${SLACK_URL}"` (`acg-expiry.sh:38`). Same shape as the 2026-11-04 burst, which was
+  a revoked Slack webhook (`docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md`, Recurrence 2026-11-05).
+- Not yet confirmed: the hub is not reachable from the M4 (operator away). `failedJobsHistoryLimit: 3` and a run every 30
+  minutes mean the logs survive only about 90 minutes once later runs also fail. Next step on the M5 (read-only):
+  `kubectl -n platform-ops logs job/<latest failed acg-expiry-check> --all-containers`, the pod exit code (56 = revoked
+  webhook again), and whether an ACG expiry notice reached #grafana-notification at 10:00 PST. Do not delete the Jobs first.

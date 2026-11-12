@@ -20,7 +20,7 @@ function deploy_observability() {
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability.yaml"
   local _hub_context="k3d-k3d-cluster"
   : "${ARGOCD_NAMESPACE:=cicd}"
-  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-deploy/hub}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
   local _grafana_secret_manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-admin-externalsecret.yaml"
   _kubectl create namespace monitoring --dry-run=client -o yaml | _kubectl apply -f - >/dev/null
@@ -673,7 +673,7 @@ function deploy_observability_acg() {
   _info "[observability] Deploying ACG observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability-acg.yaml"
   : "${ARGOCD_NAMESPACE:=cicd}"
-  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-deploy/hub}"
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE

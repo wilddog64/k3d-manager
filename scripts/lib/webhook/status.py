@@ -13,6 +13,7 @@ from webhook.redact import mask_env_values, scrub_credentials
 
 __all__ = [
     "_run_cluster_status", "_format_status_summary_slack",
+    "_hostinger_status_text",
     "_run_hostinger_status", "_run_cluster_diagnostics", "configure_runtime",
 ]
 
@@ -398,8 +399,34 @@ def _format_status_summary_slack(payload, provider):
     if overall == "unknown":
         out.append("_status source unavailable — run `make restart-webhook` on the hub_")
     return _redact_secrets("\n".join(out))
+def _hostinger_status_text():
+    # A node recovery invalidates several forwards at once. Use the normal
+    # bounded retry window here so `/cluster-status` does not report a
+    # false outage while launchd is rebuilding those forwards.
+    smoke = _smoke_test_services(provider="k3s-hostinger")
+    checks = []
+    for name, ok, detail in smoke:
+        status = "healthy" if ok is True else ("warning" if ok is None else "error")
+        checks.append({"id": name.lower().replace(" ", "_"), "service": name,
+                       "status": status, "message": detail})
+    errors = [item for item in checks if item["status"] == "error"]
+    warnings = [item for item in checks if item["status"] == "warning"]
+    payload = {
+        "overall": "fail" if errors else ("warn" if warnings else "healthy"),
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+        "counts": {
+            "services_healthy": sum(item["status"] == "healthy" for item in checks),
+            "services_warning": len(warnings),
+            "services_failed": len(errors),
+        },
+    }
+    return _format_status_summary_slack(payload, "k3s-hostinger")
+
+
 def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None, channel_id=""):
-    """Run bin/cluster-status for k3s-hostinger (read-only); post result to response_url or thread."""
+    """Collect service status for k3s-hostinger (read-only); post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
         (job_dir / "thread_ts").write_text(thread_ts)
@@ -422,29 +449,7 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None, c
 
     try:
         (job_dir / "status").write_text("running")
-        # A node recovery invalidates several forwards at once. Use the normal
-        # bounded retry window here so `/cluster-status` does not report a
-        # false outage while launchd is rebuilding those forwards.
-        smoke = _smoke_test_services(provider="k3s-hostinger")
-        checks = []
-        for name, ok, detail in smoke:
-            status = "healthy" if ok is True else ("warning" if ok is None else "error")
-            checks.append({"id": name.lower().replace(" ", "_"), "service": name,
-                           "status": status, "message": detail})
-        errors = [item for item in checks if item["status"] == "error"]
-        warnings = [item for item in checks if item["status"] == "warning"]
-        payload = {
-            "overall": "fail" if errors else ("warn" if warnings else "healthy"),
-            "checks": checks,
-            "errors": errors,
-            "warnings": warnings,
-            "counts": {
-                "services_healthy": sum(item["status"] == "healthy" for item in checks),
-                "services_warning": len(warnings),
-                "services_failed": len(errors),
-            },
-        }
-        _write_log(_format_status_summary_slack(payload, "k3s-hostinger"))
+        _write_log(_hostinger_status_text())
         _finish("success")
     except Exception as exc:
         _write_log(f"ERROR: {exc}")

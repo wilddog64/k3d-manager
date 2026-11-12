@@ -285,7 +285,11 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
         if organize:
             columns = {name for name in organize["options"].get("indexByName", {})
                        if not re.fullmatch(r"(Time|Value)( #[A-Z]+)?", name)}
-            assert columns <= available_labels, (
+            built = {name for target in table.get("targets", [])
+                     for name in re.findall(r'\)\s*,\s*"([a-zA-Z_][a-zA-Z0-9_]*)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"',
+                                            target.get("expr", ""))}
+            # agent-audit: allow assert-removed widened to accept label_replace-built columns; a bogus_col mutant still fails
+            assert columns <= available_labels | built, (
                 f"{table['title']} table columns absent from producer series: "
                 f"{columns - available_labels}"
             )

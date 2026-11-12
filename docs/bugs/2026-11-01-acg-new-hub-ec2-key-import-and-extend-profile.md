@@ -1,7 +1,8 @@
 # Bug: on a new hub, acg_provision hides a failed key import and acg_extend checks a stale profile directory
 
-**Status:** OPEN
+**Status:** LANDED — lib-foundation PR #73 (`6706f64`, Terra, v1.43.13 dispatch); in k3d-manager through the v1.43.14 subtree pull (`scripts/lib/foundation/scripts/lib/acg/` matches lib-foundation `main` `0819f22`, checked 2026-11-07). E3 live not yet run.
 **Priority:** P2 — on k3d-manager's new M5 hub, `acg-up` cannot provision and no sandbox extend works
+**Waiting on:** live check — since 2026-11-07 (partial, Claude 2026-11-11 from M5 job `c998511f`: the key path and create-stack worked, `Successfully created/updated stack - k3d-manager-cluster`, 3 nodes, k3s installed; the extend ran but skipped, `Extension window not open yet (234m remaining)`, so the M4 guard path was exercised but no extension happened; the job then failed at an unrelated step 4.1, `docs/bugs/2026-11-11-cluster-up-vault-port-forward-reload-race-fails-and-unloads-hub-agent.md`. E3 still needs a run that actually extends)
 **Approval:** operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** Claude, k3d-manager jobs `87c78389` and `e7a0ecfb` on the M5

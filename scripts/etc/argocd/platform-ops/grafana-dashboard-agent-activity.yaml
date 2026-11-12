@@ -30,7 +30,7 @@ data:
         },
         {
           "type": "link",
-          "title": "Bug Tracking",
+          "title": "Release Tracking",
           "url": "/d/k3dm-bugs"
         }
       ],
@@ -596,6 +596,160 @@ data:
           }
         },
         {
+          "id": 113,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Claude weekly quota used",
+          "description": "Claude's weekly limit, read from the Claude Code status line cache. It only updates while Claude Code runs on the machine the exporter runs on.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 26
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_quota_used_ratio{limit=\"seven_day\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.7
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 114,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Claude 5h quota used",
+          "description": "",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 26
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_quota_used_ratio{limit=\"five_hour\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.7
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 115,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Claude quota reading age",
+          "description": "",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 12,
+            "y": 26
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "time() - k3dm_claude_quota_sample_timestamp_seconds",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
           "id": 54,
           "type": "bargauge",
           "title": "Untracked by repo",
@@ -604,7 +758,7 @@ data:
             "h": 12,
             "w": 6,
             "x": 0,
-            "y": 26
+            "y": 32
           },
           "datasource": {
             "type": "prometheus",
@@ -660,7 +814,7 @@ data:
             "h": 12,
             "w": 6,
             "x": 6,
-            "y": 26
+            "y": 32
           },
           "datasource": {
             "type": "prometheus",
@@ -711,7 +865,7 @@ data:
             "h": 12,
             "w": 6,
             "x": 12,
-            "y": 26
+            "y": 32
           },
           "datasource": {
             "type": "prometheus",
@@ -772,7 +926,7 @@ data:
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 26
+            "y": 32
           },
           "datasource": {
             "type": "prometheus",
@@ -818,7 +972,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 38
+            "y": 44
           },
           "datasource": {
             "type": "prometheus",
@@ -826,7 +980,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\"})",
+              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category!=\"\"})",
               "instant": true
             }
           ],
@@ -859,7 +1013,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 44
+            "y": 50
           }
         },
         {
@@ -876,7 +1030,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 45
+            "y": 51
           },
           "datasource": {
             "type": "prometheus",
@@ -922,7 +1076,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 45
+            "y": 51
           },
           "datasource": {
             "type": "prometheus",
@@ -968,7 +1122,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 45
+            "y": 51
           },
           "datasource": {
             "type": "prometheus",
@@ -1014,7 +1168,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 45
+            "y": 51
           },
           "datasource": {
             "type": "prometheus",
@@ -1055,7 +1209,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 51
+            "y": 57
           }
         },
         {
@@ -1072,7 +1226,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 52
+            "y": 58
           },
           "datasource": {
             "type": "prometheus",
@@ -1118,7 +1272,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 52
+            "y": 58
           },
           "datasource": {
             "type": "prometheus",
@@ -1164,7 +1318,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 52
+            "y": 58
           },
           "datasource": {
             "type": "prometheus",
@@ -1205,7 +1359,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 52
+            "y": 58
           },
           "datasource": {
             "type": "prometheus",
@@ -1256,7 +1410,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 60
+            "y": 66
           },
           "datasource": {
             "type": "prometheus",
@@ -1312,7 +1466,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 60
+            "y": 66
           },
           "datasource": {
             "type": "prometheus",
@@ -1353,7 +1507,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 60
+            "y": 66
           },
           "datasource": {
             "type": "prometheus",
@@ -1424,7 +1578,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 38
+            "y": 44
           },
           "datasource": {
             "type": "prometheus",

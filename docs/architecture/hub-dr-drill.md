@@ -149,8 +149,8 @@ reads the realm's users straight from postgres. The image major version must mat
   both email only (`platform-warning`).
 - **Independent check:** the data repo's scheduled `drill-freshness` workflow fails, and GitHub
   emails, when the newest result is older than 8 days or failed. It works even if the M4 is down.
-- **Dashboard:** `k3dm DR Drill`, planned for v1.46.0
-  (`docs/plans/v1.46.0-dr-drill-dashboard.md`).
+- **Dashboard:** `k3dm DR Drill`, planned for v1.55.0
+  (`docs/plans/v1.55.0-dr-drill-dashboard.md`).
 
 ## Failure modes
 

@@ -3,6 +3,8 @@ bats_require_minimum_version 1.5.0
 
 setup() {
   ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  # shellcheck source=../test_helpers.bash
+  source "${ROOT}/scripts/tests/test_helpers.bash"
   TMP="$BATS_TEST_TMPDIR"
   mkdir -p "$TMP/bin" "$TMP/home"
   export PATH="$TMP/bin:$PATH" HOME="$TMP/home" K3DM_SECRETS_PASSPHRASE_FILE="$TMP/pass"
@@ -371,7 +373,7 @@ SH
 }
 
 @test "machine secrets: real throwaway keychain round trip is macOS only" {
-  if [[ "$(uname -s)" != Darwin ]]; then skip 'macOS Keychain required'; fi
+  require_macos
   rm -f "$TMP/bin/security"
   [ "$(command -v security)" = /usr/bin/security ]
   project="$TMP/project"
@@ -410,7 +412,7 @@ SH
 }
 
 @test "M6: stream unlock round trip uses throwaway keychains on macOS" {
-  if [[ "$(uname -s)" != Darwin ]]; then skip 'macOS Keychain required'; fi
+  require_macos
   rm -f "$TMP/bin/security"
   source_keychain="$TMP/stream-source.keychain-db"
   target_keychain="$TMP/stream-target.keychain-db"

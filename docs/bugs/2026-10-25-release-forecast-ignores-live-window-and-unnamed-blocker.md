@@ -1,6 +1,6 @@
 # Bug: Release forecast dates v1.43.7 before its live window, and Target state does not say what is blocked
 
-**Status:** LIVE-VERIFIED 2026-10-25 — `1ce420f6`; pytest 98/98, BATS 32/32, ruff clean, tests 2, 3, 6, 8, 9 red on the pre-fix files. Claude gated Target state on the target being blocked (it showed the blocker even when the target came first). Live E2: Target state names v1.49.0 and its reason (operator screenshot 244); panel 28 retitled `Median gap (days)` in `d4aa4597` because the spec title truncated in the tile.
+**Status:** LIVE-VERIFIED 2026-10-25 — `1ce420f6`; pytest 98/98, BATS 32/32, ruff clean, tests 2, 3, 6, 8, 9 red on the pre-fix files. Claude gated Target state on the target being blocked (it showed the blocker even when the target came first). Live E2: Target state names v1.60.0 and its reason (operator screenshot 244); panel 28 retitled `Median gap (days)` in `d4aa4597` because the spec title truncated in the tile.
 **Live evidence:** 2026-10-25 · run hub-grafana-bugs-remaining-releases-screenshot · env hub/k3d-k3d-cluster · scenario bugs-dashboard/forecast-floor-pacific · commit 54bc6940 · proves E2
 **Fix commit:** `54bc6940`
 **Live note:** operator screenshot 248: v1.43.7 earliest, expected and latest all 2026-11-03 00:00, Not before 2026-11-03 with its reason; Target state and Median gap confirmed earlier (screenshot 244). The fix is `1ce420f6` plus the Pacific-midnight follow-up `54bc6940`.
@@ -20,8 +20,8 @@ On k3dm Bug Tracking, row **Release forecast**, on 2026-10-25:
    last 12 releases (`k3dm_release_cadence_seconds{quantile="0.5"}`), not the effort a release takes. The
    title invites the second reading, and the panel has no description.
 2. **Target state** (panel 31) reads "blocked upstream" while **Remaining releases** gives v1.43.7 dates.
-   Both are correct: the target is v1.50.0, and v1.49.0 is blocked by "TwinkleAI app M1 near done", so
-   v1.49.0 and everything after it get no date. The stat names neither the blocked milestone nor the
+   Both are correct: the target is v1.61.0, and v1.60.0 is blocked by "TwinkleAI app M1 near done", so
+   v1.60.0 and everything after it get no date. The stat names neither the blocked milestone nor the
    reason, so it reads as if the selected release were blocked.
 3. **Remaining releases** (panel 32) forecasts v1.43.7 for 2026-10-25 to 2026-10-27. v1.43.7 carries
    `docs/plans/v1.43.7-hub-argocd-pinned-upgrade.md`, whose live evidence is the upgrade itself in the
@@ -65,7 +65,7 @@ Also set `row["floored"] = True` when the floor raised the `mid` value.
   release tags. A cadence, not the effort one release takes. Earliest and latest forecasts use the 25th
   and 75th percentile gaps."
 - Panel 31: when the target is blocked or after a blocked release, show the **blocked milestone and its
-  reason**, e.g. `blocked at v1.49.0: TwinkleAI app M1 near done`, from the `state="blocked"` series of
+  reason**, e.g. `blocked at v1.60.0: TwinkleAI app M1 near done`, from the `state="blocked"` series of
   `k3dm_release_milestone_info` (its `version` and `blocked_by` labels). Keep the other states as they
   are. Add a description naming the target version's source (`target: true` in
   `docs/release-milestones.json`).
@@ -138,7 +138,7 @@ evidence:
   - id: E2
     kind: live
     proves: [M3, M4, M5]
-    text: After the hub syncs and Hermes pushes, the operator's screenshot shows v1.43.7 forecast on or after 2026-11-03, later releases after it, Target state naming v1.49.0 and its reason, and the renamed cadence panel.
+    text: After the hub syncs and Hermes pushes, the operator's screenshot shows v1.43.7 forecast on or after 2026-11-03, later releases after it, Target state naming v1.60.0 and its reason, and the renamed cadence panel.
 interface:
   - bin/k3dm-vectordb-metrics (functions _load_milestones, _forecast, _forecast_metrics, as imported by test_vectordb_bug_metrics.py)
   - docs/release-milestones.json (milestones[].not_before, milestones[].not_before_reason)

@@ -168,6 +168,6 @@ interface:
 3. For cloud-bridge `diagnose-pods` with no incoming Slack context, post a compact parent summary and place long diagnostic output in the same thread in the approved, server-configured status channel. Preserve redaction, output bounds and safe fallback; do not accept arbitrary channel/thread IDs from cloud requests.
 4. Add offline regression tests for a successful threaded diagnostics message, a failed thread-start fallback with observable error reason, and no duplicate top-level verbose message. Live-verify via one read-only cloud request and matching Slack screenshot.
 
-**Scope:** This is separate from the 2026-10-22 job-ID bug (job ID is correctly present) and from the v1.44.0 planned *selection of approved notification channels*. Reopening does not authorize bypassing cloud-bridge routing boundaries. Historical 2026-10-24 live acceptance remains recorded; current behavior requires a new live check.
+**Scope:** This is separate from the 2026-10-22 job-ID bug (job ID is correctly present) and from the v1.46.0 planned *selection of approved notification channels*. Reopening does not authorize bypassing cloud-bridge routing boundaries. Historical 2026-10-24 live acceptance remains recorded; current behavior requires a new live check.
 
 **Priority:** Retain P3 pending confirmation of actual route and impact. No webhook, Slack, or cluster configuration was modified.

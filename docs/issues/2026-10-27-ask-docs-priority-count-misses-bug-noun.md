@@ -26,7 +26,7 @@ The local source reproduces the observed routing; no production logs were
 inspected and no live service was changed.
 
 The fixed 2026-10-10 release-range bug concerns a different failure. Existing
-plan `v1.45.1-bug-count-query-translation` covers regex misses generally, but
+plan `v1.51.0-bug-count-query-translation` covers regex misses generally, but
 its item 2 gate also requires `_BUG_RE`, so implementing it verbatim would
 leave this exact question unsupported.
 

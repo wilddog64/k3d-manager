@@ -2,8 +2,8 @@ import importlib.machinery
 import importlib.util
 import json
 import shutil
-import subprocess
 import sys
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -175,8 +175,25 @@ def test_drain_happy_path_approves_deletes_and_posts(monkeypatch):
     assert "<@UAPPROVER1>" in calls[2][1] and "executed" in calls[2][1]
 
 
+def test_drain_posts_refusal_reason(monkeypatch):
+    calls, item = [], valid_item()
+    state = {"pending_repairs": {item["action_id"]: {"name": "repair"}},
+             "incident_nonce": item["nonce"]}
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_args: "tok")
+    monkeypatch.setattr(k3dm_hermes, "fetch_approvals", lambda *_args: [item])
+    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_args: ([], None))
+    monkeypatch.setattr(k3dm_hermes.repairs, "approve", lambda *_args: {
+        "outcome": "refused: command changed since proposal"})
+    monkeypatch.setattr(k3dm_hermes, "delete_approval", lambda *_args: calls.append("delete"))
+    monkeypatch.setattr(k3dm_hermes, "post_summary", lambda _relay, text: calls.append(text))
+    outcome = k3dm_hermes._drain_approvals(state, "relay", "https://drain")
+    assert outcome[0]["outcome"] == "refused: command changed since proposal"
+    assert "approval refused: command changed since proposal" in calls[1]
+
+
 def test_approval_module_never_executes_and_repairs_is_unchanged():
     source = (ROOT / "scripts/lib/hermes/approvals.py").read_text()
     assert "runner(" not in source and "subprocess" not in source
+    assert approvals.ACTION_ID_RE.fullmatch("r10-0123abcd")
     if shutil.which("git"):
         assert subprocess.run(["git", "diff", "--quiet", "--", "scripts/lib/hermes/repairs.py"], cwd=ROOT).returncode == 0

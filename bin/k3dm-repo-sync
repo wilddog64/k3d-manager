@@ -1,0 +1,390 @@
+#!/usr/bin/env python3
+"""Safely fast-forward configured checkouts and report deployment drift."""
+import json
+import os
+import pathlib
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+STATE_DIR = pathlib.Path(os.environ.get("K3DM_REPO_SYNC_STATE_DIR", pathlib.Path.home() / ".local/share/k3d-manager/repo-sync"))
+STATE = STATE_DIR / "state.json"
+LOCK = STATE_DIR / "lock"
+TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_TIMEOUT", "60"))
+UPSTREAM_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_UPSTREAM_TIMEOUT", "15"))
+APPSETS_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_APPSETS_TIMEOUT", "15"))
+
+
+def run(args, cwd=None, timeout=TIMEOUT, env=None):
+    wrapper = 'source "$1"; shift; _run_command --soft -- "$@"'
+    command = ["bash", "-c", wrapper, "k3dm-repo-sync",
+               str(ROOT / "scripts/lib/system.sh"), *args]
+    return subprocess.run(command, cwd=cwd, text=True, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, timeout=timeout, env=env)
+
+
+def git(path, *args, timeout=10):
+    return run(["git", "-C", str(path), *args], timeout=timeout)
+
+
+def lock_is_stale():
+    try:
+        if time.time() - LOCK.stat().st_mtime > 2 * TIMEOUT + 60:
+            return True
+        pid = int((LOCK / "pid").read_text().strip())
+    except (OSError, ValueError):
+        return True
+    if pid <= 0:
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    except OSError:
+        return True
+    return False
+
+
+def webhook_process_start_time():
+    try:
+        label = "com.k3d-manager.webhook"
+        launch = run(["launchctl", "print", f"gui/{os.getuid()}/{label}"], timeout=5)
+        if launch.returncode:
+            return None
+        pid_match = re.search(r"\bpid\s*=\s*(\d+)", launch.stdout)
+        if not pid_match:
+            return None
+        process = run(["ps", "-o", "lstart=", "-p", pid_match.group(1)], timeout=5)
+        if process.returncode or not process.stdout.strip():
+            return None
+        started = datetime.strptime(" ".join(process.stdout.split()), "%a %b %d %H:%M:%S %Y")
+        return time.mktime(started.timetuple())
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def repo_label(path):
+    path = pathlib.Path(path).resolve()
+    if path == ROOT.resolve():
+        return "k3d-manager"
+    try:
+        return str(path.relative_to(pathlib.Path.home() / "src"))
+    except ValueError:
+        return path.name
+
+
+def role():
+    p = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")) / "k3d-manager/machine-role"
+    try:
+        return p.read_text().strip()
+    except OSError:
+        return "worker"
+
+
+def repositories():
+    if os.environ.get("K3DM_REPO_SYNC_REPOS"):
+        return [pathlib.Path(p).resolve() for p in os.environ["K3DM_REPO_SYNC_REPOS"].split(os.pathsep) if p]
+    repos = []
+    for line in (ROOT / "scripts/etc/machine/repos.list").read_text().splitlines():
+        if not line or line.startswith("#"):
+            continue
+        rel, remote, _branch, roles = line.split("|", 3)
+        candidate = pathlib.Path.home() / "src" / rel
+        if role() in roles.split(",") and not remote.startswith("SKIP:") and candidate.exists():
+            repos.append(candidate)
+    if ROOT not in repos:
+        repos.insert(0, ROOT)
+    return repos
+
+
+def result_for(path, is_hub):
+    rec = {"path": str(path), "branch": None, "result": "current", "behind_before": 0,
+           "behind_after": 0, "old_head": None, "new_head": None, "run_time": int(time.time())}
+    if not path.is_dir() or not (path / ".git").exists():
+        rec["result"] = "skipped:missing"
+        return rec
+    head = git(path, "rev-parse", "HEAD")
+    if head.returncode:
+        rec["result"] = "skipped:not-repository"
+        return rec
+    rec["old_head"] = head.stdout.strip()
+    rec["new_head"] = rec["old_head"]
+    branch = git(path, "symbolic-ref", "--quiet", "--short", "HEAD")
+    if branch.returncode:
+        rec["result"] = "skipped:detached"
+        return rec
+    rec["branch"] = branch.stdout.strip()
+    is_hub_root = is_hub and path.resolve() == ROOT.resolve()
+    gitdir = pathlib.Path(git(path, "rev-parse", "--git-dir").stdout.strip())
+    if not gitdir.is_absolute():
+        gitdir = path / gitdir
+    if any((gitdir / item).exists() for item in ("rebase-merge", "rebase-apply", "MERGE_HEAD", "CHERRY_PICK_HEAD", "BISECT_LOG")):
+        rec["result"] = "skipped:operation-in-progress"
+        return rec
+    up = git(path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+    if up.returncode:
+        if not is_hub_root:
+            rec["result"] = "skipped:no-upstream"
+            return rec
+        remote_config = git(path, "config", "--get", f"branch.{rec['branch']}.remote")
+        merge_config = git(path, "config", "--get", f"branch.{rec['branch']}.merge")
+        remote = remote_config.stdout.strip() if remote_config.returncode == 0 else ""
+        if not remote:
+            remote = "origin"
+        merge_ref = merge_config.stdout.strip() if merge_config.returncode == 0 else ""
+        ref = merge_ref[len("refs/heads/"):] if merge_ref.startswith("refs/heads/") else ""
+        rec["promote_backlog_unknown"] = True
+    else:
+        upstream = up.stdout.strip()
+        remote, _, ref = upstream.partition("/")
+    if is_hub_root:
+        fetch_args = [
+            "fetch",
+            "--no-tags",
+            remote,
+            f"+refs/heads/deploy/hub:refs/remotes/{remote}/deploy/hub",
+        ]
+        target = f"{remote}/deploy/hub"
+    else:
+        fetch_args = ["fetch", "--no-tags", remote, f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}"]
+        target = upstream
+    comparison_ref = f"{remote}/deploy/hub" if is_hub_root else upstream
+    counts = git(path, "rev-list", "--left-right", "--count", f"HEAD...{comparison_ref}")
+    if counts.returncode == 0:
+        vals = counts.stdout.split()
+        ahead, behind = map(int, vals[:2])
+        rec["behind_before"] = behind
+        if ahead and not (is_hub and path.resolve() == ROOT.resolve()):
+            rec["result"] = "skipped:ahead"
+            return rec
+    if os.environ.get("K3DM_REPO_SYNC_CHECK") == "1":
+        rec["result"] = "would-update" if rec["behind_before"] else "current"
+        if is_hub_root:
+            rec["promote_backlog_unknown"] = True
+        return rec
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes -o ConnectTimeout=10"
+    try:
+        fetched = run(["git", "-C", str(path), *fetch_args], timeout=TIMEOUT, env=env)
+    except subprocess.TimeoutExpired:
+        rec["result"] = "fetch_failed"
+        return rec
+    if fetched.returncode:
+        rec["result"] = "fetch_failed"
+        return rec
+    if is_hub_root and ref:
+        try:
+            upstream_fetched = run(
+                ["git", "-C", str(path), "fetch", "--no-tags", remote,
+                 f"+refs/heads/{ref}:refs/remotes/{remote}/{ref}"],
+                timeout=UPSTREAM_TIMEOUT, env=env)
+            rec["promote_backlog_unknown"] = upstream_fetched.returncode != 0
+        except subprocess.TimeoutExpired:
+            rec["promote_backlog_unknown"] = True
+    elif is_hub_root:
+        rec["promote_backlog_unknown"] = True
+    fresh_counts = git(path, "rev-list", "--left-right", "--count", f"HEAD...{target}")
+    if fresh_counts.returncode == 0:
+        fresh_ahead, rec["behind_before"] = map(int, fresh_counts.stdout.split()[:2])
+        if fresh_ahead and not (is_hub and path.resolve() == ROOT.resolve()):
+            rec["result"] = "skipped:ahead"
+            return rec
+    if is_hub and path.resolve() == ROOT.resolve():
+        ff = git(path, "merge-base", "--is-ancestor", "HEAD", "origin/deploy/hub")
+        if ff.returncode:
+            rec["result"] = "skipped:not-ff-to-deploy-hub"
+            return rec
+    try:
+        merged = run(["git", "-C", str(path), "merge", "--ff-only", target], timeout=TIMEOUT, env=env)
+    except subprocess.TimeoutExpired:
+        rec["result"] = "fetch_failed"
+        return rec
+    if merged.returncode:
+        rec["result"] = "blocked"
+        return rec
+    rec["new_head"] = git(path, "rev-parse", "HEAD").stdout.strip()
+    rec["result"] = "updated" if rec["new_head"] != rec["old_head"] else "current"
+    after = git(path, "rev-list", "--left-right", "--count", f"HEAD...{comparison_ref}")
+    if after.returncode == 0:
+        rec["behind_after"] = int(after.stdout.split()[1])
+    return rec
+
+
+def main():
+    args = sys.argv[1:]
+    if args and args[0] == "--remote":
+        if len(args) != 2:
+            print("usage: k3dm-repo-sync --remote HOST", file=sys.stderr); return 2
+        host = args[1]
+        try:
+            remote_cmd = "cd ~/src/gitrepo/personal/k3d-manager && bin/k3dm-repo-sync >/dev/null && bin/k3dm-repo-sync --hub-summary"
+            p = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, remote_cmd], timeout=TIMEOUT + 15)
+        except (OSError, subprocess.TimeoutExpired):
+            print(f"WARNING: hub sync failed over SSH to {host}"); return 0
+        if p.returncode:
+            print(f"WARNING: hub sync failed over SSH to {host}"); return 0
+        print(p.stdout, end=""); return 0
+    if args == ["--hub-summary"]:
+        try:
+            state = json.loads(STATE.read_text())
+            rec = next(r for r in state["repositories"] if pathlib.Path(r["path"]).resolve() == ROOT.resolve())
+            pending = ",".join(x["step"] for x in state.get("deploy_pending", []) if x.get("paths")) or "none"
+            promote = state.get("promote_backlog")
+            print(f"hub {socket.gethostname()}: {rec.get('branch') or '-'} at {str(rec.get('new_head') or '-')[:7]} ({rec['result']}); deploy pending: {pending}; deploy/hub {str(state.get('deploy_hub_sha') or '-')[:7]}; promote backlog: {promote if promote is not None else 'unknown'}")
+            return 0
+        except Exception:
+            return 1
+    check = args == ["--check"]
+    if args and not check:
+        print("usage: k3dm-repo-sync [--check] [--remote HOST]", file=sys.stderr); return 2
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        LOCK.mkdir()
+    except FileExistsError:
+        if lock_is_stale():
+            shutil.rmtree(LOCK, ignore_errors=True)
+            try:
+                LOCK.mkdir()
+            except FileExistsError:
+                print("already running"); return 0
+        else:
+            print("already running"); return 0
+    try:
+        (LOCK / "pid").write_text(f"{os.getpid()}\n")
+    except OSError:
+        shutil.rmtree(LOCK, ignore_errors=True)
+        raise
+    try:
+        os.environ["K3DM_REPO_SYNC_CHECK"] = "1" if check else "0"
+        is_hub = role() == "hub"
+        previous = {}
+        previous_state = {}
+        try:
+            previous_state = json.loads(STATE.read_text())
+            previous = {r["path"]: r.get("last_success_timestamp_seconds", 0)
+                        for r in previous_state.get("repositories", [])}
+        except (OSError, ValueError, TypeError):
+            pass
+        records = [result_for(p, is_hub) for p in repositories()]
+        for rec in records:
+            rec["last_success_timestamp_seconds"] = (rec["run_time"] if rec["result"] in ("current", "updated")
+                                                       else previous.get(rec["path"], 0))
+        run_time = int(time.time())
+        state = {"run_time": run_time, "repositories": records,
+                 "webhook_restart_pending": False, "deploy_pending": [], "deploy_unknown": [], "promote_backlog": None}
+        previous_webhook = next((item for item in previous_state.get("deploy_pending", [])
+                                 if item.get("step") == "webhook-restart"), None)
+        if previous_webhook:
+            process_started = webhook_process_start_time()
+            pending_recorded_at = previous_state.get("webhook_restart_pending_recorded_at",
+                                                     previous_state.get("run_time", 0))
+            if not process_started or process_started <= pending_recorded_at:
+                state["deploy_pending"].append(previous_webhook)
+                state["webhook_restart_pending"] = True
+                state["webhook_restart_pending_recorded_at"] = pending_recorded_at
+        for rec in records:
+            if pathlib.Path(rec["path"]).resolve() != ROOT.resolve() or rec["result"] != "updated":
+                continue
+            changed = git(ROOT, "diff", "--name-only", f"{rec['old_head']}..{rec['new_head']}").stdout.splitlines()
+            mapping = [line.split("\t", 1) for line in (ROOT / "scripts/etc/machine/deploy-paths.tsv").read_text().splitlines()
+                      if line and not line.startswith("#") and "\t" in line]
+            webhook_paths = [p for p in changed if any(p.startswith(prefix) for prefix, step in mapping if step == "webhook-restart")]
+            if webhook_paths:
+                state["webhook_restart_pending"] = True
+                existing = next((item for item in state["deploy_pending"]
+                                 if item.get("step") == "webhook-restart"), None)
+                if existing:
+                    existing["paths"] = list(dict.fromkeys(existing.get("paths", []) + webhook_paths))[:5]
+                else:
+                    state["deploy_pending"].append({"step": "webhook-restart", "since_commit": rec["old_head"], "paths": webhook_paths[:5]})
+                    state["webhook_restart_pending_recorded_at"] = run_time
+                print("webhook code changed; restart pending")
+        if is_hub:
+            marker = STATE_DIR / "deployed-platform-ops"
+            if not marker.exists():
+                state["deploy_unknown"].append("platform-ops")
+            else:
+                rec = next((r for r in records if pathlib.Path(r["path"]).resolve() == ROOT.resolve()), None)
+                if rec and rec["old_head"]:
+                    sha = marker.read_text().strip()
+                    diff = git(ROOT, "diff", "--name-only", f"{sha}..origin/deploy/hub", "--", "scripts/etc/argocd/platform-ops")
+                    changed = diff.stdout.splitlines()
+                    if diff.returncode:
+                        state["deploy_unknown"].append("platform-ops")
+                    elif changed:
+                        state["deploy_pending"].append({"step":"platform-ops", "since_commit":sha, "paths":changed[:5]})
+            try:
+                query = run(["make", "--no-print-directory", "appsets-check"], cwd=ROOT, timeout=APPSETS_TIMEOUT)
+                query_output = query.stdout + query.stderr
+            except (subprocess.TimeoutExpired, OSError):
+                query = None
+                query_output = ""
+            if query is None:
+                state["deploy_unknown"].append("appsets-reapply")
+            elif "Applications on a stale values branch:" in query_output:
+                drift_lines = []
+                in_drift = False
+                for line in query_output.splitlines():
+                    if "Applications on a stale values branch:" in line:
+                        in_drift = True
+                    elif in_drift and "[argocd] Fix:" in line:
+                        break
+                    elif in_drift and line.strip() and not line.startswith("[argocd]"):
+                        drift_lines.append(line.strip())
+                state["deploy_pending"].append({"step":"appsets-reapply", "since_commit":"deploy/hub", "paths":(drift_lines or ["Application values branch drift"])[:5]})
+            elif (query.returncode not in (0, 1)
+                  or "Could not read Applications" in query_output
+                  or "Could not evaluate values-branch drift" in query_output
+                  or (query.returncode == 1 and "Applications Degraded on the expected branch" not in query_output)
+                  or (query.returncode == 0 and "All Applications reference values branch deploy/hub" not in query_output)):
+                state["deploy_unknown"].append("appsets-reapply")
+            try:
+                root_rec = next((r for r in records if pathlib.Path(r["path"]).resolve() == ROOT.resolve()), None)
+                if (root_rec and root_rec.get("result") != "fetch_failed"
+                        and not root_rec.get("promote_backlog_unknown", False)):
+                    upstream_ref = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip()
+                    backlog = git(ROOT, "rev-list", "--count", f"origin/deploy/hub..{upstream_ref}")
+                    state["promote_backlog"] = int(backlog.stdout.strip()) if backlog.returncode == 0 else None
+                state["deploy_hub_sha"] = git(ROOT, "rev-parse", "origin/deploy/hub").stdout.strip()
+            except Exception:
+                pass
+        STATE.write_text(json.dumps(state, indent=2) + "\n")
+        for rec in records:
+            print(f"{pathlib.Path(rec['path']).name}: {rec['branch'] or '-'} {rec['result']} ({rec['behind_before']} behind before, {rec['behind_after']} after)")
+        if is_hub:
+            metrics = [f'k3dm_repo_sync_behind_commits{{repo="{repo_label(r["path"])}"}} {r["behind_after"]}' for r in records]
+            metrics += [f'k3dm_repo_sync_last_success_timestamp_seconds{{repo="{repo_label(r["path"])}"}} {r["last_success_timestamp_seconds"]}' for r in records]
+            for r in records:
+                metrics.append(f'k3dm_repo_sync_result{{repo="{repo_label(r["path"])}",result="{r["result"]}"}} 1')
+            metrics.append(f"k3dm_repo_sync_webhook_restart_pending {int(state['webhook_restart_pending'])}")
+            for step in ("platform-ops", "appsets-reapply", "webhook-restart"):
+                if step not in state["deploy_unknown"]:
+                    metrics.append(f'k3dm_repo_sync_deploy_pending{{step="{step}"}} {int(any(p["step"] == step and p["paths"] for p in state["deploy_pending"]))}')
+            url = os.environ.get("PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+            data = "\n".join(metrics) + "\n"
+            try:
+                subprocess.run(["curl", "--silent", "--show-error", "--fail", "-X", "PUT", "--data-binary", data,
+                                f"{url}/metrics/job/k3dm_repo_sync/instance/{socket.gethostname().split('.')[0]}"],
+                               check=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                print("WARNING: Pushgateway update failed", file=sys.stderr)
+        return 0
+    finally:
+        try:
+            owner = int((LOCK / "pid").read_text().strip())
+        except (OSError, ValueError):
+            owner = None
+        if owner == os.getpid():
+            shutil.rmtree(LOCK, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

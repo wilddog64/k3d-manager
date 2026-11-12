@@ -354,7 +354,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False, trust_vault_ca=F
         if excerpt:
             summary += f"\n```{excerpt}```"
         _notify_job(job_id, summary)
-        if not dry_run:
+        if not dry_run and not trust_vault_ca:
             _push_metrics(action, provider, status, elapsed_secs, job_id)
 
     try:

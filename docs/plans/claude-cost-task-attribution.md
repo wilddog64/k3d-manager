@@ -1,0 +1,120 @@
+# Claude cost task attribution: tie each Claude dollar to the task it worked on, and say how much is untied
+
+**Status:** PLANNED — moved from v1.43.15 by Claude on 2026-11-07 to make room for the P1 hub deploy ref; dispatch after `k3d-manager-v1.44.0` is cut (`v1.43.15-cost-attribution-coverage` lands in v1.43.15 first) **Unnumbered 2026-11-08 by Claude (operator: release grooming, 5 plans per release):** replaced in v1.44.0 by the sprint picks `hub-deploy-one-command` and `hermes-slack-config-sensors`; now an ordered backlog item in `docs/roadmap.md`, numbered when groomed into the next release.
+**Approval:** operator, 2026-11-01 ("how could we close the gap … investigate and file bug/plan accordly for next avaiable spot"), quoting a review: "approximate model-cost attribution … needs closing before making strong efficiency claims"
+**Intent approved:** pending
+**Branch:** `k3d-manager-v1.44.0`
+**Depends on:** `docs/plans/v1.43.15-cost-attribution-coverage.md` (lands first: same exporter, same coverage-by-cost idea for Codex); `docs/plans/v1.43.14-claude-context-cost-per-turn.md` (same Claude rollup pass)
+**Related:** `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md` (the outcome half of the same gap)
+
+## Goal
+
+Claude is almost all of the measured model spend. `bin/k3dm-dispatch-metrics --dry-run` on the M4, 2026-11-01:
+
+| Window | Claude (API prices) | Codex dispatch | Claude share |
+|---|---|---|---|
+| 30d | $1,096.99 | $28.54 | 97.5% |
+| 7d | $324.21 | $17.07 | 95.0% |
+
+Yet the per-task Claude figure (`k3dm_dispatch_task_claude_api_cost_usd`) is an estimate by time.
+`_render_claude` gives each Claude message to every task whose dispatch-to-land interval contains the message's
+timestamp, split evenly. That has three faults:
+
+1. **Concurrency decides the split.** With seven dispatches open (this session, 2026-11-01), every Claude message
+   in that hour is split seven ways, including messages about an unrelated live acg-up.
+2. **Work outside the interval is lost.** Writing the spec before `start` and live verification after `land` fall
+   outside every interval, so the task is undercharged for exactly the steps Claude does most.
+3. **No coverage figure.** The dashboard does not say what share of Claude cost is tied to any task, so a
+   "cost per verified spec" cannot be judged.
+
+The Codex plan before this one (`cost-attribution-coverage`) left Claude out on purpose: "A similar category split
+for Claude needs its own plan."
+
+## Change
+
+1. **Attribute from evidence, not time.** In the existing Claude rollup pass (which already reads each assistant
+   message's `tool_use` inputs), collect the task keys each message's tool calls reference. A reference is any of:
+   a dispatch command naming `--slug S` or `--spec P`; a path under the task's worktree
+   (`$K3DM_WORKTREE_ROOT/<version>/<slug>`); the task's spec path (`docs/bugs/<file>` or `docs/plans/<file>` whose
+   basename is the slug, or which `start --spec` recorded for the slug). Match against tasks known from the ledger
+   only.
+2. **Turn scope.** A user turn (from one user message to the next) takes the union of task keys referenced in it.
+   Every assistant message in that turn is charged to those tasks, split evenly when there are several. A turn with
+   no reference is `unattributed`.
+3. **Categories.** Each priced Claude message goes into exactly one `attribution` value:
+   - `task` — the turn references exactly one task.
+   - `multi_task` — the turn references several tasks (cost split evenly among them).
+   - `unattributed` — no reference: investigation, live operations, chat, session start.
+4. **Metrics.** New: `k3dm_dispatch_claude_api_cost_by_attribution_usd{window,attribution}` and
+   `k3dm_dispatch_claude_attribution_coverage{window}` = (`task` + `multi_task`) / all priced Claude cost.
+   `k3dm_dispatch_task_claude_api_cost_usd` keeps its name and labels and switches to the evidence rule. For one
+   release, add `k3dm_dispatch_task_claude_api_cost_overlap_usd` with the old interval rule, so the two can be compared,
+   and say in its help text that v1.44.0 removes it.
+5. **Rollup cache.** The cache (`claude-usage/rollup.json`) gains the per-record task keys. Bump the cache format
+   version so an old cache is rebuilt once, not mixed.
+6. **Dashboard.** On the agent-cost dashboard, next to every Claude cost-per-task or cost-per-spec figure, show the
+   attribution coverage for the same window, and add a bar gauge of cost by `attribution`. The descriptions define
+   each value in one line and say the figure is a lower bound when coverage is under 100%.
+7. **Guide.** `docs/guides/grafana-dashboards/k3dm-agent-cost.md`: how attribution works and what it cannot see (a
+   task discussed without any tool call that names it).
+
+## Files
+
+- `bin/k3dm-dispatch-metrics`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml`
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats` (or the suite that pins the agent-cost panels)
+- `docs/guides/grafana-dashboards/k3dm-agent-cost.md`
+- `CHANGELOG.md`
+
+## What NOT to do
+
+- Do not read or store message text beyond tool-call inputs, and never store tool-call inputs in the cache: store
+  only the matched task keys.
+- Do not attribute by the worker's (Codex's) activity or by time windows in the new metric.
+- Do not change Claude prices, the price file, or `_claude_cost`.
+- Do not change the Codex metrics from `cost-attribution-coverage`.
+- Tests build transcripts in a scratch projects dir (asserted not to be `~/.claude/projects`); message shapes copy
+  real transcript lines (M4, 2026-11-01) with that note in a comment, reduced to the fields the rollup reads.
+
+## Acceptance
+
+```yaml
+must:
+  M1: a turn whose tool calls reference one task's slug, worktree path or spec path charges all its assistant messages' cost to that task, attribution task
+  M2: a turn referencing two tasks splits its cost evenly between them, attribution multi_task
+  M3: a turn with no task reference is attribution unattributed and adds to no task
+  M4: a turn before the task's start event or after its land event that references the task is still charged to it
+  M5: k3dm_dispatch_claude_attribution_coverage equals (task + multi_task) / total priced Claude cost for the window
+must_not:
+  N1: the sum over attribution values equals k3dm_dispatch_claude_api_cost_usd for the same window (nothing dropped or double-counted)
+  N2: a message inside a task's dispatch-to-land interval whose turn references no task is never charged to that task (red on the pre-fix exporter)
+  N3: the rollup cache stores no tool-call input text, only task keys
+  N4: no Codex metric, price, or existing Claude metric name or label set changes
+evidence:
+  E1:
+    proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
+    kind: offline
+    intent: You will see pytest build scratch transcripts and a scratch ledger, then assert per-task cost under each rule, the attribution totals summing to the window total, coverage from the formula, a cache file with keys and no command text, and an unrelated message inside a task interval charged to nobody (red on the pre-fix exporter, which charges it).
+    what: pytest scripts/tests/bin/test_dispatch_metrics.py
+  E2:
+    proves: [N4]
+    kind: offline
+    intent: You will see the dashboard suite find the new panels by title, the coverage stat beside each Claude per-task figure, and every pre-existing panel expr unchanged.
+    what: bats on the agent-cost dashboard suite; make validate-manifests
+  E3:
+    proves: [M5]
+    kind: live
+    intent: You will see the agent-cost dashboard on Window 7d show Claude attribution coverage and the cost-by-attribution bars, with the per-task figure differing from the overlap figure for tasks that ran concurrently.
+    what: operator screenshot of the agent-cost dashboard
+interface:
+  - bin/k3dm-dispatch-metrics --dry-run --claude-projects DIR --claude-cache FILE
+  - ledger.jsonl under K3DM_WORKTREE_ROOT
+  - k3dm_dispatch_claude_api_cost_by_attribution_usd{window,attribution}, k3dm_dispatch_claude_attribution_coverage{window}, k3dm_dispatch_task_claude_api_cost_usd
+  - Grafana agent-cost dashboard
+```
+
+## Not in this plan
+
+- Attribution of the operator's interactive Codex (the Codex plan's `interactive` category).
+- Subscription versus API-price accounting: cost stays at API list prices, as every panel already says.

@@ -35,7 +35,7 @@ Priority measures urgency, not size. `k3dm e2e-sandbox` already runs the ACG E2E
 hurt the operator was the error: `runner 'acg' not in allowlist (m2)` says nothing about which command
 to use instead. This bug fixes only that. The unified `e2e-remote RUNNER=m2|m4|aws` command is
 enhancement-scale and now lives in
-[`v1.46.1-e2e-unified-runner-command`](../plans/v1.46.1-e2e-unified-runner-command.md).
+[`v1.56.0-e2e-unified-runner-command`](../plans/v1.56.0-e2e-unified-runner-command.md).
 
 ## Fix
 
@@ -125,6 +125,6 @@ interface:
 ## What NOT to Do
 
 - Do NOT add `aws` or `m4` to `E2E_RUNNER_ALLOWLIST`, and do not add any runner adapter; that is the
-  v1.46.1 plan.
+  v1.56.0 plan.
 - Do NOT touch `scripts/plugins/e2e.sh`, the sandbox, or `e2e-sandbox` behaviour.
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.

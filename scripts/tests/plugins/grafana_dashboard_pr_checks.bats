@@ -281,3 +281,17 @@ PY_PROMQL
   run promtool test rules "${test_file}"
   echo "$output"; [ "${status}" -eq 0 ]
 }
+
+@test "PR checks Open PRs table shows columns in operator order" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+panel = next(panel for panel in data["panels"] if panel["id"] == 5)
+options = next(item for item in panel["transformations"] if item["id"] == "organize")["options"]
+index = options["indexByName"]
+shown = [options["renameByName"][name] for name in sorted(index, key=index.get)]
+assert shown == ["Repo", "Head", "Draft", "PR", "Title", "Overall"], shown
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
+}

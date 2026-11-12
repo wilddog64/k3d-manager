@@ -5,10 +5,10 @@
 **Previous fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2 (rolled back by 2d88c7be)
 **Priority:** P2
 **Waiting on:** live check
-**Deferred:** 2026-10-30, operator: no more matcher vocabulary. Wording gaps ("how many P1 open", "what are / list open P2 bugs") wait for `docs/plans/v1.45.1-bug-count-query-translation.md`, where the model writes the query and the tally counts. Workaround: start with "how many … bugs".
+**Deferred:** 2026-10-30, operator: no more matcher vocabulary. Wording gaps ("how many P1 open", "what are / list open P2 bugs") wait for `docs/plans/v1.51.0-bug-count-query-translation.md`, where the model writes the query and the tally counts. Workaround: start with "how many … bugs".
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
-**Related:** `docs/plans/v1.45.1-bug-count-query-translation.md`; `docs/bugs/2026-10-10-ask-docs-bug-count-ignores-release-range.md`
+**Related:** `docs/plans/v1.51.0-bug-count-query-translation.md`; `docs/bugs/2026-10-10-ask-docs-bug-count-ignores-release-range.md`
 
 `ask-docs how many P1 open for v1.43.5` returns unrelated documentation
 excerpts and cannot answer the count. The deterministic matcher requires the
@@ -18,7 +18,7 @@ This degrades the question interface. Adding "bugs" selects the tally route, but
 Evidence and exact reproduction:
 [Investigation](../issues/2026-10-27-ask-docs-priority-count-misses-bug-noun.md).
 
-The existing v1.45.1 translation plan's `_BUG_RE` gate would also reject this
+The existing v1.51.0 translation plan's `_BUG_RE` gate would also reject this
 question. A scoped fix should recognize a bounded priority-count question,
 use the deterministic tally, and retain ordinary non-bug count fallback.
 Required regressions: this exact wording selects P1/open/v1.43.5 and bypasses
@@ -45,7 +45,7 @@ PR, issue, release-plan or other object counts merely mentioning priority.
 Existing explicit bug/bugs queries, release/current/lastN ranges and state
 normalization must retain behavior. Ordinary non-bug questions still fall
 through. Reuse deterministic bug-tally; do not count semantic results, add
-model/network calls or implement the broader v1.45.1 translation plan.
+model/network calls or implement the broader v1.51.0 translation plan.
 
 Regression exact question bypasses retrieval/model and selects correct
 priority/state/release; explicitbugs result unchanged; unrelated pod counts

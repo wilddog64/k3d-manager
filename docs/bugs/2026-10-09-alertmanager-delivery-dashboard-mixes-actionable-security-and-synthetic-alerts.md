@@ -7,7 +7,7 @@
 **Severity:** low
 **Origin:** operator, 2026-10-09, from a ChatGPT review of the dashboard. Claude's evaluation kept
 A, B and 4 and part of 5; the response-handling funnel (C, 2, 3) went into
-`docs/plans/v1.45.0-alert-intake-draft-bugs.md`, and ownership grouping (1) was rejected (one operator).
+`docs/plans/v1.50.0-alert-intake-draft-bugs.md`, and ownership grouping (1) was rejected (one operator).
 
 ## Symptom
 

@@ -5,8 +5,8 @@
 **Approval:** explicit 2026-10-16 "another thing worth to is to write a resrach paper for what we
 are doing (not necessary right now) … plan for it" (operator)
 **Related:** `docs/roadmap.md` (Candidate theme — v2.x: model economics; Candidate major — v3.0.0),
-`docs/plans/v1.45.1-codex-model-routing-and-efficiency.md`,
-`docs/plans/v1.48.0-human-effort-per-release.md`, `docs/howto/cloud-session-requests.md`
+`docs/plans/v1.51.0-codex-model-routing-and-efficiency.md`,
+`docs/plans/v1.58.0-human-effort-per-release.md`, `docs/howto/cloud-session-requests.md`
 
 This is a planning note, not a release spec. It takes no slot in any release's five-plan cap.
 
@@ -39,11 +39,11 @@ Corpus as of 2026-10-16 (`git rev-list --count HEAD`, `ls | wc -l`):
 
 | # | Question | Evidence today | Evidence still to build |
 |---|---|---|---|
-| RQ1 | Can one experienced engineer coordinate AI agents to develop and operate a complex infrastructure platform? | Git history, releases, specs, retros, bug lifecycle (Filed / Fixed-in / Verified), DR drills | Human effort per verified release (v1.48.0) |
+| RQ1 | Can one experienced engineer coordinate AI agents to develop and operate a complex infrastructure platform? | Git history, releases, specs, retros, bug lifecycle (Filed / Fixed-in / Verified), DR drills | Human effort per verified release (v1.58.0) |
 | RQ2 | Does multi-model collaboration outperform a single coding agent? | Codex dispatch metrics per spec (v1.43.3) — observational only | Controlled replay benchmark (roadmap: v2.x model economics, after v2.4) |
-| RQ3 | Do more expensive models deliver better verified outcomes? | — | v1.45.1 Codex model routing and efficiency; the same replay benchmark across tiers |
+| RQ3 | Do more expensive models deliver better verified outcomes? | — | v1.51.0 Codex model routing and efficiency; the same replay benchmark across tiers |
 | RQ4 | How much does the agent harness influence engineering performance? | Claude Code CLI vs cloud sessions (`docs/howto/cloud-session-requests.md`), anecdotal | Same specs run under each harness in the replay benchmark |
-| RQ5 | Can intent-driven automation reduce manual operational work? | Hub recovery, cloud-bridge, ChatOps (Slack/Hermes), e2e workflows | Intervention ledger (v1.48.0); v2.x intent engine |
+| RQ5 | Can intent-driven automation reduce manual operational work? | Hub recovery, cloud-bridge, ChatOps (Slack/Hermes), e2e workflows | Intervention ledger (v1.58.0); v2.x intent engine |
 
 **Outcome measure for every RQ: a *verified* outcome**, as the repo already defines it — a spec
 landed with its tests green, its mutations shown red, the reviewer's findings resolved, and for
@@ -87,7 +87,7 @@ not results.
 | When | Step |
 |---|---|
 | Now – v2.0.0 | Data hygiene only. No writing. |
-| v1.48.0 | Human effort per release gives the RQ1/RQ5 baseline. |
+| v1.58.0 | Human effort per release gives the RQ1/RQ5 baseline. |
 | v2.4 (+ model-economics theme) | Replay benchmark answers RQ2–RQ4. |
 | After that | Draft. Short version first as an experience report; full paper second. |
 | v3.0.0 | Possible follow-up paper: the multi-agent product team against this baseline. |

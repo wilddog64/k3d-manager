@@ -1,5 +1,7 @@
 # k3dm Agent Cost (`k3dm-agent-cost`) — hub
 
+The **Window** dropdown order comes from the exporter’s `k3dm_dispatch_window_order` metric. Release values rank by numeric version (`major*1000000 + minor*1000 + patch`), followed by `1d`, `7d`, and `30d`. Grafana 11.4.0 cannot natural-sort query variable values because of an upstream scenes defect, so the variable disables Grafana sorting and preserves Prometheus query order. Grafana 11.5.0 or later can natural-sort, but the data-side order remains correct there too.
+
 [← Grafana dashboards index](../grafana-dashboards.md)
 
 The **Agent Cost** dashboard contains the per-spec cost table, Codex API-equivalent costs, subscription costs, model breakdown, projected monthly cost, and Claude usage totals. Its **Window** selector matches Agent Dispatch, including release scope.
@@ -67,8 +69,8 @@ includes the full dispatch-to-land interval; the latter is not proof of human wa
 verification happens after land. **Human continuation prompts** counts explicit operator records
 by reason and displays the tracked-task coverage denominator; older history is unknown and is not
 backfilled. Codex tokens uses the cumulative session total from the last
-exit after a resume; summing those exits would double count. API equiv. counts each session's
-recorded cumulative usage once.
+exit after a resume; summing those exits would double count. API equiv. counts each Codex session's
+recorded cumulative usage once and each agy run's usage once.
 
 **Delivered** means the latest independent verification recorded `pass`. If the spec's Acceptance
 requires live evidence, its document must also have `**Status:** LIVE-VERIFIED` and a well-formed
@@ -98,12 +100,12 @@ bars are horizontal, so each outcome name reads in full left of its bar. **First
 verification** sits left of the table, the way Last update sits beside Per spec: horizontal pass
 and fail bars with fixed-size names.
 
-The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
+The **Cost (API-equivalent)** row estimates what recorded Codex and agy session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
 Rates live in `scripts/etc/agent/codex-model-prices.json`; update a model's input, cached-input and
 output rates there when pricing changes. Models without an explicit entry remain unpriced.
 
-- **API equiv.** in Per spec is the sum for that landed task's priced Codex sessions. An empty cell
+- **API equiv.** in Per spec is the sum for that landed task's priced Codex and agy sessions. An empty cell
   means at least one session is unpriced or no session usage was recorded.
 - **Codex at API prices** totals all priced usage in scope, including refused and abandoned attempts.
 - **Per landed spec** divides that same total by landed tasks. Landed means the tests and scope gate
@@ -111,9 +113,31 @@ output rates there when pricing changes. Models without an explicit entry remain
 - **Cached input** shows cached input tokens as a share of input tokens.
 - **Subscriptions / month** shows the fixed ChatGPT, Claude, Gemini, GitHub and Hostinger plan costs
   (Hostinger is $250 per two years, so $10.42 a month); only the ChatGPT plan pays for Codex.
-- **Ledger coverage** compares Codex sessions started in the selected time window with sessions
-  present in the dispatch ledger. It has no release-scope value; “outside the ledger” estimates the
-  cost of sessions missing from that ledger.
+- **Dispatch coverage (by cost)** measures the share of agent-run Codex spend recorded in the ledger:
+  `dispatch / (dispatch + dispatch_unrecorded + exec_untracked)`. Interactive work and guardian reviews
+  (assigned to their parents) are excluded from the denominator. This replaces the old "Ledger coverage"
+  stat; the old metric measured raw session counts (diluted by high-frequency guardian reviews) and is
+  not comparable. The legacy `k3dm_dispatch_codex_sessions` and `k3dm_dispatch_unledgered_api_cost_usd`
+  metrics are deprecated and will be removed in the next release.
+- **Codex spend by category** shows priced Codex spend (`k3dm_codex_api_cost_usd`) classified into
+  mutually exclusive categories:
+  - `dispatch`: session with a `codex_usage` ledger event.
+  - `dispatch_unrecorded`: worktree session (`cwd` under `K3DM_WORKTREE_ROOT`) with no `codex_usage` event.
+  - `interactive`: operator interactive session (`originator: codex-tui` outside worktree root).
+  - `exec_untracked`: raw CLI session (`originator: codex_exec` outside worktree root).
+  - `other`: any other session, including unreadable `session_meta`.
+  - `guardian`: guardian approval reviews (`thread_source: guardian_review`). A guardian review's tokens
+    and priced cost are assigned to its parent session (`parent_thread_id`) and that session's category
+    (and dispatched task when ledgered). When the parent is not in the scanned sessions or is itself a
+    guardian session, the review remains categorized as `guardian` with label `parent="missing"`.
+  - **Unpriced tokens**: models without a price row in `scripts/etc/agent/codex-model-prices.json` (such
+    as `codex-auto-review`) contribute $0 to priced cost and are exported as
+    `k3dm_codex_unpriced_tokens{window,model,kind}`. The panel notes "+ N unpriced tokens" beside the
+    dollar figure when unpriced tokens are present.
+- **Ledger gaps** displays the priced cost and session count of `dispatch_unrecorded` only. This is the
+  number the dispatch tooling should drive to zero.
+- **Spend outside dispatch** measures `(interactive + exec_untracked + other) / all_cost`, showing the
+  share of total spend sitting outside dispatched agent work so per-spec figures can be contextualized.
 - **By model** splits priced usage by model. Time windows count a session by when it started;
   **Projected / month** divides the 7d cost by the days actually observed, then scales to 30 days.
 - **Claude per landed spec** and **Claude tokens per landed spec** have values only when Window is a
@@ -126,6 +150,12 @@ output rates there when pricing changes. Models without an explicit entry remain
   `input` and `output`; cache reads are billed at a fraction of the input rate.
 - **Claude cost by kind** splits Claude API-equivalent cost in the selected window or release into
   `cache_read`, `cache_write`, `input` and `output`, using the price for each cache write duration.
+
+For agy runs, the model comes from the run's `start` event; a trailing `-low`, `-medium` or `-high`
+thinking-level suffix is removed before looking up the Gemini rate. Cost is
+`(input_tokens × input + cache_read_tokens × cached_input + (output_tokens + thinking_tokens) × output) / 1,000,000`;
+input excludes cache reads, and thinking tokens use the output rate. The configured Standard Paid Tier
+Gemini rates for `gemini-3.8-flash` change on 2027-01-01, and `gemini-4-argon` rates change on 2026-12-01.
 
 `bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`

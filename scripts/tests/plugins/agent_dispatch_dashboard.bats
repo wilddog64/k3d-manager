@@ -64,7 +64,7 @@ assert next(item for item in baseline_json["panels"] if item["id"] == 105)["type
 old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
 assert set(old) == set(new)
-for panel_id in old.keys() - {105}:
+for panel_id in old.keys() - {105, 12}:
     assert old[panel_id] == new[panel_id], panel_id
 print("ok: verification ladder contract; other panels unchanged")
 PY
@@ -152,7 +152,7 @@ text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split(
 by_id={p["id"]:p for p in d["panels"]}
 cost=by_id[58]; excluded=by_id[83]
 assert "priced sessions only" in cost["description"]
-assert cost["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window"})'
+assert cost["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category!=""})'
 assert excluded["title"]=="Unpriced Codex sessions"
 assert excluded["targets"][0]["expr"]=='sum(k3dm_codex_unpriced_sessions{window="$window"})'
 assert cost["gridPos"]["y"]==excluded["gridPos"]["y"] and cost["gridPos"]["x"]+cost["gridPos"]["w"]==excluded["gridPos"]["x"]
@@ -206,8 +206,11 @@ from pathlib import Path
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
     text=(Path(sys.argv[1])/filename).read_text(); d=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
     var=next(v for v in d["templating"]["list"] if v["name"]=="window")
-    assert var["type"]=="query" and var["definition"]=="label_values(k3dm_dispatch_landed, window)"
+    assert var["type"]=="query" and var["definition"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+    assert var["query"]["query"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+    assert var["regex"]=='/window="([^"]+)"/' and var["sort"]==0
     assert var["current"]["value"]=="7d" and var["label"]=="Window"
+    assert var["sort"]==0, (filename, var["sort"])
 PY
   [ "$status" -eq 0 ]
 }
@@ -274,14 +277,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106}|set(range(42,49))
-assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112}
-assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,116,117,118,119,120,121,122}
+assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 96 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 106 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -294,20 +297,21 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112):
+    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
       if field=="options" and panel["id"]==48:
         continue
-      if panel["id"]==12 or (field=="targets" and panel["id"] in (54,56)):
+      # agent-audit: allow panel 58 targets exempt; the category!="" filter is pinned in the Codex API cost test
+      if panel["id"]==12 or (field=="targets" and panel["id"] in (54,56,58)):
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
       if field=="fieldConfig" and panel["id"] in (29,31):
         new=json.loads(json.dumps(new)); new["defaults"].pop("noValue",None)
       if field=="options" and panel["id"]==32:
-        new={k:v for k,v in new.items() if k!="text"}
+        new={k:v for k,v in new.items() if k not in ("text","showValue","tooltip","xTickLabelRotation","xTickLabelSpacing")}
       if field=="fieldConfig" and panel["id"] in (56,71) and new["defaults"].get("unit")=="short":
         new=json.loads(json.dumps(new)); new["defaults"]["unit"]=old_field["defaults"]["unit"]
       assert new==old_field,(panel["id"],field)
@@ -377,7 +381,7 @@ expected={"type":"dashboards","tags":["k3dm-agents"],"asDropdown":False,"include
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  text=(base/filename).read_text(); d=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
  assert "k3dm-agents" in d["tags"] and d["links"][0]==expected
- assert d["links"][1]=={"type":"link","title":"Bug Tracking","url":"/d/k3dm-bugs"}
+ assert d["links"][1]=={"type":"link","title":"Release Tracking","url":"/d/k3dm-bugs"}
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -396,7 +400,9 @@ assert activity["name"]=="window" and activity["label"]=="Window" and activity["
 assert [o["value"] for o in activity["options"]]==["1d","7d","30d"] and activity["current"]["value"]=="7d"
 for file,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
  window=load(file,key)["templating"]["list"][0]
- assert window["type"]=="query" and window["definition"]=="label_values(k3dm_dispatch_landed, window)"
+ assert window["type"]=="query" and window["definition"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+ assert window["query"]["query"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+ assert window["regex"]=='/window="([^"]+)"/' and window["sort"]==0
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -622,11 +628,22 @@ from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-cost.yaml").read_text()
 cost=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
 by_id={p["id"]:p for p in cost["panels"]}
-daily=by_id[87]; gauge=by_id[88]
+p32=by_id[32]; daily=by_id[87]; gauge=by_id[88]
+assert p32["title"]=="Claude tokens per day" and p32["type"]=="barchart"
+assert p32["targets"][0]["expr"]=="sum by (date, model) (k3dm_dispatch_claude_daily_tokens)"
+assert p32["gridPos"]=={"h":8,"w":24,"x":0,"y":19}
+assert p32["options"]["stacking"]=="normal" and p32["options"]["xField"]=="date"
+assert "all token kinds including cache reads" in p32["description"]
 assert daily["title"]=="Claude tokens per day by kind" and daily["type"]=="barchart"
 assert daily["targets"][0]["expr"]=="sum by (date, kind) (k3dm_dispatch_claude_daily_tokens_by_kind)"
 assert daily["targets"][0]["legendFormat"]=="{{kind}}" and daily["gridPos"]=={"h":8,"w":24,"x":0,"y":35}
 assert daily["options"]["stacking"]=="normal" and "cache_read" in daily["description"] and "fraction" in daily["description"]
+for p in (p32, daily):
+  opt=p["options"]
+  assert opt["showValue"]=="never" and opt["tooltip"]=={"mode":"multi","sort":"desc"}
+  assert opt["xTickLabelRotation"]==-45 and opt["xTickLabelSpacing"]==100
+  assert opt.get("showValue") not in ("always","auto")
+  assert "text" not in opt or "valueSize" not in opt["text"]
 assert gauge["title"]=="Claude cost by kind" and gauge["type"]=="bargauge"
 assert gauge["targets"][0]["expr"]=='k3dm_dispatch_claude_api_cost_by_kind_usd{window="$window"}'
 assert gauge["targets"][0]["instant"] and gauge["targets"][0]["legendFormat"]=="{{kind}}"
@@ -656,7 +673,8 @@ assert sum(cost[i]["gridPos"]["w"] for i in (34,93,86,88))==24
 for i in (29,31):
   assert cost[i]["fieldConfig"]["defaults"]["noValue"]=="Release window only",i
 for i in (32,87):
-  assert cost[i]["options"]["text"]["valueSize"]>=14,i
+  if cost[i]["options"].get("showValue") != "never":
+    assert cost[i]["options"].get("text", {}).get("valueSize", 0) >= 14, i  # agent-audit: allow assert-removed valueSize guard made conditional on showValue, bug 2026-11-07-claude-tokens-per-day-chart-crowded-labels
 rename=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"continue_prompt"}]
 assert rename and {"id":"displayName","value":"continue"} in rename[0]["properties"]
 assert dispatch[85]["options"]["namePlacement"]=="top"
@@ -756,7 +774,7 @@ import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 panel=next(p for p in d["panels"] if p["id"]==12)
 props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for o in panel["fieldConfig"]["overrides"]}
-for field in ["Worker","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
+for field in ["Worker model","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
     opts=props[field]["mappings"][0]["options"]
     assert opts=={"unknown":{"text":"not recorded"}}
 assert len(d["panels"])==35
@@ -773,7 +791,7 @@ text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split(
 by_title={p["title"]:p for p in d["panels"]}
 titles=["Claude + Codex at API prices","Claude + Codex per live-verified spec","API run rate / month","API vs replaced plans"]
 row=next(p for p in d["panels"] if p["title"]=="Whole system at API prices")
-assert row["type"]=="row" and row["gridPos"]["y"]>=max(p["gridPos"]["y"]+p["gridPos"]["h"] for p in d["panels"] if p["id"] not in range(94,99) and p["id"] not in range(107,113))
+assert row["type"]=="row" and row["gridPos"]["y"]>=max(p["gridPos"]["y"]+p["gridPos"]["h"] for p in d["panels"] if p["id"] not in range(94,99) and p["id"] not in range(107,113) and p["id"] not in range(120,123))
 for title in titles:
     p=by_title[title]
     assert p["type"]=="stat" and p["gridPos"]["y"]>row["gridPos"]["y"]
@@ -805,24 +823,86 @@ PY
   [[ "$output" == *ok* ]]
 }
 
-@test "agent cost: existing panels are unchanged and new API panels do not overlap" {
+@test "agent cost: new attribution panels exist with exprs, unpriced note, no Ledger coverage, and no overlaps" {
   run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
-import json,subprocess,sys
+import json,sys
 from pathlib import Path
 path=Path(sys.argv[1]); text=path.read_text()
 def load(raw): return json.loads("\n".join(x[4:] for x in raw.split("  agent-cost.json: |\n",1)[1].splitlines()))
 current=load(text)
-base=load(subprocess.check_output(["git","show","HEAD:scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml"],text=True))
-old={p["id"]:p for p in base["panels"]}
-now={p["id"]:p for p in current["panels"]}
-assert set(old).issubset(now)
-for panel_id,panel in old.items():
-    assert now[panel_id]==panel,(panel_id,"existing panel changed")
-for i,a_panel in enumerate(current["panels"]):
+panels=current["panels"]
+by_title={p["title"]:p for p in panels}
+
+expected_titles=["Dispatch coverage (by cost)", "Codex spend by category", "Ledger gaps", "Spend outside dispatch"]
+for title in expected_titles:
+    assert title in by_title, f"missing panel: {title}"
+
+coverage=by_title["Dispatch coverage (by cost)"]
+assert coverage["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category="dispatch"}) / sum(k3dm_codex_api_cost_usd{window="$window",category=~"dispatch|dispatch_unrecorded|exec_untracked"})'
+
+spend=by_title["Codex spend by category"]
+assert spend["targets"][0]["expr"]=='sum by (category) (k3dm_codex_api_cost_usd{window="$window",category!=""})'
+assert spend["targets"][1]["expr"]=='sum by (model) (k3dm_codex_unpriced_tokens{window="$window"}) > 0'
+assert "unpriced" in spend["description"].lower()
+
+gaps=by_title["Ledger gaps"]
+assert gaps["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category="dispatch_unrecorded"})'
+assert gaps["targets"][1]["expr"]=='sum(k3dm_codex_sessions{window="$window",category="dispatch_unrecorded"})'
+
+outside=by_title["Spend outside dispatch"]
+assert outside["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category=~"interactive|exec_untracked|other"}) / sum(k3dm_codex_api_cost_usd{window="$window",category!=""})'
+
+assert not any(p["title"]=="Ledger coverage" for p in panels)
+
+for i,a_panel in enumerate(panels):
     a=a_panel["gridPos"]
-    for b_panel in current["panels"][i+1:]:
+    for b_panel in panels[i+1:]:
         b=b_panel["gridPos"]
         assert not (a["x"]<b["x"]+b["w"] and b["x"]<a["x"]+a["w"] and a["y"]<b["y"]+b["h"] and b["y"]<a["y"]+a["h"]),(a_panel["id"],b_panel["id"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Codex API cost queries never add the mode and category series together" {
+  run python3 - "$BASE" <<'PY'
+import json,re,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+def load(name,key):
+    text=(base/name).read_text()
+    return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+seen=0
+for name,key in (("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+    for panel in load(name,key)["panels"]:
+        for target in panel.get("targets",[]):
+            for selector in re.findall(r"k3dm_codex_api_cost_usd\{([^}]*)\}",target.get("expr","")):
+                seen+=1
+                assert re.search(r"\b(category|mode)\s*(=|!=|=~)",selector),(name,panel["title"],selector)
+assert seen>=6,seen
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Codex spend by category is readable and shows tokens as counts" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
+spend={p["title"]:p for p in d["panels"]}["Codex spend by category"]
+assert spend["options"]["orientation"]=="horizontal"
+assert spend["options"]["namePlacement"]=="left"
+refs={t["refId"]:t for t in spend["targets"]}
+assert "k3dm_codex_unpriced_tokens" in refs["B"]["expr"]
+assert spend["fieldConfig"]["defaults"]["unit"]=="currencyUSD"
+units=[prop["value"] for o in spend["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byFrameRefID","options":"B"} for prop in o["properties"] if prop["id"]=="unit"]
+assert units==["short"],units
+assert len(refs["B"]["legendFormat"].replace("{{model}}","codex-auto-review"))<=26,refs["B"]["legendFormat"]
+colors=[prop["value"]["fixedColor"] for o in spend["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byFrameRefID","options":"B"} for prop in o["properties"] if prop["id"]=="color"]
+assert colors and colors[0]!="blue",colors
+assert "$0" in spend["description"] and "/bin/" not in spend["description"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -924,7 +1004,7 @@ assert panel["type"]=="stat" and panel["targets"][0]["expr"]=='k3dm_agy_source_p
 assert panel["targets"][1]["expr"]=='k3dm_agy_source_present{source="none"}'
 assert [target["refId"] for target in panel["targets"]]==["A","B"]
 assert panel["options"]["textMode"]=="name"
-assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":60}
+assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":66}
 assert "host" in panel["targets"][0]["legendFormat"] and "source" in panel["targets"][0]["legendFormat"]
 assert "interactive and print" in panel["description"] and "not combined" in panel["description"]
 warning=panel["fieldConfig"]["overrides"][0]
@@ -1125,6 +1205,105 @@ p_orphan = next(r for r in joined_rows if r["parent"] == "p-orphan")
 assert p_orphan["build"] == 0 and p_orphan["review"] == 0 and p_orphan["verify"] == 0
 assert p_orphan["combine"] == "pass"
 
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent activity: Claude quota panels exist, query quota metrics, and do not overlap" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json, sys
+text = open(sys.argv[1]).read()
+d = json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n", 1)[1].splitlines()))
+panels = {p.get("title"): p for p in d["panels"]}
+
+assert "Claude weekly quota used" in panels, "missing Claude weekly quota used panel"
+assert "Claude 5h quota used" in panels, "missing Claude 5h quota used panel"
+assert "Claude quota reading age" in panels, "missing Claude quota reading age panel"
+
+weekly = panels["Claude weekly quota used"]
+assert weekly["type"] == "stat"
+assert weekly["targets"][0]["expr"] == 'k3dm_claude_quota_used_ratio{limit="seven_day"}'
+assert weekly["fieldConfig"]["defaults"]["unit"] == "percentunit"
+assert "Claude Code status line cache" in weekly["description"]
+assert "only updates while Claude Code runs on the machine the exporter runs on" in weekly["description"]
+
+five_h = panels["Claude 5h quota used"]
+assert five_h["type"] == "stat"
+assert five_h["targets"][0]["expr"] == 'k3dm_claude_quota_used_ratio{limit="five_hour"}'
+assert five_h["fieldConfig"]["defaults"]["unit"] == "percentunit"
+assert five_h["fieldConfig"]["defaults"]["thresholds"] == weekly["fieldConfig"]["defaults"]["thresholds"]
+
+age = panels["Claude quota reading age"]
+assert age["type"] == "stat"
+assert age["targets"][0]["expr"] == 'time() - k3dm_claude_quota_sample_timestamp_seconds'
+assert age["fieldConfig"]["defaults"]["unit"] == "s"
+
+all_ids = [p["id"] for p in d["panels"]]
+assert len(all_ids) == len(set(all_ids)), "duplicate panel ids found"
+
+for i, left in enumerate(d["panels"]):
+    a = left["gridPos"]
+    for right in d["panels"][i + 1:]:
+        b = right["gridPos"]
+        assert not (a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]), (left["id"], right["id"])
+
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: unpriced Claude messages stat sits beside Claude cost and is red above 0" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
+by_id={p["id"]:p for p in panels}
+claude_cost=by_id[28]
+assert claude_cost["title"]=="Claude at API prices"
+unpriced=next((p for p in panels if any("k3dm_dispatch_claude_unpriced_messages" in t.get("expr","") for t in p.get("targets",[]))),None)
+assert unpriced is not None, "no panel queries k3dm_dispatch_claude_unpriced_messages"
+assert unpriced["type"]=="stat"
+assert unpriced["gridPos"]["y"]==claude_cost["gridPos"]["y"], (unpriced["gridPos"], claude_cost["gridPos"])
+assert unpriced["gridPos"]["x"]==claude_cost["gridPos"]["x"]+claude_cost["gridPos"]["w"], (unpriced["gridPos"], claude_cost["gridPos"])
+assert "excludes" in unpriced["description"].lower()
+steps=unpriced["fieldConfig"]["defaults"]["thresholds"]["steps"]
+assert any(s.get("color")=="red" and s.get("value") is not None and s.get("value")>0 for s in steps)
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Fable row has daily tokens on own axis and weekly limit gauge" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
+fable_row=next((p for p in panels if p.get("type")=="row" and p.get("title")=="Fable"),None)
+assert fable_row is not None, "Fable row not found"
+daily=next((p for p in panels if "fable" in p.get("title","").lower() and any("k3dm_dispatch_claude_daily_tokens" in t.get("expr","") for t in p.get("targets",[]))),None)
+assert daily is not None, "Fable daily tokens panel not found"
+assert any("claude-fable-5-1" in t.get("expr","") for t in daily["targets"])
+gauge=next((p for p in panels if p.get("type")=="gauge" and any("weekly_fable" in t.get("expr","") for t in p.get("targets",[]))),None)
+assert gauge is not None, "Fable weekly limit gauge not found"
+assert any("k3dm_claude_quota_resets_at_seconds" in t.get("expr","") for t in gauge["targets"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch dashboard: Landed specs table places Worker model column right after Agent" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
+per_spec=next(p for p in panels if p.get("id")==12)
+organize=next(t["options"] for t in per_spec["transformations"] if t["id"]=="organize")
+index=organize["indexByName"]
+rename=organize["renameByName"]
+assert rename.get("worker")=="Worker model", rename.get("worker")
+assert index["worker"]==index["agent"]+1, (index["agent"], index["worker"])
 print("ok")
 PY
   [ "$status" -eq 0 ]

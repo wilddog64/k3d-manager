@@ -1140,6 +1140,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         if not question:
             _notify_job(job_id, "❌ Question rejected — too long or contains disallowed patterns.")
             return
+        user_question = question
         _job_output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=6000)
         if _job_output:
             _ctx_lines = [line.rstrip() for line in _job_output.splitlines() if line.strip()][-80:]
@@ -1167,7 +1168,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         threading.Thread(
             target=_run_cluster_ask,
             args=(new_job_id, agent, question, ""),
-            kwargs={"thread_ts": thread_ts, "max_turns": ask_max_turns, "role": role},
+            kwargs={"thread_ts": thread_ts, "max_turns": ask_max_turns, "role": role, "user_question": user_question},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🤖 Asking *{agent}*…")

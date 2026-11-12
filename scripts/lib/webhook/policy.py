@@ -169,6 +169,8 @@ def _policy_allows(role, policy):
 def _action_policy(path, body):
     if path == "/api/v1/cluster":
         action = body.get("action", "")
+        if action == "trust-vault-ca" or bool(body.get("trust_vault_ca")):
+            return {"name": "cluster-trust-vault-ca", "min_role": "admin"}
         if action == "kill":
             return {"name": "cluster-kill", "min_role": "operator"}
         if action in ("up", "down"):

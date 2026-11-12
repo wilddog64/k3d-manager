@@ -7,7 +7,7 @@
 **Approval:** operator requested review and dispatch on 2026-10-21; live DR operations, data-repo deployment, and synthetic result publication remain unauthorized
 **Verification:** focused BATS 7/7; ShellCheck, Bash syntax, `git diff --check`, documentation links, and `_agent_audit` passed. The installed `wilddog64/k3dm-hub-data:main/drill-freshness.sh` was not changed or live-tested.
 **Component:** `scripts/etc/dr/drill-freshness.sh`, `scripts/tests/plugins/dr_drill_freshness.bats`, installed copy `wilddog64/k3dm-hub-data:main/drill-freshness.sh`
-**Related:** `docs/plans/v1.46.0-scheduled-dr-drill.md` (weekly unattended drill is already queued; do not duplicate); `docs/howto/hub-dr-drill.md`; `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md`
+**Related:** `docs/plans/v1.55.0-scheduled-dr-drill.md` (weekly unattended drill is already queued; do not duplicate); `docs/howto/hub-dr-drill.md`; `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md`
 
 ## Symptom / verified evidence
 
@@ -22,7 +22,7 @@ The workflow's `actions/checkout@v4.2.2` Node.js deprecation warning is unrelate
 - Scheduled run [39577636232](https://github.com/wilddog64/k3dm-hub-data/actions/runs/39577636232) failed again at 09:31 UTC (02:31 PDT), on data-repo `main` commit `7c88cbf8`.
 - Both checkouts completed successfully, including the `results` branch. The `freshness` job's `bash k3dm-manager/drill-freshness.sh results` step exited 1 immediately with no diagnostic; all other job steps completed.
 - As inspected on October 21, the `results` branch still contains only `results/20261010T182508Z.json` plus `.gitkeep`. The October 10 JSON says `success: true`, V0–V7 true, RTO 499 seconds, RPO 459 seconds. At the October 21 run it is approximately 10 days 15 hours old, exceeding the eight-day gate.
-- This confirms repeated **stale evidence**, not a new failed DR execution. Investigate why subsequent runs were not executed and/or published separately under the existing `docs/plans/v1.46.0-scheduled-dr-drill.md` work; preserve the existing eight-day threshold.
+- This confirms repeated **stale evidence**, not a new failed DR execution. Investigate why subsequent runs were not executed and/or published separately under the existing `docs/plans/v1.55.0-scheduled-dr-drill.md` work; preserve the existing eight-day threshold.
 - The operator requested P2 bug tracking on October 21 and authorized a direct documentation update to `k3d-manager-v1.43.5` without a PR. No DR operation or data-repo update is authorized by that request.
 
 ## Root cause
@@ -35,11 +35,11 @@ jq -e '.success == true' "$latest" >/dev/null || exit 1
 (( age <= 8 * 86400 ))
 ```
 
-Consequently, an operator cannot distinguish missing drill results, latest drill failure, and stale successful drills from the Actions log. There is no discrepancy in the threshold itself; the unattended weekly scheduling/publishing gap belongs to the existing v1.46.0 plan.
+Consequently, an operator cannot distinguish missing drill results, latest drill failure, and stale successful drills from the Actions log. There is no discrepancy in the threshold itself; the unattended weekly scheduling/publishing gap belongs to the existing v1.55.0 plan.
 
 ## Fix (direction)
 
-Retain nonzero exit semantics and the eight-day policy. Emit concise, actionable diagnostics to stderr/GitHub Actions annotations, distinguishing: no readable/valid results, most recent result failed, and most recent successful result older than the configured freshness threshold. Include last timestamp, computed age (days/hours), cutoff, and the steps `make dr-drill` on M2 and `make dr-drill-publish` on M4 until v1.46.0 scheduled agents are installed. Never print secrets, encrypted contents, or other result payloads.
+Retain nonzero exit semantics and the eight-day policy. Emit concise, actionable diagnostics to stderr/GitHub Actions annotations, distinguishing: no readable/valid results, most recent result failed, and most recent successful result older than the configured freshness threshold. Include last timestamp, computed age (days/hours), cutoff, and the steps `make dr-drill` on M2 and `make dr-drill-publish` on M4 until v1.55.0 scheduled agents are installed. Never print secrets, encrypted contents, or other result payloads.
 
 Update the authoritative `scripts/etc/dr/drill-freshness.sh` and tests; document how the installed script in the data repo is synchronized after review. Do not silently modify the data repo or claim a successful drill was run.
 
@@ -82,7 +82,7 @@ interface:
 - [ ] Offline cases pass, including previously silent stale-result path.
 - [ ] Code review and PR merge through the normal branch workflow.
 - [ ] Operator-approved sync to data-repo `main` and E2 checked.
-- [ ] The unattended drill itself remains tracked by the existing v1.46.0 plan.
+- [ ] The unattended drill itself remains tracked by the existing v1.55.0 plan.
 
 ## What NOT to Do
 

@@ -40,6 +40,10 @@ function init_test_env() {
   export -f _systemd_available
 }
 
+function require_macos() {
+  [[ "$(uname -s)" == Darwin ]] || skip 'macOS-only'
+}
+
 # Define kubectl stub that logs commands and uses scripted exit codes
 function stub_kubectl() {
   _kubectl() {
@@ -192,12 +196,12 @@ function read_lines() {
   if (( BASH_VERSINFO[0] >= 4 )); then
     mapfile -t "$array_name" < "$file"
   else
-    local line i=0 quoted
+    local line i=0
+    [[ "$array_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 1
     unset "$array_name"
     [[ -r "$file" ]] || return 0
     while IFS= read -r line; do
-      printf -v quoted '%q' "$line"
-      eval "$array_name[$i]=$quoted"
+      IFS= read -r "${array_name}[$i]" <<< "$line"
       (( i++ ))
     done < "$file"
     return 0

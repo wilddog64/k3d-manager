@@ -88,7 +88,11 @@ if echo "$CMD" | grep -E '\b(rm|rmdir|dd|mkfs|shred|truncate|mv|chmod|chown|kill
 fi
 
 # General-purpose interpreters — bypass every denylist above, so block outright.
-if echo "$CMD" | grep -E '\b(python[0-9.]*|perl|ruby|node|deno|bun|osascript|php|lua|tclsh|Rscript|gdb|lldb)\b' >/dev/null; then
+_repo_prefix="${K3DM_REPO%/}/"
+_shopping_carts_prefix="${SHOPPING_CARTS_ROOT%/}/"
+_interp_scan="${CMD//"$_repo_prefix"/}"
+_interp_scan="${_interp_scan//"$_shopping_carts_prefix"/}"
+if echo "$_interp_scan" | grep -E '\b(python[0-9.]*|perl|ruby|node|deno|bun|osascript|php|lua|tclsh|Rscript|gdb|lldb)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
@@ -244,7 +248,8 @@ _profile="(version 1)
                   (subpath \"$_ARGOCD\") (subpath \"$_HELM\")
                   (subpath \"$_HELM_PREFS\") (subpath \"$_HELM_CACHE\")
                   (literal \"$_GITCONFIG\") (subpath \"$_GIT_CONFIG\"))
-(allow file-write* (subpath \"$_KUBE_CACHE\") (subpath \"$_HELM_CACHE\"))"
+(allow file-write* (subpath \"$_KUBE_CACHE\") (subpath \"$_HELM_CACHE\"))
+(deny process-exec (regex #\"/(python[0-9.]*|Python|perl[0-9.]*|ruby[0-9.]*|node|deno|bun|osascript|php[0-9.]*|lua[0-9.]*|tclsh[0-9.]*|Rscript|gdb|lldb)\$\"))"
 
 if [[ "$(uname -s)" == "Darwin" && "${K3DM_ASK_OS_SANDBOX:-1}" != "0" ]]; then
   if [[ ! -x /usr/bin/sandbox-exec ]]; then

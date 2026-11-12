@@ -296,12 +296,12 @@ Usage:
   bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--primary-coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch open [--version vX.Y.Z]
-  bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope]
+  bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope] [--allow-instruction-files]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--model ID] [--coordinator VENDOR/MODEL]
   bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
-  bin/k3dm-codex-dispatch abandon --slug SLUG --yes
+  bin/k3dm-codex-dispatch abandon --slug SLUG [--version V] [--reason TEXT] --yes
   bin/k3dm-codex-dispatch prune [--yes]
   bin/k3dm-codex-dispatch usage-backfill
   bin/k3dm-codex-dispatch release-merged --version vX.Y.Z --pr N --merged-at YYYY-MM-DDTHH:MM:SSZ
@@ -323,7 +323,7 @@ from pathlib import Path
 
 root, manager, command, *args = sys.argv[1:]
 ledger = Path(root) / 'ledger.jsonl'
-PARENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
+PARENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$')
 def die(msg): print('[codex-dispatch] ERROR: '+msg, file=sys.stderr); raise SystemExit(2)
 def parse(argv, boolean=()):
     d={}; i=0
@@ -799,6 +799,23 @@ _dispatch_scope_verdict() {
   if (( in_scope )); then echo "scope: in-scope"; elif (( allow )); then echo "scope: out-of-scope (allowed)"; else return 1; fi
 }
 
+_dispatch_instruction_files() {
+  local worktree="$1" base="$2" path name
+  {
+    git -C "$worktree" diff --name-only "$base" HEAD
+    git -C "$worktree" diff --cached --name-only
+    git -C "$worktree" diff --name-only
+    git -C "$worktree" ls-files --others --exclude-standard
+  } | sort -u | while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    name="${path##*/}"
+    case "$name" in AGENTS.md|CLAUDE.md|GEMINI.md|.mcp.json|.envrc) printf '%s\n' "$path"; continue ;; esac
+    case "$path" in
+      .github/copilot-instructions.md|*/.github/copilot-instructions.md|.claude/*|*/.claude/*|.codex/*|*/.codex/*|.gemini/*|*/.gemini/*) printf '%s\n' "$path" ;;
+    esac
+  done
+}
+
 _dispatch_task_spec() {
   local task="$1" run="$2" spec
   [[ -f "$run/spec" ]] || return 1
@@ -854,7 +871,7 @@ _dispatch_start() {
     coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
   fi
   if [[ -n "$parent" || -n "$role" ]]; then
-    [[ "$parent" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ && "$role" =~ ^(build|review|verify)$ ]] || _dispatch_error "--parent and --role must be valid and used together"
+    [[ "$parent" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$ && "$role" =~ ^(build|review|verify)$ ]] || _dispatch_error "--parent and --role must be valid and used together"
   fi
   [[ -z "$parent" || -n "$role" ]] || _dispatch_error "--parent requires --role"
   [[ -z "$role" || -n "$parent" ]] || _dispatch_error "--role requires --parent"
@@ -894,6 +911,16 @@ _dispatch_start() {
   fi
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
   [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
+  local spec_intent_output spec_intent_rc
+  if spec_intent_output="$(python3 "$_dispatch_script_dir/../scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
+    :
+  else
+    spec_intent_rc=$?
+    if (( spec_intent_rc == 1 )); then
+      _dispatch_error "refused: ${spec_intent_output}"
+    fi
+    _dispatch_error "spec-intent checker failed (rc ${spec_intent_rc}): ${spec_intent_output}"
+  fi
   git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1 || _dispatch_error "spec is not tracked: $spec"
   git -C "$_dispatch_repo_root" diff --quiet HEAD -- "$spec" || _dispatch_error "spec is changed: $spec"
   git -C "$_dispatch_repo_root" fetch origin "+$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"
@@ -1004,18 +1031,20 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" superseding="" allow=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0
+  local slug="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
+  local -a superseding=()
   local _landing_parts=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
-      --superseding) (($# >= 2)) || _dispatch_error "--superseding requires a slug"; superseding="$2"; shift 2 ;;
+      --superseding) (($# >= 2)) || _dispatch_error "--superseding requires a slug"; superseding+=("$2"); shift 2 ;;
       --test) (($# >= 2)) || _dispatch_error "--test requires a command"; test_set=1; test_cmd="$2"; shift 2 ;;
       --no-test) no_test=1; shift ;;
       --landing-actor) (($# >= 2)) || _dispatch_error "--landing-actor requires a value"; landing_actor="$2"; shift 2 ;;
       --landing-model) (($# >= 2)) || _dispatch_error "--landing-model requires VENDOR/MODEL"; landing_model="$2"; shift 2 ;;
       --review-pending) review_pending=1; shift ;;
       --allow-out-of-scope) allow=1; shift ;;
+      --allow-instruction-files) allow_instruction_files=1; shift ;;
       *) _dispatch_error "unknown land option: $1" ;;
     esac
   done
@@ -1041,18 +1070,43 @@ _dispatch_land() {
   [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
   [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
+  spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
+  base="$(<"$run/base")"
+  instruction_files="$(_dispatch_instruction_files "$task" "$base")"
+  if [[ -n "$instruction_files" && "$allow_instruction_files" -eq 0 ]]; then
+    while IFS= read -r instruction_path; do
+      [[ -n "$instruction_path" ]] || continue
+      echo "instruction-file: $instruction_path"
+      if git -C "$task" ls-files --error-unmatch "$instruction_path" >/dev/null 2>&1; then
+        git -C "$task" diff "$base" HEAD -- "$instruction_path"
+        git -C "$task" diff --cached -- "$instruction_path"
+        git -C "$task" diff -- "$instruction_path"
+      else
+        git -C "$task" diff --no-index -- /dev/null "$instruction_path" || true
+      fi
+    done <<<"$instruction_files"
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope --arg detail instruction-files '.reason=$reason|.detail=$detail'
+    _dispatch_schedule_metrics
+    _dispatch_error "instruction files require --allow-instruction-files"
+  fi
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
   [[ "$(git -C "$task" rev-list --count "origin/$target..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$target"
-  spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
-  local prior_slug prior_run
   for prior_run in "$_dispatch_worktree_root/$version"/*.run; do
     [[ -f "$prior_run/landed" ]] || continue
     prior_slug="$(basename "$prior_run" .run)"
     [[ "$prior_slug" == "$slug" ]] && continue
     if [[ -f "$prior_run/spec" && "$(<"$prior_run/spec")" == "$spec" ]]; then
-      [[ "$superseding" == "$prior_slug" ]] || _dispatch_error "spec already landed by $prior_slug; use --superseding $prior_slug"
+      superseding_match=0
+      for superseding_slug in "${superseding[@]}"; do
+        [[ "$superseding_slug" == "$prior_slug" ]] && superseding_match=1
+      done
+      if (( superseding_match == 0 )); then
+        [[ -z "$unnamed_prior" ]] || unnamed_prior+=" "
+        unnamed_prior+="$prior_slug"
+      fi
     fi
   done
+  [[ -z "$unnamed_prior" ]] || _dispatch_error "spec already landed by $unnamed_prior; name each with --superseding"
   if ! _dispatch_scope_verdict "$task" "$spec" "$target" "$allow"; then
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
     _dispatch_schedule_metrics
@@ -1164,11 +1218,12 @@ _dispatch_land() {
   local test_result=passed
   (( no_test )) && test_result=skipped
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
+    --argjson instruction_files "$(jq -Rn --arg paths "$instruction_files" '$paths|split("\n")|map(select(length>0))')" \
     --argjson wait_seconds "$wait_seconds" --arg tree "$(cat "$run/codex-tree" 2>/dev/null || true)" \
     --arg validation "$validation" --arg test_result "$test_result" \
     --argjson target_moved_commits "$target_count" --arg commit "$land_commit" --argjson change "$change_json" \
     --arg actor "$landing_actor" --arg vendor "$landing_vendor" --arg model "$landing_model" --argjson review_pending "$review_pending" \
-    '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.landing_actor={actor:$actor,vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:(if $actor=="unknown" then "unknown" else "declared" end)}|.review_status=(if $review_pending then "pending" else "unknown" end)|if $commit!="" then .commit=$commit else . end|if ($change|type)=="object" then .change=$change else . end|.chosen=true'
+    '.verifier_lines=$verifier_lines|.instruction_files=$instruction_files|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.landing_actor={actor:$actor,vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:(if $actor=="unknown" then "unknown" else "declared" end)}|.review_status=(if $review_pending then "pending" else "unknown" end)|if $commit!="" then .commit=$commit else . end|if ($change|type)=="object" then .change=$change else . end|.chosen=true'
   case "$review_pending" in
     1) _dispatch_ledger_event_best_effort review_pending "$version" "$slug" --arg actor "$landing_actor" '.landing_actor=$actor|.review_status="pending"' ;;
   esac
@@ -1176,7 +1231,7 @@ _dispatch_land() {
   git -C "$repo_path" worktree remove "$task"
   git -C "$repo_path" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
   git -C "$repo_path" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
-  echo "landed: $slug"; echo "push: git -C $repo_path push origin $target"
+  echo "landed: $slug"; echo "push: git -C $repo_path push origin $target && make hub-sync"
 }
 
 _dispatch_handoff() {
@@ -1309,24 +1364,106 @@ _dispatch_resume() {
   echo "resumed: $slug"; echo "resume: $n"
 }
 
+_dispatch_abandon_check_ledger() {
+  local ledger="$1" version="$2" slug="$3"
+  [[ -f "$ledger" ]] || _dispatch_error "task has no start in ledger: $version/$slug"
+  local check rc=0
+  check="$(python3 - "$ledger" "$version" "$slug" <<'PYCHECK'
+import json, sys
+
+ledger_path = sys.argv[1]
+target_version = sys.argv[2]
+target_slug = sys.argv[3]
+
+has_start = False
+is_closed = False
+repo = "k3d-manager"
+
+try:
+    with open(ledger_path, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(ev, dict) and ev.get("version") == target_version and ev.get("slug") == target_slug:
+                ev_type = ev.get("event")
+                if ev_type == "start":
+                    has_start = True
+                    if ev.get("repo"):
+                        repo = ev.get("repo")
+                elif ev_type in ("land", "abandon"):
+                    is_closed = True
+except Exception:
+    sys.exit(3)
+
+if not has_start:
+    sys.exit(3)
+if is_closed:
+    sys.exit(4)
+print(repo)
+sys.exit(0)
+PYCHECK
+  )" || rc=$?
+  case "$rc" in
+    0) printf '%s' "${check:-k3d-manager}" ;;
+    3) _dispatch_error "task has no start in ledger: $version/$slug" ;;
+    4) _dispatch_error "task is already closed: $version/$slug" ;;
+    *) _dispatch_error "could not verify task in ledger: $version/$slug" ;;
+  esac
+}
+
+_dispatch_abandon_remove() {
+  local repo_path="$1" version="$2" slug="$3" task_dir="$4"
+  if [[ -d "$task_dir" ]]; then
+    git -C "$repo_path" worktree remove --force "$task_dir"
+  else
+    echo "missing worktree: $task_dir"
+    git -C "$repo_path" worktree prune 2>/dev/null || true
+  fi
+  if git -C "$repo_path" show-ref --verify --quiet "refs/heads/task/$version/$slug"; then
+    git -C "$repo_path" branch -D "task/$version/$slug" >/dev/null
+  else
+    echo "missing branch: task/$version/$slug"
+  fi
+}
+
 _dispatch_abandon() {
-  local slug="" yes=0 rel version
+  local slug="" version="" reason="" yes=0 rel
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; version="$2"; shift 2 ;;
+      --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
       --yes) yes=1; shift ;;
       *) _dispatch_error "unknown abandon option: $1" ;;
     esac
   done
   [[ -n "$slug" ]] || _dispatch_error "abandon requires --slug SLUG"
-  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
-  _dispatch_event_repo="$(cat "$_dispatch_run_dir/repo-name" 2>/dev/null || echo k3d-manager)"
-  local repo_path target
+  if [[ -z "$version" ]]; then
+    rel="$(_dispatch_release_branch)"
+    version="${rel#k3d-manager-}"
+  else
+    [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version: $version"
+  fi
+  local ledger="$_dispatch_worktree_root/ledger.jsonl" ledger_repo
+  ledger_repo="$(_dispatch_abandon_check_ledger "$ledger" "$version" "$slug")"
+  _dispatch_task_paths "$version" "$slug"
+  _dispatch_event_repo="$(cat "$_dispatch_run_dir/repo-name" 2>/dev/null || echo "$ledger_repo")"
+  local repo_path
   repo_path="$(cat "$_dispatch_run_dir/repo" 2>/dev/null || printf '%s' "$_dispatch_repo_root")"
-  target="$(cat "$_dispatch_run_dir/target" 2>/dev/null || printf '%s' "$rel")"
-  if (( ! yes )); then echo "would remove: $_dispatch_task_dir"; echo "would delete branch: task/$version/$slug"; exit 2; fi
-  git -C "$repo_path" worktree remove --force "$_dispatch_task_dir"; git -C "$repo_path" branch -D "task/$version/$slug" >/dev/null
-  _dispatch_ledger_event_best_effort abandon "$version" "$slug"
+  if (( ! yes )); then
+    [[ -d "$_dispatch_task_dir" ]] && echo "would remove: $_dispatch_task_dir"
+    git -C "$repo_path" show-ref --verify --quiet "refs/heads/task/$version/$slug" && echo "would delete branch: task/$version/$slug"
+    echo "would record: abandon $version/$slug"
+    exit 2
+  fi
+  _dispatch_abandon_remove "$repo_path" "$version" "$slug" "$_dispatch_task_dir"
+  if [[ -n "$reason" ]]; then
+    _dispatch_ledger_event_best_effort abandon "$version" "$slug" --arg reason "$reason" '.reason=$reason'
+  else
+    _dispatch_ledger_event_best_effort abandon "$version" "$slug"
+  fi
   _dispatch_schedule_metrics
   echo "abandoned: $slug"
 }

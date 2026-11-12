@@ -1,7 +1,7 @@
 # Bug: the pre-push fast gate, run from a linked worktree, lets test fixtures write into the real repository
 
-**Status:** FIXED — `9942c413` (Codex; Claude review, independent verifier PASS); live check pending
-**Priority:** P1
+**Status:** LANDED — `9942c413` (Codex; Claude review, independent verifier PASS); live check pending. Not reopened: the 2026-11-09 `Test` identity was this incident's leftover, see Correction
+**Priority:** P2 (operator, 2026-11-09: lowered from P1; the 2026-11-09 finding's only damage was commit authorship; was P1 when core.bare and stray branches broke the main checkout)
 **Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31
 **Detected by:** Claude, pushing `k3d-manager-v1.43.13` from a scratch worktree to work around the push drop in
@@ -102,3 +102,17 @@ interface:
   - .githooks/pre-push (run by git push)
   - scripts/ci/fast_gate.sh [BASE]
 ```
+
+## Correction (2026-11-09): not a recurrence, a missed repair
+
+Claude first recorded the `Test <test@example.invalid>` section found on 2026-11-09 as a recurrence starting
+2026-11-07. Reading the reflog author of every local commit since 2026-10-01 showed it was set at **2026-10-31 15:03**,
+the commit that filed this doc, and never removed: the repair above restored `core.bare` but left the `[user]` section
+it had recorded. Every later non-`Test` commit came from GitHub squash merges, the CVE promoter or a pull. Each of the
+11 test files that use `test@example.invalid`, run from the main checkout on 2026-11-09, left `.git/config` unchanged.
+
+Claude removed the section on 2026-11-09 and re-authored the two unpushed commits. Commits pushed in between stay
+authored `Test`; release squash merges author them as the operator on `main`.
+
+The guard from `9942c413` compares before and after, so it could not see a section already present. That gap is
+filed as `docs/bugs/2026-11-09-fast-gate-guard-misses-preexisting-fixture-identity.md`.

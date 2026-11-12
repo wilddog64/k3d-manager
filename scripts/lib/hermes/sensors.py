@@ -17,7 +17,6 @@ WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
 GITHUB_SERVICE = "k3dm-hermes-gh-token"
 TERMINAL_OPERATION_FAILURES = ("Error", "Failed")
-RELEASE_BRANCH = re.compile(r"\Ak3d-manager-v\d+\.\d+\.\d+\Z")
 
 
 def _keychain_secret(service):
@@ -112,30 +111,15 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
 
 
 def _values_branch_expected(run, expected=None):
-    if expected:
-        return expected, None
-    configured = os.environ.get("K3DM_RELEASE_BRANCH", "").strip()
-    if configured:
-        return configured, None
-    try:
-        code, output = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], {})
-        if code != 0 or not output.strip():
-            return None, "checkout branch could not be determined"
-        return output.strip(), None
-    except Exception:
-        return None, "checkout branch could not be determined"
+    return expected or "deploy/hub", None
 
 
 def values_branch(run, argocd_run, state, token=None, expected=None, threshold=3,
                   server="argocd.3ai-talk.org"):
-    """Check k3d-manager Application sources against the checked-out release branch."""
+    """Check k3d-manager Application sources against the hub deploy branch."""
     branch, error = _values_branch_expected(run, expected)
     if error:
         return record("values_branch", "unknown", error)
-    if not RELEASE_BRANCH.fullmatch(branch):
-        return record("values_branch", "healthy",
-                      f"skipped: checkout on {branch}, not a release branch",
-                      data={"expected": branch, "skipped": True})
     token = token if token is not None else _keychain_secret(ARGOCD_SERVICE)
     if not token:
         return _unavailable("values_branch", ARGOCD_SERVICE)

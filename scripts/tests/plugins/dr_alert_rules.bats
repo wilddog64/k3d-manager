@@ -1,7 +1,11 @@
 #!/usr/bin/env bats
 
+setup() {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+}
+
 @test "DR rules: failed and stale alerts are warning alerts in dr.alerts" {
-  run python3 - scripts/etc/argocd/platform-ops/prometheusrule.yaml <<'PY'
+  run "$(k3dm_python_yaml)" - scripts/etc/argocd/platform-ops/prometheusrule.yaml <<'PY'
 import sys, yaml
 doc = yaml.safe_load(open(sys.argv[1]))
 rules = next(g['rules'] for g in doc['spec']['groups'] if g['name'] == 'dr.alerts')
@@ -12,7 +16,7 @@ PY
 }
 
 @test "DR rules: rendered Alertmanager routes both alerts to platform-warning" {
-  run python3 - scripts/etc/prometheus/alertmanager.yaml.tmpl <<'PY'
+  run "$(k3dm_python_yaml)" - scripts/etc/prometheus/alertmanager.yaml.tmpl <<'PY'
 import sys, yaml
 doc = yaml.safe_load(open(sys.argv[1]))
 routes = doc['route']['routes']

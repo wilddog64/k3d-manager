@@ -3,6 +3,7 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
 }
 
 @test "argocd app cluster generator: no static ubuntu-k3s ApplicationSet destination remains" {
@@ -60,7 +61,7 @@ setup() {
 }
 
 @test "services-git selects the exact e2e Stripe overlays" {
-  run python3 - "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/services-git.yaml" <<'PY'
+  run "$(k3dm_python_yaml)" - "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/services-git.yaml" <<'PY'
 import os, sys, yaml
 doc = yaml.safe_load(open(sys.argv[1]))
 root = os.path.abspath(os.path.join(os.path.dirname(sys.argv[1]), '..', '..', '..', '..'))

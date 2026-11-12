@@ -1,4 +1,4 @@
-# k3dm Bug Tracking (`k3dm-bugs`) — hub
+# k3dm Release Tracking (`k3dm-bugs`) — hub
 
 [← Grafana dashboards index](../grafana-dashboards.md)
 
@@ -143,13 +143,23 @@ of `-2`. The pre-commit hook rejects a commit that makes a bug doc LIVE-VERIFIED
 well-formed line and now requires a **Fix commit:** header for a new LIVE-VERIFIED doc, checking
 that an evidence commit contains it (`make check-bug-evidence` sweeps every doc).
 
+The **State check** column verifies the doc's `Waiting on` claim against the dispatch ledger (`k3dm_dispatch_bug_state` and `k3dm_dispatch_ledger_timestamp_seconds`):
+
+| State check | Meaning | Action called for |
+|---|---|---|
+| `no worker running (<dispatch_state>)` | The bug doc says `Waiting on: fix running`, but its latest dispatch task has exited (with state `awaiting_land`, `codex_failed`, `landed`, etc.) rather than `running`. | Verify the worker's changes (if awaiting land), re-dispatch/rework (if failed), or update the doc's `Waiting on` header (e.g. to `live check` or `investigation`). |
+| `no dispatch recorded` | The bug doc says `Waiting on: fix running`, but no dispatch task matching the bug stem exists in the dispatch ledger. | Verify the dispatch slug/branch, dispatch the task with `bin/k3dm-codex-dispatch`, or correct the doc's `Waiting on` line. |
+| `already dispatched (<dispatch_state>)` | The bug doc says `Waiting on: dispatch`, but a dispatch task already exists in the ledger with state `<dispatch_state>`. | Update the doc's `Waiting on` line to reflect the dispatch (e.g. `fix running` or `live check`), or check whether a previous dispatch was abandoned. |
+| `unchecked` | Dispatch metrics are stale (older than 30 minutes, measured by `k3dm_dispatch_ledger_timestamp_seconds`). Freshness is not guaranteed. | Check the dispatch metrics exporter and Pushgateway scrape; refresh telemetry before relying on the check. |
+| `ok` | The doc's `Waiting on` claim matches the dispatch ledger state, or the bug is not waiting on dispatch / fix running (e.g. `live check`, `scheduled run`, `triage`, or fixed). | None. |
+
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
 has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
 
 The summary strip follows the Release dropdown and shows open P0–P3 (titled P0 to P3), Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
-Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, and Live evidence, and clicking a title opens that
+Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, Live evidence, and State check, and clicking a title opens that
 document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the
 other option. It keeps open, unknown, deferred, and not-yet-live-verified rows visible while hiding
 live-verified and historic `n/a` fixes. To mark a fix live-proven, change its Status to
@@ -192,7 +202,7 @@ with `OPEN`.
 The pre-commit guard refuses a Status value that starts with none of those recognized words,
 and refuses `OPEN` followed by `fix landed`. Keep extra detail after the recognized first word.
 
-In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
+In the k3dm Release Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 
 Bug Tracking defaults to **Auto (current)**: the **Release** row (Release, Bugs filed, Bugs open and Bugs fixed) and Bugs table follow `k3dm_bug_current_release_info` for the selected repository. Choose **Manual** to use **Manual releases (ignored in Auto)**, which retains historical multi-select and **All**; the Release tile shows the picked releases as that box names them, or All. **Open, scheduled later** and **Open, untriaged** are repository-wide counts in both modes. “Filed in” follows the shared attribution rule: the bug doc's **Branch:** line, otherwise the first tag containing the commit that added it, otherwise the current release branch. If the selected repository has no current-release metric, use Manual; Auto has no release to match. In Manual, panels filter with `release=~"$release"`; the `release_order` label only sorts release choices and tables (it holds an ordering prefix and the release value), so never filter on it.
 
@@ -206,7 +216,7 @@ The **Order** column comes from the plan number on each document's `**Release:**
 
 **Overlaps** flags same-release plans that share a path listed on their `**Component:**` lines and have no direct or transitive dependency. Directory paths ending in `/` cover paths below them. To clear an overlap, add the real prerequisite to `**Depends on:**`; if the shared work is intentionally independent, record the accepted overlap in the plan body. The table continues to flag accepted overlaps by design. Keep `**Component:**` complete: detection reads only that header, not paths mentioned elsewhere in the document. The Undeclared plan overlaps stat counts conflicting pairs for the selected releases.
 
-**Spec approval** reports `approved`, `pending`, `none`, or `n/a` from the plan `**Approval:**` header. **Dispatch approval** reports the plan `**Dispatch:**` header (`go`, `needed`, `not required`, or `unknown`); the table displays `unknown` as `not recorded`. It is independent of spec approval, and neither approval prose nor ledger events fill in a missing header. **Dispatch task** comes from the dispatch ledger and shows lifecycle (`landed`, `awaiting land`, `refused`, `Codex failed`, `running`, or `no record`). `awaiting land` means the worker exited successfully and the task still awaits integration; it does not mean landed or verified. **Execution**, **Verified**, and **Live verified** come from the plan `**Status:**` header, never from the land event. The verification columns are status indicators only; they do not identify a verifier, timestamp, commit, or evidence record. **Verified** is marked for `verified` and `live_verified`; **Live verified** is marked only for `live_verified`; other states show `-`. The raw source verification label remains unchanged in query metadata. **Status lags dispatch** counts ledger-landed tasks whose document still says proposed, ready, or in progress. In the v1.43.9 screenshot, all five ledger tasks were landed while four plan Status headers remained PROPOSED/READY. After reviewing the landed change and its evidence, reconcile the plan document itself; the dashboard preserves its current Status and verification until then. For a landed task with stale Status, **Blocked by** displays `landed; documentation stale`; tasks that have not landed retain their branch, dependency, approval, and wave blockers.
+**Spec approval** reports `approved`, `pending`, `none`, or `n/a` from the plan `**Approval:**` header. **Dispatch approval** reports the plan `**Dispatch:**` header (`go`, `needed`, `not required`, `unknown`, or `n/a`). A plan not yet dispatched waits on the operator: `needed` shows an orange `⚠ needs your go`, and a missing header shows an orange `⚠ needs your decision`; **Blocked by** says `needs your dispatch go` or `needs your dispatch decision` in orange. `go` shows `✓ go`, `not required` shows `not gated`, and a plan past dispatch with no header reports `n/a`, shown as `-`. It is independent of spec approval, and neither approval prose nor ledger events fill in a missing header. **Dispatch task** comes from the dispatch ledger and shows lifecycle (`landed`, `awaiting land`, `refused`, `Codex failed`, `running`, or `no record`). `awaiting land` means the worker exited successfully and the task still awaits integration; it does not mean landed or verified. **Execution**, **Verified**, and **Live verified** come from the plan `**Status:**` header, never from the land event. The verification columns are status indicators only; they do not identify a verifier, timestamp, commit, or evidence record. **Verified** is marked for `verified` and `live_verified`; **Live verified** is marked only for `live_verified`; other states show `-`. The raw source verification label remains unchanged in query metadata. **Status lags dispatch** counts ledger-landed tasks whose document still says proposed, ready, or in progress. In the v1.43.9 screenshot, all five ledger tasks were landed while four plan Status headers remained PROPOSED/READY. After reviewing the landed change and its evidence, reconcile the plan document itself; the dashboard preserves its current Status and verification until then. For a landed task with stale Status, **Blocked by** displays `landed; documentation stale`; tasks that have not landed retain their branch, dependency, approval, and wave blockers.
 
 When filing a plan, keep `**Component:**` complete with every touched file or directory in backticks. The overlap scanner intentionally uses this line alone.
 

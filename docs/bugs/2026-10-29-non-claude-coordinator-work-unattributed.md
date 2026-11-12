@@ -7,7 +7,7 @@
 **Filed:** 2026-10-29, operator: "we need to consider other models like OpenAI Sol6.1 and Terra 6.1 as primary coordinators as we are not capturing their work like yours"
 **Approval:** pending
 **Component:** `bin/k3dm-codex-dispatch`, git commit attribution, `AGENTS.md`, Agent Dispatch dashboard
-**Related:** [`2026-10-26-primary-coordinator-and-handoff-telemetry.md`](2026-10-26-primary-coordinator-and-handoff-telemetry.md) (fix `9424c32a`, works only when a coordinator is declared), [`v1.44.1-coordinator-rotation-trial.md`](../plans/v1.44.1-coordinator-rotation-trial.md), [`v1.44.1-dispatch-agent-five-hour-window-usage.md`](../plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+**Related:** [`2026-10-26-primary-coordinator-and-handoff-telemetry.md`](2026-10-26-primary-coordinator-and-handoff-telemetry.md) (fix `9424c32a`, works only when a coordinator is declared), [`v1.47.0-coordinator-rotation-trial.md`](../plans/v1.47.0-coordinator-rotation-trial.md), [`v1.47.0-dispatch-agent-five-hour-window-usage.md`](../plans/v1.47.0-dispatch-agent-five-hour-window-usage.md)
 
 ## Evidence (2026-10-29, read-only)
 
@@ -32,7 +32,7 @@ The telemetry contract is correct. Adoption is zero, so the metric is empty.
 4. Agent Dispatch dashboard: add a stat for the share of `start` events with an `unreported` coordinator over the selected range.
 5. Update `docs/howto/codex-dispatch.md` with the env var, the precedence and the trailer.
 
-Out of scope: inferring the coordinator from `agent`/`model` (the 10-26 spec forbids this), quota pools (v1.44.1), and rewriting history.
+Out of scope: inferring the coordinator from `agent`/`model` (the 10-26 spec forbids this), quota pools (v1.47.0), and rewriting history.
 
 ## Acceptance
 

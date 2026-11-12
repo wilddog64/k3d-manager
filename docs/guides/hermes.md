@@ -66,7 +66,7 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
 | R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
-| R9 | Reapply ApplicationSets on the release branch | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH` pinned |
+| R9 | Reapply ApplicationSets pinned to deploy/hub | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH=deploy/hub` |
 | R10 | Delete failed Jobs superseded by a newer CronJob spec | A failed, inactive CronJob-owned Job in `identity`, `monitoring`, or `cicd` has a different runnable template (image/command/args); never automatic | `kubectl ... delete job --wait=false -- <pinned Job names>`; the allowlisted namespace and exact target set are rechecked and pinned at approval time |
 
 ## Slack approvals (opt-in)
@@ -84,7 +84,13 @@ Operator setup (run in Terminal.app):
 1. `make hermes-approvals-setup APPROVERS=<your Slack user ID>` creates and binds the KV namespace, creates or reuses the Keychain drain token and pushes it to the relay, and validates and pushes the approver allowlist.
    `ROTATE=1 make hermes-drain-token` rotates the drain token and syncs it to the relay.
 2. Commit `workers/slack-relay/wrangler.toml` if it changed, then run `make deploy-worker`.
-3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
+3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth` with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/commands`, the same as every other slash command. Not the interactivity URL: a command sent there has no `payload`, the relay answers 400, and Slack reports "/hermes-auth failed because the app did not respond" (2026-11-08).
+   It must be the app whose signing secret the relay holds (`SLACK_SIGNING_SECRET`, the slash-command app), and the
+   `k3dm-slack-webhook` Keychain item must be an incoming webhook of that same app. Slack sends a button click to the
+   app that posted the message: a card posted through another app's webhook (for example `k3dm-notices`) shows
+   "This app is not configured to handle interactive responses" (operator, 2026-11-08).
+   Since 2026-11-08 the item holds a `k3d-manager` app webhook for `#grafana-notification`; a webhook URL carries
+   its channel, so a rebuild that creates a new one must pick that channel.
 4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
 
 `APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.

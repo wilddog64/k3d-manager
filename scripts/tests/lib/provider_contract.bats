@@ -999,7 +999,7 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- 'ADDRESS=127.0.0.1' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
   [ "$status" -eq 0 ]
-  run grep -F -- 'http://127.0.0.1:18080/health/ready' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  run grep -F -- 'http://keycloak.shopping-cart.local/health/ready' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
   [ "$status" -eq 0 ]
   run python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["Label"] == sys.argv[2]; assert d["ProgramArguments"][-1] and __import__("os").path.isfile(d["ProgramArguments"][-1])' "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist" com.k3d-manager.browser.argocd-https
   [ "$status" -eq 0 ]

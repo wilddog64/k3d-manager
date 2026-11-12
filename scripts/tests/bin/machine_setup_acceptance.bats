@@ -16,7 +16,7 @@ setup() {
 
 make_stubs() {
   local c
-  for c in launchctl gh make curl sudo installer softwareupdate xcode-select pkgutil direnv python3 brew security git uname; do
+  for c in launchctl gh make curl sudo installer softwareupdate xcode-select pkgutil direnv python3 brew security git uname id scutil ssh; do
     cat > "$STUBS/$c" <<STUB
 #!/bin/bash
 echo "$c \$*" >> "$CALLS"
@@ -34,6 +34,8 @@ case "$c" in
       for x in python pip python3; do printf '#!/bin/bash\necho "venv-%s \$*" >> "%s"\nexit 0\n' "\$x" "$CALLS" > "\$3/bin/\$x"; chmod +x "\$3/bin/\$x"; done
     fi ;;
   uname) case "\${1:-}" in -m) echo arm64;; *) echo Darwin;; esac ;;
+  id) [ "\${1:-}" = -un ] && echo fixture-user ;;
+  scutil) [ "\${1:-}" = --get ] && [ "\${2:-}" = LocalHostName ] && echo fixture-hub ;;
   security)
     case " \$* " in *" -w "*|*" -g "*|*" -gw "*|*" -wg "*) echo "SECRETVALUE_LEAK";; esac ;;
   git)
@@ -72,9 +74,11 @@ complete_machine() {
   mkdir -p "$HOME_FX/.local/share/k3d-manager/venv/bin"
   for x in python ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; chmod +x "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; done
   if [ "$role" = hub ]; then
-    mkdir -p "$HOME_FX/.ssh"
+    mkdir -p "$HOME_FX/.ssh" "$HOME_FX/.config/k3d-manager"
     (umask 077; printf 'fixture private key\n' > "$HOME_FX/.ssh/k3d-manager-key.pem")
     printf 'fixture public key\n' > "$HOME_FX/.ssh/k3d-manager-key.pub"
+    printf 'E2E_M2_PUBLISH_BACK_HOST=fixture-user@fixture-hub.local\n' > "$HOME_FX/.config/k3d-manager/e2e-remote.env"
+    printf 'from="192.168.39.0/24",command="%s/scripts/k3d-manager e2e_result_publish",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAA e2e-m2-publisher@m2-air-20260824\n' "$TREE" > "$HOME_FX/.ssh/authorized_keys"
   fi
   mkdir -p "$HOME_FX/.local/bin"
   for x in agy gemini; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/bin/$x"; chmod +x "$HOME_FX/.local/bin/$x"; done
@@ -139,7 +143,7 @@ mk() {
 }
 
 mutating() {
-  grep -E '^(brew (install|reinstall|upgrade|tap|uninstall)|git .*(clone|checkout|reset|pull|clean|switch|merge|rebase|stash)|security (add|delete)|launchctl |make install|make .*install-|curl |sudo |installer |softwareupdate )' "$CALLS" || true
+  grep -E '^(brew (install|reinstall|upgrade|tap|uninstall)|git( -[Cc] [^ ]+| --[a-z-]+=[^ ]+)* (clone|checkout|reset|pull|clean|switch|merge|rebase|stash)( |$)|security (add|delete)|launchctl |make install|make .*install-|curl |sudo |installer |softwareupdate )' "$CALLS" || true
 }
 
 # ---------------------------------------------------------------- M1
@@ -375,7 +379,7 @@ STUB
 @test "M5: README and Makefile link the howto" {
   grep -q 'docs/howto/machine-setup.md' "$SRC/README.md"
   grep -q 'docs/howto/machine-setup.md' "$SRC/Makefile"
-  [ "$(grep -c 'docs/howto/machine-setup.md' "$SRC/README.md")" -ge 2 ]
+  awk '/^### How-To/{h=1;next} /^##+ |^---/{h=0} h' "$SRC/README.md" | grep -q 'docs/howto/machine-setup.md'
 }
 
 # ---------------------------------------------------------------- N1
@@ -446,13 +450,18 @@ STUB
         if grep -qE "^make .*$t( |\$)" "$CALLS"; then false; fi
       fi
     done
-    if grep -E 'hub-(snapshot|data-export)|webhook\.plist|hermes\.plist|heartbeat\.plist' "$CALLS"; then false; fi
+    if sed -e "s|$BATS_RUN_TMPDIR||g" -e "s|$TREE||g" "$CALLS" | grep -E 'hub-(snapshot|data-export)|webhook\.plist|hermes\.plist|heartbeat\.plist'; then false; fi
   done
 }
 
-@test "N3: console runs no install-* at all and writes no LaunchAgents" {
+@test "N3: console only runs install-* named in agents.console.list, never a hub-only agent" {
   ms --role console
-  if grep -E '^make .*install-' "$CALLS"; then false; fi
+  grep -qE '^make .*install-repo-sync' "$CALLS"
+  while read -r line; do
+    t="$(echo "$line" | grep -oE 'install-[a-z0-9-]+' | head -1)"
+    grep -qxF "$t" "$TREE/scripts/etc/machine/agents.console.list"
+    if grep -qxF "$t" "$TREE/scripts/etc/machine/agents.hub.list" && ! grep -qxF "$t" "$TREE/scripts/etc/machine/agents.worker.list"; then false; fi
+  done < <(grep -E '^make .*install-' "$CALLS" || true)
   [ -z "$(ls "$HOME_FX/Library/LaunchAgents" 2>/dev/null)" ]
 }
 
@@ -485,7 +494,7 @@ STUB
 @test "N4: no sudo outside _run_command, no curl|sh, no security -w in the scripts" {
   local f
   for f in "$TREE/bin/k3dm-machine-setup" "$TREE/bin/machine-bootstrap"; do
-    if awk '/^_run_command\(\)/ {skip=1} skip {if ($0 ~ /^}/) skip=0; next} {print NR": "$0}' "$f" | grep -E '(^|[^_[:alnum:]-])sudo[[:space:]]' | grep -v '_run_command' | grep -vE '^[0-9]+:[[:space:]]*#'; then false; fi
+    if awk '/^_run_command\(\)/ {skip=1} skip {if ($0 ~ /^}/) skip=0; next} {print NR": "$0}' "$f" | grep -E '(^|[^_[:alnum:]-])sudo[[:space:]]' | grep -v '_run_command' | grep -v 'Homebrew Linux prerequisites are missing' | grep -vE '^[0-9]+:[[:space:]]*#'; then false; fi
     if grep -nE 'curl[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z)?sh' "$f"; then false; fi
     if grep -nE '(sh|bash)[[:space:]]+-c[[:space:]]+"?\$\(curl' "$f"; then false; fi
     if grep -nE 'security[^|;&#]*[[:space:]]-[a-zA-Z]*[wg][a-zA-Z]*([[:space:]]|$)' "$f" | grep -v 'add-generic' | grep -vE '^[0-9]+:[[:space:]]*#'; then false; fi

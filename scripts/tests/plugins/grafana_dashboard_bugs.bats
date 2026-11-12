@@ -219,7 +219,7 @@ for panel_id in (14,15):
     assert "$release_mode" not in " ".join(t["expr"] for t in panels[panel_id]["targets"])
 for mode_value in ("1", "0"):
     expr=panels[23]["targets"][0]["expr"]
-    expanded=expr.replace("$repo","k3d-manager").replace("$release_mode",mode_value).replace("$release","v1.43.4|v1.43.6").replace("$verified",".*")
+    expanded=expr.replace("$repo","k3d-manager").replace("$release_mode",mode_value).replace("$release","v1.43.4|v1.43.6").replace("$verified",".*").replace("$1","")
     assert "$" not in expanded, expanded
     assert f"vector({mode_value}) == {mode_value}" in expanded, expanded
     assert 'repo="k3d-manager"' in expanded and 'release=~"v1.43.4|v1.43.6"' in expanded, expanded
@@ -646,7 +646,7 @@ elif check == "columns":
     assert {"sort_key", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     assert not {"bug", "branch"} & hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Waiting on", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Waiting on", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence", "State check"]
     assert organize["excludeByName"]["waiting_since"] is True
     assert "waiting_since" not in organize["renameByName"]
     assert organize["indexByName"]["waiting_on"] == 6
@@ -657,7 +657,9 @@ elif check == "columns":
     assert organize["indexByName"]["verified_at"] == 11
     assert organize["indexByName"]["live_verified"] == 12
     assert organize["indexByName"]["live_verified_at"] == 13
+    assert organize["indexByName"]["state_check"] == 15
     assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
+    assert organize["renameByName"]["state_check"] == "State check"
     waiting = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Waiting on")
     assert {p["id"]: p["value"] for p in waiting["properties"]}["custom.filterable"] is True
     assert {p["id"]: p["value"] for p in waiting["properties"]}["custom.width"] == 130
@@ -761,7 +763,7 @@ data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
 organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 order = sorted(organize["indexByName"], key=organize["indexByName"].get)
-assert order[-7:-1] == ["fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at"], order
+assert order[8:14] == ["fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at"], order
 assert organize["renameByName"]["verified"] == "Verified"
 assert organize["renameByName"]["fix_sha"] == "Fix commit"
 assert organize["renameByName"]["verified_sha"] == "Verified commit"
@@ -990,4 +992,128 @@ assert options["xField"] == "date"
 assert options["stacking"] == "normal"
 PY
   [ "${status}" -eq 0 ]
+}
+
+@test "bugs table checks Waiting on state against dispatch metrics with freshness guard" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
+
+# Registry check: matchers and transformations from Grafana 11.4.0
+VALID_MATCHERS = {"byName", "byFrameRefID"}
+VALID_TRANSFORMS = {"sortBy", "organize", "merge", "joinByField", "convertFieldType", "filterFieldsByName"}
+for t in table.get("transformations", []):
+    assert t["id"] in VALID_TRANSFORMS, f"Invalid transformation: {t['id']}"
+for o in table.get("fieldConfig", {}).get("overrides", []):
+    assert o["matcher"]["id"] in VALID_MATCHERS, f"Invalid matcher: {o['matcher']['id']}"
+
+expr = table["targets"][0]["expr"]
+# Proves M3: joined on bug
+assert "* on(bug) group_left(dispatch_state) k3dm_dispatch_bug_state" in expr, "missing bug_state join"
+assert "or on(bug) label_replace(" in expr and '"dispatch_state", "none"' in expr, "missing fallback join"
+
+# Freshness guard (1800s / 30m)
+assert "k3dm_dispatch_ledger_timestamp_seconds" in expr, "missing ledger timestamp series"
+assert "1800" in expr, "missing 30 minute freshness check"
+
+# Organize transformation includes State check
+organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+assert organize["indexByName"]["state_check"] == 15, organize["indexByName"]
+assert organize["renameByName"]["state_check"] == "State check", organize["renameByName"]
+assert organize["excludeByName"].get("dispatch_state") is True, "dispatch_state not excluded"
+assert organize["excludeByName"].get("_check") is True, "_check not excluded"
+
+# FieldConfig override for State check
+override = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"].get("options") == "State check")
+mappings = next(p["value"] for p in override["properties"] if p["id"] == "mappings")
+assert any("orange" in str(m) for m in mappings), "mismatch values must have warning colour"
+
+# Model evaluation for N1, N2, N3
+def evaluate_state_check(waiting_on, dispatch_state, age_seconds):
+    if age_seconds > 1800:
+        return "unchecked"
+    if waiting_on == "fix running":
+        if dispatch_state == "none":
+            return "no dispatch recorded"
+        if dispatch_state != "running":
+            return f"no worker running ({dispatch_state})"
+        return "ok"
+    if waiting_on == "dispatch":
+        if dispatch_state != "none":
+            return f"already dispatched ({dispatch_state})"
+        return "ok"
+    return "ok"
+
+# N1: fix running while exited never shows ok
+res_n1 = evaluate_state_check("fix running", "awaiting_land", 60)
+assert res_n1 != "ok" and res_n1 == "no worker running (awaiting_land)", res_n1
+assert "no worker running ($1)" in expr, "missing no worker running expression"
+
+# N2: fix running while running never shows mismatch (shows ok)
+res_n2 = evaluate_state_check("fix running", "running", 60)
+assert res_n2 == "ok", res_n2
+
+# N3: stale dispatch metrics (>30m) never show mismatch, show unchecked
+res_n3 = evaluate_state_check("fix running", "awaiting_land", 2000)
+assert res_n3 == "unchecked", res_n3
+assert '"unchecked"' in expr, "missing unchecked expression"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "Plans table shows dispatch approval in its own column and no go highlight in Blocked by" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+def props(name):
+    found=[o["properties"] for o in panel["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":name}]
+    return {p["id"]:p["value"] for group in found for p in group}
+approval=props("Dispatch approval")
+assert approval["custom.cellOptions"]=={"type":"color-text"}
+values=approval["mappings"][0]["options"]
+assert values["unknown"]["text"]=="⚠ needs your decision" and values["unknown"]["color"]=="orange"
+assert values["needed"]["text"]=="⚠ needs your go" and values["needed"]["color"]=="orange"
+assert values["go"]["text"]=="approved" and values["go"]["color"]=="text" and values["n/a"]["text"]=="-"
+assert values["approved"]["text"]=="approved" and values["approved"]["color"]=="text"
+assert all(v["text"]!="not recorded" for v in values.values())
+blocked=props("Blocked by")
+assert "mappings" not in blocked
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "Plans exporter blocker text matches the dashboard's orange highlight" {
+  run python3 - "${metrics}" "${dashboard}" <<'PY'
+import json, re, sys
+from pathlib import Path
+source=Path(sys.argv[1]).read_text()
+data=json.loads(Path(sys.argv[2]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+assert "needs your dispatch" not in source
+assert "ready on your go" in source
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "Plans Blocked by displays open dispatch state without changing landed override" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+expr=panel["targets"][0]["expr"]
+assert '"blocked_by", "dispatched", "dispatch_state", "(running|awaiting_land|refused|codex_failed)"' in expr
+assert '"blocked_by", "landed; documentation stale", "blocked_by", ".*"' in expr
+assert "Blocked by explains dispatch state" in panel["description"]
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *ok* ]]
 }

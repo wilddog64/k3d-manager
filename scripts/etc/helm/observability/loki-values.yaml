@@ -4,6 +4,21 @@ loki:
   auth_enabled: false
   commonConfig:
     replication_factor: 1
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+  limits_config:
+    retention_period: 336h
+    retention_stream:
+      - selector: '{job="k3dm-dispatch-run"}'
+        priority: 1
+        period: 720h
+      - selector: '{namespace="trivy-system"}'
+        priority: 1
+        period: 720h
+      - selector: '{namespace="cicd"}'
+        priority: 1
+        period: 720h
   storage:
     type: filesystem
   schemaConfig:

@@ -1,10 +1,10 @@
 # Bug: Host Disk dashboard labels the new hub's disk as "m4" and shows m2 down after the cutover
 
-**Status:** REGRESSION UNDER INVESTIGATION 2026-11-04 (E2E runner); previously LIVE-VERIFIED 2026-10-31 — `1708c97a` (Luna); E3 live on the M5 at `4f409ba6`: probe_success 1 for m5 (822 GiB), m4 (173 GiB), m2 and hostinger
+**Status:** LIVE-VERIFIED 2026-11-11 — Claude queried the M5 Prometheus at 02:15Z (`deploy/hub` `cf86a93f`): `k3dm_disk_probe_success` is 1 for m5, m4, m2 and hostinger (E3). Was: VERIFIED 2026-11-08 — M1 met live again after `d70047d5` reached the M5: all four hosts `up` with correct labels (operator screenshot, below). The 2026-11-04 E2E runner regression is covered by `2026-11-07-e2e-results-never-reach-m5-hub.md` (run 1794086864-5662 PASSED from the M5)
 **Fix commit:** 1708c97a
 **Live evidence:** 2026-10-31 · run k3dm-disk-metrics-m5-1420z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit 4f409ba6 · proves E3
+**Live evidence:** 2026-11-11 · run claude-prom-query-0215z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit cf86a93f · proves E3
 **Priority:** P2
-**Waiting on:** investigation — since 2026-11-07
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30
 **Detected by:** the operator (Host Disk dashboard on the M5 hub); root-caused by Claude
@@ -147,3 +147,13 @@ No cluster changes or recovery actions were performed. This evidence is on branc
 `HostDiskMetricsStale` has fired since 2026-10-31T15:14Z. On the M5 Pushgateway, `push_time_seconds{job="k3dm-disk"}` is 2026-10-31T14:13:42Z, about six days old, while the `m5`, `m4`, `m2` and `hostinger` `k3dm_disk_probe_success` series still read 1. Those 1s are frozen values, not live probes, so the Oct 31 live verification is the last known good and cannot speak for today. Hermes runs `bin/k3dm-disk-metrics` with `check=False` and captured output (`_publish_disk_metrics`), so a failure leaves no trace in its log. Cause not established.
 
 **Cause found 2026-11-07 (Claude):** `bin/k3dm-disk-metrics` runs bare `scutil`, which this doc's fix added; Hermes's launchd PATH has no `/usr/sbin`, so the script dies with `FileNotFoundError` and Hermes discards the traceback. Fix and acceptance: `docs/bugs/2026-11-07-disk-metrics-crash-under-launchd-scutil-not-on-path.md`.
+
+## Triage 2026-11-07 (Claude)
+
+Checked at 2026-11-07 21:50Z: the M5 checkout `8e483765` still calls bare `scutil` (`bin/k3dm-disk-metrics:30`), and Prometheus returns no `k3dm_disk_probe_success` series. Once the M5 checkout moves to `k3d-manager-v1.43.15`, the next Hermes disk run should push again. Live pass = `k3dm_disk_probe_success` 1 for m5, m4, m2 and hostinger, with a fresh `push_time_seconds{job="k3dm-disk"}`; then `HostDiskMetricsStale` clears.
+
+## Live check — 2026-11-08 (operator screenshot, Host Disk dashboard on the M5 hub, ~04:10 PT)
+
+- Probe status: hostinger, m2, m4, m5 all `up`. Used %: hostinger 19.8, m2 69.7, m4 69.1, m5 14.9. Free: 155, 281, 142, 789 GiB (m5 matches the M5 disk, 822 GiB free on 2026-10-31; m4 is no longer the M5's disk).
+- Last push age 42.6 s, and the push-age sparkline stays flat from about 15:30 on 2026-11-07, so the launchd-scheduled Hermes runs push every cycle again. Used % over time has no data from about 07:00 to 15:30 on 2026-11-07, the window before the M5 checkout had `d70047d5`.
+- Not shown: `HostDiskMetricsStale` resolved. The hub was not reachable from Claude's M4 session, so the Prometheus query was not run by Claude.

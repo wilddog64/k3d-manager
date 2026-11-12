@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator received a `PublicEndpointDown` SMS for argocd)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — `90d8942a`, shipped in v1.42.0 (on `main`); the watchdog is loaded and running. The restart path has not been seen end to end yet; that proof belongs to `docs/plans/v1.45.0-node-tunnel-fault-drill.md`. Close at the v1.50.1 status cleanup unless it recurs and the restart fails
+**Status:** IMPLEMENTED — `90d8942a`, shipped in v1.42.0 (on `main`); the watchdog is loaded and running. The restart path has not been seen end to end yet; that proof belongs to `docs/plans/v1.50.0-node-tunnel-fault-drill.md`. Close at the v1.61.1 status cleanup unless it recurs and the restart fails
 **Priority:** P3 — reclassified 2026-10-15 from P1 (operator-approved): the fix has shipped, so no outage is waiting on this doc; what remains is test-only proof (see "Reclassified 2026-10-15")
 **Severity:** High
 **Component:** `bin/k3dm-node-health-watch` (`_healthy`, `_tick`)
@@ -296,7 +296,7 @@ That is no longer true:
   threshold, so correctly no restart was issued. Since then the log has been quiet, which is how this
   watchdog reports healthy (it writes only on a problem).
 - What remains is proof that the **restart** branch works on a real dead tunnel. That is a test-only
-  gap, covered by the queued fault drill (`v1.45.0-node-tunnel-fault-drill.md`). A test gap is P3 by
+  gap, covered by the queued fault drill (`v1.50.0-node-tunnel-fault-drill.md`). A test gap is P3 by
   this repo's priority scale.
 
 Leaving it at P1 kept one "open P1" on the Bug Tracking dashboard for something with no outage and

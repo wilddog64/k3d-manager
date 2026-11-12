@@ -1286,7 +1286,7 @@ function _argocd_apply_and_confirm_appset_stage() {
 }
 
 function _argocd_prepare_applicationsets() {
-   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-deploy/hub}"
    export K3D_MANAGER_BRANCH
 
    local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
@@ -1304,7 +1304,7 @@ function _argocd_prepare_applicationsets() {
    export APP_CLUSTER_NAME
    _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
    _argocd_set_active_app_cluster "${_active_app_cluster}"
-   _info "[argocd] Preparing ApplicationSets (branch ${K3D_MANAGER_BRANCH}, app-cluster ${APP_CLUSTER_NAME})"
+   _info "[argocd] Preparing ApplicationSets (values ref ${K3D_MANAGER_BRANCH}, app-cluster ${APP_CLUSTER_NAME})"
 }
 
 function deploy_argocd_applicationsets() {
@@ -1313,10 +1313,9 @@ function deploy_argocd_applicationsets() {
 Usage: deploy_argocd_applicationsets [--no-verify]
 
 Reapply every ApplicationSet under scripts/etc/argocd/applicationsets/ so each
-`$values` source is re-pinned to the current release branch. Required per-release
-step (see CLAUDE.md): ApplicationSets freeze their values ref to
-${K3D_MANAGER_BRANCH} at apply time, so config committed to a newer branch stays
-inert in-cluster until the sets are reapplied. Surgical — unlike
+`$values` source is pinned to the hub deployment ref (`deploy/hub` by default).
+ApplicationSets freeze their values ref at apply time, so a promoted ref is
+visible in-cluster after the sets are reapplied. Surgical — unlike
 deploy_argocd_bootstrap it does NOT redeploy the image updater or platform-ops.
 
 After reapplying it confirms each rollout stage with argocd_check_values_branch
@@ -1332,7 +1331,7 @@ Options:
    -h, --help    Show this help message
 
 Environment Variables:
-   K3D_MANAGER_BRANCH   Values branch to pin (default: current git branch)
+   K3D_MANAGER_BRANCH   Values ref to pin (default: deploy/hub)
    APP_CLUSTER_NAME     App-cluster name for sets not yet live (default: resolved/ubuntu-k3s)
    ARGOCD_NAMESPACE     Namespace for Argo CD (default: cicd)
    ARGOCD_APPSET_IGNORE_LIVE
@@ -1341,11 +1340,11 @@ Environment Variables:
    K3DM_APPSETS_STAGE   hub or all (default: all)
 
 Examples:
-   # Reapply + verify, pinning to the checked-out release branch
+   # Reapply + verify, pinning to deploy/hub
    ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 
-   # Pin explicitly (e.g. from a detached checkout or a release-close sweep)
-   K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+   # Pin a different ref only for a deliberate non-production use
+   K3D_MANAGER_BRANCH=deploy/staging ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 EOF
       return 0
    fi
@@ -2053,16 +2052,12 @@ EOF
 }
 
 function argocd_check_values_branch() {
-   local _expected="${1:-${K3D_MANAGER_BRANCH:-}}"
+   local _expected="${1:-${K3D_MANAGER_BRANCH:-deploy/hub}}"
    local _context="${2:-k3d-k3d-cluster}"
    local _owners="${3:-}"
    local _namespace="${ARGOCD_NAMESPACE:-cicd}"
    local _apps
    local _drift
-
-   if [[ -z "${_expected}" ]]; then
-      _expected="$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
-   fi
 
    _apps="$(_kubectl get application -n "${_namespace}" --context "${_context}" -o json 2>/dev/null)"
    if [[ -z "${_apps}" ]]; then

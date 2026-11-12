@@ -1,0 +1,47 @@
+# Process metrics: capture first, triage later
+
+**Started:** 2026-11-11 (operator: "sounds good, and we can measure how this can improve our process")
+**Rule:** `CLAUDE.md`, Versioning and release scope, "Capture first, triage later". Only P0/P1 are fixed without
+triage; P2/P3 are captured and triaged at `/release-groom`.
+**Review:** at the grooming after v1.44.0 merges, and again after v1.45.0. Claude fills the table from git, `gh` and
+`docs/bugs/`, then recommends keep, adjust or revert.
+
+## What we measure
+
+| Metric | How | Better means |
+|---|---|---|
+| Cycle time | release branch first commit → PR merged, in days | shorter |
+| Bugs fixed inside the release | `docs/bugs/` filed in the window whose fix landed before the merge, by priority | fewer P2/P3 (P0/P1 unchanged) |
+| Captured, not fixed | P2/P3 filed in the window and still `OPEN` at the merge | the rule working |
+| Triage outcome | of captured P2/P3: `patch` / `carry` / `close` at the post-merge grooming | some `close`: work we never needed |
+| **Safety: escalations** | captured P2/P3 later raised to P1/P0, or that caused an incident before triage | **0** |
+| Escaped bugs | filed after the merge with `**Introduced by:**` this release | not higher than baseline |
+| Triage sessions | per session: trigger (count or age), bugs triaged, minutes, share closed | under ~15 min; some closed |
+| Classification agreement | bugs where Claude's Priority equals the second agent's; disagreements by direction | high agreement; disagreements reviewed |
+
+**Tuning:** the operator expects these rules to change as data comes in; record each change here with its date and reason.
+
+- 2026-11-11: triage trigger 10 → 20 captured (or oldest 7 days). v1.43.15 filed ~80 bugs in ~4 days (~20/day), so 10 would fire about twice a day (operator: "let's set threshold to 20 to see that will be a better choice").
+
+**Revert trigger:** any escalation that the wait made worse. Claude reports it at once, not at the review.
+
+## Baseline (old rule: P2s aimed at the open release)
+
+Counted 2026-11-11 by Claude from `docs/bugs/` filename dates and `gh pr list`. "Fixed" is the Status today, so it
+includes fixes that landed after that release merged.
+
+| Release | Window | Cycle (days) | Filed | P1 / P2 / P3 | Fixed | P2 fixed |
+|---|---|---|---|---|---|---|
+| v1.43.13 | 2026-10-31 → 11-01 | 1 | 44 | 1 / 17 / 26 | 13 | 7 |
+| v1.43.14 | 2026-11-02 → 11-07 | 6 | 61 | 8 / 31 / 22 | 41 | 23 |
+| v1.43.15 | 2026-11-08 → open | ≥ 4 (open) | 77 | 2 / 33 / 42 | 44 | 24 |
+
+v1.43.15 switched rules partway (2026-11-11), so it is a transition release. v1.44.0 is the first full release
+under the new rule.
+
+## Results
+
+| Release | Cycle (days) | Fixed in release (P0-1 / P2-3) | Captured open at merge | Triage p/c/x | Escalations | Escaped |
+|---|---|---|---|---|---|---|
+| v1.44.0 | | | | | | |
+| v1.45.0 | | | | | | |

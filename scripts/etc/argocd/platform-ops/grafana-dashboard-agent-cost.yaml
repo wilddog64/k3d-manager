@@ -30,7 +30,7 @@ data:
         },
         {
           "type": "link",
-          "title": "Bug Tracking",
+          "title": "Release Tracking",
           "url": "/d/k3dm-bugs"
         }
       ],
@@ -56,12 +56,13 @@ data:
               "uid": "prometheus"
             },
             "query": {
-              "query": "label_values(k3dm_dispatch_landed, window)",
+              "query": "query_result(sort_desc(k3dm_dispatch_window_order))",
               "refId": "window"
             },
-            "definition": "label_values(k3dm_dispatch_landed, window)",
+            "definition": "query_result(sort_desc(k3dm_dispatch_window_order))",
             "refresh": 2,
-            "sort": 7,
+            "regex": "/window=\"([^\"]+)\"/",
+            "sort": 0,
             "includeAll": false,
             "multi": false,
             "current": {
@@ -98,7 +99,7 @@ data:
           "description": "API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
           "gridPos": {
             "h": 6,
-            "w": 6,
+            "w": 4,
             "x": 0,
             "y": 1
           },
@@ -140,8 +141,8 @@ data:
           "description": "All Codex usage in scope, including refused and abandoned attempts, divided by landed specs. Landed means the tests and scope gate passed, not a live proof. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
           "gridPos": {
             "h": 6,
-            "w": 6,
-            "x": 6,
+            "w": 4,
+            "x": 4,
             "y": 1
           },
           "datasource": {
@@ -171,6 +172,56 @@ data:
           }
         },
         {
+          "id": 118,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Spend outside dispatch",
+          "description": "Share of all Codex spend that is outside dispatch: (interactive + exec_untracked + other) / all cost.",
+          "gridPos": {
+            "h": 6,
+            "w": 4,
+            "x": 8,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category=~\"interactive|exec_untracked|other\"}) / sum(k3dm_codex_api_cost_usd{window=\"$window\",category!=\"\"})",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.2
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
           "id": 22,
           "type": "stat",
           "options": {
@@ -182,7 +233,7 @@ data:
           "description": "API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
           "gridPos": {
             "h": 6,
-            "w": 6,
+            "w": 4,
             "x": 12,
             "y": 1
           },
@@ -224,8 +275,8 @@ data:
           "description": "The per-plan split is available from subscription_usd_per_month; only the ChatGPT plan pays for Codex. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
           "gridPos": {
             "h": 6,
-            "w": 6,
-            "x": 18,
+            "w": 4,
+            "x": 16,
             "y": 1
           },
           "datasource": {
@@ -262,11 +313,11 @@ data:
               "valueSize": 32
             }
           },
-          "title": "Ledger coverage",
-          "description": "time windows only; shows no data for a release. The second target shows estimated unledgered API-equivalent cost. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
+          "title": "Dispatch coverage (by cost)",
+          "description": "Share of agent-run work that the ledger records: dispatch / (dispatch + dispatch_unrecorded + exec_untracked). Interactive work and guardian reviews (assigned to their parents) are not in the denominator.",
           "gridPos": {
             "h": 6,
-            "w": 8,
+            "w": 6,
             "x": 0,
             "y": 7
           },
@@ -276,14 +327,8 @@ data:
           },
           "targets": [
             {
-              "expr": "k3dm_dispatch_codex_sessions{window=\"$window\",ledgered=\"true\"} / ignoring(ledgered) sum without(ledgered) (k3dm_dispatch_codex_sessions{window=\"$window\"})",
-              "instant": true,
-              "legendFormat": "in the ledger"
-            },
-            {
-              "expr": "k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}",
-              "instant": true,
-              "legendFormat": "outside the ledger"
+              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category=\"dispatch\"}) / sum(k3dm_codex_api_cost_usd{window=\"$window\",category=~\"dispatch|dispatch_unrecorded|exec_untracked\"})",
+              "instant": true
             }
           ],
           "fieldConfig": {
@@ -299,11 +344,62 @@ data:
                 ]
               }
             },
+            "overrides": []
+          }
+        },
+        {
+          "id": 117,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Ledger gaps",
+          "description": "Cost and session count of dispatch_unrecorded sessions (worktree sessions with no codex_usage event in the ledger). The dispatch tool should drive this to zero.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_codex_api_cost_usd{window=\"$window\",category=\"dispatch_unrecorded\"})",
+              "instant": true,
+              "legendFormat": "cost"
+            },
+            {
+              "expr": "sum(k3dm_codex_sessions{window=\"$window\",category=\"dispatch_unrecorded\"})",
+              "instant": true,
+              "legendFormat": "sessions"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.01
+                  }
+                ]
+              }
+            },
             "overrides": [
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "outside the ledger"
+                  "options": "cost"
                 },
                 "properties": [
                   {
@@ -315,8 +411,80 @@ data:
                     "value": 2
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sessions"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  }
+                ]
               }
             ]
+          }
+        },
+        {
+          "id": 116,
+          "type": "bargauge",
+          "title": "Codex spend by category",
+          "description": "Priced Codex API-equivalent spend by category. Unpriced models (such as codex-auto-review) show their unpriced token count, not dollars, and contribute $0 until priced.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 12,
+            "y": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (category) (k3dm_codex_api_cost_usd{window=\"$window\",category!=\"\"})",
+              "instant": true,
+              "legendFormat": "{{category}}",
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (model) (k3dm_codex_unpriced_tokens{window=\"$window\"}) > 0",
+              "instant": true,
+              "legendFormat": "{{model}} tokens",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {"id": "byFrameRefID", "options": "B"},
+                "properties": [{"id": "unit", "value": "short"}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]
+              }
+            ]
+          },
+          "options": {
+            "displayMode": "basic",
+            "orientation": "horizontal",
+            "namePlacement": "left"
           }
         },
         {
@@ -331,9 +499,9 @@ data:
           "description": "Codex usage at API prices over the last 7 days (or since the ledger's first session, if newer), by session start time, scaled to 30 days. What this workload would cost on pay-per-token billing. Codex and Claude. Gemini is not instrumented. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
           "gridPos": {
             "h": 6,
-            "w": 8,
-            "x": 8,
-            "y": 7
+            "w": 4,
+            "x": 20,
+            "y": 1
           },
           "datasource": {
             "type": "prometheus",
@@ -368,8 +536,8 @@ data:
           "description": "API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.",
           "gridPos": {
             "h": 6,
-            "w": 8,
-            "x": 16,
+            "w": 6,
+            "x": 18,
             "y": 7
           },
           "datasource": {
@@ -415,7 +583,7 @@ data:
           "description": "Claude Code usage priced at Anthropic API list rates; not the subscription bill. A time window counts every message in it, including spec writing, design and discussion. A release counts only messages sent while one of its specs was between dispatch and land, split across specs that overlap. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.",
           "gridPos": {
             "h": 6,
-            "w": 6,
+            "w": 4,
             "x": 0,
             "y": 13
           },
@@ -442,6 +610,56 @@ data:
           }
         },
         {
+          "id": 119,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Unpriced messages",
+          "description": "Count of Claude messages from unpriced models in the selected window. The Claude API-equivalent cost excludes those messages.",
+          "gridPos": {
+            "h": 6,
+            "w": 4,
+            "x": 4,
+            "y": 13
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_claude_unpriced_messages{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
           "id": 29,
           "type": "stat",
           "options": {
@@ -453,8 +671,8 @@ data:
           "description": "Release scope only; time windows show no data, because their total is all Claude work, not only dispatch work. Claude at API prices divided by the release's landed specs. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.",
           "gridPos": {
             "h": 6,
-            "w": 6,
-            "x": 6,
+            "w": 4,
+            "x": 8,
             "y": 13
           },
           "datasource": {
@@ -607,9 +825,13 @@ data:
           "options": {
             "xField": "date",
             "stacking": "normal",
-            "text": {
-              "valueSize": 14
-            }
+            "showValue": "never",
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
           }
         },
         {
@@ -765,9 +987,13 @@ data:
           "options": {
             "xField": "date",
             "stacking": "normal",
-            "text": {
-              "valueSize": 14
-            }
+            "showValue": "never",
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
           }
         },
         {
@@ -875,7 +1101,12 @@ data:
           "type": "row",
           "title": "Whole system at API prices",
           "collapsed": false,
-          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 43},
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 43
+          },
           "panels": []
         },
         {
@@ -883,44 +1114,188 @@ data:
           "type": "stat",
           "title": "Claude + Codex at API prices",
           "description": "Sum of Claude, ledgered Codex and unledgered Codex usage in the selected window, with no denominator. Uses list API prices; includes failed dispatches, rework and review.",
-          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 44},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "targets": [{"expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) + sum by (window) (k3dm_dispatch_api_cost_usd{window=\"$window\"}) + (sum by (window) (k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}) or sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) * 0)", "instant": true}],
-          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
-          "options": {"text": {"valueSize": 32}}
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 0,
+            "y": 44
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) + sum by (window) (k3dm_dispatch_api_cost_usd{window=\"$window\"}) + (sum by (window) (k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}) or sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) * 0)",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "decimals": 2,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          }
         },
         {
           "id": 96,
           "type": "stat",
           "title": "Claude + Codex per live-verified spec",
           "description": "Claude, ledgered Codex and unledgered Codex costs at list API prices in the selected window divided by the live-verified count for that window. Shows No data when the count is 0. Includes failed dispatches, rework and review.",
-          "gridPos": {"h": 8, "w": 6, "x": 6, "y": 44},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "targets": [{"expr": "(sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) + sum by (window) (k3dm_dispatch_api_cost_usd{window=\"$window\"}) + (sum by (window) (k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}) or sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) * 0)) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=\"live\"}) > 0)", "instant": true}],
-          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
-          "options": {"text": {"valueSize": 32}}
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 44
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "(sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) + sum by (window) (k3dm_dispatch_api_cost_usd{window=\"$window\"}) + (sum by (window) (k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}) or sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) * 0)) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=\"live\"}) > 0)",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "decimals": 2,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          }
         },
         {
           "id": 97,
           "type": "stat",
           "title": "API run rate / month",
           "description": "Each Claude and Codex cost at list API prices from the 7d window is divided by its observed days and scaled to 30 days; unledgered Codex uses the Codex observed-days series. Includes failed dispatches, rework and review.",
-          "gridPos": {"h": 8, "w": 6, "x": 12, "y": 44},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "targets": [{"expr": "sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30", "instant": true}],
-          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
-          "options": {"text": {"valueSize": 32}}
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 44
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "decimals": 2,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          }
         },
         {
           "id": 98,
           "type": "stat",
           "title": "API vs replaced plans",
           "description": "The 7d API run rate at list API prices per month divided by the combined Claude + ChatGPT monthly subscription plans only. Gemini, GitHub and Hostinger plans remain. Includes failed dispatches, rework and review.",
-          "gridPos": {"h": 8, "w": 6, "x": 18, "y": 44},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "targets": [{"expr": "(sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30) / (sum(k3dm_dispatch_subscription_usd_per_month{plan=\"claude\"}) + sum(k3dm_dispatch_subscription_usd_per_month{plan=\"chatgpt\"}))", "instant": true}],
-          "fieldConfig": {"defaults": {"unit": "x", "decimals": 1, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
-          "options": {"text": {"valueSize": 32}}
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 44
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "(sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30) / (sum(k3dm_dispatch_subscription_usd_per_month{plan=\"claude\"}) + sum(k3dm_dispatch_subscription_usd_per_month{plan=\"chatgpt\"}))",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "x",
+              "decimals": 1,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          }
         },
         {
           "id": 107,
@@ -959,7 +1334,15 @@ data:
           "fieldConfig": {
             "defaults": {
               "unit": "short",
-              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": []
           }
@@ -996,7 +1379,15 @@ data:
           "fieldConfig": {
             "defaults": {
               "unit": "short",
-              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": []
           }
@@ -1029,7 +1420,15 @@ data:
           "fieldConfig": {
             "defaults": {
               "unit": "short",
-              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": []
           }
@@ -1058,7 +1457,15 @@ data:
           "fieldConfig": {
             "defaults": {
               "unit": "short",
-              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": []
           }
@@ -1091,9 +1498,139 @@ data:
           "fieldConfig": {
             "defaults": {
               "unit": "short",
-              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": []
+          }
+        },
+        {
+          "id": 120,
+          "type": "row",
+          "title": "Fable",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 74
+          }
+        },
+        {
+          "id": 121,
+          "type": "barchart",
+          "title": "Fable tokens per day",
+          "description": "Daily token volume for claude-fable-5-1 on its own axis. Last 30 days.",
+          "gridPos": {
+            "h": 8,
+            "w": 18,
+            "x": 0,
+            "y": 75
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (date) (k3dm_dispatch_claude_daily_tokens{model=\"claude-fable-5-1\"})",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "Value": "Tokens"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "xField": "date",
+            "showValue": "never",
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
+        },
+        {
+          "id": 122,
+          "type": "gauge",
+          "title": "Fable weekly limit",
+          "description": "Fable weekly scoped limit and reset time, from statusline cache.",
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 75
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_quota_used_ratio{limit=\"weekly_fable\"}",
+              "instant": true,
+              "legendFormat": "used"
+            },
+            {
+              "expr": "k3dm_claude_quota_resets_at_seconds{limit=\"weekly_fable\"} * 1000",
+              "instant": true,
+              "legendFormat": "resets at"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.7
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "resets at"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeFromNow"
+                  }
+                ]
+              }
+            ]
           }
         }
       ]

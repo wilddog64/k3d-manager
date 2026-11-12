@@ -8,7 +8,7 @@
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/lib/webhook/status.py` (`_run_cluster_diagnostics`)
-**Related:** `docs/plans/v1.44.0-cloud-request-slack-notification-routing.md` (owns the Slack
+**Related:** `docs/plans/v1.46.0-cloud-request-slack-notification-routing.md` (owns the Slack
 destination half split out of this bug; see "Split" below)
 
 ## Summary
@@ -38,7 +38,7 @@ The original filing also reported that the result does not reply in the originat
 That half is not a code defect: a cloud session submits from the `cloud-requests` branch and has no
 Slack thread of its own, and letting a request carry `channel_id`/`thread_ts` would let any branch
 writer post into arbitrary conversations. Choosing the destination is a trust decision. It belongs to
-`docs/plans/v1.44.0-cloud-request-slack-notification-routing.md` (approved-channel routing for
+`docs/plans/v1.46.0-cloud-request-slack-notification-routing.md` (approved-channel routing for
 cloud requests), not to this bug. This bug changes no Slack destination.
 
 ## Fix
@@ -95,7 +95,7 @@ interface:
 ## What NOT to Do
 
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
-- Do NOT add `channel_id`/`thread_ts` to cloud-request payloads or change Slack routing; that is the v1.44.0 plan.
+- Do NOT add `channel_id`/`thread_ts` to cloud-request payloads or change Slack routing; that is the v1.46.0 plan.
 - Do NOT post to Slack or run real diagnostics in tests.
 
 **Live evidence:** 2026-10-22 · run job-9f369739 · env hub · scenario diagnose-pods-report-shows-job-id · commit ec81caa3 · proves E2

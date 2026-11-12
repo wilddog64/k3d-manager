@@ -142,7 +142,7 @@ flowchart TD
     J --> K["Independent review / live checks"]
 ```
 
-Landing is serialized even though implementation may be parallel. It rechecks the actual target ref to prevent force-push/rewrite or intervening commits from silently invalidating review. `--allow-out-of-scope` is an explicit, reviewed exception, not the normal route. `memory-bank/**` remains prohibited in task changes. This process does **not** create or merge a PR into `main` or deploy Hostinger.
+Landing is serialized even though implementation may be parallel. It rechecks the actual target ref to prevent force-push/rewrite or intervening commits from silently invalidating review. `--allow-out-of-scope` is an explicit, reviewed exception, not the normal route. Instruction and hook files need the separate `--allow-instruction-files` flag because later agent sessions read or execute them. `memory-bank/**` remains prohibited in task changes. This process does **not** create or merge a PR into `main` or deploy Hostinger.
 
 ## Other repositories
 

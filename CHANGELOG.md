@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.43.15] - 2026-11-12
+
+### Fixed
+
+- **Hub deploy ref:** three ApplicationSet appliers (cluster-preflight, the observability deploys, the Hostinger refresh) and Hermes repair r9 no longer re-target hub Applications from `deploy/hub` to the checkout branch; `hub-promote` no longer discards CVE-promoter image-pin commits, tags a promote that moves nothing, or force-moves `deploy/hub`; `hub-rollback` returns to the state live just before the last promote and lists the commits it removes before asking; hub-sync keeps following `deploy/hub` after its upstream branch is deleted and counts the promote backlog against a ref the hub fetches.
+- **Hub timers:** the repo-sync LaunchAgent sets a Homebrew-first PATH, so the hub's `appsets-check` result is no longer always unknown; `install-*` with `K3DM_AGENT_LOAD=0` no longer boots out the live agent.
+- **Security and approvals:** a Hermes approval runs the repair the card showed, not whatever it builds at click time; ask-bash refuses a respelled interpreter name; `land --allow-out-of-scope` no longer lands worker edits to agent instruction and hook files; the fast gate refuses commits authored with a fixture identity.
+- **Cluster and CI:** cluster-up step 10d's realm-import port-forward no longer collides with the Keycloak browser agent on :18080; step 4.1 survives the launchd reload race; Linux CI is green again (`makefile_agent_load.bats` no longer runs the real `plutil`); BATS and the fast gate use the managed Python; the shopping-cart frontend rebuilds to pick up Alpine fixes (libxslt `1.1.43-r4`, live on Hostinger).
+- **Dashboards and tooling:** Codex spend panels stop double-counting the per-mode total and show unpriced tokens as unpriced; Claude context floor and ceiling count every turn; Plans panel Blocked-by, Dispatch worker labels and E2E dates corrected; `codex-dispatch` lands a third round, abandons tasks from older releases, and accepts long `--parent` slugs; hub Loki has a retention limit.
+- Rename the k3dm Bug Tracking dashboard to **k3dm Release Tracking**: it carries release plans, forecast and target state as well as bugs. The uid stays `k3dm-bugs`, so saved links keep working; the Agent dashboards' header link is renamed to match.
+- Run CI on every push to a `k3d-manager-v*` release branch, not only on pull requests. `make hub-promote` requires green GitHub check runs on the commit it promotes, and release-branch commits had none until a PR opened, so the hub could not be promoted during development without `BREAK_GLASS=1`. The `lint` job's same-repository guard now also admits push events, which only the repository's own branches can produce.
+
+### Added
+
+- Approve plain-language intents before dispatch: every dispatched spec carries an operator-facing `intent` on each evidence item and `**Intent approved:**` in its header; `codex-dispatch start` refuses a spec without it, and a verification report answers each intent in a four-part format (what was checked, how, result, what is still unproven), so the operator approves outcomes rather than test names.
+
+- Fast-forward each machine's configured checkouts on a five-minute timer; report hub sync lag, webhook restart needs, and pending hub deployment steps without running them.
+
+- Add an Ubuntu Linux control-node setup path with pinned Homebrew installer verification and no secret or sudo setup.
+
+- Add the `deploy/hub` promotion and rollback flow, status reporting, and platform-ops deployment from the promoted tree.
+- Attribute Codex spend into mutually exclusive categories (`dispatch`, `dispatch_unrecorded`, `interactive`, `exec_untracked`, `other`), assign guardian review tokens and cost to parent sessions, export unpriced model tokens (`k3dm_codex_unpriced_tokens`), and replace Ledger coverage with Dispatch coverage (by cost), Codex spend by category, Ledger gaps, and Spend outside dispatch on the Agent Cost dashboard.
+
 ## [1.43.14] - 2026-11-07
 
 - Export Claude context per turn, post-compaction floor and observed ceiling, active-day turn rates, and cache rebuild counts and cost; add the matching Agent Cost dashboard row and guide.

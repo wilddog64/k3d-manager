@@ -33,6 +33,8 @@ METRICS
   cat >"$FIXTURE/docs/plans/v9.9.9-demo.md" <<'EOF'
 # Test spec
 
+**Intent approved:** test, 2026-11-07
+
 ## Files
 
 | File |
@@ -692,6 +694,41 @@ GIT
   [ "$(jq -r 'select(.event=="land" and .slug=="second")|.chosen' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = true ]
 }
 
+@test "codex dispatch: third same-spec landing names every prior round" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/rounds.argv" STUB_ENV="$BATS_TEST_TMPDIR/rounds.env"
+  local slug
+  for slug in round1 round2 round3; do
+    dispatch start --spec docs/plans/v9.9.9-demo.md --slug "$slug" >/dev/null
+    sleep 1
+    printf '%s implementation\n' "$slug" >"$K3DM_WORKTREE_ROOT/v9.9.9/$slug/a.txt"
+    git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" add a.txt
+    git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" commit -m "$slug" >/dev/null
+    if [[ "$slug" != round3 ]]; then
+      if [[ "$slug" == round1 ]]; then
+        dispatch land --slug "$slug" --no-test >/dev/null
+      else
+        dispatch land --slug "$slug" --no-test --superseding round1 >/dev/null
+      fi
+      git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+      git -C "$FIXTURE" fetch -q origin k3d-manager-v9.9.9:refs/remotes/origin/k3d-manager-v9.9.9
+    fi
+  done
+  run dispatch land --slug round3 --no-test
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"round1"* ]]
+  [[ "$output" == *"round2"* ]]
+  run dispatch land --slug round3 --no-test --superseding round1
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"round2"* ]]
+  [[ "$output" != *"round1"* ]]
+  run dispatch land --slug round3 --no-test --superseding round1 --superseding round2
+  [ "$status" -eq 0 ]
+  [ "$(jq -r 'select(.event=="land" and .slug=="round3")|.chosen' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = true ]
+}
+
 @test "codex dispatch: start refuses a non-release branch" {
   git -C "$FIXTURE" checkout -b feature >/dev/null
   run dispatch start --spec docs/plans/v9.9.9-demo.md
@@ -944,6 +981,130 @@ EOF
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; run dispatch abandon --slug one
   [ "$status" -eq 2 ]; [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/one" ]
   git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/one
+}
+
+@test "codex dispatch: abandon refuses when task has no start in ledger (N1)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/nostart"
+  git -C "$FIXTURE" branch task/v9.9.9/nostart
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/nostart" task/v9.9.9/nostart >/dev/null
+  printf '{"ts":1,"event":"start","version":"v9.9.9","slug":"other","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  local before
+  before="$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  run dispatch abandon --slug nostart --yes
+  [ "$status" -ne 0 ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$before" ]
+}
+
+@test "codex dispatch: abandon refuses when task is already landed or abandoned (N2)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/already-landed"
+  git -C "$FIXTURE" branch task/v9.9.9/already-landed
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/already-landed" task/v9.9.9/already-landed >/dev/null
+  printf '{"ts":1,"event":"start","version":"v9.9.9","slug":"already-landed","repo":"k3d-manager"}\n{"ts":2,"event":"land","version":"v9.9.9","slug":"already-landed","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  local before
+  before="$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  run dispatch abandon --slug already-landed --yes
+  [ "$status" -ne 0 ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$before" ]
+}
+
+@test "codex dispatch: abandon --version of an older release preserves current release worktree and branch (N3)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.8/old-task"
+  git -C "$FIXTURE" branch task/v9.9.8/old-task
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.8/old-task" task/v9.9.8/old-task >/dev/null
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/curr-task"
+  git -C "$FIXTURE" branch task/v9.9.9/curr-task
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/curr-task" task/v9.9.9/curr-task >/dev/null
+  printf '{"ts":1,"event":"start","version":"v9.9.8","slug":"old-task","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  printf '{"ts":2,"event":"start","version":"v9.9.9","slug":"curr-task","repo":"k3d-manager"}\n' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch abandon --version v9.9.8 --slug old-task --yes
+  [ "$status" -eq 0 ]
+  [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/curr-task" ]
+  git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/curr-task
+}
+
+@test "codex dispatch: abandon without yes changes nothing in ledger, worktree, or branch (N4)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.8/old-task"
+  git -C "$FIXTURE" branch task/v9.9.8/old-task
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.8/old-task" task/v9.9.8/old-task >/dev/null
+  printf '{"ts":1,"event":"start","version":"v9.9.8","slug":"old-task","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  local before_ledger
+  before_ledger="$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  run dispatch abandon --version v9.9.8 --slug old-task
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"would remove: $K3DM_WORKTREE_ROOT/v9.9.8/old-task"* ]]
+  [[ "$output" == *"would delete branch: task/v9.9.8/old-task"* ]]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$before_ledger" ]
+  [ -d "$K3DM_WORKTREE_ROOT/v9.9.8/old-task" ]
+  git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.8/old-task
+}
+
+@test "codex dispatch: abandon --version from different release branch writes abandon event and clears open (M1)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v1.2.3/older-task"
+  git -C "$FIXTURE" branch task/v1.2.3/older-task
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v1.2.3/older-task" task/v1.2.3/older-task >/dev/null
+  printf '{"ts":1,"event":"start","version":"v1.2.3","slug":"older-task","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch open
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"v1.2.3 older-task"* ]]
+  run dispatch abandon --version v1.2.3 --slug older-task --yes
+  [ "$status" -eq 0 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v1.2.3/older-task" ]
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v1.2.3/older-task
+  run jq -c 'select(.event == "abandon" and .version == "v1.2.3" and .slug == "older-task")' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  run dispatch open
+  [[ "$output" != *"older-task"* ]]
+}
+
+@test "codex dispatch: abandon of task whose worktree and branch are gone exits 0 and writes event (M2)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  printf '{"ts":1,"event":"start","version":"v1.2.3","slug":"gone-task","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch abandon --version v1.2.3 --slug gone-task --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"missing worktree:"* ]]
+  [[ "$output" == *"missing branch:"* ]]
+  [[ "$output" == *"abandoned: gone-task"* ]]
+  run jq -c 'select(.event == "abandon" and .version == "v1.2.3" and .slug == "gone-task")' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+}
+
+@test "codex dispatch: abandon --reason TEXT records TEXT in the abandon event (M3)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  printf '{"ts":1,"event":"start","version":"v1.2.3","slug":"reason-task","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch abandon --version v1.2.3 --slug reason-task --reason "superseded by v2" --yes
+  [ "$status" -eq 0 ]
+  reason="$(jq -r 'select(.event == "abandon" and .version == "v1.2.3" and .slug == "reason-task") | .reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$reason" = "superseded by v2" ]
+}
+
+@test "codex dispatch: abandon without --version closes current release task and removes worktree and branch (M4)" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/current-task"
+  git -C "$FIXTURE" branch task/v9.9.9/current-task
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/current-task" task/v9.9.9/current-task >/dev/null
+  printf '{"ts":1,"event":"start","version":"v9.9.9","slug":"current-task","repo":"k3d-manager"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch abandon --slug current-task --yes
+  [ "$status" -eq 0 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/current-task" ]
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/current-task
+  run jq -c 'select(.event == "abandon" and .version == "v9.9.9" and .slug == "current-task")' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
 }
 
 @test "codex dispatch: prune removes landed current and earlier release tasks and branch-only leftovers" {
@@ -1703,6 +1864,85 @@ EOF
   [[ "$output" == *"$run_dir/state/jobs"* && "$output" == *"$run_dir/state/tmp"* ]]
 }
 
+@test "codex dispatch: instruction files require explicit land authorization" {
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/guard.argv" STUB_ENV="$BATS_TEST_TMPDIR/guard.env"
+  sed -i.bak '/| `a.txt` |/a\
+| `AGENTS.md` |' "$FIXTURE/docs/plans/v9.9.9-demo.md"
+  rm -f "$FIXTURE/docs/plans/v9.9.9-demo.md.bak"
+  git -C "$FIXTURE" add docs/plans/v9.9.9-demo.md; git -C "$FIXTURE" commit -qm list-instruction-file
+  git -C "$FIXTURE" push origin k3d-manager-v9.9.9 >/dev/null
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug protected >/dev/null; sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/protected" before
+  printf 'new instruction\n' >"$task/AGENTS.md"
+  git -C "$task" add AGENTS.md a.txt; git -C "$task" commit -qm protected
+  before="$(git -C "$FIXTURE" rev-parse k3d-manager-v9.9.9)"
+  run dispatch land --slug protected --no-test
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'instruction-file: AGENTS.md'* ]]
+  run dispatch land --slug protected --no-test --allow-out-of-scope
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'instruction-file: AGENTS.md'* && "$output" == *'+new instruction'* ]]
+  [ "$(git -C "$FIXTURE" rev-parse k3d-manager-v9.9.9)" = "$before" ]
+  jq -e -s 'any(.[]; .slug=="protected" and .event=="land_refused" and .reason=="scope" and .detail=="instruction-files")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  if jq -e -s 'any(.[]; .slug=="protected" and .event=="land")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null; then false; fi
+  run dispatch land --slug protected --no-test --allow-out-of-scope --allow-instruction-files
+  [ "$status" -eq 0 ]
+  jq -e -s 'any(.[]; .slug=="protected" and .event=="land" and (.instruction_files|index("AGENTS.md")))' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "codex dispatch: instruction path patterns cover nested names and uncommitted files" {
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/pattern.argv" STUB_ENV="$BATS_TEST_TMPDIR/pattern.env"
+  local path slug task
+  for path in scripts/lib/foundation/CLAUDE.md .claude/hooks/x.sh .github/copilot-instructions.md nested/.envrc nested/.mcp.json; do
+    slug="pattern-$RANDOM"
+    dispatch start --spec docs/plans/v9.9.9-demo.md --slug "$slug" >/dev/null; sleep 1
+    task="$K3DM_WORKTREE_ROOT/v9.9.9/$slug"
+    mkdir -p "$task/${path%/*}" 2>/dev/null || true
+    printf 'protected change\n' >"$task/$path"
+    git -C "$task" add "$path" a.txt; git -C "$task" commit -qm protected
+    run dispatch land --slug "$slug" --no-test --allow-out-of-scope
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"instruction-file: $path"* ]]
+  done
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug untracked >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/untracked"
+  git -C "$task" add a.txt; git -C "$task" commit -qm baseline-edit
+  mkdir -p "$task/nested"
+  printf 'tracked marker\n' >"$task/nested/AGENTS.md"
+  git -C "$task" add nested/AGENTS.md; git -C "$task" commit -qm tracked-instruction
+  printf 'uncommitted marker\n' >>"$task/nested/AGENTS.md"
+  printf 'untracked marker\n' >"$task/nested/CLAUDE.md"
+  run dispatch land --slug untracked --no-test --allow-out-of-scope
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'instruction-file: nested/AGENTS.md'* && "$output" == *'+uncommitted marker'* ]]
+  [[ "$output" == *'instruction-file: nested/CLAUDE.md'* && "$output" == *'+untracked marker'* ]]
+}
+
+@test "codex dispatch: ordinary scope rules remain unchanged" {
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/scope.argv" STUB_ENV="$BATS_TEST_TMPDIR/scope.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug ordinary >/dev/null; sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/ordinary"
+  printf 'changed\n' >"$task/a.txt"
+  git -C "$task" add a.txt; git -C "$task" commit -qm ordinary
+  run dispatch land --slug ordinary --no-test
+  [ "$status" -eq 0 ]
+  git -C "$FIXTURE" push origin k3d-manager-v9.9.9 >/dev/null
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug extra >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/extra"
+  printf 'out of scope\n' >"$task/extra.txt"
+  git -C "$task" add extra.txt a.txt; git -C "$task" commit -qm extra
+  run dispatch land --slug extra --no-test
+  [ "$status" -eq 2 ]
+  run dispatch land --slug extra --no-test --allow-out-of-scope --superseding ordinary
+  [ "$status" -eq 0 ]
+}
+
 @test "codex dispatch: evidence refusals and failure without evidence" {
   printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"sample"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ "$FIXTURE" != "$(git rev-parse --show-toplevel)" ]
@@ -1796,4 +2036,18 @@ LEDGER
   [ "$status" -eq 0 ]; [ -z "$output" ]
   cmp "$BATS_TEST_TMPDIR/before" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ "$(find "$K3DM_WORKTREE_ROOT" -mindepth 1 | wc -l | tr -d ' ')" -eq 1 ]
+}
+
+@test "codex dispatch start accepts a long parent slug and refuses one over 120 characters" {
+  local long over
+  [ "$K3DM_WORKTREE_ROOT" != "$HOME/.local/share/k3d-manager/worktrees" ]
+  sed '/deliberately corrupt/d' "$BATS_TEST_DIRNAME/../fixtures/dispatch-gates/synthetic.jsonl" >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/long-parent.argv" STUB_ENV="$BATS_TEST_TMPDIR/long-parent.env"
+  long="$(printf 'p%.0s' {1..120})"
+  over="${long}p"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug over-parent --parent "$over" --role review
+  [ "$status" -eq 2 ]
+  [ "$(jq -s '[.[]|select(.slug=="over-parent" and .event=="start")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug long-parent --parent "$long" --role review >/dev/null
+  [ "$(jq -r -s '[.[]|select(.slug=="long-parent" and .event=="start")][-1] | .parent' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$long" ]
 }

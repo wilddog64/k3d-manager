@@ -148,10 +148,16 @@ from the keychain, so the fallback has no bootstrapping circularity.
 ### Why item 3 denies a read, and what to do about it
 
 `gemini-cli-api-key` was created by the Gemini CLI with an access control trusting only its own
-binary, so a value read from any other process returns **rc 36** (`errSecInteractionNotAllowed`,
--25308 truncated to a byte): the item exists, the keychain is unlocked, and the process cannot
-present the authorization dialog. This is not a locked keychain — every k3dm-owned item reads at rc 0
-from the same non-TTY shell.
+binary, so a value read from any other process can return **rc 36** (`errSecInteractionNotAllowed`,
+-25308 truncated to a byte). First check whether the login keychain is locked for this session:
+
+```bash
+security show-keychain-info ~/Library/Keychains/login.keychain-db
+```
+
+If that check is refused, run `security unlock-keychain` in the same session and retry the read.
+If the check answers, the lock is not the cause in this case: every k3dm-owned item reads at rc 0
+from the same non-TTY shell, so the Gemini item's access control is the likely cause.
 
 **Widen that item's access; do not copy the key into a second item.** Run this in a GUI Terminal
 session, where the keychain can prompt:

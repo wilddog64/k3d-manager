@@ -84,6 +84,44 @@ class WebhookPolicyTests(unittest.TestCase):
                     "reader", wh.effective_policy(
                         route, "/api/v1/cluster", {"action": action, "provider": "aws"})))
 
+    def test_trust_vault_ca_action_requires_admin(self):
+        route = {"handler": "cluster", "min_role": "reader", "action_name": "cluster"}
+        policy_result = policy.effective_policy(
+            route, "/api/v1/cluster", {"action": "trust-vault-ca"})
+        self.assertFalse(policy._policy_allows("reader", policy_result))
+        self.assertEqual(policy_result, {
+            "name": "cluster-trust-vault-ca", "min_role": "admin"
+        })
+        self.assertTrue(policy._policy_allows("admin", policy_result))
+
+    def test_trust_vault_ca_flag_requires_admin_and_is_not_cluster_up(self):
+        route = {"handler": "cluster", "min_role": "reader", "action_name": "cluster"}
+        policy_result = policy.effective_policy(
+            route, "/api/v1/cluster",
+            {"action": "up", "provider": "aws", "trust_vault_ca": True})
+        self.assertEqual(policy_result["min_role"], "admin")
+        self.assertNotEqual(policy_result["name"], "cluster-up")
+        self.assertFalse(policy._policy_allows("cloud-runner", policy_result))
+        self.assertTrue(policy._policy_allows("admin", policy_result))
+
+    def test_trust_vault_ca_truthy_flag_matches_webhook_bool(self):
+        route = {"handler": "cluster", "min_role": "reader", "action_name": "cluster"}
+        for flag in (1, "true"):
+            with self.subTest(flag=flag):
+                policy_result = policy.effective_policy(
+                    route, "/api/v1/cluster", {"action": "up", "trust_vault_ca": flag})
+                self.assertEqual(policy_result["name"], "cluster-trust-vault-ca")
+                self.assertEqual(policy_result["min_role"], "admin")
+
+    def test_cluster_up_down_kill_policies_remain_unchanged(self):
+        route = {"handler": "cluster", "min_role": "reader", "action_name": "cluster"}
+        expected = {"up": "admin", "down": "admin", "kill": "operator"}
+        for action, role in expected.items():
+            with self.subTest(action=action):
+                result = policy.effective_policy(
+                    route, "/api/v1/cluster", {"action": action})
+                self.assertEqual(result["min_role"], role)
+
     def test_reader_token_role_is_ceiling_without_header(self):
         self.assertEqual(wh._request_role({}, "reader"), "reader")
 

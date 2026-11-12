@@ -63,4 +63,4 @@ scope: out-of-scope (allowed)
 ```
 
 No changes were made to the live webhook or infrastructure. The E2E runner-interface bug was held
-for `v1.46.0` release triage at the operator's direction; no task was dispatched for it.
+for `v1.55.0` release triage at the operator's direction; no task was dispatched for it.

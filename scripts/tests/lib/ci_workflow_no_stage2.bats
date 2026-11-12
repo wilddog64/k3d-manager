@@ -1,7 +1,11 @@
 #!/usr/bin/env bats
 
+setup() {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+}
+
 @test "CI workflow: retired jobs and self-hosted runners stay absent" {
-  run python3 - "${CI_WORKFLOW_PATH:-${BATS_TEST_DIRNAME}/../../../.github/workflows/ci.yml}" <<'PY'
+  run "$(k3dm_python_yaml)" - "${CI_WORKFLOW_PATH:-${BATS_TEST_DIRNAME}/../../../.github/workflows/ci.yml}" <<'PY'
 import sys
 import yaml
 
