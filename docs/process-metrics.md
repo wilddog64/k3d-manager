@@ -21,6 +21,8 @@ triage; P2/P3 are captured and triaged at `/release-groom`.
 
 **Tuning:** the operator expects these rules to change as data comes in; record each change here with its date and reason.
 
+- 2026-11-11: triage trigger 10 → 20 captured (or oldest 7 days). v1.43.15 filed ~80 bugs in ~4 days (~20/day), so 10 would fire about twice a day (operator: "let's set threshold to 20 to see that will be a better choice").
+
 **Revert trigger:** any escalation that the wait made worse. Claude reports it at once, not at the review.
 
 ## Baseline (old rule: P2s aimed at the open release)

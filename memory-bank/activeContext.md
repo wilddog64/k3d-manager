@@ -1,3 +1,4 @@
+- 2026-11-11 late: triage trigger raised 10 -> 20 captured (or oldest 7 days), operator; logged in docs/process-metrics.md tuning log.
 - 2026-11-11 late: triage trigger set (operator 'sounds good'): 10 captured since last triage or oldest 7 days, from v1.44.0; Wednesday slot dropped. Shared rule block, release-groom, process-metrics (triage sessions metric, tuning log) updated.
 - 2026-11-11 late: first second-agent classification: forecast-tiles bug Argon P2 vs Claude P3 -> P2 stands pending operator. ideas.md test-health row lever (1) extended with codex_dispatch.bats per-test setup (operator go).
 - 2026-11-11 late: captured P3 docs/bugs/2026-11-11-bugs-dashboard-target-forecast-tiles-always-no-date.md (operator: tiles not needed; Waiting on operator decision; first capture under the new rule). LinkedIn: operator wants concrete v1.44.0 evidence before the next post; no draft.
