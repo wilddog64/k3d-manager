@@ -1,10 +1,10 @@
 # Bug: cluster-status test rewrites the operator's real Alertmanager launch agent
 
-**Status:** OPEN — child C3 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
+**Status:** LANDED — test-hygiene batch `0b8d2b80` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The unisolated test fails `make test-bin` on offline hosts and overwrites the operator's real LaunchAgent plist, though no active service is down now and the plist can be removed or regenerated as a workaround); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (test-hygiene batch, before plan 1) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-12 (operator `make test` on the M4 / fresh clone)
 **Introduced by:** unknown (the restore call in `bin/cluster-status:431` and the test predate this audit; not bisected)
 **Should have been caught by:** review
 **Prior art:** none above threshold — exact-slug glob empty; `make find-similar-docs` not run to a result (vector

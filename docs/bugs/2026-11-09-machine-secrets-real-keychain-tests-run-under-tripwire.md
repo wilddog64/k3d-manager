@@ -1,10 +1,10 @@
 # Bug: machine-secrets real-Keychain tests run inside the tripwire, where they can never pass
 
-**Status:** OPEN — child C4 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
+**Status:** LANDED — test-hygiene batch `0b8d2b80` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P2
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only defect where two real-Keychain test cases were placed in the tripwire-wrapped `make test-bin` suite and lacked teardown hygiene, with no impact on production code); Claude proposed P2. Claude's higher P2 stands until the operator decides.
 **Triage:** carry → v1.44.0 (test-hygiene batch, before plan 1) — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-12 (operator `make test` on the M4 / fresh clone)
 **Introduced by:** `bd68d6ff` (v1.43.12, 2026-10-31), which added both real-Keychain cases to a file that
 `make test-bin` runs under `scripts/tests/tripwire.sh`
 **Should have been caught by:** review

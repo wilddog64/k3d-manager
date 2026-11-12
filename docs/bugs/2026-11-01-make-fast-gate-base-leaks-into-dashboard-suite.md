@@ -1,10 +1,10 @@
 # Bug: `make fast-gate BASE=<sha>` fails `agent_dispatch_dashboard.bats` because the suite reads `BASE` from the environment
 
-**Status:** OPEN
+**Status:** LANDED — test-hygiene batch `0b8d2b80` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (make fast-gate BASE=<sha>` fails due to `BASE` leaking into `agent_dispatch_dashboard.bats`, but calling `scripts/ci/fast_gate.sh <sha>` directly with a positional argument works around it); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-12 (operator `make test` on the M4 / fresh clone)
 **Severity:** low — a false red from the documented `make fast-gate BASE=...` form; the pre-push hook and `land` pass the base positionally and are unaffected; workaround `scripts/ci/fast_gate.sh <sha>`
 **Approval:** operator, 2026-11-01 ("let's get the reminding items complete so we can create-pr"; found while running E4 of the fast-gate bug)
 **Filed:** 2026-11-01

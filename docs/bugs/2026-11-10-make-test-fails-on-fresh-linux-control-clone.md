@@ -1,10 +1,10 @@
 # Bug: `make test` fails 7 tests on a fresh Linux control-node clone (three test-hermeticity causes)
 
-**Status:** OPEN
+**Status:** LANDED — test-hygiene batch `0b8d2b80` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only hermeticity failures in `make test` (missing fixture commit in single-branch clones, unstubbed `htpasswd`, and `tripwire.sh` masking missing `helm` skip guards) with no production runtime impact); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-12 (operator `make test` on the M4 / fresh clone)
 **Introduced by:** A `82c1d9c8` (v1.43.14 release squash); B pre-existing (`945018ee`, v1.36.0); C `76446d6e` (v1.43.15, helm skip guard)
 **Should have been caught by:** A review (the 2026-08-03 lesson: fixtures must not depend on branch-only commits); B offline test (host tool not stubbed); C offline test (skip guard never run on a host without helm)
 **Prior art:** `docs/issues/2026-08-03-stale-test-refs-fixture-orphaned-by-branch-cleanup.md` — read, same class as A (recurrence; that doc recommended a self-contained fixture); `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` — read, related to C (tripwire vs tool fallback), different mechanism; `make find-similar-docs` not run (vector store unreachable from the M4)

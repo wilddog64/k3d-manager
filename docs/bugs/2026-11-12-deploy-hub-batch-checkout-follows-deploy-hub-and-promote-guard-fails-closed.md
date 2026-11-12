@@ -1,8 +1,8 @@
 # deploy/hub batch: the hub checkout follows deploy/hub, the promote guard fails closed, and four P3s on the same files
 
-**Status:** OPEN — batch fix spec, written 2026-11-12
+**Status:** LANDED — deploy-hub batch `c7466d65` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-12 (after `make hub-promote`)
 **Introduced by:** v1.43.15 (checkout auto-sync and deploy/hub promote plans)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — this is a batch spec over six captured docs; each doc carries its own Prior art line

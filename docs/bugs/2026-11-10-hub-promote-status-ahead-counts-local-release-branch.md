@@ -1,10 +1,10 @@
 # Bug: `make hub-promote-status` counts "ahead of deploy/hub" from the local release branch, not origin
 
-**Status:** OPEN
+**Status:** LANDED — deploy-hub batch `c7466d65` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (make hub-promote-status` reports a misleading ahead-count when the local release branch is stale, but moves no refs and has simple workarounds (`git pull`, `git rev-list` against `origin`, or `state.json`'s `promote_b…); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** carry → v1.44.0 (deploy/hub batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-12 (after `make hub-promote`)
 **Introduced by:** v1.44.0 hub-deploy-ref work (`bin/k3dm-hub-promote` `status()`), landed in v1.43.15
 **Should have been caught by:** offline test (status is tested only in a fixture where local and origin agree)
 **Prior art:** `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` absent on the M4, 2026-11-10); exact-slug glob: none
