@@ -2,7 +2,7 @@
 
 **Status:** OPEN — child C2 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-09
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` fix (v1.43.5), which
 installed promtool in the CI `lint` job only
 **Should have been caught by:** spec (the 2026-10-24 fix covered one environment; its 2026-10-30 Recurrence named

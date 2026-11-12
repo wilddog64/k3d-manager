@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** pre-existing (`/hostinger-status` added in v1.7.1, `0c9b2707`; `/cluster-status [provider]` later
 covered the same checks)
 **Should have been caught by:** live check

@@ -2,7 +2,7 @@
 
 **Status:** OPEN — specced 2026-11-07; queued for a P3 batch under the dispatch WIP limit
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-07
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** pre-existing (the rule is new on 2026-11-07; nothing enforces it yet)
 **Should have been caught by:** none
 **Severity:** low — without enforcement, the new `Introduced by` and `Should have been caught by` lines will be skipped, and the per-release escape counts in the retro will be incomplete

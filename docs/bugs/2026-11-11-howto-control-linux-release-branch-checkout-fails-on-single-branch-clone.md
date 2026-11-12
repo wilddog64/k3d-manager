@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-11 (next free slot; WIP 3/3)
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** `4bd764b9` (control-node-linux: the how-to's VM sequence)
 **Should have been caught by:** live check (the sequence was first run end to end in this E3 rerun)
 **Prior art:** exact-slug glob: none. `make find-similar-docs`: unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-11)

@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P2 — raised from P3 2026-11-11 (operator: "go ahead with your recommendation"): the Slack Promote button (part 3 of the promote-smoothing idea) needs Hermes buttons to record every press; this bug drops a Deny. Target: v1.44.0, before part 3.
-**Waiting on:** dispatch — since 2026-11-11 (after `k3d-manager-v1.44.0` is cut)
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes

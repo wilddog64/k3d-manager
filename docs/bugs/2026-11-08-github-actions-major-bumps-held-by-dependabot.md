@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed; batch with other P3s into the release
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** pre-existing (pins set before the upstream majors: checkout v5 2025-08-11, setup-kubectl v5 2026-03-25, wrangler-action v4 2026-05-12)
 **Should have been caught by:** none
 **Severity:** low — nothing is broken today; the pins age, and #158 as opened would replace a pinned Wrangler with `latest`

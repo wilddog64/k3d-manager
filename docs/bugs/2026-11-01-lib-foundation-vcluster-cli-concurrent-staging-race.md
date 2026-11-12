@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P3 — test-only so far; it flakes CI on unrelated PRs. Separate processes stage different files and end with the same binary
 **Approval:** pending (filed by Claude 2026-11-01 while gating lib-foundation PR #74)
-**Waiting on:** dispatch — since 2026-11-07
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Affected:** lib-foundation `scripts/lib/system.sh` `foundation_ensure_vcluster_cli` (staging at ~line 2025, `staged_binary="${managed_dir}/.vcluster.$$"`); `_foundation_vcluster_lock` (~line 1965); test `scripts/tests/lib/system.bats` "concurrent callers leave one binary and no lock" (~line 566)
 
 ## Symptom

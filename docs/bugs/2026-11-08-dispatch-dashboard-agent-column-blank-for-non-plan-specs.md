@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08 (batch with the Acting coordinator P3; both edit the Per spec panel)
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** `d0c247dc` (v1.43.7, Agent read from the spec series)
 **Should have been caught by:** offline test
 **Severity:** low — display only; the ledger records the agent correctly

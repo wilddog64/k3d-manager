@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2 — `/cluster-up aws` from Slack fails at step 1 whenever the Pluralsight session lapses; workaround: sign in by hand on the M5's CDP Chrome (:9222) and rerun
-**Waiting on:** dispatch — since 2026-11-11 (lib-foundation upstream; after the queued P2s)
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Severity:** medium — unattended cluster-up depends on a human at the M5's screen every few days; each recurrence of this flow is diagnosed by guessing

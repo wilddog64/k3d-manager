@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** `cd38a7e5` (v1.29.0, Hermes phase 1)
 **Should have been caught by:** spec
 **Severity:** low — misleading Slack message; workaround: read the earlier incident message and `bin/k3dm-hermes` status

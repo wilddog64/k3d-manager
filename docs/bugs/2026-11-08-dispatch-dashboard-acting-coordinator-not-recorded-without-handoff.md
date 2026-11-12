@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08 (batch with the Agent column P3; both edit the Per spec panel)
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** `32393e17` (v1.43.9, Acting coordinator column)
 **Should have been caught by:** spec
 **Severity:** low — display only; reads as missing data when nothing is missing

@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-11
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** unknown
 **Should have been caught by:** spec
 **Severity:** low — two v1.43.15 test-only P2s sit orange "not yet" for ever, as if a live check were owed; workaround: read the doc's Acceptance block

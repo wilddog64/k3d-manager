@@ -2,7 +2,7 @@
 
 **Status:** OPEN — child C3 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-09
+**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
 **Introduced by:** unknown (the restore call in `bin/cluster-status:431` and the test predate this audit; not bisected)
 **Should have been caught by:** review
 **Prior art:** none above threshold — exact-slug glob empty; `make find-similar-docs` not run to a result (vector
