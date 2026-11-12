@@ -1,8 +1,8 @@
 # hub-rollback's confirmation lists no commits, and drops promoter commits it never shows
 
-**Status:** OPEN — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude (scratch repo + reading)
+**Status:** LANDED `abbb15cd` + `9e80d429` 2026-11-11 (Luna, 3 rounds; Fable review applied; Flash 3.8 review: land; Claude 39/39 under a pty) — found 2026-11-11 by the Fable pre-PR review of v1.43.15; confirmed by Claude (scratch repo + reading)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11 (first real rollback; no live evidence required by the spec)
 **Introduced by:** `897cfe72` (v1.43.15, deploy/hub with hub-promote and hub-rollback)
 **Should have been caught by:** review
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` — read, different case (that fix guards commits on top of the stack top; it states a rollback "drops the latest promotion's commits by design"); `docs/bugs/2026-11-08-hub-promote-no-op-promote-tags-and-breaks-rollback.md` — read, different root cause

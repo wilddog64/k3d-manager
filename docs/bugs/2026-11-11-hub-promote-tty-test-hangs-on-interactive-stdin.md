@@ -1,8 +1,7 @@
 # hub_promote.bats "non-TTY" test hangs forever when the suite runs from a terminal
 
-**Status:** OPEN — found 2026-11-11 by Claude (Flash review child hung 40 min)
+**Status:** LANDED `abbb15cd` 2026-11-11 (folded into the rollback dispatch; suite finishes under `script -q /dev/null`)
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-11 (fold into the open rollback dispatch, which owns `hub_promote.bats`)
 **Introduced by:** `897cfe72` (v1.43.15, deploy/hub with hub-promote and hub-rollback)
 **Should have been caught by:** review
 **Prior art:** `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md` — read by title, same class (test inherits an interactive stdin), different file; none above threshold otherwise (`find-similar-docs` not run)
