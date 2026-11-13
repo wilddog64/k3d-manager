@@ -577,3 +577,7 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13: dev-hub B r6 verified, P3 lows captured, landing; plan 5 correction 1 running; plan 3 r1 exited.
 - 2026-11-13: dev-hub B landed 65e4799f, offline_tested; awaiting operator E2. Plan 3 r1 under Fable review.
 - 2026-11-13: plan 3 correction 2 sent.
+- 2026-11-13: plan 5 r1 under verification.
+- 2026-11-13: plan 5 correction 2 running.
+- 2026-11-13: plan 3 r2 under verification.
+- 2026-11-13: plan 3 r2 verified, P3 captured, landing.
