@@ -49,44 +49,70 @@ PY
   [ "$status" -eq 0 ]
 }
 
-@test "release forecast panels align by version and map dates and states" {
+@test "release forecast row has no table and no old forecast titles (M1)" {
   run python3 - "${dashboard}" <<'PY'
 import json, re, sys
 d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d["panels"]
-new=[p for p in panels if 26 <= p["id"] <= 32]
-tiles={p["id"]:p for p in new}
-table=tiles[32]
-assert len(new)==7
-names=[p.get("title","") for p in new]
-names += list(next(t for t in table["transformations"] if t["id"]=="organize")["options"].get("renameByName",{}).values())
-assert all(not re.search(r"ship|release date", name, re.I) for name in names)
+tiles={p["id"]:p for p in panels}
+assert len(tiles)==len(panels)==41
+assert 32 not in tiles
+assert not any(p.get("title") in {"Target forecast (earliest)","Target forecast (latest)","Remaining releases"} for p in panels)
+assert not any(p["type"]=="table" and 10 <= p["gridPos"]["y"] < 15 for p in panels)
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release forecast tiles show open-release Earliest and Latest dates only (M2, N3)" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+panels=d["panels"]
+tiles={p["id"]:p for p in panels}
+row=[p for p in panels if 26 <= p["id"] <= 31]
+assert len(row)==6
+assert all(not re.search(r"ship|release date", p.get("title",""), re.I) for p in row)
 assert all(tiles[i]["fieldConfig"]["defaults"].get("noValue") for i in (28,29,30,31))
-for field in ("Value #B","Value #C","Value #D"):
- override=next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"]==field)
- assert {p["id"]:p["value"] for p in override["properties"]}.get("noValue")=="-"
- assert "custom.noValue" not in {p["id"] for p in override["properties"]}
-exprs={t["refId"]:t["expr"] for t in table["targets"]}
-assert all(f"by (version)" in exprs[k] for k in "BCDE")
-assert all(re.fullmatch(r"version", label) for label in re.findall(r"(?:sum|max) by \(([^)]+)\)", " ".join(exprs[k] for k in "BCDE")))
-assert "sum by (release)" not in exprs["E"]
-assert all(f'bound="{bound}"' in exprs[ref] for ref,bound in zip("BCD",("low","mid","high")))
-assert [t["id"] for t in table["transformations"]]==["merge","convertFieldType","organize"]
-assert table["transformations"][-1]["options"]["excludeByName"].get("Value #A") is True
-conversion=table["transformations"][1]["options"]["conversions"]
-assert any(c["targetField"]=="position" and c["destinationType"]=="number" for c in conversion)
+for pid,bound,title in ((29,"low","Earliest"),(30,"high","Latest")):
+ p=tiles[pid]
+ assert p["title"]==title
+ expr=p["targets"][0]["expr"]
+ assert expr==f'(max by (version) (k3dm_release_milestone_forecast_seconds{{repo="$repo",bound="{bound}"}}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{{repo="$repo"}}, "version", "$1", "release", "(.*)")',expr
+ assert "$release" not in expr
+ assert p["fieldConfig"]["defaults"]["displayName"]=="${__field.labels.version}"
+ assert p["fieldConfig"]["defaults"]["unit"]=="dateTimeAsIso"
+ assert p["options"]["textMode"]=="value_and_name"
+ assert p["fieldConfig"]["defaults"]["noValue"]=="-"
+assert tiles[29]["description"]=="Earliest forecast date for the open release, from tagged release cadence. A range, not a commitment."
+assert tiles[30]["description"]=="Latest forecast date for the open release, from tagged release cadence. A range, not a commitment."
 state_expr=tiles[31]["targets"][0]["expr"]
 assert all(f"({code} * k3dm_release_milestone_info" in state_expr for code in range(2,5))
 assert '(1 * label_replace(label_join(k3dm_release_milestone_info' in state_expr
 mapping=tiles[31]["fieldConfig"]["defaults"]["mappings"]
 assert set(mapping[0]["options"])=={"1","2","3","4"}
 assert mapping[0]["options"]["1"]["text"] == "blocked"
-for panel in new:
- a=panel["gridPos"]
- for other in panels:
-  if other["id"]==panel["id"]: continue
-  b=other["gridPos"]
-  assert a["x"]+a["w"]<=b["x"] or b["x"]+b["w"]<=a["x"] or a["y"]+a["h"]<=b["y"] or b["y"]+b["h"]<=a["y"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release forecast tiles sit in one line and lower panels move up 12 (M3)" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+panels=d["panels"]
+tiles={p["id"]:p for p in panels}
+assert tiles[26]["type"]=="row" and tiles[26]["gridPos"]=={"x":0,"y":10,"w":24,"h":1}
+for x,pid in zip((0,4,8,12,16),(27,28,29,30,31)):
+ assert tiles[pid]["type"]=="stat" and tiles[pid]["gridPos"]=={"x":x,"y":11,"w":4,"h":4},(pid,tiles[pid]["gridPos"])
+assert tiles[107]["title"]=="Plans" and tiles[107]["gridPos"]["y"]==15
+assert max(p["gridPos"]["y"]+p["gridPos"]["h"] for p in panels)==62
+cells=set()
+for panel in panels:
+ pos=panel["gridPos"]
+ for x in range(pos["x"],pos["x"]+pos["w"]):
+  for y in range(pos["y"],pos["y"]+pos["h"]):
+   assert (x,y) not in cells,(panel["id"],x,y)
+   cells.add((x,y))
 PY
   [ "${status}" -eq 0 ]
 }
@@ -118,21 +144,6 @@ assert p[31]["fieldConfig"]["defaults"]["noValue"] == "-"
 assert 'label_join(k3dm_release_milestone_info{repo="$repo",state="blocked"}' in blocked
 assert 'state=~"blocked|after_blocked"' in blocked
 assert 'k3dm_release_milestone_info{repo="$repo",target="true",state=~"forecast|in_progress"}' in blocked
-PY
-  [ "${status}" -eq 0 ]
-}
-
-@test "remaining releases table shows a not-before column" {
-  run python3 - "${dashboard}" <<'PY'
-import json, sys
-d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
-p={panel["id"]:panel for panel in d["panels"]}
-organize=next(t for t in p[32]["transformations"] if t["id"]=="organize")["options"]
-for tgt in p[32]["targets"]:
-    e=tgt["expr"]
-    assert 'and on(version) label_replace(k3dm_bug_current_release_info{repo="$repo"}, "version", "$1", "release", "(.*)") and on() (vector($release_mode) == 1)' in e, e
-    assert 'and on() (vector($release_mode) == 0)' in e and '=~"$release"' in e.split("vector($release_mode) == 1")[1], e
-assert organize["renameByName"].get("not_before") == "Not before"
 PY
   [ "${status}" -eq 0 ]
 }
@@ -319,9 +330,9 @@ assert "k3dm_bug_fixed_in_release_docs" in panels[4]["targets"][0]["expr"]
 assert panels[8]["title"] == "Bugs filed per release, open vs fixed"
 assert panels[25]["targets"][0]["expr"] == 'sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs{repo="$repo"}) > 0'
 assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
-    {"x": 0, "y": 37, "w": 8, "h": 9},
-    {"x": 8, "y": 37, "w": 8, "h": 9},
-    {"x": 16, "y": 37, "w": 8, "h": 9},
+    {"x": 0, "y": 25, "w": 8, "h": 9},
+    {"x": 8, "y": 25, "w": 8, "h": 9},
+    {"x": 16, "y": 25, "w": 8, "h": 9},
 ]
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["fixed_in"] == 7
@@ -379,7 +390,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "release forecast sits between the plan tiles and the Plans table, and lists only unshipped milestones for the selected release" {
+@test "release forecast sits between the plan tiles and Plans table" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 from pathlib import Path
@@ -388,15 +399,8 @@ by_title={p["title"]: p for p in d["panels"]}
 tiles=by_title["Plans in release"]["gridPos"]
 forecast=by_title["Release forecast"]["gridPos"]["y"]
 assert tiles["y"]+tiles["h"] <= forecast < by_title["Plans"]["gridPos"]["y"]
-table=by_title["Remaining releases"]
-plans_expr=next(t["expr"] for t in table["targets"] if t["refId"]=="E")
-head=plans_expr.split("vector($release_mode) == 1)) or ",1)[-1].split(" or on(version) ",1)[0]
-assert 'and on(version) k3dm_release_milestone_info{repo="$repo",version=~"$release",state!="shipped"}' in head, head
-for target in table["targets"]:
-    assert 'version=~"$release"' in target["expr"], (target["refId"], target["expr"])
-assert 'k3dm_plan_release_docs{repo="$repo",release=~"$release"}' in plans_expr
-excluded=next(t for t in table["transformations"] if t["id"]=="organize")["options"]["excludeByName"]
-assert excluded.get("job") and excluded.get("instance")
+assert by_title["Earliest"]["gridPos"]["y"]==forecast+1
+assert by_title["Latest"]["gridPos"]["y"]==forecast+1
 PY
   [ "${status}" -eq 0 ]
 }
@@ -433,8 +437,8 @@ d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d['panels']; row=next(p for p in panels if p['id']==100)
 assert row['title']=='Release plans', row['title']
 added=[p for p in panels if p['id'] >= 100]
-assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 6, 27]
-assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 6, 15]
+assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 24
 table=next(p for p in added if p['title']=='Plans')
 expr=table['targets'][0]['expr']
 assert 'group_left(dispatch_state, slug)' in expr and ' or on(plan) ' in expr
@@ -633,10 +637,10 @@ elif check == "sort":
     assert sort == [{"field": "sort_key", "desc": False}], sort
 elif check == "layout":
     assert panels[22]["type"] == "row"
-    assert table["gridPos"] == {"x": 0, "y": 50, "w": 24, "h": 12}, table["gridPos"]
-    assert all(panels[i]["gridPos"]["y"] == 47 and panels[i]["gridPos"]["h"] == 3 for i in (9, 10, 11, 12, 13, 14, 16, 17, 24))
+    assert table["gridPos"] == {"x": 0, "y": 38, "w": 24, "h": 12}, table["gridPos"]
+    assert all(panels[i]["gridPos"]["y"] == 35 and panels[i]["gridPos"]["h"] == 3 for i in (9, 10, 11, 12, 13, 14, 16, 17, 24))
     assert sum(panels[i]["gridPos"]["w"] for i in (9, 10, 11, 12, 13, 14, 16, 17, 24)) == 24
-    assert panels[15]["gridPos"]["y"] == 62
+    assert panels[15]["gridPos"]["y"] == 50
     rows = sorted((p["gridPos"]["y"], p["id"]) for p in data["panels"] if p["type"] == "row")
     owner = [rid for y, rid in rows if y <= table["gridPos"]["y"]][-1]
     assert owner == 22, owner
@@ -684,11 +688,11 @@ panels = {panel["id"]: panel for panel in data["panels"]}
 live = panels[24]
 assert live["title"] == "Live-verified"
 assert 'live_verified="true"' in live["targets"][0]["expr"]
-assert panels[13]["gridPos"] == {"x": 8, "y": 47, "w": 3, "h": 3}
-assert panels[16]["gridPos"] == {"x": 11, "y": 47, "w": 3, "h": 3}
-assert live["gridPos"] == {"x": 14, "y": 47, "w": 4, "h": 3}
-assert panels[17]["gridPos"] == {"x": 18, "y": 47, "w": 3, "h": 3}
-assert panels[14]["gridPos"] == {"x": 21, "y": 47, "w": 3, "h": 3}
+assert panels[13]["gridPos"] == {"x": 8, "y": 35, "w": 3, "h": 3}
+assert panels[16]["gridPos"] == {"x": 11, "y": 35, "w": 3, "h": 3}
+assert live["gridPos"] == {"x": 14, "y": 35, "w": 4, "h": 3}
+assert panels[17]["gridPos"] == {"x": 18, "y": 35, "w": 3, "h": 3}
+assert panels[14]["gridPos"] == {"x": 21, "y": 35, "w": 3, "h": 3}
 table = panels[23]
 assert 'live_verified=~"$verified"' in table["targets"][0]["expr"]
 PY
@@ -875,24 +879,6 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "remaining releases table shows forecast dates only and fits a laptop-width panel" {
-  run python3 - "${dashboard}" <<'PY'
-import json, sys
-data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
-table = {p["id"]: p for p in data["panels"]}[32]
-assert table["gridPos"]["w"] == 24
-props = {o["matcher"].get("options"): {p["id"]: p["value"] for p in o["properties"]} for o in table["fieldConfig"]["overrides"]}
-for field in ("Value #B", "Value #C", "Value #D"):
-    assert props[field]["unit"] == "time:YYYY-MM-DD", field
-widths = {name: p["custom.width"] for name, p in props.items() if "custom.width" in p}
-org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
-assert "not_before_reason" not in org["renameByName"] or "Not before reason" not in widths
-assert [org["renameByName"][k] for k in ("Value #B", "Value #C", "Value #D")] == ["Earliest", "Expected", "Latest"]
-assert sum(widths.values()) + 2 * table["fieldConfig"]["defaults"]["custom"]["minWidth"] <= 1100, widths
-PY
-  [ "${status}" -eq 0 ]
-}
-
 @test "Plans table separates verified and live-verified status indicators" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
@@ -970,8 +956,8 @@ for panel in data["panels"]:
             cells.add((x, y))
 
 # Next to 3-day panel at y=62
-assert p15["gridPos"]["y"] == 62
-assert new_panel["gridPos"]["y"] == 62
+assert p15["gridPos"]["y"] == 50
+assert new_panel["gridPos"]["y"] == 50
 assert p15["gridPos"]["h"] == new_panel["gridPos"]["h"]
 PY
   [ "${status}" -eq 0 ]

@@ -404,7 +404,7 @@ data:
           "collapsed": false,
           "gridPos": {
             "x": 0,
-            "y": 36,
+            "y": 24,
             "w": 24,
             "h": 1
           },
@@ -421,7 +421,7 @@ data:
           "description": "Every bug doc counted toward each release. unset = filed before priorities existed (2026-10-09). Hover a bar for every count.",
           "gridPos": {
             "x": 0,
-            "y": 37,
+            "y": 25,
             "w": 8,
             "h": 9
           },
@@ -588,7 +588,7 @@ data:
           "description": "closed = FIXED, RESOLVED, CLOSED or similar; unknown = no recognisable status line. Hover a bar for every count.",
           "gridPos": {
             "x": 8,
-            "y": 37,
+            "y": 25,
             "w": 8,
             "h": 9
           },
@@ -723,7 +723,7 @@ data:
           "description": "Counted by the release whose commits changed the bug's status to fixed. A bug filed in one release and fixed in a later one counts here under the later one.",
           "gridPos": {
             "x": 16,
-            "y": 37,
+            "y": 25,
             "w": 8,
             "h": 9
           },
@@ -780,7 +780,7 @@ data:
           "collapsed": false,
           "gridPos": {
             "x": 0,
-            "y": 46,
+            "y": 34,
             "w": 24,
             "h": 1
           },
@@ -794,7 +794,7 @@ data:
           "id": 9,
           "type": "stat",
           "title": "Open P0",
-          "gridPos": {"x": 0, "y": 47, "w": 2, "h": 3},
+          "gridPos": {"x": 0, "y": 35, "w": 2, "h": 3},
           "targets": [
             {
               "refId": "A",
@@ -837,7 +837,7 @@ data:
           "id": 10,
           "type": "stat",
           "title": "Open P1",
-          "gridPos": {"x": 2, "y": 47, "w": 2, "h": 3},
+          "gridPos": {"x": 2, "y": 35, "w": 2, "h": 3},
           "targets": [
             {
               "refId": "A",
@@ -880,7 +880,7 @@ data:
           "id": 11,
           "type": "stat",
           "title": "Open P2",
-          "gridPos": {"x": 4, "y": 47, "w": 2, "h": 3},
+          "gridPos": {"x": 4, "y": 35, "w": 2, "h": 3},
           "targets": [
             {
               "refId": "A",
@@ -919,7 +919,7 @@ data:
           "id": 12,
           "type": "stat",
           "title": "Open P3",
-          "gridPos": {"x": 6, "y": 47, "w": 2, "h": 3},
+          "gridPos": {"x": 6, "y": 35, "w": 2, "h": 3},
           "targets": [
             {
               "refId": "A",
@@ -958,7 +958,7 @@ data:
           "id": 13,
           "type": "stat",
           "title": "Fixed",
-          "gridPos": {"x": 8, "y": 47, "w": 3, "h": 3},
+          "gridPos": {"x": 8, "y": 35, "w": 3, "h": 3},
           "targets": [
             {
               "refId": "A",
@@ -1002,7 +1002,7 @@ data:
           "id": 16,
           "type": "stat",
           "title": "Verified",
-          "gridPos": {"x": 11, "y": 47, "w": 3, "h": 3},
+          "gridPos": {"x": 11, "y": 35, "w": 3, "h": 3},
           "targets": [{"refId": "A", "expr": "sum((((k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",verified=\"true\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"})) and on() (vector($release_mode) == 1)) or ((k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",verified=\"true\",release=~\"$release\"}) and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
@@ -1013,7 +1013,7 @@ data:
           "id": 24,
           "type": "stat",
           "title": "Live-verified",
-          "gridPos": {"x": 14, "y": 47, "w": 4, "h": 3},
+          "gridPos": {"x": 14, "y": 35, "w": 4, "h": 3},
           "targets": [{"refId": "A", "expr": "sum((((k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",live_verified=\"true\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"})) and on() (vector($release_mode) == 1)) or ((k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",live_verified=\"true\",release=~\"$release\"}) and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
@@ -1024,7 +1024,7 @@ data:
           "id": 17,
           "type": "stat",
           "title": "Deferred",
-          "gridPos": {"x": 18, "y": 47, "w": 3, "h": 3},
+          "gridPos": {"x": 18, "y": 35, "w": 3, "h": 3},
           "targets": [{"refId": "A", "expr": "sum((((k3dm_bug_status_docs{repo=\"$repo\",status=\"deferred\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"})) and on() (vector($release_mode) == 1)) or ((k3dm_bug_status_docs{repo=\"$repo\",status=\"deferred\",release=~\"$release\"}) and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "#8e8e8e"}}},
@@ -1035,7 +1035,7 @@ data:
           "id": 14,
           "type": "stat",
           "title": "Scan age",
-          "gridPos": {"x": 21, "y": 47, "w": 3, "h": 3},
+          "gridPos": {"x": 21, "y": 35, "w": 3, "h": 3},
           "targets": [
             {
               "refId": "A",
@@ -1086,7 +1086,7 @@ data:
           "title": "Bugs",
           "gridPos": {
             "x": 0,
-            "y": 50,
+            "y": 38,
             "w": 24,
             "h": 12
           },
@@ -1595,7 +1595,7 @@ data:
           "title": "Open by priority over time",
           "gridPos": {
             "x": 0,
-            "y": 62,
+            "y": 50,
             "w": 12,
             "h": 8
           },
@@ -1719,7 +1719,7 @@ data:
           "description": "Counts are open docs per day, read from the last commit of each UTC day on the release ref. This is an inventory snapshot, not opened/fixed events: a falling count does not prove a fix. Not limited by Prometheus retention.",
           "gridPos": {
             "x": 12,
-            "y": 62,
+            "y": 50,
             "w": 12,
             "h": 8
           },
@@ -2179,7 +2179,7 @@ data:
           "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; orange means the plan waits on the operator's dispatch go or decision; Dispatch task comes from the dispatch ledger. Execution, Verified, and Live verified are status indicators from plan Status only; they do not identify a verifier or evidence record. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains dispatch state and pre-dispatch requirements.",
           "gridPos": {
             "x": 0,
-            "y": 27,
+            "y": 15,
             "w": 24,
             "h": 9
           },
@@ -2810,7 +2810,8 @@ data:
         {
           "id": 29,
           "type": "stat",
-          "title": "Target forecast (earliest)",
+          "title": "Earliest",
+          "description": "Earliest forecast date for the open release, from tagged release cadence. A range, not a commitment.",
           "gridPos": {
             "x": 8,
             "y": 11,
@@ -2820,12 +2821,13 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "min(k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"low\"} * on(version) group_left k3dm_release_milestone_info{repo=\"$repo\",target=\"true\"}) * 1000",
+              "expr": "(max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"low\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\")",
               "instant": true
             }
           ],
           "options": {
             "graphMode": "none",
+            "textMode": "value_and_name",
             "colorMode": "value",
             "reduceOptions": {
               "calcs": [
@@ -2835,7 +2837,8 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "noValue": "no date \u2014 see table",
+              "displayName": "${__field.labels.version}",
+              "noValue": "-",
               "unit": "dateTimeAsIso"
             },
             "overrides": []
@@ -2848,7 +2851,8 @@ data:
         {
           "id": 30,
           "type": "stat",
-          "title": "Target forecast (latest)",
+          "title": "Latest",
+          "description": "Latest forecast date for the open release, from tagged release cadence. A range, not a commitment.",
           "gridPos": {
             "x": 12,
             "y": 11,
@@ -2858,12 +2862,13 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "max(k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"high\"} * on(version) group_left k3dm_release_milestone_info{repo=\"$repo\",target=\"true\"}) * 1000",
+              "expr": "(max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"high\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\")",
               "instant": true
             }
           ],
           "options": {
             "graphMode": "none",
+            "textMode": "value_and_name",
             "colorMode": "value",
             "reduceOptions": {
               "calcs": [
@@ -2873,7 +2878,8 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "noValue": "no date \u2014 see table",
+              "displayName": "${__field.labels.version}",
+              "noValue": "-",
               "unit": "dateTimeAsIso"
             },
             "overrides": []
@@ -2951,261 +2957,6 @@ data:
           }
         },
         {
-          "id": 32,
-          "type": "table",
-          "title": "Remaining releases",
-          "gridPos": {
-            "x": 0,
-            "y": 15,
-            "w": 24,
-            "h": 12
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "((k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"}) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"}) and on() (vector($release_mode) == 0))",
-              "instant": true,
-              "format": "table"
-            },
-            {
-              "refId": "B",
-              "expr": "((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"low\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"low\"}) * 1000) and on() (vector($release_mode) == 0))",
-              "instant": true,
-              "format": "table"
-            },
-            {
-              "refId": "C",
-              "expr": "((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"mid\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"mid\"}) * 1000) and on() (vector($release_mode) == 0))",
-              "instant": true,
-              "format": "table"
-            },
-            {
-              "refId": "D",
-              "expr": "((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"high\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"high\"}) * 1000) and on() (vector($release_mode) == 0))",
-              "instant": true,
-              "format": "table"
-            },
-            {
-              "refId": "E",
-              "expr": "(((sum by (version) (label_replace(k3dm_plan_release_docs{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\")) and on(version) k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"}) or on(version) sum by (version) (0 * k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"})) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or (((sum by (version) (label_replace(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\"}, \"version\", \"$1\", \"release\", \"(.*)\")) and on(version) k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"}) or on(version) sum by (version) (0 * k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"})) and on() (vector($release_mode) == 0))",
-              "instant": true,
-              "format": "table"
-            }
-          ],
-          "transformations": [
-            {
-              "id": "merge",
-              "options": {}
-            },
-            {
-              "id": "convertFieldType",
-              "options": {
-                "conversions": [
-                  {
-                    "targetField": "position",
-                    "destinationType": "number"
-                  }
-                ]
-              }
-            },
-            {
-              "id": "organize",
-              "options": {
-                "indexByName": {
-                  "position": 0,
-                  "version": 1,
-                  "kind": 2,
-                  "state": 3,
-                  "blocked_by": 4,
-                  "Value #E": 5,
-                  "Value #B": 6,
-                  "Value #C": 7,
-                  "Value #D": 8
-                },
-                "renameByName": {
-                  "position": "Position",
-                  "version": "Version",
-                  "kind": "Kind",
-                  "state": "State",
-                  "blocked_by": "Blocked by",
-                  "not_before": "Not before",
-                  "not_before_reason": "Not before reason",
-                  "Value #E": "Plans",
-                  "Value #B": "Earliest",
-                  "Value #C": "Expected",
-                  "Value #D": "Latest"
-                },
-                "excludeByName": {
-                  "repo": true,
-                  "release_order": true,
-                  "target": true,
-                  "current": true,
-                  "overdue": true,
-                  "Time": true,
-                  "Value #A": true,
-                  "__name__": true,
-                  "job": true,
-                  "instance": true
-                }
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "custom": {
-                "minWidth": 80
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Value #B"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 105
-                  },
-                  {
-                    "id": "unit",
-                    "value": "time:YYYY-MM-DD"
-                  },
-                  {
-                    "id": "noValue",
-                    "value": "-"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Value #C"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 105
-                  },
-                  {
-                    "id": "unit",
-                    "value": "time:YYYY-MM-DD"
-                  },
-                  {
-                    "id": "noValue",
-                    "value": "-"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Value #D"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 105
-                  },
-                  {
-                    "id": "unit",
-                    "value": "time:YYYY-MM-DD"
-                  },
-                  {
-                    "id": "noValue",
-                    "value": "-"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Position"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 80
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Version"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 80
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Kind"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 70
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "State"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 90
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Plans"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 60
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Not before"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 105
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "showHeader": true,
-            "sortBy": [
-              {
-                "displayName": "Position",
-                "desc": false
-              }
-            ]
-          }
-        },
-        {
           "id": 108,
           "type": "stat",
           "title": "Undeclared plan overlaps",
@@ -3221,7 +2972,7 @@ data:
           "type": "stat",
           "title": "deploy/hub behind",
           "description": "Commits on the release branch that deploy/hub does not contain; the legend shows the newest CI-green SHA ready for operator promotion.",
-          "gridPos": {"x": 0, "y": 70, "w": 6, "h": 4},
+          "gridPos": {"x": 0, "y": 58, "w": 6, "h": 4},
           "targets": [
             {"refId": "A", "expr": "k3dm_repo_sync_promote_backlog_commits{repo=\"k3d-manager\"}", "instant": true, "legendFormat": "backlog"},
             {"refId": "B", "expr": "k3dm_repo_sync_promotable{repo=\"k3d-manager\"}", "instant": true, "legendFormat": "{{sha}}"},
