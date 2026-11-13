@@ -567,3 +567,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - [ ] dev-hub B round 5 correction running (2026-11-12); then land + operator E2.
 - [ ] plan 3 deploy-hub-behind-alert exited; verify, review, land.
 - [x] deploy/hub promoted to 34707659 (2026-11-12); promotion tag push pending.
+- 2026-11-13: plan 5 captures done — relay unsigned POST 401 on both paths and on a control path (401 proves deployment, not routing; fcc7b09c); manifest export for app k3d-manager A0B863SCQUV OK after duplicate token pair cleared (12/14 command URLs are bare relay root; events go straight to webhook.3ai-talk.org; fb10924a). Spec written e183d18b (rotation via tooling.tokens.rotate with stdin Keychain writes, hourly cadence, relay probe). Waiting on: Fable spec review (running), item 4 rotate-shape capture by operator, intent approval, WIP slot.
