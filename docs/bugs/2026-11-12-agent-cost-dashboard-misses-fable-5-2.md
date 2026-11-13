@@ -4,11 +4,14 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (cost observability degraded; the gauge and raw metrics remain); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-13 (intent approval)
+**Waiting on:** fix running — since 2026-11-13
 **Introduced by:** pre-existing (Fable 5.2 became the subagent default after the panel was written)
 **Should have been caught by:** none
 **Prior art:** `docs/bugs/2026-11-10-dispatch-table-shows-flash-and-fable-as-other.md` (exact-topic read) — same allowlist pattern, fixed for 5-1 only; `make find-similar-docs` not run
-**Approval:** none yet (capture only)
+**Approval:** operator, 2026-11-13: "approved"
+**Dispatch go:** operator, 2026-11-13: "approved"
+**Intent approved:** operator, 2026-11-13
+**Intent approval words:** "approved", in reply to Claude's E1–E5 intents
 
 The "Fable tokens per day" panel queries only `k3dm_dispatch_claude_daily_tokens{model="claude-fable-5-1"}`
 (`scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml:1542`), and
