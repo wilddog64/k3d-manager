@@ -608,3 +608,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13: plan 5 landed (offline_tested); live check after promote.
 - 2026-11-13 ~16:00Z: forecast row run 1 rejected on review (reformat, HEAD-baseline tests, 2 red suite tests); correction resume 2 running. Stray m4-air group now fires K3dmPromoteLookupFailed; proposed P2. Plan 3 E6 pending (cf8cfc2).
 - 2026-11-13 ~16:15Z: forecast row correction verified by Claude (47/47, E1 red pre-fix, E2 clean); Fable review pending before land.
+- 2026-11-13 16:15Z: plan 3 E6 arrival PASS (cf8cfc2); forecast fix cd726a46 committed in worktree after Fable review fixes; landing next.
