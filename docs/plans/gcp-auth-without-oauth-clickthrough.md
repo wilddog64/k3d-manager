@@ -10,6 +10,15 @@ GCP sandbox, with the SA JSON that `providers/gcp.js` writes to `~/.local/share/
 `... gcloud compute instances list`, then `gcloud auth list` (must still show the operator's own account, unchanged).
 Record host, date and `gcloud --version` here. Per the "prove external behaviour" rule this is the proof; until it
 exists the SA's Compute rights are **UNCONFIRMED** (Fable review, 2026-11-12).
+**Probe result (m4-air.local, 2026-11-13T00:55Z and retry 00:57Z, Google Cloud SDK 565.0.0, sandbox project
+playground-s-11-bdff1cbe):** the override works (gcloud: "authenticated as cli-service-account-1@... using the credentials in
+...gcp-service-account.json, specified by the [auth/credential_file_override] property"; a token was issued), and
+`gcloud auth list` was identical before and after (active account unchanged). The SA has **no Compute rights**:
+`compute.zones.list` and `compute.instances.list` denied, unchanged after 2 min; `projects get-iam-policy` and
+`services list` also denied (Cloud Resource Manager API disabled). **Primary path fails; the fallback (step 3) is the
+plan.** Side finding: `gcloud auth list` on m4-air holds five stale `cloud_user_p_*@linuxacademygclabs.com` accounts from
+past robot logins; cleanup belongs in plan 4 (lifecycle). Probe lesson: check the key's `project_id` matches the
+sandbox before running (a July key gave a misleading `invalid_grant: account not found`).
 **Related:** Fable and Argon GCP reviews 2026-11-12 (synthesis in `memory-bank/activeContext.md`);
 `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` (why global `activate-service-account` is banned)
 
