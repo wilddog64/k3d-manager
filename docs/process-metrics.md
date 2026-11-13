@@ -71,3 +71,9 @@ Judged after 2–3 releases.
 | 2026-11-12 | dev-hub-vcluster-b (3) | Claude | — | 1 | 1 | 0 | 1 | 0 |
 | 2026-11-12 | dev-hub-vcluster-b (4) | Fable | 110,524 | 6 | 2 verified by Claude (BRANCH test indistinguishable, empty-kubeconfig -f check); 4 read-plausible, sent as low | 0 | 0 | 6 |
 | 2026-11-12 | dev-hub-vcluster-b (4) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+| 2026-11-13 | dev-hub-vcluster-b (5) | Fable | 121,151 | 11 | 4 verified by Claude (no probe on create path, dead inner branch, DRY_RUN fails, N1 too narrow); 7 read-plausible, 5 sent | 0 | 0 | 1 (first `dev-hub-up` may hit an unready proxy, inferred) |
+| 2026-11-13 | dev-hub-vcluster-b (5) | Claude | — | 0 new (6 round-4 fixes re-checked) | 0 | 0 | 0 | 0 |
+| 2026-11-13 | deploy-hub-behind-alert (1) | Fable | 93,816 | 13 | 6 verified by Claude (cap test can't fail, unknown cycle resets for:, lookup_failed unread, except-pass reads none, split outside try, hardcoded origin); 7 sent; 3 deferred (squash ancestry, rollback, SHA length) | 0 | 0 | 2 (silent producer, alert reset) |
+| 2026-11-13 | deploy-hub-behind-alert (1) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+
+Quota (operator gauge, 2026-11-13): the two 2026-11-13 Fable reviews (215K tokens together) used 4% of the Fable weekly limit, about 2% per review, so roughly 50 reviews fit in a week.
