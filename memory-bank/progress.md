@@ -581,3 +581,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13: plan 5 correction 2 running.
 - 2026-11-13: plan 3 r2 under verification.
 - 2026-11-13: plan 3 r2 verified, P3 captured, landing.
+- 2026-11-13: plan 3 re-land pending test-bin; plan 5 r2 under verification; dev-hub B CI green.
