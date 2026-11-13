@@ -8,6 +8,15 @@
 # same capture. Sync tests use a scratch clone and local bare origin; passwords are fixture values.
 # No live credential, GitHub request, Keychain, or cluster state is read by this suite.
 
+setup_file() {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+  K3DM_TEST_PYTHON3="$(k3dm_python_yaml 2>/dev/null || true)"
+  if [[ -n "$K3DM_TEST_PYTHON3" ]]; then
+    PYTHONUSERBASE="${PYTHONUSERBASE:-$("$K3DM_TEST_PYTHON3" -c 'import site; print(site.getuserbase())')}"
+    export K3DM_TEST_PYTHON3 PYTHONUSERBASE
+  fi
+}
+
 setup() {
   TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dev-hub-bats.XXXXXX")"
   export TEST_ROOT HOME="${TEST_ROOT}/home" SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
@@ -458,6 +467,116 @@ teardown() {
   [ -f "${SCRIPT_DIR}/etc/vcluster/values-dev-hub.yaml" ]
   if grep -REn 'all:[[:space:]]*true|mountPath:.*dashboard|configMap:.*dashboard' \
     "${SCRIPT_DIR}/etc/vcluster/values-dev-hub.yaml" "${SCRIPT_DIR}/etc/dev-hub"; then return 1; fi
+}
+
+@test "M1 CoreDNS deployment resources retain the vCluster limits" {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+  local python_yaml
+  python_yaml="$(k3dm_python_yaml)"
+  "${python_yaml}" - "${SCRIPT_DIR}/etc/vcluster/values-dev-hub.yaml" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    values = yaml.safe_load(handle)
+resources = values["controlPlane"]["coredns"]["deployment"]["resources"]
+assert resources == {
+    "requests": {"cpu": "20m", "memory": "32Mi"},
+    "limits": {"cpu": "100m", "memory": "128Mi"},
+}, resources
+print("CoreDNS requests 20m/32Mi; limits 100m/128Mi")
+PY
+}
+
+@test "M2 every vCluster values file uses a v0.32.1 root key and N1 rejects top-level coredns" {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+  local python_yaml
+  python_yaml="$(k3dm_python_yaml)"
+  "${python_yaml}" - "${SCRIPT_DIR}/etc/vcluster" <<'PY'
+from pathlib import Path
+import sys
+import yaml
+
+# Source: chart/values.schema.json at v0.32.1, tag commit 9d2cec3;
+# captured on m4-air 2026-11-13. Root properties from the captured schema.
+allowed = {
+    "controlPlane", "deletion", "deploy", "experimental", "exportKubeConfig",
+    "global", "integrations", "logging", "networking", "platform", "plugin",
+    "plugins", "policies", "privateNodes", "pro", "rbac", "serviceCIDR", "sleep",
+    "snapshots", "sync", "telemetry",
+}
+directory = Path(sys.argv[1])
+files = sorted(directory.glob("values*.yaml"))
+assert [path.name for path in files] == [
+    "values-dev-hub.yaml", "values-preflight.yaml", "values.yaml",
+], f"unexpected vCluster values files in {directory}: {[path.name for path in files]}"
+for path in files:
+    values = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for key in values:
+        assert key in allowed, f"{path.name}: unsupported vCluster root key {key!r}"
+    if path.name == "values-dev-hub.yaml":
+        assert "coredns" not in values, f"{path.name}: top-level coredns is unsupported"
+print(f"validated v0.32.1 root keys in {len(files)} vCluster YAML files")
+PY
+}
+
+@test "N2 values-dev-hub changes only by moving coredns under controlPlane" {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+  local python_yaml
+  python_yaml="$(k3dm_python_yaml)"
+  "${python_yaml}" - "${SCRIPT_DIR}/etc/vcluster/values-dev-hub.yaml" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    actual = yaml.safe_load(handle)
+actual["coredns"] = actual["controlPlane"].pop("coredns")
+expected = yaml.safe_load("""
+controlPlane:
+  statefulSet:
+    scheduling:
+      priorityClassName: k3dm-dev-preemptible
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
+    persistence:
+      volumeClaim:
+        enabled: true
+        size: 2Gi
+        storageClass: local-path
+coredns:
+  deployment:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+sync:
+  toHost:
+    priorityClasses:
+      enabled: false
+    configMaps:
+      all: false
+    pods:
+      priorityClassName: k3dm-dev-preemptible
+  fromHost:
+    priorityClasses:
+      enabled: false
+networking:
+  replicateServices:
+    fromHost:
+      - from: monitoring/kube-prometheus-stack-prometheus
+        to: monitoring/hub-prometheus
+""")
+assert actual == expected, "values-dev-hub.yaml changed beyond the coredns move"
+print("parsed values match the pre-fix configuration after restoring coredns")
+PY
 }
 
 @test "M5 memory alerts are warnings outside the analyze alert-name matcher" {

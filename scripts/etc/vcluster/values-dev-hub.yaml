@@ -15,15 +15,15 @@ controlPlane:
         size: 2Gi
         storageClass: local-path
 
-coredns:
-  deployment:
-    resources:
-      requests:
-        cpu: 20m
-        memory: 32Mi
-      limits:
-        cpu: 100m
-        memory: 128Mi
+  coredns:
+    deployment:
+      resources:
+        requests:
+          cpu: 20m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
 
 sync:
   toHost:
