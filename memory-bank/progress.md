@@ -606,3 +606,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13: plan 5 r5 under verification.
 - 2026-11-13: plan 5 r5 review clean of medium; P3 residual-lows bug captured.
 - 2026-11-13: plan 5 landed (offline_tested); live check after promote.
+- 2026-11-13 ~16:00Z: forecast row run 1 rejected on review (reformat, HEAD-baseline tests, 2 red suite tests); correction resume 2 running. Stray m4-air group now fires K3dmPromoteLookupFailed; proposed P2. Plan 3 E6 pending (cf8cfc2).
