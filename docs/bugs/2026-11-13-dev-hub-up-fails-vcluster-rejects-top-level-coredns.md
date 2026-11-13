@@ -38,7 +38,7 @@ must:
   - id: M1
     text: values-dev-hub.yaml sets controlPlane.coredns.deployment.resources to requests cpu 20m memory 32Mi, limits cpu 100m memory 128Mi
   - id: M2
-    text: every top-level key of each file in scripts/etc/vcluster/*.yaml is in the v0.32.1 root property list (captured above; the test names host, date and tag commit in a comment)
+    text: every top-level key of each vCluster values file, scripts/etc/vcluster/values*.yaml (values.yaml, values-dev-hub.yaml, values-preflight.yaml; not the argocd-manager-rbac.yaml manifest), is in the v0.32.1 root property list (captured above; the test names host, date and tag commit in a comment)
 must_not:
   - id: N1
     text: values-dev-hub.yaml has a top-level coredns key (red on pre-fix)
@@ -71,6 +71,8 @@ interface: scripts/etc/vcluster/values-dev-hub.yaml
 ## Definition of done (worker)
 
 - Edit text only (do not re-serialise the YAML): move the `coredns:` block under `controlPlane:` with two extra spaces of indent; nothing else in the file changes.
-- In `dev_hub.bats`, add tests for M1, M2/N1 and N2. The M2 test holds the 21 root keys above as a literal list with a comment naming the source (`chart/values.schema.json` at v0.32.1, tag commit 9d2cec3, captured on m4-air 2026-11-13), parses each `scripts/etc/vcluster/*.yaml` with the repo's existing YAML approach, and fails naming the file and key. Do not remove or weaken any existing test or assert.
+- In `dev_hub.bats`, add tests for M1, M2/N1 and N2. The M2 test holds the 21 root keys above as a literal list with a comment naming the source (`chart/values.schema.json` at v0.32.1, tag commit 9d2cec3, captured on m4-air 2026-11-13), parses each `scripts/etc/vcluster/values*.yaml` (asserting the glob found exactly `values-dev-hub.yaml`, `values-preflight.yaml` and `values.yaml`) with the repo's existing YAML approach, and fails naming the file and key. Do not remove or weaken any existing test or assert.
 - Run and paste command, exit code and summary line: `bats scripts/tests/plugins/dev_hub.bats` (0 not ok); then with `values-dev-hub.yaml` temporarily restored from `git show HEAD:scripts/etc/vcluster/values-dev-hub.yaml` (keep your test edits) the new N1 test is not ok; restore your fix.
 - Do not commit; leave changes in the worktree.
+
+**Spec correction 2026-11-13 (Claude):** M2 said `scripts/etc/vcluster/*.yaml`, which also matches the multi-document Kubernetes manifest `argocd-manager-rbac.yaml`; Luna stopped and flagged it. M2 now names `values*.yaml`.
