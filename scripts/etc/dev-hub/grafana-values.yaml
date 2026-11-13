@@ -1,0 +1,32 @@
+replicas: 1
+admin:
+  existingSecret: dev-hub-grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+persistence:
+  enabled: false
+deploymentStrategy: {type: Recreate}
+sidecar:
+  resources:
+    requests: {cpu: 32m, memory: 32Mi}
+    limits: {cpu: 150m, memory: 128Mi}
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: monitoring
+  datasources:
+    enabled: false
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: 400m, memory: 384Mi}
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        isDefault: true
+        url: http://hub-prometheus.monitoring.svc:9090

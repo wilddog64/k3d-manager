@@ -22,6 +22,27 @@ quota and defaults are reconciled. The vCluster kubeconfig is `~/.kube/vclusters
 does not run the shared `vcluster_destroy` path, which deregisters resources from hub ArgoCD. The PriorityClass
 remains installed and has no effect when no matching pods exist.
 
+## Sync a pushed branch
+
+Push the branch first, then run `make dev-hub-sync` to use the current branch or
+`make dev-hub-sync BRANCH=<branch>` to choose one. The command requires the local branch head to match the head
+published on `origin`, and refuses `main` and `deploy/hub`. It applies only the `grafana-dashboards-hub`
+ApplicationSet with the dev-hub kubeconfig; it never reads the working tree's dashboard files. The in-vCluster
+ArgoCD then pulls the dashboards and `k3dm-tests` ConfigMap from that branch. Other hub and app-cluster
+ApplicationSets are not part of this workflow.
+
+## Grafana and hub data
+
+`dev-hub-status` prints the port-forward command and URL. Run the command on the hub, then open
+`http://127.0.0.1:13000`. Sign in as `admin` with the password stored in the operator's Keychain under service
+`k3dm-dev-hub-grafana-admin` and account `k3dm`. Grafana reads the hub Prometheus through a replicated read-only
+Service. vCluster's `networking.replicateServices.fromHost` needs a ClusterRole with cluster-wide `get`, `list`
+and `watch` on Services and Endpoints so it can discover the named host Service; it does not grant writes.
+
+The Loki panels show no data in this isolated Grafana because the dev hub has no Loki datasource. Dashboard
+ConfigMaps are discovered by Grafana's sidecar inside `monitoring`; they are not mounted as volumes or synced to
+the host namespace.
+
 ## Resource priority and alerts
 
 The host namespace has a 3 GiB memory limit quota, a 1 GiB memory request quota, CPU quotas and a 30 pod cap.

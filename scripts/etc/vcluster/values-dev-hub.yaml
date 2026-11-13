@@ -36,3 +36,9 @@ sync:
   fromHost:
     priorityClasses:
       enabled: false
+
+networking:
+  replicateServices:
+    fromHost:
+      - from: monitoring/kube-prometheus-stack-prometheus
+        to: monitoring/hub-prometheus

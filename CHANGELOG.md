@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add an isolated development vCluster on the hub with a memory quota, preemptible workload priority, read-only status and low-memory/quota alerts.
+- Add an isolated development vCluster on the hub with a memory quota, preemptible workload priority, read-only status and low-memory/quota alerts; run ArgoCD and Grafana inside it, sync only pushed-branch dashboards, and read hub Prometheus through a replicated Service.
 
 ## [1.43.15] - 2026-11-12
 

@@ -51,10 +51,14 @@ hub-migrate:
 hub-new:
 	@bin/hub-new
 
-.PHONY: dev-hub-up dev-hub-down dev-hub-status
-dev-hub-up dev-hub-down dev-hub-status:
+.PHONY: dev-hub-up dev-hub-down dev-hub-status dev-hub-sync
+dev-hub-up dev-hub-down dev-hub-status dev-hub-sync:
 	@bin/k3dm-require-role hub
 	@./scripts/k3d-manager $(@:dev-hub-%=dev_hub_%)
+
+ifneq ($(filter dev-hub-sync,$(MAKECMDGOALS)),)
+export BRANCH
+endif
 
 .PHONY: hub-sync
 hub-sync:
@@ -1540,6 +1544,7 @@ validate-manifests:
 	@set -euo pipefail; \
 	 SCRIPT_DIR="$(CURDIR)/scripts" bash -c 'source "$$SCRIPT_DIR/lib/system.sh"; _ensure_kubeconform'; \
 	 PATH="$(HOME)/.local/bin:$$PATH" kubeconform -strict -summary \
+	   -ignore-filename-pattern 'scripts/etc/dev-hub/.*-values\.yaml' \
 	   -schema-location default -schema-location '$(KUBECONFORM_CRD_CATALOG)' \
 	   $(or $(FILES),$(VALIDATE_MANIFESTS_DEFAULT))
 
@@ -1805,6 +1810,7 @@ help:
 	@echo "    make dev-hub-up             Create the isolated development vCluster (hub role only)"
 	@echo "    make dev-hub-down           Remove the isolated development vCluster (hub role only)"
 	@echo "    make dev-hub-status         Show development vCluster and quota status (hub role only)"
+	@echo "    make dev-hub-sync [BRANCH=<branch>] Sync the development hub from a pushed branch"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo "    make fleet-render          Render count-driven ACG fleet (offline)"

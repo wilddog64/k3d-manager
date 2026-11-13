@@ -1,0 +1,52 @@
+global:
+  domain: argocd.dev-hub.local
+
+configs:
+  params:
+    server.insecure: "true"
+  cm:
+    url: http://argocd-server.cicd.svc
+  rbac:
+    policy.default: role:readonly
+
+dex:
+  enabled: false
+notifications:
+  enabled: false
+applicationSet:
+  deploymentStrategy: {type: Recreate}
+  resources:
+    requests: {cpu: 48m, memory: 48Mi}
+    limits: {cpu: 100m, memory: 128Mi}
+controller:
+  metrics:
+    enabled: false
+  resources:
+    requests: {cpu: 200m, memory: 192Mi}
+    limits: {cpu: 700m, memory: 512Mi}
+repoServer:
+  deploymentStrategy: {type: Recreate}
+  metrics:
+    enabled: false
+  resources:
+    requests: {cpu: 100m, memory: 96Mi}
+    limits: {cpu: 350m, memory: 384Mi}
+server:
+  deploymentStrategy: {type: Recreate}
+  service:
+    type: ClusterIP
+  metrics:
+    enabled: false
+  resources:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {cpu: 200m, memory: 256Mi}
+redis:
+  metrics:
+    enabled: false
+  resources:
+    requests: {cpu: 50m, memory: 32Mi}
+    limits: {cpu: 100m, memory: 128Mi}
+redisSecretInit:
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {cpu: 100m, memory: 128Mi}
