@@ -1,9 +1,9 @@
 # dev-hub-up fails: vCluster 0.32.1 rejects the top-level `coredns` key in values-dev-hub.yaml
 
-**Status:** OPEN — captured 2026-11-13
+**Status:** LANDED — 8c2bfc5f on k3d-manager-v1.44.0 (2026-11-13)
 **Priority:** P1 (Claude proposal: `make dev-hub-up` cannot create the dev hub, no workaround short of editing the file; blocks dev-hub plan E2 in the open v1.44.0 release)
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** fix running — since 2026-11-13
+**Waiting on:** live check — since 2026-11-13
 **Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/vcluster/values-dev-hub.yaml`)
 **Should have been caught by:** offline test (no test validates the values file against the pinned chart schema; the plan's source table cites `coredns` values ~521–530, which sit under `controlPlane`)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing)
@@ -83,3 +83,7 @@ interface: scripts/etc/vcluster/values-dev-hub.yaml
 - M1 (CI exposure): same cause, same fix; not probed separately.
 - L1 (glob narrowed to `values*.yaml`): overlap with Claude and Luna; spec already corrected.
 - L2 (root keys only): accepted as spec scope; N2's frozen comparison covers nested keys in `values-dev-hub.yaml`; the vCluster upgrade idea should consider a full schema walk.
+
+## Landed (2026-11-13)
+
+`8c2bfc5f` (Luna, 3 correction runs). E1 offline PASS outside the sandbox with no Python overrides: `bats scripts/tests/plugins/dev_hub.bats` 55/55; M1, M2/N1 and N2 red on the pre-fix values file for the coredns reason; no-interpreter control red with the helper message. Correction 2's `setup()` PYTHONUSERBASE line (Claude's) broke all 55 tests (venv `python3 -m site --user-base` exits 1 under errexit); correction 3 resolves the interpreter in `setup_file()` and uses that interpreter's own user base. E2 live: after promote, operator runs `make dev-hub-up` on the M5.
