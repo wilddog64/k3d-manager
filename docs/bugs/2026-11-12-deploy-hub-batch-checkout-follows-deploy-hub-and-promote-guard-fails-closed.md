@@ -1,6 +1,6 @@
 # deploy/hub batch: the hub checkout follows deploy/hub, the promote guard fails closed, and four P3s on the same files
 
-**Status:** LANDED — deploy-hub batch `c7466d65` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
+**Status:** VERIFIED — `c7466d65` independently verified 2026-11-13 at e9c375c4 (Acceptance-only Opus verifier, own harness: E1–E8 and E10 pass; N3–N7 red on c7466d65^; M9/M10/M11 red by mutant; 7 existing suites green, 0 ssh/security/kubectl/launchctl calls; Claude checked the saved outputs); E9 live still open; landed `c7466d65` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P2
 **Waiting on:** live check — since 2026-11-12 (after `make hub-promote`)
 **Introduced by:** v1.43.15 (checkout auto-sync and deploy/hub promote plans)

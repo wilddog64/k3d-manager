@@ -1,6 +1,6 @@
 # Test-hygiene batch: tripwire host writes, real-Keychain tests, fresh-clone hermeticity and the fast-gate BASE leak
 
-**Status:** LANDED — test-hygiene batch `0b8d2b80` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
+**Status:** VERIFIED — `0b8d2b80` independently verified 2026-11-13 at e9c375c4 (Acceptance-only Opus verifier, own harness: all offline items pass; N1/N5/N8/N11/M14 and E6/E10/E11/E12/E14 red on 0b8d2b80^; N2/N3/N7/N10 red by mutant; real LaunchAgents byte-identical, no real security call; Claude checked the saved outputs and reran E14 BASE=deadbeef: 49/49); live E4/E7/E8/E13/E15 still open; CI has no fast-gate job, so E5's CI part is unconfirmed; landed `0b8d2b80` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
 **Priority:** P2
 **Waiting on:** live check — since 2026-11-12 (operator `make test` on the M4 / fresh clone)
 **Introduced by:** per part: unknown (A); `bd68d6ff` v1.43.12 (B); `82c1d9c8` v1.43.14 (C), pre-existing `945018ee` v1.36.0 (D), `76446d6e` v1.43.15 (E); unknown (F)
