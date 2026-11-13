@@ -173,6 +173,8 @@ SH
   [ "$status" -eq 0 ]
   grep -q 'k3dm_repo_sync_promote_lookup_failed{repo="k3d-manager"} 1' "$CURL_BODY"
   grep -q "k3dm_repo_sync_promotable{repo=\"k3d-manager\",sha=\"${candidate:0:7}\",branch=\"main\"} 1" "$CURL_BODY"
+  run "$HUB_ROOT/bin/k3dm-repo-sync" --hub-summary
+  [[ "$output" == *"promotable: unknown"* ]]
 
   git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
   run "$HUB_ROOT/bin/k3dm-repo-sync"

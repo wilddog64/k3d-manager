@@ -322,7 +322,8 @@ def main():
             rec = next(r for r in state["repositories"] if pathlib.Path(r["path"]).resolve() == ROOT.resolve())
             pending = ",".join(x["step"] for x in state.get("deploy_pending", []) if x.get("paths")) or "none"
             promote = state.get("promote_backlog")
-            promotable = state.get("promotable_sha") or ("unknown" if state.get("promotable_unknown") else "none")
+            promotable = ("unknown" if state.get("promotable_unknown") else
+                          state.get("promotable_sha") or "none")
             print(f"hub {socket.gethostname()}: {rec.get('branch') or '-'} at {str(rec.get('new_head') or '-')[:7]} ({rec['result']}); deploy pending: {pending}; deploy/hub {str(state.get('deploy_hub_sha') or '-')[:7]}; promote backlog: {promote if promote is not None else 'unknown'}; promotable: {promotable}")
             return 0
         except Exception:
