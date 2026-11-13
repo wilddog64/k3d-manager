@@ -69,3 +69,5 @@ Judged after 2–3 releases.
 | 2026-11-12 | dev-hub-vcluster-b (2) | Claude | — | 1 | 1 | 0 | 1 | 0 |
 | 2026-11-12 | dev-hub-vcluster-b (3) | Fable | 132,304 | 5 + 1 unverified | 5 (F1 reproduced by Fable and Claude; F2 read plus Fable mutant; F4 chart templates read by Claude) | 0 | 1 | 4 (protected-branch test can't fail, N4 weak, chart no-op keys, untested BRANCH paths) |
 | 2026-11-12 | dev-hub-vcluster-b (3) | Claude | — | 1 | 1 | 0 | 1 | 0 |
+| 2026-11-12 | dev-hub-vcluster-b (4) | Fable | 110,524 | 6 | 2 verified by Claude (BRANCH test indistinguishable, empty-kubeconfig -f check); 4 read-plausible, sent as low | 0 | 0 | 6 |
+| 2026-11-12 | dev-hub-vcluster-b (4) | Claude | — | 0 | 0 | 0 | 0 | 0 |
