@@ -1,9 +1,9 @@
 # Bug Tracking: "Target forecast (earliest/latest)" tiles only say "no date — see table"
 
-**Status:** OPEN — captured 2026-11-11 from the operator's report; not investigated (capture-first rule)
+**Status:** LANDED — 2e0fa2d8 on 2026-11-13 (captured 2026-11-11 from the operator's report)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-11 ("degraded, and the Remaining releases table is the workaround"); Claude proposed P3 (cosmetic: the tiles duplicate the table). Higher stands until the operator decides.
-**Waiting on:** fix running — since 2026-11-13
+**Waiting on:** live check — since 2026-11-13 (E3 after the next hub promote)
 **Introduced by:** unknown (tiles from `401e4eca`, v1.43.5; when they stopped showing a date is not established)
 **Should have been caught by:** unknown
 **Prior art:** `docs/bugs/2026-11-07-forecast-milestones-drift-and-folded-releases.md` — read, different defect (that one
@@ -106,3 +106,12 @@ interface:
   (`y - 12` for panels that were at y >= 27) and paste the empty diff. Run `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`
   and `PYTHONPATH=scripts/lib python3 -m pytest scripts/tests/bin/test_dashboard_queries.py -q` from the repo root and paste
   command, rc and counts. Leave changes uncommitted.
+
+## Landed 2026-11-13 — 2e0fa2d8
+
+- Worker: Codex gpt-6-luna, 2 runs. Run 1 rejected by Claude: whole-dashboard JSON re-serialised (+943/-447 ignoring whitespace), tests baselined on `git show HEAD:`, tests 41 and 44 red. Run 2 (correction) fixed those; Claude removed one mis-copied assert in test 20 (list index used as panel id; red).
+- Fable side-by-side review: 0 high, 3 medium, 2 low, all in tests, all reproduced by Claude by mutation before fixing: N3 guard missed `=~"$release"` (M-1); `and`→`or` and a dropped `max by` survived (M-2); tests pinned to `30471754`, which is not an ancestor of squash-merged main and froze every other panel (M-3, Claude's own correction instruction); vacuous table assert (L-1); dropped 28/31 noValue + row count (L-2). Claude rewrote the tests as one self-contained test per Acceptance item (M1; M2/N3 exact expressions; M3 absolute layout). Overlap with Claude's review: 0 of 5; Claude's 4 run-1 findings were not in Fable's scope (it reviewed run 2).
+- E1 (offline): the three new tests are red on the 30471754 dashboard and green on the fix; mutants A (=~ $release), B (and→or), D (no max by) red; a later legitimate retitle stays green.
+- E2 (offline, one-off script, Claude 2026-11-13 ~16:05Z, not a committed test): parsed 30471754 vs fix — ConfigMap header and dashboard top-level keys identical; only id 32 removed, none added; panel order unchanged; with y normalised (+12 for y >= 27) no panel other than 29/30 differs. Suite 48/48; `codex-land` gate passed (grafana_dashboard_bugs.bats, test_dashboard_queries.py with promtool test skipped locally, test_vectordb_bug_metrics.py, grafana_dashboard_appsets.bats).
+- Note for the spec (Fable L-1): by Grafana row ownership the Plans table (107, y=15) sits in the Release forecast row before and after, so M1's "no table panel is in the Release forecast row" means the forecast table; E3's "Plans directly below" is the intended layout.
+- E3 (live) open: after the next hub promote.
