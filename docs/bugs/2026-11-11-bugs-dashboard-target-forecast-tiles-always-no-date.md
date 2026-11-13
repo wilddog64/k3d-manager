@@ -45,17 +45,22 @@ In `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (`k3dm-bugs.jso
 - Delete panel 29 "Target forecast (earliest)" (x 8, y 11) and panel 30 "Target forecast (latest)" (x 12, y 11).
 - Move panel 31 "Target state" from x 16 to x 8 and widen it to w 8, so the row has no hole
   (Releases to target 0–4, Median gap 4–8, Target state 8–16). Panel ids 26, 27, 28, 31, 32 keep their ids; no other panel moves.
+- Rename panel 32 from "Remaining releases" to "Current release" (operator, 2026-11-13: "Remaining release seem to be
+  missleading! should it be Current release?"). Since v1.43.7 (`d0c247dc`) its queries are filtered by the Release picker,
+  so in Auto it shows one row, the open release. Add a panel description: "Auto: the open release. Manual: the release you
+  picked; All lists every unshipped release." Queries, columns and transformations are unchanged.
 - No producer change: `k3dm_release_milestone_forecast_seconds` stays, because the Remaining releases table (panel 32) reads it.
 
 In `scripts/tests/plugins/grafana_dashboard_bugs.bats`, test "release forecast panels align by version and map dates and states"
-(~:52): expect 5 panels in ids 26–32 instead of 7, and check `noValue` on 28 and 31 only. Add a test that no panel titled
+(~:52) and the `by_title["Remaining releases"]` lookup (~:391): use the new title; expect 5 panels in ids 26–32 instead of 7, and check `noValue` on 28 and 31 only. Add a test that no panel titled
 "Target forecast" exists and that panel 31 sits at x 8, w 8, y 11.
 
 ## Contract readers
 
 Panel ids 29/30 and titles: grep 2026-11-13 found them only in `grafana-dashboard-bugs.yaml:2811-2886`, in
 `grafana_dashboard_bugs.bats:65` (`for i in (28,29,30,31)`) and `:58` (`len(new)==7`), and in
-`docs/plans/v1.43.5-release-forecast.md` (history, unchanged). No other dashboard, alert or script reads them.
+`docs/plans/v1.43.5-release-forecast.md` (history, unchanged). Title "Remaining releases": `grafana_dashboard_bugs.bats:391`;
+CHANGELOG.md:330/:517 and the v1.43.5/v1.43.7 plan docs are history, unchanged. No other dashboard, alert or script reads them.
 
 ## Acceptance
 
@@ -63,13 +68,14 @@ Panel ids 29/30 and titles: grep 2026-11-13 found them only in `grafana-dashboar
 must:
   M1: the Bug Tracking dashboard has no panel titled "Target forecast (earliest)" or "Target forecast (latest)"
   M2: Target state (id 31) sits at x 8, y 11, w 8, h 4 and overlaps no panel
+  M3: panel 32 is titled "Current release" and its description names the Auto, Manual and All behaviour
 must_not:
-  N1: Releases to target (27), Median gap (28), Target state (31) or Remaining releases (32) change query, mappings or title
+  N1: Releases to target (27), Median gap (28), Target state (31) or panel 32 change query, mappings, columns or transformations (32's title and description excepted)
   N2: any other panel's id or gridPos changes
 evidence:
-  - {id: E1, proves: [M1, M2], kind: offline, intent: "You will see a test that finds no 'Target forecast' panel and finds Target state at x 8, width 8. It fails on today's dashboard."}
+  - {id: E1, proves: [M1, M2, M3], kind: offline, intent: "You will see a test that finds no 'Target forecast' panel, finds Target state at x 8, width 8, and finds the table titled 'Current release' with a description of the picker modes. It fails on today's dashboard."}
   - {id: E2, proves: [N1, N2], kind: offline, intent: "You will see a script compare every other panel with today's dashboard: same ids, queries, mappings and positions; the whole dashboard suite passes."}
-  - {id: E3, proves: [M1, M2], kind: live, intent: "After a hub promote, you will see the Release forecast row show three tiles (Releases to target, Median gap, a wider Target state) above Remaining releases."}
+  - {id: E3, proves: [M1, M2], kind: live, intent: "After a hub promote, you will see the Release forecast row show three tiles (Releases to target, Median gap, a wider Target state) above a table titled Current release showing v1.44.0."}
 interface:
   - "Grafana Bug Tracking dashboard, Release forecast row"
 ```
@@ -78,12 +84,12 @@ interface:
 
 | File | Change |
 |---|---|
-| `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` | delete panels 29, 30; move/widen 31 |
+| `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` | delete panels 29, 30; move/widen 31; retitle and describe 32 |
 | `scripts/tests/plugins/grafana_dashboard_bugs.bats` | update the 7-panel test; add E1 |
 
 ## Worker definition of done
 
 - Change only the files above. No network, no make target that touches the hub or a cluster. Show E1 red on today's
-  dashboard, then green. For E2, diff every panel except 29, 30, 31 (and 31's gridPos) against `git show HEAD:<file>`
+  dashboard, then green. For E2, diff every panel except 29, 30, 31's gridPos and 32's title/description against `git show HEAD:<file>`
   and paste the empty diff. Run `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` from the repo root and paste
   command, rc and the ok/not ok count. Leave changes uncommitted.
