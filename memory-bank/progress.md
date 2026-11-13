@@ -612,3 +612,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - [x] 2026-11-13 dev-hub-coredns fix landed 8c2bfc5f (offline verified); [ ] CI, promote, live E2 `make dev-hub-up`
 
 - 2026-11-13: coredns fix live-confirmed up to vCluster creation on m5-air. E2 128Mi still unproven: every synced pod is forbidden because PriorityClass k3dm-dev-preemptible has preemptionPolicy Never and the synced pods carry PreemptLowerPriority. Filed docs/bugs/2026-11-13-dev-hub-synced-pods-forbidden-preemption-policy-never.md (P1 proposal, c8099c47); waiting on operator decision.
+- 2026-11-13: operator approved the dev-hub preemption fix. Spec 7e1d2e12 (upstream proof: k8s v1.35.0 preemptionPolicy immutable; vCluster v0.32.1 copies the pod policy as is). Dispatched slug dev-hub-preemption to Luna.
