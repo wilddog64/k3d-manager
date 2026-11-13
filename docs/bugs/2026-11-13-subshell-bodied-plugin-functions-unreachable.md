@@ -1,8 +1,8 @@
 # Bug: public plugin functions with a subshell body are unreachable through the dispatcher (`make dev-hub-sync`, `make snapshot`)
 
-**Status:** OPEN — captured 2026-11-13 from the independent Acceptance verification of dev-hub B (Opus verifier; Claude reproduced)
+**Status:** LANDED — d1c2c441 on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of dev-hub B (Opus verifier; Claude reproduced)
 **Priority:** P1 (dev-hub E2 `make dev-hub-sync` cannot work; no workaround through the interface; blocks the v1.44.0 release PR)
-**Waiting on:** dispatch — since 2026-11-13
+**Waiting on:** live check — since 2026-11-13 (E4: operator runs make dev-hub-sync BRANCH=<feature> on the M5 during dev-hub E2, after a promote)
 **Introduced by:** `65e4799f` (v1.44.0 dev-hub B, `dev_hub_sync`); `6974f426` (v1.43.8, `hub_snapshot_capture`)
 **Should have been caught by:** offline test (dev_hub.bats and hub_snapshot.bats source the plugin directly and never go through the dispatcher)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run
@@ -58,3 +58,8 @@ interface:
 ## Worker definition of done
 
 - Change only the files above. Stub every external tool (kubectl, helm, vcluster, ssh, rsync, security, curl, launchctl) on PATH with a scratch HOME; no real cluster, hub or Keychain call. Show E1 and E2 red on today's code, then green. Run the touched suites plus `bats scripts/tests/lib/plugin_function_declarations.bats` and paste command, rc and proving lines. Leave changes uncommitted.
+
+## Residual lows (P3 batch candidates)
+
+- Low (Fable): the guard's regex is a hand copy of the loader's (`plugin_function_declarations.bats:6`); a loader change after a subtree pull would not be noticed.
+- Fixed before landing (Fable low): the guard originally selected only `name()` lines, so `function name {` / `function name (` escaped it; Claude widened the selector and proved all three unreachable forms fail the guard, with a passing positive control.

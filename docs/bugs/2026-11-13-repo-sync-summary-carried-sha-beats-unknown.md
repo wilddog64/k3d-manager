@@ -1,8 +1,7 @@
 # Bug: hub-sync summary shows a carried-forward promotable SHA instead of `unknown` after a failed lookup
 
-**Status:** OPEN — captured 2026-11-13 from the independent Acceptance verification of plan 3 (Opus verifier, item N2; Claude reproduced)
+**Status:** LANDED — b4290ee9 on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of plan 3 (Opus verifier, item N2; Claude reproduced)
 **Priority:** P3 (summary line only; metrics are correct)
-**Waiting on:** dispatch — since 2026-11-13
 **Introduced by:** `c763e239` (v1.44.0 plan 3 `deploy-hub-behind-alert`)
 **Should have been caught by:** offline test (E5/E10 in repo_sync_promote_backlog.bats assert metrics, never the summary)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run
@@ -44,3 +43,8 @@ interface:
 ## Worker definition of done
 
 - Change only the files above. Stub `gh`, `curl`, `ssh` on PATH; set `PUSHGATEWAY_URL` to `http://127.0.0.1:9`; scratch HOME. Show E1 red on today's code, then green. Run `bats scripts/tests/bin/repo_sync_promote_backlog.bats scripts/tests/bin/repo_sync.bats` from the repo root and paste command, rc and proving lines. Leave changes uncommitted.
+
+## Residual lows (P3 batch candidates)
+
+- Low (Fable): the fetch-failure carry path (E10, `repo_sync_promote_backlog.bats:293`) has no `promotable: unknown` summary assertion; code is correct (flag set at `bin/k3dm-repo-sync:472`).
+- Low (Fable): the new assertion (`:176`) skips `[ "$status" -eq 0 ]`; harmless.
