@@ -267,7 +267,7 @@ function dev_hub_status() {
   printf 'Grafana URL: http://127.0.0.1:13000\n'
 }
 
-function dev_hub_sync() (
+function dev_hub_sync() { (
   _dev_hub_load_vcluster
   local branch="${1:-${BRANCH:-}}" local_ref remote_ref remote_output appset rendered
   if [[ -z "${branch}" ]]; then
@@ -303,3 +303,4 @@ function dev_hub_sync() (
   _run_command -- envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' <"${appset}" >"${rendered}"
   _dev_hub_child_kubectl apply -f "${rendered}"
 )
+}

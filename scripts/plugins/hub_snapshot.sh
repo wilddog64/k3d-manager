@@ -199,7 +199,7 @@ function hub_snapshot_guard_delete() {
 }
 
 # shellcheck disable=SC2120
-function hub_snapshot_capture() (
+function hub_snapshot_capture() { (
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_snapshot_capture"
     return 0
@@ -260,6 +260,7 @@ function hub_snapshot_capture() (
   _info "[hub-snapshot] captured ${_timestamp} to ${K3DM_SNAPSHOT_HOST}:${_remote}"
   _hub_snapshot_capture_retention_notice "$_timestamp"
 )
+}
 
 function _hub_snapshot_remote_names() {
   _hub_snapshot_ssh "find '$K3DM_SNAPSHOT_DIR' -mindepth 1 -maxdepth 1 -type d -name '20*' -exec basename {} \\; | sort"

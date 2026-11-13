@@ -11,7 +11,8 @@
 setup() {
   TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dev-hub-bats.XXXXXX")"
   export TEST_ROOT HOME="${TEST_ROOT}/home" SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
-  export SOURCE_SCRIPTS_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+  SOURCE_SCRIPTS_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+  export SOURCE_SCRIPTS_DIR
   mkdir -p "${HOME}/.kube/vclusters" "${TEST_ROOT}/repo"
   export CALL_LOG="${TEST_ROOT}/calls.log" REPO_ROOT="${TEST_ROOT}/repo"
   export APPLY_LOG="${TEST_ROOT}/applied-files.log" TEMP_PATH_LOG="${TEST_ROOT}/temp-paths.log"
@@ -372,6 +373,16 @@ teardown() {
   [ "${status}" -ne 0 ]
   [ -s "${TEMP_PATH_LOG}" ]
   while IFS= read -r temp_path; do [ ! -e "${temp_path}" ]; done <"${TEMP_PATH_LOG}"
+}
+
+@test "dispatcher reaches dev_hub_sync and preserves subshell state" {
+  run env HOME="$HOME" PATH="$PATH" bash "$SCRIPT_DIR/k3d-manager" dev_hub_sync main
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"refuses protected branch 'main'"* ]]
+  [[ "$output" != *"not found in plugins"* ]]
+
+  run bash -c 'SCRIPT_DIR="$1"; PLUGINS_DIR="$SCRIPT_DIR/plugins"; source "$SCRIPT_DIR/plugins/dev_hub.sh"; before=$PWD; SENTINEL=before; _dev_hub_load_vcluster() { cd /; SENTINEL=leaked; }; dev_hub_sync main >/dev/null 2>&1 || :; [[ $PWD == "$before" && $SENTINEL == before ]]' _ "$SOURCE_SCRIPTS_DIR"
+  [ "$status" -eq 0 ]
 }
 
 @test "dev hub up refuses a non-hub current context before lifecycle calls" {

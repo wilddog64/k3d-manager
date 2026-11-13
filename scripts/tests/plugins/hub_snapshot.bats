@@ -3,6 +3,8 @@
 
 setup() {
   export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
+  SOURCE_SCRIPTS_DIR="$(cd "$SCRIPT_DIR" && pwd)"
+  export SOURCE_SCRIPTS_DIR
   export PLUGINS_DIR="$SCRIPT_DIR/plugins"
   export K3DM_SNAPSHOT_HOST=stub-m2
   export K3DM_SNAPSHOT_DIR="$BATS_TEST_TMPDIR/remote"
@@ -156,6 +158,16 @@ EOF
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/storage-loki-0/data"
   : > "$PATCH_LOG"
   source "${HUB_SNAPSHOT_SOURCE:-$SCRIPT_DIR/plugins/hub_snapshot.sh}"
+}
+
+@test "dispatcher reaches hub_snapshot_capture and preserves subshell state" {
+  run env HOME="$HOME" K3DM_SNAPSHOT_LOCK="$K3DM_SNAPSHOT_LOCK" bash "$SCRIPT_DIR/k3d-manager" hub_snapshot_capture --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: hub_snapshot_capture"* ]]
+  [[ "$output" != *"not found in plugins"* ]]
+
+  run bash -c 'SCRIPT_DIR="$1"; PLUGINS_DIR="$SCRIPT_DIR/plugins"; source "$SCRIPT_DIR/plugins/hub_snapshot.sh"; before=$PWD; SENTINEL=before; mkdir() { cd /; SENTINEL=leaked; return 1; }; hub_snapshot_capture >/dev/null 2>&1 || :; [[ $PWD == "$before" && $SENTINEL == before ]]' _ "$SOURCE_SCRIPTS_DIR"
+  [ "$status" -eq 0 ]
 }
 
 capture_snapshot() {
