@@ -1,8 +1,8 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
 **Status:** OPEN — captured 2026-11-13 by Claude while watching plan 3 E6
-**Priority:** P3 (proposed P2 on 2026-11-13 15:57Z: the stray group now fires K3dmPromoteLookupFailed; operator decides)
-**Waiting on:** operator decision — since 2026-11-13
+**Priority:** P3 (Claude proposal, revised 2026-11-13 16:25Z after the group was deleted; the earlier P2 proposal is withdrawn)
+**Waiting on:** operator decision — since 2026-11-13 (P3 confirmation, then batch with the next repo-sync dispatch)
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; memory `feedback_pushgateway_tests_leak_to_real_hub` (same class). `make find-similar-docs` not run
@@ -33,3 +33,11 @@ After the promote of `6375f228` loaded the plan 3 rules at 15:24Z, a read-only G
 The hub's own job (`instance="m5-air"`) is healthy: at the same moment it holds `K3dmPromoteWaiting{sha="cf8cfc2"}` pending.
 That alert is false: the M4 is not the hub and computes no promotion. Until option 1 or 2 lands, every K3dmPromoteLookupFailed page has to be checked for `instance`.
 The rule could also be scoped to the hub instance, but that only hides the symptom. Options 1 and 2 above still stand.
+
+## Update 2026-11-13 16:25Z: group deleted, M4 role written, cause corrected
+
+- Operator deleted the group on the M5 (`curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air`). Claude confirmed: 0 `instance="m4-air"` series on the hub Pushgateway, and `K3dmPromoteLookupFailed` is no longer listed in hub Prometheus alerts (16:20Z); the hub's own `K3dmPromoteWaiting{instance="m5-air"}` is unaffected.
+- Push time of the deleted group: `push_time_seconds` 1794578588 = 2026-11-13 14:03:08Z, a single push, never refreshed.
+- Correction to "Make the default safe" above: `bin/k3dm-repo-sync` already pushes only when the role is `hub` (`is_hub`, :358, push block :488-509), and the M4 had no role file at all (its launchd job exits 1). So the 14:03Z push came from a run that was **given** a hub role — most likely a test or verifier reproduction with a scratch `XDG_CONFIG_HOME` holding `hub`, and `PUSHGATEWAY_URL` unset. The default `http://localhost:19094` (:502) then reached the hub through the M4's ssh forward (an `ssh` process listens on 127.0.0.1:19094 here).
+- Fix shape (option 2, refined): drop the default. Push only when `PUSHGATEWAY_URL` is set; warn and skip otherwise. The hub's launchd template `scripts/etc/launchd/com.k3d-manager.repo-sync.plist.tmpl` does not set it today (only PATH), so it gains `PUSHGATEWAY_URL=http://localhost:19094`. This is a contract change (env var): the spec must list every reader and writer, and rollout must run `make install-repo-sync` on the M5 right after the promote, or the hub stops pushing and its own promote alerts go silent. Tests: unset URL → no curl (with a positive control: set URL → one PUT), plist carries the variable.
+- Option 3 done: `~/.config/k3d-manager/machine-role` on the M4 = `worker` (operator go, 16:20Z). `bin/k3dm-repo-sync --check` dry-run: every repo `current`, `skipped:ahead` or `skipped:no-upstream`, nothing would update; worker mode never pushes metrics.
