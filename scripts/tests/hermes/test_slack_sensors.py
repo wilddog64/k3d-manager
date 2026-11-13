@@ -181,6 +181,62 @@ def test_rotation_writes_refresh_then_access_and_reads_back(tmp_path, monkeypatc
     assert state["slack_config"]["expires_at"] == 50000
 
 
+def test_rotation_redacts_every_token_seen_when_manifest_echoes_superseded_pair(tmp_path, monkeypatch, caplog, capsys):
+    import json
+    import logging
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    old_access, old_refresh = "old-access-token", "old-refresh-token"
+    new_access, new_refresh = "new-access-token", "new-refresh-token"
+    store = Store()
+    store.values[sensors.SLACK_CONFIG_SERVICE] = old_access
+    store.values[sensors.SLACK_CONFIG_REFRESH_SERVICE] = old_refresh
+    echoed = manifest()
+    echoed["settings"]["event_subscriptions"]["request_url"] = (
+        f"https://example.test/events?access={old_access}&refresh={old_refresh}"
+    )
+    state = {"slack_config": {"expires_at": 1200}}
+
+    def api(method, *_args):
+        if method == "tooling.tokens.rotate":
+            return {"ok": True, "refresh_token": new_refresh, "token": new_access, "exp": 50000}
+        return {"ok": True, "manifest": echoed}
+
+    with caplog.at_level(logging.INFO):
+        result = sensors.slack_app_config(api, state, store, now=1000, may_rotate=True)
+    output = capsys.readouterr()
+    encoded = json.dumps((result, state, output.out, output.err, caplog.text))
+    for token in (old_access, old_refresh, new_access, new_refresh):
+        assert token not in encoded
+    assert result["data"]["event_url"].count("[redacted]") == 2
+
+
+@pytest.mark.parametrize("source", ["rejected_rotate", "manifest", "rotate"])
+def test_regenerate_evidence_starts_with_hint_and_fits_limit(source):
+    state = {}
+    store = Store()
+
+    def api(method, *_args):
+        if method == "tooling.tokens.rotate":
+            return {"ok": False, "error": "invalid_refresh_token"}
+        return {"ok": False, "error": "token_revoked" if source == "manifest" else "invalid_auth"}
+
+    if source == "rejected_rotate":
+        state["slack_config"] = {"expires_at": 1200}
+        result = sensors.slack_app_config(api, state, store, now=1000, may_rotate=True)
+    elif source == "manifest":
+        result = sensors.slack_app_config(api, state, store, now=1000, may_rotate=True)
+    else:
+        state["slack_config"] = {"needs_regenerate": True,
+                                  "needs_regenerate_refresh": sensors._slack_refresh_hash("refresh-secret"),
+                                  "needs_regenerate_source": "rotate",
+                                  "last_error": "invalid_refresh_token", "regenerate_checked_at": -5000}
+        result = sensors.slack_app_config(api, state, store, now=1000, may_rotate=True)
+    assert result["status"] == "unknown"
+    assert result["evidence"].startswith("Regenerate")
+    assert len(result["evidence"]) <= 140
+
+
 def test_no_secret_in_record_on_api_exception():
     store, state = Store(), {}
     def api(*_):
@@ -266,7 +322,7 @@ def test_rejected_rotation_sets_regenerate_and_stops_rotating(tmp_path, monkeypa
             return {"ok": False, "error": "invalid_auth"}
         return {"ok": False, "error": "invalid_auth"}
     first = sensors.slack_app_config(api, state, store, now=1000, may_rotate=True)
-    assert first["status"] == "unknown" and "regenerate the config token" in first["evidence"]
+    assert first["status"] == "unknown" and first["evidence"].startswith("Regenerate")
     assert state["slack_config"]["needs_regenerate"] is True
     sensors.slack_app_config(api, state, store, now=1001, may_rotate=True)
     assert len(rotations) == 1
@@ -307,7 +363,7 @@ def test_regenerate_manifest_retries_by_interval_without_clearing_until_refresh_
     assert first["status"] == second["status"] == "unknown" and calls == []
     recovered = sensors.slack_app_config(api, state, store, now=1061, may_rotate=True)
     assert recovered["status"] == "unknown" and calls == ["apps.manifest.export"]
-    assert "Slack config token rejected" in recovered["evidence"]
+    assert "token rejected:" in recovered["evidence"]
     assert state["slack_config"]["needs_regenerate"] is True
 
 
@@ -595,7 +651,7 @@ def test_n2_unchanged_rejected_refresh_never_rotates_at_interval_60(monkeypatch,
     for now in (1000, 1060, 1120, 1180, 1240):
         result = sensors.slack_app_config(api, state, store, now=now, may_rotate=True)
         assert result["status"] == "unknown"
-        assert "Slack config token rejected (invalid_refresh_token)" in result["evidence"]
+        assert result["evidence"].startswith("Regenerate") and "token rejected: invalid_refresh_token" in result["evidence"]
     assert len(rotations) == 1
 
 
@@ -607,8 +663,8 @@ def test_n2_regenerate_replay_preserves_action_and_code():
     replay = sensors.slack_app_config(lambda *_: {"ok": True, "manifest": manifest()},
                                       state, Store(), now=1001)
     assert first["evidence"] == replay["evidence"]
-    assert "Slack config token rejected (invalid_refresh_token)" in replay["evidence"]
-    assert "regenerate the config token at api.slack.com/apps" in replay["evidence"]
+    assert replay["evidence"].startswith("Regenerate")
+    assert "token rejected: invalid_refresh_token" in replay["evidence"]
 
 
 def test_n1_regenerate_bypasses_stale_cached_record_without_secret(monkeypatch):
@@ -624,7 +680,7 @@ def test_n1_regenerate_bypasses_stale_cached_record_without_secret(monkeypatch):
     result = sensors.slack_app_config(lambda *_: {"ok": False, "error": "bad token xoxe-SECRET"},
                                       state, Store(), now=1001)
     assert result["status"] == "unknown" and result["data"].get("cached") is not True
-    assert "Slack config token rejected (invalid_refresh_token)" in result["evidence"]
+    assert result["evidence"].startswith("Regenerate") and "token rejected: invalid_refresh_token" in result["evidence"]
     assert "xoxe-SECRET" not in json.dumps((result, state))
 
 
@@ -971,7 +1027,7 @@ def test_manifest_sourced_regeneration_does_not_stick_without_rotation_permissio
     bad = sensors.slack_app_config(lambda *_: {"ok": False, "error": "account_inactive"},
                                    state, store, now=1000, may_rotate=False)
     assert bad["status"] == "unknown" and not state["slack_config"].get("needs_regenerate")
-    assert "regenerate the config token" not in bad["evidence"]
+    assert "Regenerate" not in bad["evidence"]
     good = sensors.slack_app_config(lambda *_: {"ok": True, "manifest": manifest()},
                                     state, store, now=1001, may_rotate=False)
     assert good["status"] == "healthy" and not state["slack_config"].get("needs_regenerate")
@@ -1015,7 +1071,7 @@ def test_replaced_pair_rechecks_immediately_and_keeps_actionable_replay(monkeypa
     assert result["status"] == "healthy" and calls == [True]
     replay = sensors.slack_app_config(api, state, store, now=1101)
     assert replay["status"] == "healthy"
-    assert "regenerate the config token" not in replay["evidence"]
+    assert "Regenerate" not in replay["evidence"]
 
 
 def test_replaced_pair_auth_failure_replay_keeps_regeneration_action(monkeypatch):
@@ -1028,7 +1084,7 @@ def test_replaced_pair_auth_failure_replay_keeps_regeneration_action(monkeypatch
                                       state, store, now=1100)
     replay = sensors.slack_app_config(lambda *_: {"ok": False, "error": "internal_error"},
                                       state, store, now=1101)
-    assert "Slack config token rejected (invalid_auth)" in result["evidence"]
+    assert result["evidence"].startswith("Regenerate") and "token rejected: invalid_auth" in result["evidence"]
     assert replay["evidence"] == result["evidence"]
 
 
@@ -1232,7 +1288,7 @@ def test_manifest_auth_after_rotation_never_repeats_each_poll(tmp_path, monkeypa
         results = [sensors.slack_app_config(api, state, store, now=now, may_rotate=True)
                    for now in (1000, 1001, 1002, 1003)]
         assert sum(method == "tooling.tokens.rotate" for method in calls) == 1
-        assert all("Slack config token rejected" in item["evidence"] for item in results)
+        assert all(item["evidence"].startswith("Regenerate") for item in results)
         assert state["slack_config"]["needs_regenerate_source"] == "rotate"
 
 
@@ -1266,7 +1322,7 @@ def test_manifest_flag_transient_recheck_keeps_old_error_and_returns_unknown(mon
     result = sensors.slack_app_config(lambda *_: {"ok": False, "error": "ratelimited"},
                                       state, store, now=1060, may_rotate=True)
     assert result["status"] == "unknown" and result["data"]["error"] == "ratelimited"
-    assert "Slack config token rejected" not in result["evidence"]
+    assert "token rejected" not in result["evidence"]  # agent-audit: allow assert-removed wording-only update to the hint-first regenerate evidence (spec E3)
     assert state["slack_config"]["last_error"] == "account_inactive"
 
 
@@ -1296,7 +1352,7 @@ def test_manifest_sourced_regeneration_interval_state_and_recovery(monkeypatch):
         return {"ok": True, "manifest": manifest()}
     sensors.slack_app_config(api, state, Store(), now=1000, may_rotate=True)
     replay = sensors.slack_app_config(api, state, Store(), now=1020, may_rotate=True)
-    assert len(calls) == 1 and "Slack config token rejected (account_inactive)" in replay["evidence"]
+    assert len(calls) == 1 and replay["evidence"].startswith("Regenerate") and "token rejected: account_inactive" in replay["evidence"]
     assert state["slack_config"]["needs_regenerate_source"] == "manifest"
     assert state["slack_config"]["needs_regenerate_refresh"] == sensors._slack_refresh_hash("refresh-secret")
     checked = sensors.slack_app_config(api, state, Store(), now=1060, may_rotate=True)
@@ -1381,7 +1437,7 @@ def test_l2_recent_rotation_keeps_regenerate_action_and_does_not_recheck(tmp_pat
     result = sensors.slack_app_config(lambda method, *_: calls.append(method) or
                                       {"ok": False, "error": "token_expired"},
                                       state, store, now=1000, may_rotate=True)
-    assert "regenerate the config token" in result["evidence"]
+    assert result["evidence"].startswith("Regenerate")
     assert calls == ["apps.manifest.export"]
     assert state["slack_config"]["needs_regenerate"] is True
 
@@ -1398,8 +1454,8 @@ def test_l3_rejected_refresh_token_is_not_retried_for_six_hours(tmp_path, monkey
     for cycle in range(1, 73):
         latest = sensors.slack_app_config(api, state, store, now=cycle * 300, may_rotate=True)
     assert calls.count("tooling.tokens.rotate") == 1
-    assert "regenerate the config token" in first["evidence"]
-    assert "regenerate the config token" in latest["evidence"]
+    assert first["evidence"].startswith("Regenerate")
+    assert latest["evidence"].startswith("Regenerate")
 
 
 def test_round5_rotation_rate_for_twelve_hours(tmp_path, monkeypatch):
@@ -1418,7 +1474,7 @@ def test_round5_rotation_rate_for_twelve_hours(tmp_path, monkeypatch):
     assert len(rotations) <= 12
     assert len(rotations) == 1
     assert state["slack_config"]["needs_regenerate"] is True
-    assert "regenerate the config token" in record["evidence"]
+    assert record["evidence"].startswith("Regenerate")
 
 
 @pytest.mark.parametrize("failure", ["ratelimited", "exception", "write"])
@@ -1541,8 +1597,8 @@ def test_11f_transient_error_is_popped_after_auth_recheck(monkeypatch):
                                      state, store, now=1000)
     replay = sensors.slack_app_config(lambda *_: {"ok": False, "error": "invalid_auth"},
                                       state, store, now=1001)
-    assert "regenerate the config token" in first["evidence"]
-    assert "regenerate the config token" in replay["evidence"]
+    assert first["evidence"].startswith("Regenerate")
+    assert replay["evidence"].startswith("Regenerate")
     assert replay["data"]["error"] == "invalid_auth"
     assert "regenerate_check_error" not in state["slack_config"]
 
@@ -1605,4 +1661,4 @@ def test_round4_manifest_auth_poll_limit_mutant_is_caught(tmp_path, monkeypatch)
     records = [sensors.slack_app_config(api, state, store, now=1000 + i, may_rotate=True)
                for i in range(4)]
     assert len(rotations) == 1
-    assert all("Slack config token rejected" in item["evidence"] for item in records)
+    assert all(item["evidence"].startswith("Regenerate") for item in records)

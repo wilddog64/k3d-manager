@@ -83,8 +83,22 @@ def slack_app_config(api, state, store=None, now=None, may_rotate=False, thresho
     store = store or _SlackKeychainStore()
     access = refresh = ""
     error = ""
+    secrets_seen = []
+
+    def remember(value):
+        if isinstance(value, str) and value and value not in secrets_seen:
+            secrets_seen.append(value)
+        return value
+
+    def read_token(service):
+        return remember(store.read(service))
+
+    def write_token(service, value):
+        remember(value)
+        return store.write(service, value)
+
     try:
-        access, refresh = store.read(SLACK_CONFIG_SERVICE), store.read(SLACK_CONFIG_REFRESH_SERVICE)
+        access, refresh = read_token(SLACK_CONFIG_SERVICE), read_token(SLACK_CONFIG_REFRESH_SERVICE)
         if not access or not refresh:
             return record("slack_app_config", "unknown", "Restore both Slack config token items")
         refresh_hash = _slack_refresh_hash(refresh)
@@ -182,11 +196,11 @@ def slack_app_config(api, state, store=None, now=None, may_rotate=False, thresho
             os.makedirs(lock_dir, mode=0o700, exist_ok=True)
             with open(os.path.join(lock_dir, "slack-config.lock"), "a", encoding="utf-8") as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX)
-                access, refresh = store.read(SLACK_CONFIG_SERVICE), store.read(SLACK_CONFIG_REFRESH_SERVICE)
+                access, refresh = read_token(SLACK_CONFIG_SERVICE), read_token(SLACK_CONFIG_REFRESH_SERVICE)
                 if not access or not refresh:
                     return record("slack_app_config", "unknown", "Restore both Slack config token items")
                 if refresh != refresh_before_lock:
-                    access = store.read(SLACK_CONFIG_SERVICE)
+                    access = read_token(SLACK_CONFIG_SERVICE)
                     _reload_slack_rotation_state(config, state_path)
                     payload, error = manifest(access)
                 else:
@@ -201,9 +215,9 @@ def slack_app_config(api, state, store=None, now=None, may_rotate=False, thresho
                         return _slack_rotation_unknown(type(exc).__name__)
                     if not isinstance(rotated, dict) or rotated.get("ok") is not True:
                         error = rotated.get("error", "") if isinstance(rotated, dict) else ""
-                        latest = store.read(SLACK_CONFIG_REFRESH_SERVICE)
+                        latest = read_token(SLACK_CONFIG_REFRESH_SERVICE)
                         if latest != refresh:
-                            access = store.read(SLACK_CONFIG_SERVICE)
+                            access = read_token(SLACK_CONFIG_SERVICE)
                             refresh = latest
                             _reload_slack_rotation_state(config, state_path)
                             payload, error = manifest(access)
@@ -219,10 +233,10 @@ def slack_app_config(api, state, store=None, now=None, may_rotate=False, thresho
                     else:
                         new_refresh, new_access = rotated.get("refresh_token"), rotated.get("token")
                         if (not new_refresh or not new_access or
-                                not store.write(SLACK_CONFIG_REFRESH_SERVICE, new_refresh) or
-                                not store.write(SLACK_CONFIG_SERVICE, new_access) or
-                                store.read(SLACK_CONFIG_REFRESH_SERVICE) != new_refresh or
-                                store.read(SLACK_CONFIG_SERVICE) != new_access):
+                                not write_token(SLACK_CONFIG_REFRESH_SERVICE, new_refresh) or
+                                not write_token(SLACK_CONFIG_SERVICE, new_access) or
+                                read_token(SLACK_CONFIG_REFRESH_SERVICE) != new_refresh or
+                                read_token(SLACK_CONFIG_SERVICE) != new_access):
                             return record("slack_app_config", "unknown", "Keychain write failed; unlock the login keychain on the hub")
                         access, refresh = new_access, new_refresh
                         expiry = rotated.get("exp")
@@ -287,7 +301,6 @@ def slack_app_config(api, state, store=None, now=None, may_rotate=False, thresho
         else:
             _debounced("slack_app_config", False, threshold, state)
             result = record("slack_app_config", "healthy", "Slack app settings healthy", data=data)
-        secrets_seen = [value for value in (access, refresh) if value]
         def clean(value):
             if isinstance(value, str):
                 for secret in secrets_seen:
@@ -308,7 +321,7 @@ def slack_app_config(api, state, store=None, now=None, may_rotate=False, thresho
 def _slack_regenerate_record(error):
     code = _slack_error_code(error)
     return record("slack_app_config", "unknown",
-                  f"Slack config token rejected ({code}): regenerate the config token at api.slack.com/apps",
+                  f"Regenerate the Slack config token at api.slack.com/apps and re-store both Keychain items (token rejected: {code})",
                   data={"error": code})
 
 
