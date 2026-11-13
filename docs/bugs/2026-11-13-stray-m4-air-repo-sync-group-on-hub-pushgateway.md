@@ -1,7 +1,7 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
 **Status:** OPEN — captured 2026-11-13 by Claude while watching plan 3 E6
-**Priority:** P3 (stale series; no alert fires from it today)
+**Priority:** P3 (proposed P2 on 2026-11-13 15:57Z: the stray group now fires K3dmPromoteLookupFailed; operator decides)
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** unknown
 **Should have been caught by:** unknown
@@ -25,3 +25,11 @@ Pushgateway groups never expire. A panel that sums `promote_lookup_failed` witho
 1. Delete the group: `curl -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air` on the M5 (write to the hub; operator runs it).
 2. Make the default safe: have repo-sync publish only when the role is hub and the hostname matches the hub host, or require `PUSHGATEWAY_URL` to be set explicitly.
 3. Write the M4's machine-role file (`worker`) so the M4 job runs as intended. Its own logs show an error every 5 minutes.
+
+## Update 2026-11-13 15:57Z: the stray group now pages
+
+After the promote of `6375f228` loaded the plan 3 rules at 15:24Z, a read-only GET of hub Prometheus (`ssh m5-air.local curl -s 127.0.0.1:19091/api/v1/alerts`) shows
+`K3dmPromoteLookupFailed{instance="m4-air",cluster="hub",job="k3dm_repo_sync",repo="k3d-manager",severity="warning"}` **firing**, active since 15:25:56Z.
+The hub's own job (`instance="m5-air"`) is healthy: at the same moment it holds `K3dmPromoteWaiting{sha="cf8cfc2"}` pending.
+That alert is false: the M4 is not the hub and computes no promotion. Until option 1 or 2 lands, every K3dmPromoteLookupFailed page has to be checked for `instance`.
+The rule could also be scoped to the hub instance, but that only hides the symptom. Options 1 and 2 above still stand.
