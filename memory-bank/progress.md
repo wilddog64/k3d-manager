@@ -610,3 +610,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13 ~16:15Z: forecast row correction verified by Claude (47/47, E1 red pre-fix, E2 clean); Fable review pending before land.
 - 2026-11-13 16:15Z: plan 3 E6 arrival PASS (cf8cfc2); forecast fix cd726a46 committed in worktree after Fable review fixes; landing next.
 - [x] 2026-11-13 dev-hub-coredns fix landed 8c2bfc5f (offline verified); [ ] CI, promote, live E2 `make dev-hub-up`
+
+- 2026-11-13: coredns fix live-confirmed up to vCluster creation on m5-air. E2 128Mi still unproven: every synced pod is forbidden because PriorityClass k3dm-dev-preemptible has preemptionPolicy Never and the synced pods carry PreemptLowerPriority. Filed docs/bugs/2026-11-13-dev-hub-synced-pods-forbidden-preemption-policy-never.md (P1 proposal, c8099c47); waiting on operator decision.
