@@ -67,3 +67,5 @@ Judged after 2–3 releases.
 | 2026-11-12 | dev-hub-vcluster-b (1) | Claude | — | 2 | 2 | 0 | 1 | 1 |
 | 2026-11-12 | dev-hub-vcluster-b (2) | Fable | 135,495 | 5 + 7 low | 5 checked (H1 reproduced by both; M3 read by Claude), rest plausible | 0 | 1 | 2 (M2 teardown advice, M3 silent exit) |
 | 2026-11-12 | dev-hub-vcluster-b (2) | Claude | — | 1 | 1 | 0 | 1 | 0 |
+| 2026-11-12 | dev-hub-vcluster-b (3) | Fable | 132,304 | 5 + 1 unverified | 5 (F1 reproduced by Fable and Claude; F2 read plus Fable mutant; F4 chart templates read by Claude) | 0 | 1 | 4 (protected-branch test can't fail, N4 weak, chart no-op keys, untested BRANCH paths) |
+| 2026-11-12 | dev-hub-vcluster-b (3) | Claude | — | 1 | 1 | 0 | 1 | 0 |
