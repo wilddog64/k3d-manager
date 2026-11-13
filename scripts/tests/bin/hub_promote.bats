@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2030,SC2031
 
 # Captures for deterministic command stubs (M4 Air, 2026-11-07 UTC):
 # git ls-remote origin refs/heads/deploy/hub refs/heads/k3d-manager-v1.43.15
@@ -79,7 +80,9 @@ EOF
 # Read-only capture: m4-air.local, 2026-11-07 20:28:49 UTC:
 # gh api repos/.../check-runs => {"total_count":0,"check_runs":[]}.
 [[ "$1" == api && "$2" == --paginate && "$3" == repos/wilddog64/k3d-manager/commits/*/check-runs && "$4" == --jq && "$5" == '.check_runs[]' ]] || exit 97
-if [[ "${GH_STUB_MODE:-empty}" == success ]]; then
+if [[ "${GH_STUB_MODE:-empty}" == lookup-fail ]]; then
+  exit 1
+elif [[ "${GH_STUB_MODE:-empty}" == success ]]; then
   printf '{"status":"completed","conclusion":"success"}\n'
 elif [[ "${GH_STUB_MODE:-empty}" == pending ]]; then
   printf '{"status":"in_progress","conclusion":null}\n'
@@ -130,6 +133,20 @@ EOF
   export CALLS="$BATS_TEST_TMPDIR/calls"
   : > "$BATS_TEST_TMPDIR/kubectl-calls"
   export KUBECTL_CAPTURE="$BATS_TEST_TMPDIR/kubectl-calls"
+}
+
+@test "M4: is-green shares promote classification and distinguishes lookup failure" {
+  sha="$(git -C "$WORK" rev-parse HEAD)"
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=success "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 0 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=pending "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 3 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=failed "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 3 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=empty "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 3 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=lookup-fail "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 2 ]
 }
 
 _run_promoter_tty() {

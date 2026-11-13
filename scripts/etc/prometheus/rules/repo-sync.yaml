@@ -28,3 +28,21 @@ spec:
           annotations:
             summary: "Hub deployment step {{ $labels.step }} is pending"
             description: 'Run {{ if eq $labels.step "platform-ops" }}make platform-ops{{ else if eq $labels.step "appsets-reapply" }}make appsets-reapply{{ else }}restart the webhook{{ end }}.'
+        - alert: K3dmPromoteWaiting
+          expr: k3dm_repo_sync_promotable == 1
+          for: 15m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "CI-green {{ $labels.sha }} is waiting to promote"
+            description: "Run: make hub-promote REF={{ $labels.sha }}"
+        - alert: K3dmPromoteLookupFailed
+          expr: k3dm_repo_sync_promote_lookup_failed == 1
+          for: 30m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "Hub promotion check-runs lookup is failing"
+            description: "Check the gh token/authentication and repo-sync PATH; these are the usual causes."

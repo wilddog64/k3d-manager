@@ -80,6 +80,52 @@ def repo_label(path):
         return path.name
 
 
+def find_promotable(remote, upstream_ref, backlog_count):
+    """Return (sha, check_lookup_failed, candidate_list_unknown)."""
+    commits = git(ROOT, "rev-list", "--max-count=10", f"{remote}/deploy/hub..{upstream_ref}")
+    if commits.returncode:
+        return None, False, True
+    candidates = commits.stdout.splitlines()
+    for commit in candidates:
+        try:
+            check = run([str(ROOT / "bin/k3dm-hub-promote"), "is-green", commit], cwd=ROOT)
+        except (OSError, subprocess.TimeoutExpired):
+            return None, True, True
+        if check.returncode == 0:
+            return commit[:7], False, False
+        if check.returncode == 3:
+            continue
+        return None, True, True
+    return None, False, len(candidates) == 10 and backlog_count > 10
+
+
+def carry_forward_promotable(state, previous_state, remote, upstream_ref):
+    """Keep the prior alert series through an unknown cycle if it remains unpromoted."""
+    sha = previous_state.get("promotable_sha")
+    if not sha:
+        return
+    branch = state.get("upstream_branch") or previous_state.get("promotable_branch")
+    if not branch:
+        return
+    try:
+        upstream_contains = git(ROOT, "merge-base", "--is-ancestor", sha, upstream_ref)
+        deployed_contains = git(ROOT, "merge-base", "--is-ancestor", sha, f"{remote}/deploy/hub")
+    except (OSError, subprocess.TimeoutExpired):
+        return
+    if upstream_contains.returncode == 0 and deployed_contains.returncode == 1:
+        state["promotable_sha"] = sha
+        state["promotable_branch"] = branch
+
+
+def prom_label(value):
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def promotable_metric(sha, branch):
+    return (f'k3dm_repo_sync_promotable{{repo="k3d-manager",sha="{prom_label(sha)}",'
+            f'branch="{prom_label(branch)}"}} 1')
+
+
 def role():
     p = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")) / "k3d-manager/machine-role"
     try:
@@ -276,7 +322,8 @@ def main():
             rec = next(r for r in state["repositories"] if pathlib.Path(r["path"]).resolve() == ROOT.resolve())
             pending = ",".join(x["step"] for x in state.get("deploy_pending", []) if x.get("paths")) or "none"
             promote = state.get("promote_backlog")
-            print(f"hub {socket.gethostname()}: {rec.get('branch') or '-'} at {str(rec.get('new_head') or '-')[:7]} ({rec['result']}); deploy pending: {pending}; deploy/hub {str(state.get('deploy_hub_sha') or '-')[:7]}; promote backlog: {promote if promote is not None else 'unknown'}")
+            promotable = state.get("promotable_sha") or ("unknown" if state.get("promotable_unknown") else "none")
+            print(f"hub {socket.gethostname()}: {rec.get('branch') or '-'} at {str(rec.get('new_head') or '-')[:7]} ({rec['result']}); deploy pending: {pending}; deploy/hub {str(state.get('deploy_hub_sha') or '-')[:7]}; promote backlog: {promote if promote is not None else 'unknown'}; promotable: {promotable}")
             return 0
         except Exception:
             return 1
@@ -322,7 +369,8 @@ def main():
                                                        else previous.get(rec["path"], 0))
         run_time = int(time.time())
         state = {"run_time": run_time, "repositories": records,
-                 "webhook_restart_pending": False, "deploy_pending": [], "deploy_unknown": [], "promote_backlog": None}
+                 "webhook_restart_pending": False, "deploy_pending": [], "deploy_unknown": [], "promote_backlog": None,
+                 "promotable_sha": None, "promote_lookup_failed": False, "promotable_unknown": False}
         previous_webhook = next((item for item in previous_state.get("deploy_pending", [])
                                  if item.get("step") == "webhook-restart"), None)
         if previous_webhook:
@@ -392,16 +440,44 @@ def main():
                 state["deploy_unknown"].append("appsets-reapply")
             try:
                 root_rec = next((r for r in records if pathlib.Path(r["path"]).resolve() == ROOT.resolve()), None)
+                remote = (root_rec.get("remote") or "origin") if root_rec else "origin"
+                upstream_ref = ""
+                if root_rec:
+                    deployed_sha = git(ROOT, "rev-parse", f"{remote}/deploy/hub")
+                    if deployed_sha.returncode == 0:
+                        state["deploy_hub_sha"] = deployed_sha.stdout.strip()
+                    upstream_result = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+                    upstream_ref = upstream_result.stdout.strip()
+                    if not upstream_ref:
+                        branch = previous_state.get("upstream_branch") or previous_state.get("promotable_branch")
+                        if branch:
+                            upstream_ref = f"{remote}/{branch}"
+                    if upstream_ref.startswith(f"{remote}/"):
+                        state["upstream_branch"] = upstream_ref.partition("/")[2]
                 if (root_rec and root_rec.get("result") != "fetch_failed"
                         and not root_rec.get("promote_backlog_unknown", False)):
-                    upstream_ref = git(ROOT, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip()
-                    remote = root_rec.get("remote") or "origin"
-                    backlog = git(ROOT, "rev-list", "--count", f"{remote}/deploy/hub..{upstream_ref}")
-                    state["promote_backlog"] = int(backlog.stdout.strip()) if backlog.returncode == 0 else None
-                remote = root_rec.get("remote") or "origin"
-                state["deploy_hub_sha"] = git(ROOT, "rev-parse", f"{remote}/deploy/hub").stdout.strip()
+                    upstream_branch = state.get("upstream_branch", "")
+                    backlog = (git(ROOT, "rev-list", "--count", f"{remote}/deploy/hub..{upstream_ref}")
+                               if upstream_ref else None)
+                    state["promote_backlog"] = int(backlog.stdout.strip()) if backlog and backlog.returncode == 0 else None
+                    if state["promote_backlog"] is None:
+                        state["promotable_unknown"] = True
+                    elif state["promote_backlog"] > 0:
+                        (state["promotable_sha"], state["promote_lookup_failed"],
+                         state["promotable_unknown"]) = find_promotable(remote, upstream_ref, state["promote_backlog"])
+                        if state["promotable_sha"]:
+                            state["promotable_branch"] = upstream_branch
+                else:
+                    state["promotable_unknown"] = True
+                if state["promotable_unknown"]:
+                    carry_forward_promotable(state, previous_state, remote, upstream_ref)
             except Exception:
-                pass
+                state["promotable_unknown"] = True
+                state["promote_lookup_failed"] = True
+                try:
+                    carry_forward_promotable(state, previous_state, remote, upstream_ref)
+                except Exception as error:
+                    print(f"WARNING: could not retain prior promotable SHA: {error}", file=sys.stderr)
         STATE.write_text(json.dumps(state, indent=2) + "\n")
         for rec in records:
             line = f"{pathlib.Path(rec['path']).name}: {rec['branch'] or '-'} {rec['result']} ({rec['behind_before']} behind before, {rec['behind_after']} after)"
@@ -414,6 +490,11 @@ def main():
             for r in records:
                 metrics.append(f'k3dm_repo_sync_result{{repo="{repo_label(r["path"])}",result="{r["result"]}"}} 1')
             metrics.append(f"k3dm_repo_sync_webhook_restart_pending {int(state['webhook_restart_pending'])}")
+            if state["promote_backlog"] is not None:
+                metrics.append(f'k3dm_repo_sync_promote_backlog_commits{{repo="k3d-manager"}} {state["promote_backlog"]}')
+            metrics.append(f'k3dm_repo_sync_promote_lookup_failed{{repo="k3d-manager"}} {int(state["promote_lookup_failed"])}')
+            if state["promotable_sha"]:
+                metrics.append(promotable_metric(state["promotable_sha"], state["promotable_branch"]))
             for step in ("platform-ops", "appsets-reapply", "webhook-restart"):
                 if step not in state["deploy_unknown"]:
                     metrics.append(f'k3dm_repo_sync_deploy_pending{{step="{step}"}} {int(any(p["step"] == step and p["paths"] for p in state["deploy_pending"]))}')

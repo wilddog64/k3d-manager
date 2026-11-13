@@ -3215,6 +3215,21 @@ data:
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
           "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "id": 33,
+          "type": "stat",
+          "title": "deploy/hub behind",
+          "description": "Commits on the release branch that deploy/hub does not contain; the legend shows the newest CI-green SHA ready for operator promotion.",
+          "gridPos": {"x": 0, "y": 70, "w": 6, "h": 4},
+          "targets": [
+            {"refId": "A", "expr": "k3dm_repo_sync_promote_backlog_commits{repo=\"k3d-manager\"}", "instant": true, "legendFormat": "backlog"},
+            {"refId": "B", "expr": "k3dm_repo_sync_promotable{repo=\"k3d-manager\"}", "instant": true, "legendFormat": "{{sha}}"},
+            {"refId": "C", "expr": "k3dm_repo_sync_promote_lookup_failed{repo=\"k3d-manager\"}", "instant": true, "legendFormat": "lookup failed"}
+          ],
+          "options": {"graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
     }

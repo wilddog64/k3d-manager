@@ -67,14 +67,24 @@ resolve_on_origin() {
   printf '%s' "$sha"
 }
 
-check_runs() {
+classify_check_runs() {
   local sha="$1" data count pending failed
-  data="$(_run_command --soft -- gh api --paginate "repos/$GH_REPO/commits/$sha/check-runs" --jq '.check_runs[]')" || die "GitHub check-runs lookup failed"
-  count="$(jq -s 'length' <<< "$data")"
-  (( count > 0 )) || die "no GitHub check runs exist for $sha"
-  pending="$(jq -s '[.[] | select(.status != "completed")] | length' <<< "$data")"
-  failed="$(jq -s '[.[] | select(.conclusion != "success" and .conclusion != "neutral" and .conclusion != "skipped")] | length' <<< "$data")"
-  (( pending == 0 && failed == 0 )) || die "GitHub check runs are pending or failed for $sha"
+  data="$(_run_command --soft -- gh api --paginate "repos/$GH_REPO/commits/$sha/check-runs" --jq '.check_runs[]')" || return 2
+  count="$(jq -s 'length' <<< "$data")" || return 2
+  (( count > 0 )) || return 3
+  pending="$(jq -s '[.[] | select(.status != "completed")] | length' <<< "$data")" || return 2
+  failed="$(jq -s '[.[] | select(.conclusion != "success" and .conclusion != "neutral" and .conclusion != "skipped")] | length' <<< "$data")" || return 2
+  (( pending == 0 && failed == 0 ))
+}
+
+check_runs() {
+  local sha="$1" rc
+  if classify_check_runs "$sha"; then return 0; else rc=$?; fi
+  case "$rc" in
+    2) die "GitHub check-runs lookup failed" ;;
+    3) die "no GitHub check runs exist for $sha" ;;
+    *) die "GitHub check runs are pending or failed for $sha" ;;
+  esac
 }
 
 show_and_confirm() {
@@ -250,6 +260,15 @@ rollback() {
 main() {
   [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] | rollback [BREAK_GLASS=1] | status'
   case "$1" in
+    is-green)
+      [[ $# == 2 && -n "$2" ]] || die 'usage: k3dm-hub-promote is-green <sha>'
+      if classify_check_runs "$2"; then exit 0; else rc=$?; fi
+      case "$rc" in
+        1|3) exit 3 ;;
+        2) exit 2 ;;
+        *) exit 2 ;;
+      esac
+      ;;
     status) [[ $# == 1 ]] || die 'status takes no arguments'; status ;;
     rollback)
       [[ $# -ge 1 && $# -le 2 ]] || die 'usage: k3dm-hub-promote rollback [BREAK_GLASS=1]'
