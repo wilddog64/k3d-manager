@@ -510,7 +510,7 @@ PY
   run "$REAL_MAKE" --no-print-directory -f "$PROJECT_ROOT/Makefile" hub-sync
   [ "$status" -eq 0 ]
   [[ "$output" == hub\ *": main at "* ]]
-  expected_tail="(updated); deploy pending: platform-ops; deploy/hub ${promoted:0:7}; promote backlog: 1"
+  expected_tail="(updated); deploy pending: platform-ops; deploy/hub ${promoted:0:7}; promote backlog: 1; promotable: unknown"
   [[ "$output" == *"$expected_tail" ]]
   [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 1 ]
   grep -q 'BatchMode=yes' "$SSH_LOG"
