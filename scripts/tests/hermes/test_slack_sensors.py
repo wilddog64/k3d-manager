@@ -1294,7 +1294,7 @@ def test_manifest_sourced_regeneration_interval_state_and_recovery(monkeypatch):
         if len(calls) == 2:
             return {"ok": False, "error": "not_authed"}
         return {"ok": True, "manifest": manifest()}
-    first = sensors.slack_app_config(api, state, Store(), now=1000, may_rotate=True)
+    sensors.slack_app_config(api, state, Store(), now=1000, may_rotate=True)
     replay = sensors.slack_app_config(api, state, Store(), now=1020, may_rotate=True)
     assert len(calls) == 1 and "Slack config token rejected (account_inactive)" in replay["evidence"]
     assert state["slack_config"]["needs_regenerate_source"] == "manifest"
@@ -1518,7 +1518,7 @@ def test_11d_e_f_regenerate_check_error_is_stored_replayed_and_popped(monkeypatc
     def limited(*_args):
         calls.append(True)
         return {"ok": False, "error": "ratelimited"}
-    first = sensors.slack_app_config(limited, state, store, now=1100)
+    sensors.slack_app_config(limited, state, store, now=1100)
     replay = sensors.slack_app_config(limited, state, store, now=1101)
     assert state["slack_config"]["regenerate_check_error"] == "ratelimited"
     assert replay["data"]["error"] == "ratelimited" and len(calls) == 1

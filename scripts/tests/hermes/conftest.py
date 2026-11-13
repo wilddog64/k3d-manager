@@ -168,7 +168,6 @@ def _no_live_slack_or_keychain(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_sensitive_hermes_subprocesses(monkeypatch, tmp_path):
-    import subprocess
     import sys
     import types
     import os

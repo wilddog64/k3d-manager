@@ -26,8 +26,7 @@ from hermes.correlator import Correlator
 from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
-                            SLACK_CONFIG_SERVICE, SLACK_CONFIG_REFRESH_SERVICE,
-                            HERMES_USER_AGENT, SLACK_RELAY,
+                            HERMES_USER_AGENT,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
                             app_health, data_layer, hostnet_drift, node_pressure, reachability,
                             stale_acg_registration, superseded_jobs,
