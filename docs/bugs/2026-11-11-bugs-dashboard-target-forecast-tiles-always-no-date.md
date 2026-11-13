@@ -45,8 +45,9 @@ In `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (`k3dm-bugs.jso
 - Delete panel 29 "Target forecast (earliest)" (x 8, y 11) and panel 30 "Target forecast (latest)" (x 12, y 11).
 - Move panel 31 "Target state" from x 16 to x 8 and widen it to w 8, so the row has no hole
   (Releases to target 0–4, Median gap 4–8, Target state 8–16). Panel ids 26, 27, 28, 31, 32 keep their ids; no other panel moves.
-- Rename panel 32 from "Remaining releases" to "Current release" (operator, 2026-11-13: "Remaining release seem to be
-  missleading! should it be Current release?"). Since v1.43.7 (`d0c247dc`) its queries are filtered by the Release picker,
+- Rename panel 32 from "Remaining releases" to "Forecast window" (operator, 2026-11-13: "Remaining release seem to be
+  missleading!"; "Current release" was rejected because the Release tile, panel 1, already names the current release, and
+  the v1.43.5 test bans "ship" and "release date" in forecast titles). Since v1.43.7 (`d0c247dc`) its queries are filtered by the Release picker,
   so in Auto it shows one row, the open release. Add a panel description: "Auto: the open release. Manual: the release you
   picked; All lists every unshipped release." Queries, columns and transformations are unchanged.
 - No producer change: `k3dm_release_milestone_forecast_seconds` stays, because the Remaining releases table (panel 32) reads it.
@@ -68,14 +69,14 @@ CHANGELOG.md:330/:517 and the v1.43.5/v1.43.7 plan docs are history, unchanged. 
 must:
   M1: the Bug Tracking dashboard has no panel titled "Target forecast (earliest)" or "Target forecast (latest)"
   M2: Target state (id 31) sits at x 8, y 11, w 8, h 4 and overlaps no panel
-  M3: panel 32 is titled "Current release" and its description names the Auto, Manual and All behaviour
+  M3: panel 32 is titled "Forecast window" and its description names the Auto, Manual and All behaviour
 must_not:
   N1: Releases to target (27), Median gap (28), Target state (31) or panel 32 change query, mappings, columns or transformations (32's title and description excepted)
   N2: any other panel's id or gridPos changes
 evidence:
-  - {id: E1, proves: [M1, M2, M3], kind: offline, intent: "You will see a test that finds no 'Target forecast' panel, finds Target state at x 8, width 8, and finds the table titled 'Current release' with a description of the picker modes. It fails on today's dashboard."}
+  - {id: E1, proves: [M1, M2, M3], kind: offline, intent: "You will see a test that finds no 'Target forecast' panel, finds Target state at x 8, width 8, and finds the table titled 'Forecast window' with a description of the picker modes. It fails on today's dashboard."}
   - {id: E2, proves: [N1, N2], kind: offline, intent: "You will see a script compare every other panel with today's dashboard: same ids, queries, mappings and positions; the whole dashboard suite passes."}
-  - {id: E3, proves: [M1, M2], kind: live, intent: "After a hub promote, you will see the Release forecast row show three tiles (Releases to target, Median gap, a wider Target state) above a table titled Current release showing v1.44.0."}
+  - {id: E3, proves: [M1, M2], kind: live, intent: "After a hub promote, you will see the Release forecast row show three tiles (Releases to target, Median gap, a wider Target state) above a table titled Forecast window showing v1.44.0."}
 interface:
   - "Grafana Bug Tracking dashboard, Release forecast row"
 ```
