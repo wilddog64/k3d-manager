@@ -1,6 +1,6 @@
 # Bug: Hermes Slack config sensor leaves the superseded token pair unredacted after a rotate; regenerate evidence does not lead with the hint
 
-**Status:** LANDED — 1db4e68b on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of plan 5 (Opus verifier, items N1 and N5; Claude reproduced)
+**Status:** VERIFIED — `1db4e68b` independently verified 2026-11-13 at e9c375c4 (Acceptance-only Opus verifier, own harness: 16/16 on fix, 16/16 red on 1db4e68b^, final-pair secrets_seen mutant red on both E1 cases; 14 regenerate strings 117–128 chars; suite 388 passed, guard hits 0; Claude checked the saved outputs); landed 1db4e68b on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of plan 5 (Opus verifier, items N1 and N5; Claude reproduced)
 **Priority:** P2 (a superseded token stays valid; reaching the record needs Slack to echo it, so practical risk is low)
 **Introduced by:** `58237c77` (v1.44.0 plan 5 `hermes-slack-config-sensors`)
 **Should have been caught by:** offline test (the redaction test covered only the tokens held at the end of the cycle)
@@ -50,6 +50,6 @@ interface:
 ## Residual lows (P3 batch candidates)
 
 - Low (Fable): `store.writable()` (`sensors.py:207`) reads and rewrites the Keychain item outside `read_token`, so a value re-stored mid-cycle is not remembered; the test store never reads.
-- Low (Fable): the 140-char cap is not enforced; a persisted `last_error` of 34+ chars gives up to 155 (record() truncates at 200).
+- Low (Fable; confirmed by the 2026-11-13 verifier: a 48-char code from persisted `last_error` gives 155): the 140-char cap is not enforced; a persisted `last_error` of 34+ chars gives up to 155 (record() truncates at 200).
 - Low (Fable): `clean()` replaces in insertion order; a token that is a prefix of another leaves the longer one's tail. Sort by length descending.
 - Fixed before landing (Claude): three negative assertions still checked the old wording (vacuous) and the account_inactive replay lost its code check; restored and flip-tested.
