@@ -1,9 +1,9 @@
 # dev-hub: every synced pod is forbidden — PriorityClass `preemptionPolicy: Never` conflicts with the pod spec vCluster copies
 
-**Status:** OPEN
+**Status:** LANDED — 3e0ee4ac on k3d-manager-v1.44.0 (2026-11-13)
 **Priority:** P1 (Claude proposal: no pod inside the dev hub can run, so CoreDNS, Argo CD and Grafana never start; blocks dev-hub plan E2 in the open v1.44.0 release)
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** dispatch — since 2026-11-13
+**Waiting on:** live check — since 2026-11-13
 **Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/dev-hub/priorityclass.yaml`)
 **Should have been caught by:** live check (host admission is invisible to offline tests; the first live run stopped earlier, at the coredns schema bug)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing); related, different root cause: docs/bugs/2026-11-13-dev-hub-up-fails-vcluster-rejects-top-level-coredns.md
@@ -91,3 +91,13 @@ The PriorityClass name does not change; only its preemption policy does.
 - In `dev_hub.bats`, extend the kubectl stub so `get priorityclass k3dm-dev-preemptible` prints `${LIVE_PREEMPTION_POLICY}` and exits 0 when it is set, and exits 1 when it is unset (absent class). Add tests: M1/N1 (parse or grep the manifest by key, with a positive control that the file still has `value: -100`); M2 (`LIVE_PREEMPTION_POLICY=Never`: delete line present and earlier in `CALL_LOG` than the apply line); N2 (unset and `PreemptLowerPriority`: no `delete priorityclass` line, and the apply is still present). Extend the N1 host-scope test's allow-list to the two exact calls and nothing broader. Do not remove or weaken any other test or assert.
 - Run, then paste each command, its exit code and the summary line: `bats scripts/tests/plugins/dev_hub.bats` (0 not ok); `shellcheck scripts/plugins/dev_hub.sh`. Then put back `priorityclass.yaml` and `dev_hub.sh` from `git show HEAD:<path>` (keep your test edits), confirm the new M1/N1 and M2 tests are not ok, and restore your fix.
 - Do not commit; leave changes in the worktree.
+
+## Review log (Fable side-by-side, 2026-11-13)
+
+- Medium, accepted as pre-existing: under `DRY_RUN=1` the `system_overrides.sh` wrapper prints a preview line to stdout. The policy read captures that line, so the dry run would preview a delete. Nothing is deleted, because the delete is only previewed too. It can't be reached today: `_dev_hub_require_host_context` captures `current-context` the same way and fails first, so a real dev-hub dry run was already broken. The bats stub ignores `DRY_RUN`. Captured as docs/bugs/2026-11-13-dev-hub-dry-run-captures-preview-lines-as-values.md (P3).
+- Low, accepted for the same P3: M2 doesn't check that the delete goes to the host context; `[ a ] && [ b ]` at bats :275 fails only because of the line after it; a failed read (timeout or RBAC) counts as "class absent", which is fail-safe but gives a raw immutable-field error.
+- Claude's own review overlapped on the code path; the dry-run wrapper behaviour came only from Fable.
+
+## Landed (2026-11-13)
+
+`3e0ee4ac` (Luna, 1 run, no corrections). E1 offline PASS outside the sandbox: `bats scripts/tests/plugins/dev_hub.bats` 58/58, shellcheck clean. On the pre-fix files the new M1/N1 and M2 tests fail and N2 stays green, as expected. Mark offline_tested recorded. E2 live: after promote, the operator runs `make dev-hub-down` then `make dev-hub-up` on the M5.
