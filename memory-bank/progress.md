@@ -588,3 +588,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13: plan 5 correction 4 running.
 - 2026-11-13: plan 5 r4 under verification.
 - 2026-11-13: plan 5 correction 5 running.
+- 2026-11-13: plan 5 r5 under verification.
+- 2026-11-13: plan 5 r5 review clean of medium; P3 residual-lows bug captured.
