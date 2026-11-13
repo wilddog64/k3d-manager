@@ -575,3 +575,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-13: verification: both diffs clean (webhook 29 = parallel port contention, rerun green; hub_data = cwd-dependent test + load, green from worktree cwd; pytest 4 reds identical to base). Corrections sent: dev-hub B round 6, plan 3 round 1 (sequential resume, b7wy0yyig).
 - 2026-11-13: plan 5 exited (8 files, hermes 301 pass; Luna skipped N1-N8 mutants) → independent mutant verifier + Fable review running. dev-hub B r6 exited: 51/51 bats (Claude rerun), item-1 mutant red on tests 40-41; full make test (bxq6kacwi) + Fable r6 review running. Plan 3 r1 still running.
 - 2026-11-13: dev-hub B r6 verified, P3 lows captured, landing; plan 5 correction 1 running; plan 3 r1 exited.
+- 2026-11-13: dev-hub B landed 65e4799f, offline_tested; awaiting operator E2. Plan 3 r1 under Fable review.

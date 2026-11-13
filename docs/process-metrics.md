@@ -75,5 +75,10 @@ Judged after 2–3 releases.
 | 2026-11-13 | dev-hub-vcluster-b (5) | Claude | — | 0 new (6 round-4 fixes re-checked) | 0 | 0 | 0 | 0 |
 | 2026-11-13 | deploy-hub-behind-alert (1) | Fable | 93,816 | 13 | 6 verified by Claude (cap test can't fail, unknown cycle resets for:, lookup_failed unread, except-pass reads none, split outside try, hardcoded origin); 7 sent; 3 deferred (squash ancestry, rollback, SHA length) | 0 | 0 | 2 (silent producer, alert reset) |
 | 2026-11-13 | deploy-hub-behind-alert (1) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+| 2026-11-13 | hermes-slack-config-sensors (0) | Fable | 106,033 | 14 | 4 confirmed by Claude (transient rotate error sets regenerate, pre-lock double rotate, notified set on failed post, N6 test unstubbed); independent verifier also found N8 GREEN, N4 weak, M6 untested — all sent in correction 1 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (0) | Claude | — | 0 new beyond Fable | 0 | 0 | 0 | 0 |
+| 2026-11-13 | dev-hub-vcluster-b (6) | Fable | 92,567 | 6 | 3 shown by mutant/ad hoc test, 1 inferred, 1 nit; all low → captured as P3 `docs/bugs/2026-11-13-dev-hub-b-dry-run-and-untested-probe-paths.md`, not a round 7 | — | — | — | — |
+| 2026-11-13 | dev-hub-vcluster-b (6) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+| 2026-11-13 | dev-hub-vcluster-b (7) | — | — | — | No Fable review: mechanical split of `dev_hub_up` (pre-commit `_agent_audit` if-count gate, never run in six rounds because the worker cannot commit); Claude checked it as a verbatim move | — | — | — | — |
 
 Quota (operator gauge, 2026-11-13): the two 2026-11-13 Fable reviews (215K tokens together) used 4% of the Fable weekly limit, about 2% per review, so roughly 50 reviews fit in a week.
