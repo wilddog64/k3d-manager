@@ -137,3 +137,34 @@ interface: scripts/etc/vcluster/values-dev-hub.yaml; scripts/plugins/dev_hub.sh 
 - Pre-fix control: with `values-dev-hub.yaml` and `dev_hub.sh` restored to beda86c1 and the new tests kept, the M1/N1, M2/N2, M3 and M4 tests are not ok. Paste both runs.
 - `shellcheck scripts/plugins/dev_hub.sh`: clean.
 - Do not commit; leave changes in the worktree.
+
+## Spec amendment after Fable review (2026-11-13, before landing; supersedes the conflicting lines above)
+
+Fable read the vCluster v0.32.1 and Helm v4.3.1 upstream source; Claude re-checked findings 1 and 3 itself (`dev_hub.sh:207-222`; Helm `pkg/action/uninstall.go:164-212`).
+
+1. **Values reach only a new vCluster.** `dev_hub_up` calls `vcluster_create` only when the cluster is absent (`dev_hub.sh:207-209`), and the existing-cluster branch (`:218-221`) applies no values. Fix 1 therefore takes effect only after `make dev-hub-down` then `make dev-hub-up`. No code change for this; E2 is reworded below.
+2. **`--rollback-on-failure` is best-effort.** Its uninstall reads release history first (`uninstall.go:164`). If the vCluster API is unreachable at that moment, the release stays pending. Fix 3 is a mitigation; fix 2, the pre-install unlock, is the guaranteed recovery.
+3. **`uninstalling` is also a stuck state.** Uninstall saves `uninstalling` before deleting (`uninstall.go:196,212`). `upgrade --install` neither installs nor upgrades such a release. Fix 2 adds: `uninstalling` → `helm uninstall <release> -n <ns>`.
+4. **Status probe, exact command:** use `helm history <release> -n <ns> --max 1 -o json`. It reads only Helm's release storage; `helm status` also fetches the release's resources. Call it through `_run_command --soft --quiet`. Outcomes:
+   - "release: not found", or an empty list: treat as absent and do nothing.
+   - Any other non-zero exit: fail, naming the release.
+   - Otherwise take `.[0].status`.
+   The bats stub's output must match `helm history -o json` from Helm v4.3.1 (`pkg/cmd/history.go`, `releaseHistory` fields `revision`, `updated`, `status`, `chart`, `app_version`, `description`). Cite that source in a comment; Claude captures a real M5 sample at live check.
+5. **Rollback target:**
+   - `pending-upgrade` or `pending-rollback`: roll back to the newest revision whose status is `deployed` or `superseded`, read from `helm history <release> -n <ns> -o json`.
+   - If no such revision exists: uninstall instead.
+   A bare `helm rollback` targets revision N-1, which may be the failed one (`rollback.go:140-142`).
+6. **Any other status not listed** (`absent`, `deployed`, `failed`, `superseded`, `uninstalled`, and the five handled pending/uninstalling cases) fails `dev_hub_up` loudly, naming the release and the status.
+
+### Acceptance changes
+
+- **M3** now also covers `uninstalling` → uninstall.
+- **M4** reads "rolls back to the newest deployed or superseded revision (`helm rollback <release> <rev> -n <ns>`), or uninstalls when none exists."
+- **New M5:** `DEV_HUB_HELM_TIMEOUT=3m` changes both `--timeout` values to `3m`.
+- **New N5:** an unrecognised status, or a non-not-found history error, leads to a chart install anyway.
+- **N4 and N5** join the DoD's list of tests that must fail on pre-fix code. N3 is a positive control and cannot fail pre-fix.
+- **E2 (live), reworded:**
+  1. After the promote, `make dev-hub-up` with no down clears the stuck `argocd` release and installs Argo CD and Grafana (proves M2, M3).
+  2. Then `make dev-hub-down` and `make dev-hub-up` finish in one run.
+  3. On that second run, the `dev-hub-0` syncer log line `Starting controller-manager` shows `--leader-elect=false`, and the container does not restart during the install (proves M1).
+  A failing install can now take about 20 minutes: a 10m wait plus a 10m rollback.
