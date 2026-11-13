@@ -19,6 +19,11 @@ playground-s-11-bdff1cbe):** the override works (gcloud: "authenticated as cli-s
 plan.** Side finding: `gcloud auth list` on m4-air holds five stale `cloud_user_p_*@linuxacademygclabs.com` accounts from
 past robot logins; cleanup belongs in plan 4 (lifecycle). Probe lesson: check the key's `project_id` matches the
 sandbox before running (a July key gave a misleading `invalid_grant: account not found`).
+**cloud_user probe (operator, m4-air.local, 2026-11-13 ~01:10Z):** `gcloud compute zones list --account=cloud_user_p_e76bc7a9@linuxacademygclabs.com
+--project=playground-s-11-bdff1cbe --limit 2` listed us-east1-b and us-east1-c (UP): the browser-login identity has Compute
+rights. Direction (Claude, 2026-11-13): robot login per sandbox into an isolated `CLOUDSDK_CONFIG` under
+`~/.local/share/k3d-manager/`, every k3s-gcp gcloud call pointed at it, removed on sandbox down; the operator's own gcloud
+store is never written. Role of cloud_user (Owner or not, for an SA-grant hybrid) not yet read.
 **Related:** Fable and Argon GCP reviews 2026-11-12 (synthesis in `memory-bank/activeContext.md`);
 `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` (why global `activate-service-account` is banned)
 
