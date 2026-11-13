@@ -3,12 +3,15 @@
 **Status:** OPEN — captured 2026-11-11 from the operator's report; not investigated (capture-first rule)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-11 ("degraded, and the Remaining releases table is the workaround"); Claude proposed P3 (cosmetic: the tiles duplicate the table). Higher stands until the operator decides.
-**Waiting on:** dispatch — since 2026-11-13 (intent approval pending)
+**Waiting on:** fix running — since 2026-11-13
 **Introduced by:** unknown (tiles from `401e4eca`, v1.43.5; when they stopped showing a date is not established)
 **Should have been caught by:** unknown
 **Prior art:** `docs/bugs/2026-11-07-forecast-milestones-drift-and-folded-releases.md` — read, different defect (that one
 fixed the Remaining releases table going blank or overdue); `find-similar-docs` unavailable (vector store context missing)
 **Approval:** operator, 2026-11-11 ("we don't need those two"); triage decision 2026-11-13: "both said no date -- see table, table is Remaining releases. this mean those two are no needed" → option 1 (remove)
+**Dispatch go:** operator, 2026-11-13: "go ahead for forecast"
+**Intent approved:** operator, 2026-11-13
+**Intent approval words:** "go ahead for forecast", in reply to Claude's three intents (Earliest/Latest tiles, table removed)
 
 ## Symptom
 
