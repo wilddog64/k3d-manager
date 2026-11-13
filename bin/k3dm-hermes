@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -25,10 +26,13 @@ from hermes.correlator import Correlator
 from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
+                            SLACK_CONFIG_SERVICE, SLACK_CONFIG_REFRESH_SERVICE,
+                            HERMES_USER_AGENT, SLACK_RELAY,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
                             app_health, data_layer, hostnet_drift, node_pressure, reachability,
                             stale_acg_registration, superseded_jobs,
-                            status_checks, token_expiry_advisory, values_branch, vectordb)
+                            status_checks, token_expiry_advisory, values_branch, vectordb,
+                            slack_app_config, slack_relay_reachable)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
@@ -83,6 +87,32 @@ def _http_json(url, headers, timeout=None):
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
+
+
+def _slack_api(method, token, fields):
+    headers = {"User-Agent": HERMES_USER_AGENT,
+               "Content-Type": "application/x-www-form-urlencoded"}
+    if method == "apps.manifest.export":
+        headers["Authorization"] = f"Bearer {token}"
+    data = urllib.parse.urlencode(fields).encode()
+    request = urllib.request.Request(f"https://slack.com/api/{method}", data=data,
+                                     headers=headers, method="POST")
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+
+
+def _slack_relay_probe(url):
+    request = urllib.request.Request(url, data=b"", headers={"User-Agent": HERMES_USER_AGENT}, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def _slack_config_store():
+    from hermes.sensors import _SlackKeychainStore
+    return _SlackKeychainStore()
 
 
 def _github_headers(path, headers):
@@ -187,7 +217,7 @@ def _alert_delivery_run(command, _additions):
     return result.returncode, result.stdout
 
 
-def _run_cycle(state, status_runner=None):
+def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path=None):
     """Sample the Phase 1 sensors and propose, but never execute, repairs."""
     webhook = _keychain_secret(WEBHOOK_SERVICE)
     argo_token = _keychain_secret(ARGOCD_SERVICE)
@@ -214,11 +244,23 @@ def _run_cycle(state, status_runner=None):
         superseded_jobs(_probe_run, state),
         kine(_datastore_run, state),
         vectordb(_vectordb_run, state),
-        alert_delivery(_alert_delivery_run, state),
+    ]
+    alert_record = alert_delivery(_alert_delivery_run, state)
+    previous_rotated_at = state.get("slack_config", {}).get("rotated_at")
+    slack_config_record = slack_app_config(
+        _slack_api, state, store=_slack_config_store(), now=now, may_rotate=may_rotate,
+        state_path=state_path)
+    if (state_path is not None and
+            state.get("slack_config", {}).get("rotated_at") != previous_rotated_at):
+        _save_state(state_path, state)
+    records.extend([
+        alert_record,
+        slack_config_record,
+        slack_relay_reachable(_slack_relay_probe, state),
         ci(github_fetch, state, token=github),
         app_health(_app_health_run, state, targets=_app_health_targets(),
                    context=os.environ.get("K3DM_HERMES_APP_CONTEXT", "")),
-    ]
+    ])
     if status_runner is not None:
         records.append(status_checks(status_runner, state))
     correlator = Correlator(
@@ -471,6 +513,19 @@ def _status_notification(state, record, relay):
         state["status_reminder_date"] = today
     state["status_groups"] = [{key: group[key] for key in ("slug", "kind", "target", "count")}
                               for group in groups]
+
+
+def _slack_config_notification(state, record, relay):
+    config = state.setdefault("slack_config", {})
+    degraded = record.get("status") == "degraded"
+    previous = config.get("notified", False)
+    if degraded and not previous:
+        first = (record.get("data", {}).get("findings") or [{}])[0]
+        if post_summary(relay, "Hermes: Slack app setting wrong — " + first.get("field", record.get("evidence", "configuration"))):
+            config["notified"] = True
+    elif not degraded and previous and record.get("status") == "healthy":
+        if post_summary(relay, "Hermes: Slack app settings recovered"):
+            config["notified"] = False
 
 
 def _file_app_health_bugs(records, slot):
@@ -916,7 +971,11 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     now = time.time() if now is None else now
     _refresh_index(state, now)
     due = _status_due(state, now)
-    records, event = _run_cycle(state, status_runner if due else None)
+    previous_rotation = state.get("slack_config", {}).get("rotated_at")
+    records, event = _run_cycle(state, status_runner if due else None, may_rotate=True,
+                                 now=now, state_path=state_path)
+    if state.get("slack_config", {}).get("rotated_at") != previous_rotation:
+        _save_state(state_path, state)
     if due:
         state["status_last_run"] = now
     relay = _keychain_secret("k3dm-slack-webhook")
@@ -961,6 +1020,9 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     if (status_record and status_record.get("status") != "unknown" and
             (status_record.get("status") == "degraded" or state.get("status_groups"))):
         _status_notification(state, status_record, relay)
+    slack_config_record = next((item for item in records if item.get("sensor") == "slack_app_config"), None)
+    if slack_config_record:
+        _slack_config_notification(state, slack_config_record, relay)
     app_health_filed = _file_app_health_bugs(records, timestamp())
     if app_health_filed and app_health_filed.get("groups"):
         post_summary(relay, e2e_triage.redact(

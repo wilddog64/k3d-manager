@@ -289,6 +289,8 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
+    monkeypatch.setattr(k3dm_hermes, "slack_app_config", lambda *_args, **_kwargs: sensor("slack_app_config", "healthy"))
+    monkeypatch.setattr(k3dm_hermes, "slack_relay_reachable", lambda *_args, **_kwargs: sensor("slack_relay_reachable", "healthy"))
     state = {}
     assert k3dm_hermes._status_due(state, 1_000)
     records, _event = k3dm_hermes._run_cycle(state, runner)
@@ -299,6 +301,48 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     assert next(item for item in records if item["sensor"] == "status_checks")["status"] == "healthy"
     monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "0")
     assert not k3dm_hermes._status_due({}, 1_000)
+
+
+def test_c13_poll_time_and_permissions_are_forwarded_to_slack_sensor(monkeypatch, tmp_path):
+    from hermes.records import record
+    seen = []
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "")
+    for name in ("eso", "argocd", "values_branch", "reachability", "node_pressure", "data_layer",
+                 "hostnet_drift", "superseded_jobs", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
+        monkeypatch.setattr(k3dm_hermes, name,
+                            lambda *_args, sensor_name=name, **_kwargs: record(sensor_name, "healthy", "fixture"))
+    monkeypatch.setattr(k3dm_hermes, "slack_app_config",
+                        lambda _api, _state, **kwargs: seen.append(kwargs) or
+                        record("slack_app_config", "healthy", "fixture"))
+    monkeypatch.setattr(k3dm_hermes, "slack_relay_reachable",
+                        lambda *_args, **_kwargs: record("slack_relay_reachable", "healthy", "fixture"))
+    path = tmp_path / "state.json"
+    k3dm_hermes._run_cycle({}, may_rotate=True, now=1234.5, state_path=path)
+    assert len(seen) == 1 and seen[0]["now"] == 1234.5
+    assert seen[0]["may_rotate"] is True and seen[0]["state_path"] == path
+    assert seen[0]["store"].__class__.__name__ == "_SlackKeychainStore"
+
+
+def test_c6_rotation_metadata_is_saved_before_later_cycle_failure(monkeypatch, tmp_path):
+    import json
+    import pytest
+    from hermes.records import record
+    path = tmp_path / "state.json"
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "")
+    for name in ("eso", "argocd", "values_branch", "reachability", "node_pressure", "data_layer",
+                 "hostnet_drift", "superseded_jobs", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
+        monkeypatch.setattr(k3dm_hermes, name,
+                            lambda *_args, sensor_name=name, **_kwargs: record(sensor_name, "healthy", "fixture"))
+    def rotated(_api, state, **_kwargs):
+        state["slack_config"] = {"rotated_at": 1000, "expires_at": 44200}
+        return record("slack_app_config", "healthy", "fixture")
+    monkeypatch.setattr(k3dm_hermes, "slack_app_config", rotated)
+    def failed_probe(*_args, **_kwargs):
+        raise RuntimeError("later sensor failed")
+    monkeypatch.setattr(k3dm_hermes, "slack_relay_reachable", failed_probe)
+    with pytest.raises(RuntimeError, match="later sensor failed"):
+        k3dm_hermes._run_cycle({}, may_rotate=True, now=1000, state_path=path)
+    assert json.loads(path.read_text())["slack_config"]["expires_at"] == 44200
 
 
 def test_status_notifications_are_state_change_only(monkeypatch):
@@ -336,6 +380,8 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_orbstack_notice", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
+    monkeypatch.setattr(k3dm_hermes, "slack_app_config", lambda *_args, **_kwargs: sensor("slack_app_config", "healthy"))
+    monkeypatch.setattr(k3dm_hermes, "slack_relay_reachable", lambda *_args, **_kwargs: sensor("slack_relay_reachable", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
                  "alert_delivery", "vectordb", "superseded_jobs"):
         monkeypatch.setattr(k3dm_hermes, name,

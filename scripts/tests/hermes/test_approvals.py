@@ -97,7 +97,7 @@ def _stub_approval_poll(monkeypatch, tmp_path, token):
                         lambda service: token if service == k3dm_hermes.APPROVAL_DRAIN_SERVICE else "relay")
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_status_due", lambda *_: False)
-    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_: ([], {
+    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_, **__: ([], {
         "text": "proposal", "proposals": [{"action_id": "r2-0123abcd", "name": "repair", "blast_radius": "low"}],
         "nonce": "0123456789abcdef"}))
     interactive = []
@@ -166,7 +166,7 @@ def test_drain_happy_path_approves_deletes_and_posts(monkeypatch):
     state = {"pending_repairs": {item["action_id"]: {"name": "repair"}}, "incident_nonce": item["nonce"]}
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_args: "tok")
     monkeypatch.setattr(k3dm_hermes, "fetch_approvals", lambda *_args: [item])
-    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_args: ([], None))
+    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_args, **_kwargs: ([], None))
     monkeypatch.setattr(k3dm_hermes.repairs, "approve", lambda action_id, *_args: calls.append(("approve", action_id)) or {"outcome": "executed"})
     monkeypatch.setattr(k3dm_hermes, "delete_approval", lambda *_args: calls.append(("delete", item["action_id"])))
     monkeypatch.setattr(k3dm_hermes, "post_summary", lambda _relay, text: calls.append(("post", text)))
@@ -181,7 +181,7 @@ def test_drain_posts_refusal_reason(monkeypatch):
              "incident_nonce": item["nonce"]}
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_args: "tok")
     monkeypatch.setattr(k3dm_hermes, "fetch_approvals", lambda *_args: [item])
-    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_args: ([], None))
+    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_args, **_kwargs: ([], None))
     monkeypatch.setattr(k3dm_hermes.repairs, "approve", lambda *_args: {
         "outcome": "refused: command changed since proposal"})
     monkeypatch.setattr(k3dm_hermes, "delete_approval", lambda *_args: calls.append("delete"))

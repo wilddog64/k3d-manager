@@ -16,13 +16,13 @@ and [`docs/architecture/hermes-phase2-repair-scope.md`](../architecture/hermes-p
 [`docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`](../plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md),
 [`docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`](../plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md).
 
-The operating cycle is read-only sensing, deterministic correlation, Slack reporting, and a
+The operating cycle is sensing, deterministic correlation, Slack reporting, and a
 closed repair proposal. A human approves an exact action only after Hermes revalidates its
 precondition; Hermes then samples again to report the result.
 
 ```mermaid
 flowchart LR
-    S[Read-only sensors\nESO · ArgoCD · reachability\nnode pressure · CI · app health]
+    S[Sensors; Slack config rotation writes its token pair\nESO · ArgoCD · reachability\nnode pressure · CI · app health]
     C[Deterministic correlator\nsustained multi-signal incident]
     R[Slack report\nevidence + possible prior art]
     P[Allowlisted repair proposal\nexact command + action ID]
@@ -41,7 +41,7 @@ flowchart LR
 |-----------|------|------|
 | Agent entrypoint | [`bin/k3dm-hermes`](../../bin/k3dm-hermes) | One sense → correlate → report cycle per run; persists state |
 | Records | [`scripts/lib/hermes/records.py`](../../scripts/lib/hermes/records.py) | Normalized `{sensor, status, evidence, sampled_at, data}` record; status enum |
-| Sensors | [`scripts/lib/hermes/sensors.py`](../../scripts/lib/hermes/sensors.py) | The five read-only sensors |
+| Sensors | [`scripts/lib/hermes/sensors.py`](../../scripts/lib/hermes/sensors.py) | Sensors are read-only except that the Slack config sensor writes its two Keychain items when rotating tokens |
 | Correlator | [`scripts/lib/hermes/correlator.py`](../../scripts/lib/hermes/correlator.py) | Deterministic multi-signal fire + bounded LLM enrichment |
 | Slack relay | [`scripts/lib/hermes/slack.py`](../../scripts/lib/hermes/slack.py) | Summary POST + optional Approve/Deny buttons (see Slack approvals) |
 | Slack approvals | [`scripts/lib/hermes/approvals.py`](../../scripts/lib/hermes/approvals.py) | Drain approved action-ids from the relay worker (opt-in) |
@@ -177,7 +177,7 @@ Sensor status is a three-value enum defined in
 ## The sensors
 
 Each sensor emits one normalized record per cycle and debounces on a sustained signal (a single
-flap does not trip it). All are read-only.
+flap does not trip it). Sensors are read-only except that the Slack config sensor writes its two Keychain items when rotating tokens.
 
 1. **`eso`** — ExternalSecrets health, from every webhook `services[]` row whose name ends in
    `ESO ClusterSecretStore` or `ESO ExternalSecrets`, including the `Hub `-prefixed pair. Neutral
@@ -282,12 +282,13 @@ Slack relay by [`slack.py`](../../scripts/lib/hermes/slack.py) — there is no i
 
 ---
 
-## Access model (least privilege, read-only)
+## Access model (least privilege)
 
-Hermes holds only read-only credentials, all off-hub in the laptop login Keychain (account
+Hermes holds credentials off-hub in the laptop login Keychain (account
 `k3dm`). It provisions **no** direct Kubernetes credential — no ServiceAccount, no kubeconfig — by
 design: the webhook already is the authoritative read path, so a second cluster credential would add
-risk for no signal.
+risk for no signal. The Slack app config token pair is the exception: Hermes rotates and writes only
+the two items listed below.
 
 | Purpose | Keychain service | Notes |
 |---------|------------------|-------|
@@ -299,6 +300,24 @@ risk for no signal.
 | SMS pager sender (optional) | `k3dm-hermes-sms-from` | Gmail address; see [SMS pager](#sms-pager) |
 | SMS pager password (optional) | `k3dm-alertmanager-gmail-app-password` | Existing Google App Password item shared with Alertmanager (login-user account); not duplicated |
 | SMS pager recipient (optional) | `k3dm-hermes-sms-to` | Carrier SMS gateway address |
+| Slack app manifest access token | `k3dm-slack-config-token` | Rotated by Hermes; read by the Slack app settings sensor |
+| Slack app manifest refresh token | `k3dm-slack-config-refresh-token` | Rotated by Hermes; read by the Slack app settings sensor |
+
+The Slack app settings sensor checks that Interactivity is enabled and points to the relay, and that
+required slash commands are present and do not point at the relay's named non-command routes. It
+also records the Event Subscriptions URL without judging it. A separate unsigned POST sensor checks
+that both relay endpoints return 401, confirming the relay is deployed and verifies signatures.
+
+### Replacing the Slack config token pair
+
+If Hermes reports that the pair must be regenerated, open `api.slack.com/apps`, select `k3d-manager`,
+delete all existing config-token rows, and generate one new token pair. Store the access and refresh
+values with `security -i` so neither value appears in command arguments:
+
+```text
+add-generic-password -U -a k3dm -s k3dm-slack-config-token -X <hex-of-access-token>
+add-generic-password -U -a k3dm -s k3dm-slack-config-refresh-token -X <hex-of-refresh-token>
+```
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in
 [`scripts/etc/argocd/values.yaml.tmpl`](../../scripts/etc/argocd/values.yaml.tmpl). The ArgoCD token
@@ -415,7 +434,7 @@ subtree-pulled into [`scripts/lib/foundation/`](../../scripts/lib/foundation)); 
 copy directly. It is macOS-launchd only, and it **preflights** that the four Keychain entries above
 exist, refusing to run if any is missing — it never creates a credential.
 
-Provision the read-only credentials first (see [Access model](#access-model-least-privilege-read-only)),
+Provision the Hermes credentials first (see [Access model](#access-model-least-privilege)),
 then:
 
 ```bash

@@ -154,6 +154,7 @@ def test_launchagent_template_enables_app_health_for_ubuntu_hostinger():
 
 
 def test_run_cycle_webhook_fetch_pins_hostinger_provider(monkeypatch):
+    from hermes import sensors
     monkeypatch.setenv("K3DM_HERMES_PROVIDER", "k3s-hostinger")
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "dummy")
     urls = []
@@ -165,6 +166,15 @@ def test_run_cycle_webhook_fetch_pins_hostinger_provider(monkeypatch):
             "sensor": "stub", "status": "healthy", "evidence": "stub", "data": {}
         })
 
+    monkeypatch.setattr(k3dm_hermes, "_slack_relay_probe", lambda _url: 401)
+    monkeypatch.setattr(sensors, "_keychain_secret", lambda service: {
+        sensors.SLACK_CONFIG_SERVICE: "offline-access",
+        sensors.SLACK_CONFIG_REFRESH_SERVICE: "offline-refresh",
+    }.get(service, ""))
+    transport_calls = []
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, timeout: transport_calls.append((request.full_url, timeout)))
     k3dm_hermes._run_cycle({})
 
     assert urls and urls[0].endswith("provider=k3s-hostinger")
+    assert transport_calls == []

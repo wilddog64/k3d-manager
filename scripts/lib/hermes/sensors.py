@@ -1,4 +1,4 @@
-"""Read-only Hermes sensors; callers inject transport functions for testability."""
+"""Hermes sensors; the Slack config sensor writes its two Keychain items when rotating."""
 
 import base64
 import binascii
@@ -8,6 +8,9 @@ import os
 import subprocess
 import time
 import re
+import fcntl
+from pathlib import Path
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
 
 from hermes.records import record
@@ -17,10 +20,353 @@ WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
 GITHUB_SERVICE = "k3dm-hermes-gh-token"
 TERMINAL_OPERATION_FAILURES = ("Error", "Failed")
+SLACK_RELAY = "https://k3dm-slack-relay.k3dm.workers.dev"
+SLACK_APP_ID = "A0B863SCQUV"
+SLACK_CONFIG_SERVICE = "k3dm-slack-config-token"
+SLACK_CONFIG_REFRESH_SERVICE = "k3dm-slack-config-refresh-token"
+SLACK_RELAY_NAMED_ROUTES = ("/slack/interactivity", "/slack/events", "/hermes/")
+SLACK_REQUIRED_COMMANDS = ("/hermes-auth",)
+HERMES_USER_AGENT = "k3dm-hermes/1"
+
+
+class _SlackKeychainStore:
+    """Restrict Hermes writes to its Slack config token pair."""
+    def __init__(self, reader=None, runner=None):
+        self._reader = reader or _keychain_secret
+        self._runner = runner or subprocess.run
+
+    def read(self, service):
+        return self._reader(service)
+
+    def writable(self, service):
+        value = self.read(service)
+        return bool(value) and self.write(service, value) and self.read(service) == value
+
+    def write(self, service, value):
+        if service not in (SLACK_CONFIG_SERVICE, SLACK_CONFIG_REFRESH_SERVICE):
+            return False
+        command = f'add-generic-password -U -a k3dm -s "{service}" -X {value.encode().hex()}\n'
+        try:
+            result = self._runner(["security", "-i"], input=command, text=True,
+                                  capture_output=True, timeout=10, check=False)
+            return result.returncode == 0 and self.read(service) == value
+        except (OSError, subprocess.SubprocessError):
+            return False
+
+
+def slack_app_config(api, state, store=None, now=None, may_rotate=False, threshold=1, state_path=None):
+    """Check Slack app settings and rotate the config token pair when polling permits."""
+    now = time.time() if now is None else now
+    config = state.setdefault("slack_config", {})
+    stored_hash = config.get("needs_regenerate_refresh")
+    if stored_hash is not None and (not isinstance(stored_hash, str) or
+                                    not re.fullmatch(r"[0-9a-f]{64}", stored_hash)):
+        config.pop("needs_regenerate_refresh", None)
+    if config.get("last_error"):
+        config["last_error"] = _slack_error_code(config["last_error"])
+    try:
+        interval = max(60, int(os.environ.get("K3DM_HERMES_SLACK_CONFIG_INTERVAL", "3600")))
+    except (TypeError, ValueError):
+        interval = 3600
+    rotation_guard_interval = max(interval, 3600)
+    recently_rotated = (config.get("rotated_at") is not None and
+                        now - config["rotated_at"] < rotation_guard_interval)
+    recently_attempted_rotation = (config.get("rotate_attempted_at") is not None and
+                                   now - config["rotate_attempted_at"] < rotation_guard_interval)
+    rotation_guard_active = recently_rotated or recently_attempted_rotation
+    cached = config.get("record")
+    if (cached and not config.get("needs_regenerate") and config.get("checked_at") is not None and
+            now - config["checked_at"] < interval):
+        result = dict(cached)
+        result["data"] = {**cached.get("data", {}), "cached": True}
+        return result
+    store = store or _SlackKeychainStore()
+    access = refresh = ""
+    error = ""
+    try:
+        access, refresh = store.read(SLACK_CONFIG_SERVICE), store.read(SLACK_CONFIG_REFRESH_SERVICE)
+        if not access or not refresh:
+            return record("slack_app_config", "unknown", "Restore both Slack config token items")
+        refresh_hash = _slack_refresh_hash(refresh)
+
+        def manifest(token):
+            response = api("apps.manifest.export", token, {"app_id": SLACK_APP_ID})
+            if not isinstance(response, dict) or response.get("ok") is not True:
+                return None, response.get("error", "") if isinstance(response, dict) else ""
+            return response.get("manifest"), ""
+
+        payload = None
+        recovered_regenerate = False
+        rotate_first = False
+        if config.get("needs_regenerate"):
+            rejected_refresh = config.get("needs_regenerate_refresh")
+            source = config.get("needs_regenerate_source", "rotate")
+            checked_refresh = config.get("regenerate_checked_refresh")
+            checked_at = config.get("regenerate_checked_at")
+            same_rejected_pair = rejected_refresh == refresh_hash
+            recently_checked_pair = checked_refresh == refresh_hash
+            if (recently_checked_pair and checked_at is not None and
+                    now - checked_at < interval):
+                retry_error = config.get("regenerate_check_error", "")
+                if retry_error:
+                    return _slack_unknown(retry_error)
+                return _slack_regenerate_record(config.get("last_error", "unavailable"))
+            if same_rejected_pair and checked_at is not None and now - checked_at < interval:
+                return _slack_regenerate_record(config.get("last_error", "unavailable"))
+
+            config["regenerate_checked_at"] = now
+            payload, error = manifest(access)
+            config["regenerate_checked_refresh"] = refresh_hash
+            config.pop("regenerate_check_error", None)
+            if payload is not None:
+                if source == "manifest" or not same_rejected_pair:
+                    for key in ("needs_regenerate", "needs_regenerate_source", "needs_regenerate_refresh",
+                                "regenerate_checked_at", "regenerate_checked_refresh", "last_error",
+                                "regenerate_check_error"):
+                        config.pop(key, None)
+                    recovered_regenerate = True
+                else:
+                    return _slack_regenerate_record(config.get("last_error", "unavailable"))
+            else:
+                code = _slack_error_code(error)
+                auth_error = code in ("invalid_auth", "token_revoked", "token_expired",
+                                      "not_authed", "account_inactive")
+                if (code in ("invalid_auth", "token_expired") and may_rotate and
+                        not rotation_guard_active and
+                        not (source == "rotate" and same_rejected_pair)):
+                    for key in ("needs_regenerate", "needs_regenerate_source", "needs_regenerate_refresh",
+                                "regenerate_checked_at", "regenerate_checked_refresh", "last_error",
+                                "regenerate_check_error"):
+                        config.pop(key, None)
+                    rotate_first = True
+                elif auth_error:
+                    if rejected_refresh != refresh_hash or source == "manifest":
+                        config["needs_regenerate_refresh"] = refresh_hash
+                    config["needs_regenerate_source"] = (
+                        "manifest" if not same_rejected_pair else source)
+                    config["last_error"] = code
+                    return _slack_regenerate_record(code)
+                else:
+                    # Keep the prior rejection and last_error; only throttle this exact pair.
+                    config["regenerate_check_error"] = code
+                    return _slack_unknown(code)
+
+        exp = config.get("expires_at")
+        rotate_first = (rotate_first or
+                        (not recovered_regenerate and may_rotate and not config.get("needs_regenerate")
+                         and exp is not None and exp - now <= 3600 and not rotation_guard_active))
+        if not rotate_first and not recovered_regenerate:
+            payload, error = manifest(access)
+        if (not recovered_regenerate and payload is None and error in ("invalid_auth", "token_expired") and
+                may_rotate and not config.get("needs_regenerate")):
+            if rotation_guard_active:
+                return _slack_unknown(error)
+            rotate_first = True
+        if (not recovered_regenerate and payload is None and
+                error in ("token_revoked", "invalid_auth", "not_authed", "account_inactive") and
+                not may_rotate and not config.get("needs_regenerate")):
+            return _slack_unknown(error)
+        if (not recovered_regenerate and payload is None and
+                error in ("token_revoked", "not_authed", "account_inactive") and may_rotate and
+                not config.get("needs_regenerate")):
+            code = _slack_error_code(error)
+            config["needs_regenerate"] = True
+            config["needs_regenerate_source"] = "manifest"
+            config["needs_regenerate_refresh"] = refresh_hash
+            config["regenerate_checked_at"], config["regenerate_checked_refresh"] = now, refresh_hash
+            config["last_error"] = code
+            return _slack_regenerate_record(code)
+        if rotate_first:
+            refresh_before_lock = refresh
+            lock_dir = os.path.join(os.path.expanduser("~"), ".k3dm", "hermes")
+            os.makedirs(lock_dir, mode=0o700, exist_ok=True)
+            with open(os.path.join(lock_dir, "slack-config.lock"), "a", encoding="utf-8") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                access, refresh = store.read(SLACK_CONFIG_SERVICE), store.read(SLACK_CONFIG_REFRESH_SERVICE)
+                if not access or not refresh:
+                    return record("slack_app_config", "unknown", "Restore both Slack config token items")
+                if refresh != refresh_before_lock:
+                    access = store.read(SLACK_CONFIG_SERVICE)
+                    _reload_slack_rotation_state(config, state_path)
+                    payload, error = manifest(access)
+                else:
+                    access_writable = store.writable(SLACK_CONFIG_SERVICE)
+                    refresh_writable = store.writable(SLACK_CONFIG_REFRESH_SERVICE)
+                    if not access_writable or not refresh_writable:
+                        return record("slack_app_config", "unknown", "Keychain not writable; unlock the login keychain on the hub")
+                    config["rotate_attempted_at"] = now
+                    try:
+                        rotated = api("tooling.tokens.rotate", None, {"refresh_token": refresh})
+                    except Exception as exc:
+                        return _slack_rotation_unknown(type(exc).__name__)
+                    if not isinstance(rotated, dict) or rotated.get("ok") is not True:
+                        error = rotated.get("error", "") if isinstance(rotated, dict) else ""
+                        latest = store.read(SLACK_CONFIG_REFRESH_SERVICE)
+                        if latest != refresh:
+                            access = store.read(SLACK_CONFIG_SERVICE)
+                            refresh = latest
+                            _reload_slack_rotation_state(config, state_path)
+                            payload, error = manifest(access)
+                        elif error in ("invalid_refresh_token", "invalid_auth", "token_revoked", "token_expired", "not_authed"):
+                            code = _slack_error_code(error)
+                            config["needs_regenerate"] = True
+                            config["needs_regenerate_source"] = "rotate"
+                            config["needs_regenerate_refresh"] = refresh_hash
+                            config["regenerate_checked_at"], config["last_error"] = now, code
+                            return _slack_regenerate_record(code)
+                        else:
+                            return _slack_rotation_unknown(error)
+                    else:
+                        new_refresh, new_access = rotated.get("refresh_token"), rotated.get("token")
+                        if (not new_refresh or not new_access or
+                                not store.write(SLACK_CONFIG_REFRESH_SERVICE, new_refresh) or
+                                not store.write(SLACK_CONFIG_SERVICE, new_access) or
+                                store.read(SLACK_CONFIG_REFRESH_SERVICE) != new_refresh or
+                                store.read(SLACK_CONFIG_SERVICE) != new_access):
+                            return record("slack_app_config", "unknown", "Keychain write failed; unlock the login keychain on the hub")
+                        access, refresh = new_access, new_refresh
+                        expiry = rotated.get("exp")
+                        if isinstance(expiry, bool) or not isinstance(expiry, int) or expiry <= 0:
+                            config.pop("expires_at", None)
+                            config["rotated_at"] = now
+                            return record("slack_app_config", "unknown", "Slack rotation returned no expiry")
+                        config["expires_at"], config["rotated_at"] = expiry, now
+                        payload, error = manifest(access)
+                        if payload is None:
+                            code = _slack_error_code(error)
+                            if code in ("invalid_auth", "token_revoked", "token_expired",
+                                        "not_authed", "account_inactive"):
+                                config["needs_regenerate"] = True
+                                config["needs_regenerate_source"] = "rotate"
+                                config["needs_regenerate_refresh"] = _slack_refresh_hash(refresh)
+                                config["regenerate_checked_at"] = now
+                                config["regenerate_checked_refresh"] = _slack_refresh_hash(refresh)
+                                config["last_error"] = code
+                                return _slack_regenerate_record(code)
+        if payload is None:
+            return _slack_unknown(error)
+
+        settings = payload.get("settings") or {}
+        inter = settings.get("interactivity") if isinstance(settings, dict) else None
+        features = payload.get("features") or {}
+        commands = features.get("slash_commands") if isinstance(features, dict) else None
+        if not isinstance(inter, dict) or not isinstance(commands, list):
+            return record("slack_app_config", "unknown", "Retry Slack app manifest check; required settings are missing",
+                          data={"error": error} if error else {})
+        findings = []
+        def finding(field, found, expected):
+            findings.append({"field": field, "found": found, "expected": expected})
+        if inter.get("is_enabled") is not True:
+            finding("settings.interactivity.is_enabled", inter.get("is_enabled"), True)
+        expected_url = SLACK_RELAY + "/slack/interactivity"
+        if inter.get("request_url") != expected_url:
+            finding("settings.interactivity.request_url", inter.get("request_url"), expected_url)
+        by_command = {item.get("command"): item for item in commands if isinstance(item, dict)}
+        for name in SLACK_REQUIRED_COMMANDS:
+            if name not in by_command:
+                finding(f"features.slash_commands.{name}", None, "present")
+        host = urlsplit(SLACK_RELAY)
+        for name, item in by_command.items():
+            url = item.get("url") or ""
+            if not isinstance(url, str):
+                url = ""
+            parsed = urlsplit(url)
+            bad_route = any(parsed.path == route or parsed.path.startswith(route.rstrip("/") + "/") or
+                            (route.endswith("/") and parsed.path.startswith(route))
+                            for route in SLACK_RELAY_NAMED_ROUTES)
+            if parsed.scheme != host.scheme or parsed.netloc != host.netloc or bad_route:
+                finding(f"features.slash_commands.{name}.url", url, "relay command route")
+        event_subscriptions = settings.get("event_subscriptions") or {}
+        data = {"findings": findings, "commands": len(commands),
+                "event_url": event_subscriptions.get("request_url") if isinstance(event_subscriptions, dict) else None,
+                "token_expires_at": config.get("expires_at"), "rotated_at": config.get("rotated_at")}
+        if findings:
+            status = "degraded" if _debounced("slack_app_config", True, threshold, state) else "healthy"
+            result = record("slack_app_config", status,
+                            f"Fix {findings[0]['field']} ({len(findings)} finding(s))", data=data)
+        else:
+            _debounced("slack_app_config", False, threshold, state)
+            result = record("slack_app_config", "healthy", "Slack app settings healthy", data=data)
+        secrets_seen = [value for value in (access, refresh) if value]
+        def clean(value):
+            if isinstance(value, str):
+                for secret in secrets_seen:
+                    value = value.replace(secret, "[redacted]")
+                return value
+            if isinstance(value, list):
+                return [clean(item) for item in value]
+            if isinstance(value, dict):
+                return {clean(key): clean(item) for key, item in value.items()}
+            return value
+        result = clean(result)
+        config["checked_at"], config["record"] = now, result
+        return result
+    except Exception:
+        return _slack_unknown(error)
+
+
+def _slack_regenerate_record(error):
+    code = _slack_error_code(error)
+    return record("slack_app_config", "unknown",
+                  f"Slack config token rejected ({code}): regenerate the config token at api.slack.com/apps",
+                  data={"error": code})
+
+
+def _slack_refresh_hash(refresh):
+    return hashlib.sha256(refresh.encode()).hexdigest()
+
+
+def _reload_slack_rotation_state(config, state_path):
+    if state_path is None:
+        return
+    try:
+        disk_config = json.loads(Path(state_path).read_text()).get("slack_config", {})
+    except (OSError, ValueError, TypeError):
+        return
+    if disk_config.get("rotated_at") == config.get("rotated_at"):
+        config.pop("expires_at", None)
+        return
+    for key in ("expires_at", "rotated_at"):
+        if key in disk_config:
+            config[key] = disk_config[key]
+
+
+def _slack_error_code(error):
+    return error if isinstance(error, str) and re.fullmatch(r"[a-z_]{1,48}", error) else "unavailable"
+
+
+def _slack_unknown(error=""):
+    error = _slack_error_code(error) if error else ""
+    evidence = (f"Retry Slack manifest check ({error}): inspect Slack app settings" if error else
+                "Retry Slack app manifest check; source unavailable")
+    return record("slack_app_config", "unknown", evidence, data={"error": error} if error else {})
+
+
+def _slack_rotation_unknown(error):
+    value = error if isinstance(error, str) and re.fullmatch(r"[A-Za-z0-9_]{1,48}", error) else _slack_error_code(error)
+    return record("slack_app_config", "unknown", f"Slack token rotation failed ({value})",
+                  data={"error": value})
+
+
+def slack_relay_reachable(probe, state, threshold=2):
+    paths = ("/slack/interactivity", "/slack/commands")
+    codes, failures = {}, []
+    for path in paths:
+        try:
+            codes[path] = probe(SLACK_RELAY + path)
+            if codes[path] != 401: failures.append(f"{path} HTTP {codes[path]}")
+        except Exception:
+            codes[path] = "timeout"
+            failures.append(f"{path} timeout")
+    if failures:
+        status = "degraded" if _debounced("slack_relay_reachable", True, threshold, state) else "healthy"
+        return record("slack_relay_reachable", status, "Check relay " + failures[0], data={"codes": codes})
+    _debounced("slack_relay_reachable", False, threshold, state)
+    return record("slack_relay_reachable", "healthy", "relay deployed and verifying signatures", data={"codes": codes})
 
 
 def _keychain_secret(service):
-    """Read one existing Keychain item without exposing its value in agent argv."""
+    """Read Hermes Keychain items; Slack config rotation writes its dedicated token pair."""
     try:
         result = subprocess.run(
             ["security", "find-generic-password", "-a", "k3dm", "-s", service, "-w"],
