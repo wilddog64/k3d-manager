@@ -76,3 +76,10 @@ interface: scripts/etc/vcluster/values-dev-hub.yaml
 - Do not commit; leave changes in the worktree.
 
 **Spec correction 2026-11-13 (Claude):** M2 said `scripts/etc/vcluster/*.yaml`, which also matches the multi-document Kubernetes manifest `argocd-manager-rbac.yaml`; Luna stopped and flagged it. M2 now names `values*.yaml`.
+
+## Review log (Fable side-by-side, 2026-11-13)
+
+- H1 CONFIRMED by Claude: `setup()` overrides HOME, hiding user-site PyYAML, so the three new tests are red in a plain local run (and likely in CI's bats job, where PyYAML comes from `pip install --user`). Claude had misread the same symptom as "no PyYAML on this host". Fix sent as correction 2 (`PYTHONUSERBASE` exported before the HOME override).
+- M1 (CI exposure): same cause, same fix; not probed separately.
+- L1 (glob narrowed to `values*.yaml`): overlap with Claude and Luna; spec already corrected.
+- L2 (root keys only): accepted as spec scope; N2's frozen comparison covers nested keys in `values-dev-hub.yaml`; the vCluster upgrade idea should consider a full schema walk.
