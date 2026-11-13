@@ -1,10 +1,9 @@
 # Agent Cost dashboard and price table know only claude-fable-5-1; Fable 5.2 runs are uncounted
 
-**Status:** LANDED — `bac099be` on k3d-manager-v1.44.0 2026-11-13 (Codex Luna; Claude verified: E1–E4 red on pre-fix, green on fix, 50/50 bats, 205 pytest; Fable review no high/medium; Claude added the reset-gauge single-step thresholds override from Fable's low, mutant red); originally captured 2026-11-12
+**Status:** VERIFIED — live E5 2026-11-13 on deploy/hub 9a579a05 (dispatch mark live_verified); LANDED — `bac099be` on k3d-manager-v1.44.0 2026-11-13 (Codex Luna; Claude verified: E1–E4 red on pre-fix, green on fix, 50/50 bats, 205 pytest; Fable review no high/medium; Claude added the reset-gauge single-step thresholds override from Fable's low, mutant red); originally captured 2026-11-12
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (cost observability degraded; the gauge and raw metrics remain); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
-**Waiting on:** live check — since 2026-11-13 (E5, after a hub promote: Fable panel shows 11-11..11-13 bars, reset gauge not red)
 **Introduced by:** pre-existing (Fable 5.2 became the subagent default after the panel was written)
 **Should have been caught by:** none
 **Prior art:** `docs/bugs/2026-11-10-dispatch-table-shows-flash-and-fable-as-other.md` (exact-topic read) — same allowlist pattern, fixed for 5-1 only; `make find-similar-docs` not run
@@ -100,3 +99,7 @@ interface:
 - Test 49 checks the override's JSON, not Grafana's rendering; E5 is the real proof.
 - `agent_dispatch_dashboard.bats:1288` asserts the prose "all Fable versions"; a description reword breaks it.
 - The 5.2 cost test checks one summed total; two offsetting rate errors would pass.
+
+## Live verification 2026-11-13
+
+E5 PASS after the operator promoted 9a579a05 (appsets-check + platform-ops): Fable bars 11-10..11-13, weekly-limit gauge 16% green, resets-at grey (operator screenshot). Recorded with `bin/k3dm-codex-dispatch mark --state live_verified --sha 9a579a05...`.

@@ -1,9 +1,8 @@
 # Bug Tracking: "Target forecast (earliest/latest)" tiles only say "no date — see table"
 
-**Status:** LANDED — 2e0fa2d8 on 2026-11-13 (captured 2026-11-11 from the operator's report)
+**Status:** VERIFIED — live E3 2026-11-13 on deploy/hub 9a579a05 (dispatch mark live_verified); LANDED — 2e0fa2d8 on 2026-11-13 (captured 2026-11-11 from the operator's report)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-11 ("degraded, and the Remaining releases table is the workaround"); Claude proposed P3 (cosmetic: the tiles duplicate the table). Higher stands until the operator decides.
-**Waiting on:** live check — since 2026-11-13 (E3 after the next hub promote)
 **Introduced by:** unknown (tiles from `401e4eca`, v1.43.5; when they stopped showing a date is not established)
 **Should have been caught by:** unknown
 **Prior art:** `docs/bugs/2026-11-07-forecast-milestones-drift-and-folded-releases.md` — read, different defect (that one
@@ -115,3 +114,7 @@ interface:
 - E2 (offline, one-off script, Claude 2026-11-13 ~16:05Z, not a committed test): parsed 30471754 vs fix — ConfigMap header and dashboard top-level keys identical; only id 32 removed, none added; panel order unchanged; with y normalised (+12 for y >= 27) no panel other than 29/30 differs. Suite 48/48; `codex-land` gate passed (grafana_dashboard_bugs.bats, test_dashboard_queries.py with promtool test skipped locally, test_vectordb_bug_metrics.py, grafana_dashboard_appsets.bats).
 - Note for the spec (Fable L-1): by Grafana row ownership the Plans table (107, y=15) sits in the Release forecast row before and after, so M1's "no table panel is in the Release forecast row" means the forecast table; E3's "Plans directly below" is the intended layout.
 - E3 (live) open: after the next hub promote.
+
+## Live verification 2026-11-13
+
+E3 PASS after the operator promoted 9a579a05 (appsets-check + platform-ops): one row of five tiles; Earliest v1.44.0 2026-11-13 09:31:36, Latest v1.44.0 2026-11-16 18:32:52 (operator screenshot). Recorded with `bin/k3dm-codex-dispatch mark --state live_verified --sha 9a579a05...`.

@@ -1,8 +1,7 @@
 # Bug: public plugin functions with a subshell body are unreachable through the dispatcher (`make dev-hub-sync`, `make snapshot`)
 
-**Status:** LANDED — d1c2c441 on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of dev-hub B (Opus verifier; Claude reproduced)
+**Status:** VERIFIED — live E4 2026-11-13 on deploy/hub 9a579a05 (dispatch mark live_verified); LANDED — d1c2c441 on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of dev-hub B (Opus verifier; Claude reproduced)
 **Priority:** P1 (dev-hub E2 `make dev-hub-sync` cannot work; no workaround through the interface; blocks the v1.44.0 release PR)
-**Waiting on:** live check — since 2026-11-13 (E4: operator runs make dev-hub-sync BRANCH=<feature> on the M5 during dev-hub E2, after a promote)
 **Introduced by:** `65e4799f` (v1.44.0 dev-hub B, `dev_hub_sync`); `6974f426` (v1.43.8, `hub_snapshot_capture`)
 **Should have been caught by:** offline test (dev_hub.bats and hub_snapshot.bats source the plugin directly and never go through the dispatcher)
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run
@@ -63,3 +62,7 @@ interface:
 
 - Low (Fable): the guard's regex is a hand copy of the loader's (`plugin_function_declarations.bats:6`); a loader change after a subtree pull would not be noticed.
 - Fixed before landing (Fable low): the guard originally selected only `name()` lines, so `function name {` / `function name (` escaped it; Claude widened the selector and proved all three unreachable forms fail the guard, with a passing positive control.
+
+## Live verification 2026-11-13
+
+E4 PASS after the operator promoted 9a579a05 (appsets-check + platform-ops): make dev-hub-sync on m5-air reached dev_hub_sync and stopped at the child apply (no dev-hub kubeconfig: dev-hub-up not run first), not "Function not found". Recorded with `bin/k3dm-codex-dispatch mark --state live_verified --sha 9a579a05...`.
