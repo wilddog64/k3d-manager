@@ -38,7 +38,7 @@ BUG_SPEC_RE = re.compile(r"^docs/bugs/(\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*)\.md
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
 MODEL_IDENTITY_ALLOWLIST = {
     "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
-    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-fable-5-2",
     "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
     "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high",
 }

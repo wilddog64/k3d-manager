@@ -3662,6 +3662,20 @@ def test_claude_cost_prices_fable_at_published_rates_and_preserves_opus():
     assert cost_fable == pytest.approx(0.19625)
 
 
+def test_claude_cost_prices_fable_52_and_preserves_fable_51():
+    price_file = dispatch_metrics._repo_root() / "scripts/etc/agent/codex-model-prices.json"
+    _, _, _, claude_models = dispatch_metrics._prices(price_file)
+    now = 1_800_000_000
+    fable_51 = _claude_message("fable-51", now, model="claude-fable-5-1",
+                               input=10_000, output=1_000, cache_read=5_000,
+                               cache_5m=2_000, cache_1h=1_000)
+    fable_52 = _claude_message("fable-52", now, model="claude-fable-5-2",
+                               input=10_000, output=1_000, cache_read=5_000,
+                               cache_5m=2_000, cache_1h=1_000)
+    assert dispatch_metrics._claude_cost(fable_51, claude_models) == pytest.approx(0.19625)
+    assert dispatch_metrics._claude_cost(fable_52, claude_models) == pytest.approx(0.157)
+
+
 def test_claude_quota_exports_weekly_fable_limit_and_preserves_five_hour_seven_day(tmp_path):
     cache_path = tmp_path / "statusline-usage-cache.json"
     cache_data = {
@@ -3712,25 +3726,31 @@ def test_model_identity_allowlists_flash_fable_and_normalizes_unknown_models():
               worker_identity={"vendor": "anthropic", "model": "claude-fable-5-1", "source": "explicit", "status": "selected"}),
         event(5, "agent_exit", "fable-run", usage={"total_tokens": 100}),
         event(6, "land", "fable-run"),
-        event(7, "start", "luna-run", agent="codex",
+        event(7, "start", "fable-52-run", agent="agy",
+              worker_identity={"vendor": "anthropic", "model": "claude-fable-5-2", "source": "explicit", "status": "selected"}),
+        event(8, "agent_exit", "fable-52-run", usage={"total_tokens": 100}),
+        event(9, "land", "fable-52-run"),
+        event(10, "start", "luna-run", agent="codex",
               worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "explicit", "status": "selected"}),
-        event(8, "codex_exit", "luna-run", tokens=100),
-        event(9, "land", "luna-run"),
-        event(10, "start", "madeup-run", agent="codex",
+        event(11, "codex_exit", "luna-run", tokens=100),
+        event(12, "land", "luna-run"),
+        event(13, "start", "madeup-run", agent="codex",
               worker_identity={"vendor": "openai", "model": "unreal-ai-model-x", "source": "explicit", "status": "selected"}),
-        event(11, "codex_exit", "madeup-run", tokens=100),
-        event(12, "land", "madeup-run"),
+        event(14, "codex_exit", "madeup-run", tokens=100),
+        event(15, "land", "madeup-run"),
     ], 0, 100)
     lines = [line for line in output.splitlines() if line.startswith('k3dm_dispatch_model_identity{window="1d",') and 'role="worker"' in line]
     by_slug = {}
     for line in lines:
-        for slug in ("flash-run", "fable-run", "luna-run", "madeup-run"):
+        for slug in ("flash-run", "fable-run", "fable-52-run", "luna-run", "madeup-run"):
             if f'slug="{slug}"' in line:
                 by_slug[slug] = line
     assert 'model="gemini-3.8-flash-medium"' in by_slug["flash-run"]
     assert 'display="google/gemini-3.8-flash-medium (selected)"' in by_slug["flash-run"]
     assert 'model="claude-fable-5-1"' in by_slug["fable-run"]
     assert 'display="anthropic/claude-fable-5-1 (selected)"' in by_slug["fable-run"]
+    assert 'model="claude-fable-5-2"' in by_slug["fable-52-run"]
+    assert 'display="anthropic/claude-fable-5-2 (selected)"' in by_slug["fable-52-run"]
     assert 'model="gpt-6-luna"' in by_slug["luna-run"]
     assert 'display="openai/gpt-6-luna (selected)"' in by_slug["luna-run"]
     assert 'model="other"' in by_slug["madeup-run"]

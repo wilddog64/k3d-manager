@@ -1526,7 +1526,7 @@ data:
           "id": 121,
           "type": "barchart",
           "title": "Fable tokens per day",
-          "description": "Daily token volume for claude-fable-5-1 on its own axis. Last 30 days.",
+          "description": "Daily token volume for all Fable versions on its own axis. Last 30 days.",
           "gridPos": {
             "h": 8,
             "w": 18,
@@ -1539,7 +1539,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (date) (k3dm_dispatch_claude_daily_tokens{model=\"claude-fable-5-1\"})",
+              "expr": "sum by (date) (k3dm_dispatch_claude_daily_tokens{model=~\"claude-fable-.*\"})",
               "format": "table",
               "instant": true
             }
@@ -1627,6 +1627,25 @@ data:
                   {
                     "id": "unit",
                     "value": "dateTimeFromNow"
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#8e8e8e"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "#8e8e8e",
+                          "value": null
+                        }
+                      ]
+                    }
                   }
                 ]
               }

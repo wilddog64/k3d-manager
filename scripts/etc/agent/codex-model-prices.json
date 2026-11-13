@@ -40,8 +40,15 @@
       "cache_write_1h": 20.00,
       "cache_read": 0.25,
       "output": 50.00
+    },
+    "claude-fable-5-2": {
+      "input": 8.00,
+      "cache_write_5m": 10.00,
+      "cache_write_1h": 16.00,
+      "cache_read": 0.20,
+      "output": 40.00
     }
   },
-  "claude_checked": "2026-11-10",
-  "claude_source": "https://platform.claude.com/docs/en/about-claude/pricing (Haiku 5.5 at the prompts-up-to-100k-tokens rate; larger prompts cost 5x and are undercounted. Fable 5.1 read 2026-11-10: $10 input, $12.50 5m cache write, $20 1h cache write, $0.25 cache read, $50 output per MTok)"
+  "claude_checked": "2026-11-13",
+  "claude_source": "https://platform.claude.com/docs/en/about-claude/pricing (Haiku 5.5 at the prompts-up-to-100k-tokens rate; larger prompts cost 5x and are undercounted. Fable 5.1 read 2026-11-10: $10 input, $12.50 5m cache write, $20 1h cache write, $0.25 cache read, $50 output per MTok. Fable 5.2 read 2026-11-13 from the claude-api skill models table: $8 input, $10 5m cache write, $16 1h cache write, $0.20 cache read, $40 output per MTok)"
 }

@@ -1284,10 +1284,31 @@ fable_row=next((p for p in panels if p.get("type")=="row" and p.get("title")=="F
 assert fable_row is not None, "Fable row not found"
 daily=next((p for p in panels if "fable" in p.get("title","").lower() and any("k3dm_dispatch_claude_daily_tokens" in t.get("expr","") for t in p.get("targets",[]))),None)
 assert daily is not None, "Fable daily tokens panel not found"
-assert any("claude-fable-5-1" in t.get("expr","") for t in daily["targets"])
+assert any('model=~"claude-fable-.*"' in t.get("expr","") for t in daily["targets"])
+assert "all Fable versions" in daily["description"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Fable reset time has a neutral colour while used ratio keeps thresholds" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
 gauge=next((p for p in panels if p.get("type")=="gauge" and any("weekly_fable" in t.get("expr","") for t in p.get("targets",[]))),None)
 assert gauge is not None, "Fable weekly limit gauge not found"
 assert any("k3dm_claude_quota_resets_at_seconds" in t.get("expr","") for t in gauge["targets"])
+defaults=gauge["fieldConfig"]["defaults"]
+assert any(p.get("matcher",{}).get("options")=="resets at" and any(
+    prop.get("id")=="color" and prop.get("value",{}).get("mode")=="fixed"
+    and prop.get("value",{}).get("fixedColor")=="#8e8e8e"
+    for prop in p.get("properties",[])) for p in gauge["fieldConfig"]["overrides"]), "reset gauge needs fixed neutral colour"
+assert any(p.get("matcher",{}).get("options")=="resets at" and any(
+    prop.get("id")=="thresholds" and [s.get("color") for s in prop.get("value",{}).get("steps",[])]==["#8e8e8e"]
+    for prop in p.get("properties",[])) for p in gauge["fieldConfig"]["overrides"]), "reset gauge needs its own single neutral threshold step"
+assert defaults["thresholds"]["steps"][-2:]==[
+    {"color":"yellow","value":0.7}, {"color":"red","value":0.9}]
 print("ok")
 PY
   [ "$status" -eq 0 ]
