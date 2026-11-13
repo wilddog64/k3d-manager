@@ -1,7 +1,7 @@
 # dev-hub: `dev-hub-up` Argo CD `helm --wait` times out when the vCluster syncer restarts during startup
 
 **Status:** OPEN
-**Priority:** P2 (Claude proposal: `dev-hub-up` fails, but rerunning it is a working workaround)
+**Priority:** P1 (Claude proposal, raised 2026-11-13: a rerun cannot recover, and the only way back is down/up, which can hit the same timeout; blocks the plan E2 live check)
 **Classified:** pending (Argon, from this doc alone)
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** b2067ad3 or later Part B commit that added the Argo CD install with `--wait` and no `--timeout` (unknown which)
@@ -40,9 +40,18 @@ Separately, after the failure `~/.kube/vclusters/dev-hub.yaml` points to 127.0.0
 
 ## Workaround
 
-Rerun `make dev-hub-up`. `helm upgrade --install` is idempotent, and the Argo CD pods are already Ready.
+**Rerunning does NOT work.** Claude first wrote here that a rerun recovers; that was wrong and was never checked. The operator's rerun on m5-air, 2026-11-13:
+
+    Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress
+    helm command failed (1): helm --kubeconfig ~/.kube/vclusters/dev-hub.yaml upgrade --install argocd argo/argo-cd ... --wait
+
+The timed-out install left the `argocd` release in a pending state, and Helm refuses every later operation on it. The only way back is `make dev-hub-down`, which deletes the vCluster together with its Helm release Secrets, followed by `make dev-hub-up`. That can time out again in the same way.
 
 ## Fix options (for triage)
 
-- Add an explicit `--timeout` to both chart installs, for example 10m.
-- Wait for the vCluster to be Ready, and its syncer to stop restarting, before running the first Helm install.
+The fix needs all three:
+1. **Recover a stuck release before installing.** If `helm status` reports `pending-install`, `pending-upgrade` or `pending-rollback`, roll the release back, or uninstall it if it has no deployed revision. Then `dev-hub-up` can be rerun.
+2. **Do not leave a pending release behind.** Use the deployed Helm's own failure rollback, `--rollback-on-failure` in Helm 4 (the old `--atomic`), so a timeout cleans up after itself. This has to be proven against the Helm version on the M5 before dispatch.
+3. **Give startup time.** Set an explicit `--timeout`, for example 10m, on both chart installs. Optionally, wait for the vCluster to settle first.
+
+Evidence to capture before the spec, read-only on the M5: `helm version --short`; `helm --kubeconfig ~/.kube/vclusters/dev-hub.yaml -n cicd history argocd`; the `applicationset-controller` previous-container log.
