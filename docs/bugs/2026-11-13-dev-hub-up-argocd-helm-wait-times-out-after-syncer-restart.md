@@ -55,3 +55,10 @@ The fix needs all three:
 3. **Give startup time.** Set an explicit `--timeout`, for example 10m, on both chart installs. Optionally, wait for the vCluster to settle first.
 
 Evidence to capture before the spec, read-only on the M5: `helm version --short`; `helm --kubeconfig ~/.kube/vclusters/dev-hub.yaml -n cicd history argocd`; the `applicationset-controller` previous-container log.
+
+## Evidence (m5-air, 2026-11-13, operator, read-only)
+
+- `helm version --short`: `v4.3.1+gc0d08d0`. The m4-air has the same version.
+- `helm -n cicd history argocd`: revision 1, `pending-install`, "Initial install underway", 14:52:22 PST. The release was never marked `failed`, so the fix must handle a pending release with no deployed revision, which means uninstalling it.
+- `applicationset-controller --previous` log, 22:55:43Z to 22:57:04Z: it repeats `failed to get restmapping: no matches for kind "ApplicationSet" in version "argoproj.io/v1alpha1"` every 10 s, then gets `timed out waiting for cache to be synced`, and the manager exits. **This corrects "Likely cause" above.** The controller did not crash because the API was unreachable. For about 3 to 5 minutes after the install began, the vCluster API was not serving the ApplicationSet CRD that the same Helm release had created. Together with the `dev-hub-0` `/readyz` timeouts and its container restart, this points to a starved control plane: `values-dev-hub.yaml` caps it at 500m CPU and 768Mi memory. Whether the restart was an OOMKill or a failed probe is still to be confirmed.
+- Helm v4.3.1 upstream source (`pkg/cmd/install.go:204-206`, `pkg/action/install.go:592-605`): `--rollback-on-failure` exists, and `--atomic` is a deprecated alias for it. On install failure, `failRelease` uninstalls the release without keeping its history, so a timed-out install leaves nothing locked. Read via `gh api repos/helm/helm/contents/...?ref=v4.3.1` on 2026-11-13.
