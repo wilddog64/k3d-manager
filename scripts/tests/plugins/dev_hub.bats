@@ -6,7 +6,7 @@
 # the cluster.
 
 setup() {
-  TEST_ROOT="$(mktemp -d "${TMPDIR}/dev-hub-bats.XXXXXX")"
+  TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dev-hub-bats.XXXXXX")"
   export TEST_ROOT HOME="${TEST_ROOT}/home" SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
   mkdir -p "${HOME}/.kube/vclusters" "${TEST_ROOT}/repo"
   export CALL_LOG="${TEST_ROOT}/calls.log" REPO_ROOT="${TEST_ROOT}/repo"
