@@ -615,3 +615,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-13: idea row added (operator "sounds good"): release forecast cadence split minor vs patch (Earliest for v1.44.0 clamped/overdue one day after v1.43.15).
 - 2026-11-13: dev-hub-helm-wait run 1 exited (3 files, +150/-3, pre-amendment); correction 1 (851e1837 amendment: history probe, uninstalling, pending-upgrade rollback target, unknown fails, DEV_HUB_HELM_TIMEOUT, M5/N5) sent as resume 2.
 - 2026-11-13: idea row added (operator "yes"): deploy/hub behind tile counts hub-relevant commits via deploy-paths.tsv; alert only when promotable SHA carries one.
+- 2026-11-13: deploy/hub-behind idea moved to P3 bug docs/bugs/2026-11-13-deploy-hub-behind-counts-docs-only-commits.md (operator: "move this to P3 bug doc"); idea row removed. Classification pending.
