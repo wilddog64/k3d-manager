@@ -35,3 +35,12 @@ Treat an `old` commit as contained when it is an ancestor of a merged PR head wh
 `new` (via `gh api repos/…/commits/<sha>/pulls`). Or, simpler: before the cherry check, accept `old` when the
 tree of `old` merged into `new` equals `new`'s tree (`git merge-tree --write-tree new old` with no conflicts). Keep
 `check_runs` independent of BREAK_GLASS so the bypass skips only the guard that misfired.
+
+## Outcome (2026-11-13)
+
+The operator promoted with `BREAK_GLASS=1` at 00:34Z: `deploy/hub` moved to 34707659. The tag push then failed in the
+pre-push fast gate (`scripts/ci/fast_gate.sh:129-136`): the M5 checkout's `k3d-manager-v1.44.0` still pointed at the
+v1.43.15 history (9f5f0d89), whose squashed-away commits (fcc4fa4a, bb71f0cb, …, 2026-11-09) carry
+`test@example.invalid`. Same root cause as this bug: individual commits outliving a squash merge. After
+`git reset --hard origin/k3d-manager-v1.44.0` (backup `refs/k3dm/manual-backup/20261112`) the tag
+`hub-promote/20261113T003457Z` pushed, and `make platform-ops` applied deploy/hub 34707659.
