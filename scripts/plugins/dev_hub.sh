@@ -126,6 +126,12 @@ EOF
 )
 
 function _dev_hub_apply_host_objects() {
+  local preemption_policy=""
+  preemption_policy="$(_run_command --soft --quiet -- kubectl --context "${DEV_HUB_CONTEXT}" \
+    get priorityclass k3dm-dev-preemptible -o jsonpath='{.preemptionPolicy}' 2>/dev/null)" || true
+  if [[ -n "${preemption_policy}" && "${preemption_policy}" != PreemptLowerPriority ]]; then
+    _dev_hub_host_kubectl delete priorityclass k3dm-dev-preemptible
+  fi
   _dev_hub_host_kubectl apply -f "${DEV_HUB_CONFIG_DIR}/priorityclass.yaml"
   if ! _run_command --soft --quiet -- kubectl --context "${DEV_HUB_CONTEXT}" get namespace \
     "${DEV_HUB_NAMESPACE}" -n "${DEV_HUB_NAMESPACE}" >/dev/null 2>&1; then

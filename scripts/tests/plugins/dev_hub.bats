@@ -103,6 +103,13 @@ setup() {
           if [[ "${EXIST_VCLUSTER:-0}" == 1 ]]; then printf '[{"Name":"dev-hub","Status":"Ready"}]'; else printf '[]'; fi
           ;;
         *"get namespace dev-hub"*) [[ "${EXIST_NAMESPACE:-0}" == 1 ]] || rc=$? ;;
+        *"get priorityclass k3dm-dev-preemptible"*)
+          if [[ -n "${LIVE_PREEMPTION_POLICY:-}" ]]; then
+            printf '%s' "${LIVE_PREEMPTION_POLICY}"
+          else
+            rc=1
+          fi
+          ;;
         *"get --raw=/readyz"*)
           local ready_attempts
           ready_attempts="$(grep -c 'get --raw=/readyz' "${CALL_LOG}" || true)"
@@ -250,6 +257,35 @@ teardown() {
   grep -F 'upgrade --install argocd argo/argo-cd' "${CALL_LOG}" | grep -F -- "--version ${argocd_version} " | grep -F -- '--wait'
   grep -E '^kubectl --kubeconfig .* apply -f .*/argocd-project.yaml$' "${CALL_LOG}"
   grep -E '^helm .*upgrade --install dev-hub-grafana grafana/grafana .*--version 8\.8\.2 .*--wait$' "${CALL_LOG}"
+}
+
+@test "priority class manifest omits preemptionPolicy and keeps its priority value" {
+  local manifest="${SCRIPT_DIR}/etc/dev-hub/priorityclass.yaml"
+  grep -Eq '^  name: k3dm-dev-preemptible$' "${manifest}"
+  grep -Eq '^value: -100$' "${manifest}"
+  grep -Eq '^globalDefault: false$' "${manifest}"
+  if grep -Eq '^preemptionPolicy:' "${manifest}"; then return 1; fi
+}
+
+@test "dev hub up replaces an existing class with a non-default policy before applying it" {
+  export LIVE_PREEMPTION_POLICY=Never
+  dev_hub_up
+  local delete_line apply_line
+  delete_line="$(grep -nF -- 'delete priorityclass k3dm-dev-preemptible' "${CALL_LOG}" | cut -d: -f1)"
+  apply_line="$(grep -nF -- "apply -f ${SCRIPT_DIR}/etc/dev-hub/priorityclass.yaml" "${CALL_LOG}" | cut -d: -f1)"
+  [ -n "${delete_line}" ] && [ -n "${apply_line}" ]
+  [ "${delete_line}" -lt "${apply_line}" ]
+}
+
+@test "dev hub up preserves an absent or default-policy priority class" {
+  dev_hub_up
+  if grep -F 'delete priorityclass k3dm-dev-preemptible' "${CALL_LOG}"; then return 1; fi
+  grep -F -- "apply -f ${SCRIPT_DIR}/etc/dev-hub/priorityclass.yaml" "${CALL_LOG}"
+  : >"${CALL_LOG}"
+  export LIVE_PREEMPTION_POLICY=PreemptLowerPriority
+  dev_hub_up
+  if grep -F 'delete priorityclass k3dm-dev-preemptible' "${CALL_LOG}"; then return 1; fi
+  grep -F -- "apply -f ${SCRIPT_DIR}/etc/dev-hub/priorityclass.yaml" "${CALL_LOG}"
 }
 
 @test "dev-hub dry run skips kubeconfig checks, password setup, and chart installs" {
@@ -430,7 +466,9 @@ teardown() {
   while IFS= read -r call; do
     [[ "${call}" == *'--context k3d-k3d-cluster'* ]] || continue
     [[ " ${call} " == *' -n dev-hub '* ]] && continue
-    [[ "${call}" == *'priorityclass.yaml' ]] || return 1
+    [[ "${call}" == 'kubectl --context k3d-k3d-cluster get priorityclass k3dm-dev-preemptible -o jsonpath={.preemptionPolicy}' \
+      || "${call}" == 'kubectl --context k3d-k3d-cluster delete priorityclass k3dm-dev-preemptible' \
+      || "${call}" == "kubectl --context k3d-k3d-cluster apply -f ${SCRIPT_DIR}/etc/dev-hub/priorityclass.yaml" ]] || return 1
   done <"${CALL_LOG}"
 }
 
