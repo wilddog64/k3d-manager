@@ -3,11 +3,13 @@
 **Status:** OPEN — captured 2026-11-13
 **Priority:** P1 (Claude proposal: `make dev-hub-up` cannot create the dev hub, no workaround short of editing the file; blocks dev-hub plan E2 in the open v1.44.0 release)
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** operator decision — since 2026-11-13 (intent approval, then dispatch go)
+**Waiting on:** fix running — since 2026-11-13
 **Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/vcluster/values-dev-hub.yaml`)
 **Should have been caught by:** offline test (no test validates the values file against the pinned chart schema; the plan's source table cites `coredns` values ~521–530, which sit under `controlPlane`)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing)
-**Approval:**
+**Approval:** operator, 2026-11-13: "go ahead to fix coredns"
+**Dispatch go:** operator, 2026-11-13: "go ahead to fix coredns"
+**Intent approved:** operator, 2026-11-13
 
 ## Symptom
 
@@ -65,3 +67,10 @@ interface: scripts/etc/vcluster/values-dev-hub.yaml
 
 - `scripts/etc/vcluster/values-dev-hub.yaml`
 - `scripts/tests/plugins/dev_hub.bats`
+
+## Definition of done (worker)
+
+- Edit text only (do not re-serialise the YAML): move the `coredns:` block under `controlPlane:` with two extra spaces of indent; nothing else in the file changes.
+- In `dev_hub.bats`, add tests for M1, M2/N1 and N2. The M2 test holds the 21 root keys above as a literal list with a comment naming the source (`chart/values.schema.json` at v0.32.1, tag commit 9d2cec3, captured on m4-air 2026-11-13), parses each `scripts/etc/vcluster/*.yaml` with the repo's existing YAML approach, and fails naming the file and key. Do not remove or weaken any existing test or assert.
+- Run and paste command, exit code and summary line: `bats scripts/tests/plugins/dev_hub.bats` (0 not ok); then with `values-dev-hub.yaml` temporarily restored from `git show HEAD:scripts/etc/vcluster/values-dev-hub.yaml` (keep your test edits) the new N1 test is not ok; restore your fix.
+- Do not commit; leave changes in the worktree.
