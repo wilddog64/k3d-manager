@@ -1,0 +1,67 @@
+# dev-hub-up fails: vCluster 0.32.1 rejects the top-level `coredns` key in values-dev-hub.yaml
+
+**Status:** OPEN — captured 2026-11-13
+**Priority:** P1 (Claude proposal: `make dev-hub-up` cannot create the dev hub, no workaround short of editing the file; blocks dev-hub plan E2 in the open v1.44.0 release)
+**Classified:** pending (Argon, from this doc alone)
+**Waiting on:** operator decision — since 2026-11-13 (intent approval, then dispatch go)
+**Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/vcluster/values-dev-hub.yaml`)
+**Should have been caught by:** offline test (no test validates the values file against the pinned chart schema; the plan's source table cites `coredns` values ~521–530, which sit under `controlPlane`)
+**Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing)
+**Approval:**
+
+## Symptom
+
+On m5-air, 2026-11-13 09:44 PST, after the promote of 9a579a05, `make dev-hub-up` created the PriorityClass, namespace, ResourceQuota and LimitRange, then:
+
+    fatal merge values: invalid config: error unmarshaling JSON: while decoding JSON: json: unknown field "coredns"
+    ERROR: failed to execute .../vcluster/0.32.1/vcluster create dev-hub -n dev-hub --chart-version 0.32.1 --connect=false -f .../scripts/etc/vcluster/values-dev-hub.yaml: 1
+
+## Proof of external behaviour
+
+vCluster v0.32.1 (tag commit `9d2cec3`), `chart/values.schema.json` fetched with `gh api repos/loft-sh/vcluster/contents/chart/values.schema.json?ref=v0.32.1` by Claude on m4-air, 2026-11-13:
+- the root has `additionalProperties: false`; its properties are `controlPlane deletion deploy experimental exportKubeConfig global integrations logging networking platform plugin plugins policies privateNodes pro rbac serviceCIDR sleep snapshots sync telemetry` (no `coredns`);
+- `controlPlane.coredns.deployment.resources` exists.
+- Walking all three files in `scripts/etc/vcluster/` against the schema: `values-dev-hub.yaml` has one unknown key, `.coredns`; `values.yaml` and `values-preflight.yaml` are clean.
+
+## Fix
+
+Move the `coredns:` block under `controlPlane:` unchanged (same `deployment.resources` values: requests 20m/32Mi, limits 100m/128Mi). No other key changes.
+
+Retry is safe: `dev_hub_up` applies host objects with `apply` and creates the vCluster only when `_dev_hub_cluster_exists` is false, so the objects left by the failed run need no cleanup.
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: values-dev-hub.yaml sets controlPlane.coredns.deployment.resources to requests cpu 20m memory 32Mi, limits cpu 100m memory 128Mi
+  - id: M2
+    text: every top-level key of each file in scripts/etc/vcluster/*.yaml is in the v0.32.1 root property list (captured above; the test names host, date and tag commit in a comment)
+must_not:
+  - id: N1
+    text: values-dev-hub.yaml has a top-level coredns key (red on pre-fix)
+  - id: N2
+    text: any other value in values-dev-hub.yaml changes (compare the parsed file with the pre-fix parse after moving coredns back)
+evidence:
+  - id: E1
+    proves: [M1, M2, N1, N2]
+    kind: offline
+    intent: The dev hub values file uses only keys vCluster 0.32.1 accepts, with the same CoreDNS limits as before, and a test fails if a top-level key outside the chart's list comes back.
+    command: bats scripts/tests/plugins/dev_hub.bats (new tests red on b2067ad3..9a579a05 values file)
+  - id: E2
+    proves: [M1]
+    kind: live
+    intent: After a promote, make dev-hub-up on the M5 creates the dev hub and the coredns pod in host namespace dev-hub has a 128Mi memory limit; this is the start of dev-hub plan E2.
+interface: scripts/etc/vcluster/values-dev-hub.yaml
+```
+
+## Contract readers
+
+- `scripts/plugins/dev_hub.sh:9` (`DEV_HUB_VALUES`), passed as `VCLUSTER_VALUES_FILE` to `vcluster_create` (`scripts/plugins/vcluster.sh`) — reads the file; unchanged.
+- `scripts/tests/plugins/dev_hub.bats:432-460` — scanner tests read the file by path; unchanged.
+- writers: none besides this fix.
+
+## Files
+
+- `scripts/etc/vcluster/values-dev-hub.yaml`
+- `scripts/tests/plugins/dev_hub.bats`
