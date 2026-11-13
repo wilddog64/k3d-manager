@@ -1,9 +1,8 @@
 # dev-hub: every synced pod is forbidden — PriorityClass `preemptionPolicy: Never` conflicts with the pod spec vCluster copies
 
-**Status:** LANDED — 3e0ee4ac on k3d-manager-v1.44.0 (2026-11-13)
+**Status:** VERIFIED — 3e0ee4ac live on m5-air (2026-11-13)
 **Priority:** P1 (Claude proposal: no pod inside the dev hub can run, so CoreDNS, Argo CD and Grafana never start; blocks dev-hub plan E2 in the open v1.44.0 release)
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** live check — since 2026-11-13
 **Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/dev-hub/priorityclass.yaml`)
 **Should have been caught by:** live check (host admission is invisible to offline tests; the first live run stopped earlier, at the coredns schema bug)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing); related, different root cause: docs/bugs/2026-11-13-dev-hub-up-fails-vcluster-rejects-top-level-coredns.md
@@ -101,3 +100,7 @@ The PriorityClass name does not change; only its preemption policy does.
 ## Landed (2026-11-13)
 
 `3e0ee4ac` (Luna, 1 run, no corrections). E1 offline PASS outside the sandbox: `bats scripts/tests/plugins/dev_hub.bats` 58/58, shellcheck clean. On the pre-fix files the new M1/N1 and M2 tests fail and N2 stays green, as expected. Mark offline_tested recorded. E2 live: after promote, the operator runs `make dev-hub-down` then `make dev-hub-up` on the M5.
+
+## Live verification (2026-11-13)
+
+m5-air, operator, after `make hub-promote REF=5c253d1b`, `git pull --ff-only`, `make dev-hub-down`, `make dev-hub-up` (which reached the Grafana `--wait` install): `kubectl --context k3d-k3d-cluster get priorityclass k3dm-dev-preemptible -o jsonpath='{.preemptionPolicy}'` gave `PreemptLowerPriority`. Host namespace `dev-hub` lists 8 pods. Seven were copied from the vCluster (Argo CD x5, Grafana, and `coredns-7c7ccd6944-xfgqv-x-kube-system-x-dev-hub` at a `128Mi` memory limit), plus `dev-hub-0` at 768Mi. Mark live_verified recorded at 3e0ee4ac. Errors seen: none.
