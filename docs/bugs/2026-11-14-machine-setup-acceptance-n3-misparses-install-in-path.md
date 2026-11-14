@@ -1,8 +1,8 @@
 # Bug: machine-setup acceptance N3 fails when the repo path contains `install-`
 
-**Status:** OPEN
+**Status:** LANDED (42fe44fa on k3d-manager-v1.44.0)
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-14
+**Waiting on:** scheduled run — since 2026-11-14 (next CI run on the release branch)
 **Severity:** low, test-only. Two N3 tests in `scripts/tests/bin/machine_setup_acceptance.bats` fail when the checkout or `TMPDIR` path contains `install-`.
 **Filed:** 2026-11-14
 **Detected by:** Claude, while landing promtool Part B
@@ -25,3 +25,9 @@ Claude, m4-air, 2026-11-14, base `feb41165`:
 ## Fix (proposal)
 
 Match the make target, not the first token: for example, take the last word of the line, or anchor the match to whitespace, `(^| )install-[a-z0-9-]+( |$)`.
+
+## Landed 2026-11-14
+
+- Folded into the promtool Part B land by Claude without an operator decision, because it blocked that P2 land (land's own `TMPDIR` contains the slug). Test-only.
+- Two loose matches, both anchored to a space: the target extraction (`(^| )install-[a-z0-9-]+`, then `tr -d ' '`) and the line selector (`^make .* install-`). The second was found while debugging: smartcd's plain `make -C …/smartcd install` was selected only because the path contained `install-`.
+- N3 4/4 under `TMPDIR=…/x-pinned-install-on-every-host` and `…/promtool`. Control: on sample lines the anchored logic flags `install-hermes` for a worker, allows `install-sudoers`, and skips the smartcd line.

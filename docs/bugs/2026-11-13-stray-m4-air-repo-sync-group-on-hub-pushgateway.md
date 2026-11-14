@@ -1,8 +1,8 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** OPEN — captured 2026-11-13 by Claude while watching plan 3 E6
+**Status:** LANDED (22ca679c on k3d-manager-v1.44.0)
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
-**Waiting on:** fix running — since 2026-11-14 (Luna, dispatch repo-sync-push-guard)
+**Waiting on:** live check — since 2026-11-14 (E5 after the promote and `make install-repo-sync` on the M5)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** unknown
@@ -247,3 +247,11 @@ Order matters. Run on the hub (M5), in the operator's tmux, right after the prom
 
 - Behaviour change accepted: ad-hoc and ssh (`make hub-sync`) hub runs no longer push; only the launchd job does.
 - Not fixed here: an existing stray group is already deleted by the operator; if one reappears before the promote, delete it with `curl -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air` on the M5.
+
+## Landed 2026-11-14
+
+- Luna's diff landed as `22ca679c` (Claude), pushed. Claude added `unset PUSHGATEWAY_URL` to `repo_sync.bats` `setup()` after a Fable review finding: two hub-role tests ("unrelated update alone", "hub branch stops at deploy/hub") called the real `curl` and, before this fix, always pushed to `localhost:19094` as the test machine's hostname. Probe, m4-air 2026-11-14: with `PUSHGATEWAY_URL=http://127.0.0.1:9` and a logging curl first on PATH, 0 pushes with the unset and 16 PUT attempts as `instance/m4-air` without it. That is a likely source of the stray m4-air group.
+- Verification: `dispatch verify` pass. Fix tree 30/30; pre-fix tree with the new tests: rc=1, `not ok 8` (E1) and `not ok 28` (E4). Independent Opus verifier (Acceptance only): PASS E1–E4; a mutant restoring the old default URL goes red at `repo_sync.bats:274`. N3: pushed metric bodies byte-identical with the URL set.
+- Fable finding 1 (medium, not fixed here): after the promote the hub runs the new script with the old installed plist (no URL) and stops pushing until `make install-repo-sync`; a frozen `deploy_pending=1` could keep `K3dmDeployPending` firing. Run `make install-repo-sync` on the M5 in the same session as the promote. The lasting guard (reinstall an agent when its plist template changed) is the hub-deploy row in `docs/ideas.md`.
+- Fable finding 3 (low, accepted): `make hub-sync` no longer pushes, so the moved checkout's sample waits for the next launchd run (≤5 min).
+- E5 (live): m5-air `push_time_seconds` advancing after the reinstall, and no m4-air group.
