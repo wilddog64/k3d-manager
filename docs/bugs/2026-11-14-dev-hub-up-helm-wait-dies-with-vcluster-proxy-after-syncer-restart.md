@@ -3,11 +3,11 @@
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
 **Waiting on:** dispatch — since 2026-11-14 (operator: file as P2, dispatch to Luna when a slot is free)
-**Intent approved:** operator, 2026-11-14 ("go ahead to file a P2 bug and dispatch to Luna when there's a slot for it")
+**Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
 **Prior art:** exact-slug glob: none; read `docs/bugs/2026-08-16-e2e-vcluster-kubeconfig-proxy-port-drift.md` (same proxy behaviour, e2e only; e2e got `_vcluster_refresh_connection` in its readiness loop, `scripts/plugins/e2e.sh:672`, dev-hub never did); related `docs/bugs/2026-11-13-dev-hub-up-argocd-helm-wait-times-out-after-syncer-restart.md` (leader-election cause, fixed; this run is its E2 steps 2-3)
-**Approval:** operator, 2026-11-14 (P2, Luna)
+**Approval:** operator, 2026-11-14 ("go ahead to file a P2 bug and dispatch to Luna when there's a slot for it")
 
 ## Symptom
 
