@@ -63,11 +63,15 @@ describe('acg_session_check', () => {
     delete process.env.ACG_PASSWORD;
     process.env.K3DM_NONINTERACTIVE = '1';
 
-    await expect(sessionCheck._main()).rejects.toThrow('ACG_SESSION_EXPIRED');
+    const stderr = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(sessionCheck._main()).rejects.toThrow(new Error('ACG_SESSION_EXPIRED'));
 
     expect(loginLib.loginWithPage).not.toHaveBeenCalled();
     expect(page.waitForTimeout).not.toHaveBeenCalled();
     expect(browser.close).toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('ACG_SESSION_EXPIRED:'));
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('reason=no_attempt'));
+    stderr.mockRestore();
   });
 
   test('noninteractive MFA-required session fails fast without polling', async () => {
@@ -76,11 +80,41 @@ describe('acg_session_check', () => {
     process.env.K3DM_NONINTERACTIVE = '1';
     loginLib.loginWithPage.mockResolvedValue({ ok: false, reason: 'mfa_required' });
 
-    await expect(sessionCheck._main()).rejects.toThrow('ACG_SESSION_EXPIRED');
+    const stderr = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(sessionCheck._main()).rejects.toThrow(new Error('ACG_SESSION_EXPIRED'));
 
     expect(loginLib.loginWithPage).toHaveBeenCalled();
     expect(page.waitForTimeout).not.toHaveBeenCalled();
     expect(browser.close).toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('reason=mfa_required'));
+    stderr.mockRestore();
+  });
+
+  test('auto-login exception reports login_error', async () => {
+    process.env.ACG_USERNAME = 'ci@example.com';
+    process.env.ACG_PASSWORD = 'secret';
+    process.env.K3DM_NONINTERACTIVE = '1';
+    loginLib.loginWithPage.mockRejectedValue(new Error('fill_failed: password'));
+    const stderr = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(sessionCheck._main()).rejects.toThrow(new Error('ACG_SESSION_EXPIRED'));
+
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('reason=login_error'));
+    stderr.mockRestore();
+  });
+
+  test('failed post-login probe reports post_login_probe_failed', async () => {
+    process.env.ACG_USERNAME = 'ci@example.com';
+    process.env.ACG_PASSWORD = 'secret';
+    process.env.K3DM_NONINTERACTIVE = '1';
+    loginLib.loginWithPage.mockResolvedValue({ ok: true, reason: 'authenticated' });
+    loginLib.pageLooksLoggedIn.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+    const stderr = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(sessionCheck._main()).rejects.toThrow(new Error('ACG_SESSION_EXPIRED'));
+
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('reason=post_login_probe_failed'));
+    stderr.mockRestore();
   });
 
   test('credential state distinguishes absent, empty, and present', () => {

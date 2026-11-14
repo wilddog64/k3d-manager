@@ -34,7 +34,7 @@ function _reportCredentialState() {
 
 async function _autoLogin(browser) {
   if (!process.env.ACG_USERNAME || !process.env.ACG_PASSWORD) {
-    return false;
+    return { ok: false, reason: 'no_creds' };
   }
 
   const context = browser.contexts()[0];
@@ -47,7 +47,7 @@ async function _autoLogin(browser) {
   if (result.reason === 'mfa_required') {
     console.error('ACG_LOGIN_MFA_REQUIRED: MFA challenge detected — unsupported for unattended login');
   }
-  return result.ok;
+  return result;
 }
 
 async function _main() {
@@ -84,25 +84,29 @@ async function _main() {
       return;
     }
 
+    let loginResult = { ok: false, reason: 'no_attempt' };
     if (!process.env.ACG_USERNAME || !process.env.ACG_PASSWORD) {
       console.error('WARN: No ACG credentials available — unattended login is disabled. Create the Keychain item k3dm-acg-pluralsight with username and password fields to enable it.');
     }
 
     if (process.env.ACG_USERNAME && process.env.ACG_PASSWORD) {
       console.error('INFO: Session not authenticated — attempting headless Pluralsight login...');
-      const loginOk = await _autoLogin(browser).catch(err => {
+      loginResult = await _autoLogin(browser).catch(err => {
         console.error(`INFO: auto-login error: ${err.message}`);
-        return false;
+        return { ok: false, reason: 'login_error' };
       });
-      if (loginOk && await pageLooksLoggedIn(page, { attempts: 3 })) {
-        process.stdout.write('ACG_SESSION_OK path=auto-login\n');
-        return;
+      if (loginResult.ok) {
+        if (await pageLooksLoggedIn(page, { attempts: 3 })) {
+          process.stdout.write('ACG_SESSION_OK path=auto-login\n');
+          return;
+        }
+        loginResult = { ...loginResult, reason: 'post_login_probe_failed' };
       }
       console.error('INFO: headless auto-login did not succeed.');
     }
 
     if (process.env.K3DM_NONINTERACTIVE === '1' || !process.stdout.isTTY) {
-      console.error(`ACG_SESSION_EXPIRED: Pluralsight session not authenticated and auto-login unavailable — sign in on the host CDP Chrome (${CDP_URL}) and re-run.`);
+      console.error(`ACG_SESSION_EXPIRED: Pluralsight session not authenticated and auto-login unavailable — sign in on the host CDP Chrome (${CDP_URL}) and re-run. reason=${loginResult.reason}`);
       throw new Error('ACG_SESSION_EXPIRED');
     }
 

@@ -904,3 +904,38 @@ STUB
   [[ "${output}" == *"Homebrew is required to install Vagrant"* ]]
   [ ! -s "${VM_CASK_LOG}" ]
 }
+
+bash32_or_skip() {
+  BASH32="${LIB_TEST_BASH32:-/bin/bash}"
+  [[ -x "$BASH32" ]] || skip "no bash at $BASH32"
+  local version
+  version="$("$BASH32" -c 'printf "%d%d" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"')"
+  (( version < 44 )) || skip "$BASH32 is bash ${version}; the empty-array set -u failure needs bash < 4.4 (set LIB_TEST_BASH32)"
+}
+
+@test "_run_command runs under bash 3.2 with set -u and no --probe" {
+  bash32_or_skip
+  run "$BASH32" -c 'set -euo pipefail; source "$1"; _run_command -- echo plain-ok; _run_command --quiet --soft -- false || echo "quiet-rc=$?"' _ "$SYSTEM_LIB"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *plain-ok* ]]
+  [[ "$output" == *quiet-rc=1* ]]
+  [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "_install_promtool runs under bash 3.2 with set -u" {
+  bash32_or_skip
+  promtool_fixture
+  run "$BASH32" -c 'set -euo pipefail; source "$1"; _promtool_pinned_sha256() { printf "%s\n" "$PROMTOOL_FIXTURE_SHA"; }; _install_promtool' _ "$SYSTEM_LIB"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"unbound variable"* ]]
+  [[ "$("$PROMTOOL_INSTALL_DIR/promtool" --version)" == 'promtool, version 3.1.0 '* ]]
+}
+
+@test "_run_command_resolve_sudo with a TTY and interactive sudo runs under bash 3.2 with set -u" {
+  bash32_or_skip
+  [[ "$(uname -s)" == Darwin ]] || skip "uses BSD script(1) to provide a TTY"
+  run script -q /dev/null "$BASH32" -c 'set -euo pipefail; source "$1"; _run_command_resolve_sudo echo 0 1 1; printf "runner=%s\n" "${_RCRS_RUNNER[*]}"' _ "$SYSTEM_LIB" </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"unbound variable"* ]]
+  [[ "$output" == *"runner=sudo /bin/echo"* ]]
+}

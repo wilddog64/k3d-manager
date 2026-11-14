@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 const SIGNIN_URL = 'https://app.pluralsight.com/id/signin';
 const SANDBOX_URL = 'https://app.pluralsight.com/hands-on/playground/cloud-sandboxes';
 // Pluralsight's identity form uses PascalCase attributes (name="Username", id="Username") on a
@@ -100,9 +103,82 @@ async function fillIfVisible(page, selector, value, timeoutMs) {
   } catch {
     return false;
   }
-  await field.fill('');
-  await field.fill(value);
+  const fieldName = selector === PASSWORD_SELECTOR ? 'password' : selector === EMAIL_SELECTOR ? 'email' : 'field';
+  try {
+    await field.fill('');
+    await field.fill(value);
+  } catch {
+    throw new Error(`fill_failed: ${fieldName}`);
+  }
   return true;
+}
+
+async function _loginDiagnostic(page, reason, screenshotAllowed, username) {
+  let screenshot = '';
+  if (screenshotAllowed) {
+    try {
+      const stateHome = process.env.XDG_STATE_HOME && path.isAbsolute(process.env.XDG_STATE_HOME)
+        ? process.env.XDG_STATE_HOME
+        : path.join(require('os').homedir(), '.local', 'state');
+      const dir = path.join(stateHome, 'k3d-manager', 'acg-diag');
+      try {
+        const existing = fs.lstatSync(dir);
+        if (existing.isSymbolicLink() || !existing.isDirectory()) throw new Error('invalid diagnostic directory');
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+      }
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const directoryStat = fs.lstatSync(dir);
+      if (directoryStat.isSymbolicLink() || !directoryStat.isDirectory()) throw new Error('invalid diagnostic directory');
+      fs.chmodSync(dir, 0o700);
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      let file = path.join(dir, `login-${stamp}.png`);
+      let suffix = 0;
+      while (fs.existsSync(file)) {
+        suffix += 1;
+        file = path.join(dir, `login-${stamp}-${suffix}.png`);
+      }
+      const image = await page.screenshot();
+      fs.writeFileSync(file, image, { mode: 0o600, flag: 'wx' });
+      screenshot = ` screenshot=${file}`;
+      try { fs.chmodSync(file, 0o600); } catch { /* The file was created with mode 0600. */ }
+      try {
+        const old = fs.readdirSync(dir).filter(name => /^login-.*\.png$/.test(name) && path.join(dir, name) !== file)
+          .map(name => ({ name, time: fs.statSync(path.join(dir, name)).mtimeMs }))
+          .sort((a, b) => b.time - a.time);
+        old.slice(4).forEach(item => fs.unlinkSync(path.join(dir, item.name)));
+      } catch {
+        // Retention is best effort; the screenshot has already been written and reported.
+      }
+    } catch {
+      if (!screenshot) screenshot = ' screenshot=failed';
+    }
+  }
+
+  const safeUrl = (() => {
+    try {
+      const parsed = new URL(page.url());
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return 'unknown';
+    }
+  })();
+  let title = '';
+  try {
+    title = (await page.title()).replace(/[\x00-\x1f\x7f]/g, '');
+    if (username) title = title.split(username).join('[redacted]');
+    title = title.replace(/"/g, '').slice(0, 80);
+  } catch { title = 'unavailable'; }
+  const count = async selector => {
+    try { return await page.locator(selector).count(); } catch { return 0; }
+  };
+  const [emailMatches, passwordMatches, challengeFrames, loggedIn, signedOut] = await Promise.all([
+    count(EMAIL_SELECTOR), count(PASSWORD_SELECTOR), count('iframe[src*="challenges.cloudflare.com"]'),
+    anyVisible(page, LOGGED_IN_SELECTORS, 1000).catch(() => false),
+    pageLooksSignedOut(page, 1000).catch(() => false),
+  ]);
+  const challenge = /just a moment|attention required/i.test(title) || challengeFrames > 0;
+  console.error(`ACG_LOGIN_DIAG: reason=${reason} url=${safeUrl} title="${title}" challenge=${challenge ? 'yes' : 'no'} email_matches=${emailMatches} password_matches=${passwordMatches} signed_out=${signedOut ? 'yes' : 'no'} logged_in=${loggedIn ? 'yes' : 'no'}${screenshot}`);
 }
 
 async function loginWithPage(page, username, password) {
@@ -117,10 +193,11 @@ async function loginWithPage(page, username, password) {
   }
 
   const emailFilled = await fillIfVisible(page, EMAIL_SELECTOR, username, FIELD_TIMEOUT_MS);
-  const passwordFilled = await fillIfVisible(page, PASSWORD_SELECTOR, password, FIELD_TIMEOUT_MS);
+  const passwordFilled = emailFilled && await fillIfVisible(page, PASSWORD_SELECTOR, password, FIELD_TIMEOUT_MS);
 
   if (!emailFilled || !passwordFilled) {
     console.error(`ACG_LOGIN_FIELDS_MISSING: email=${emailFilled ? 'filled' : 'missing'} password=${passwordFilled ? 'filled' : 'missing'}`);
+    await _loginDiagnostic(page, 'login_form_unavailable', !emailFilled && !passwordFilled, username);
     return { ok: false, reason: 'login_form_unavailable' };
   }
 
@@ -139,6 +216,7 @@ async function loginWithPage(page, username, password) {
     return { ok: true, reason: 'authenticated' };
   }
 
+  await _loginDiagnostic(page, 'login_failed', false, username);
   return { ok: false, reason: 'login_failed' };
 }
 

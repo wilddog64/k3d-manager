@@ -77,7 +77,7 @@ function _run_command_resolve_sudo() {
 
   if (( require_sudo )); then
     if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
-      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
+      _RCRS_RUNNER=(sudo ${sudo_flags[@]+"${sudo_flags[@]}"} "$sudo_prog")
     else
       echo "sudo non-interactive not available" >&2
       _RCRS_RUNNER=()
@@ -89,12 +89,12 @@ function _run_command_resolve_sudo() {
   if (( ${#probe_args[@]} )); then
     if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
       _RCRS_RUNNER=("$prog")
-    elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$sudo_prog" "${probe_args[@]}" >/dev/null 2>&1; then
-      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
+    elif (( interactive_sudo )) && sudo ${sudo_flags[@]+"${sudo_flags[@]}"} "$sudo_prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo ${sudo_flags[@]+"${sudo_flags[@]}"} "$sudo_prog")
     elif sudo -n "$sudo_prog" "${probe_args[@]}" >/dev/null 2>&1; then
       _RCRS_RUNNER=(sudo -n "$sudo_prog")
     elif (( prefer_sudo && interactive_sudo )); then
-      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
+      _RCRS_RUNNER=(sudo ${sudo_flags[@]+"${sudo_flags[@]}"} "$sudo_prog")
     elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
       _RCRS_RUNNER=(sudo -n "$sudo_prog")
     else
@@ -104,7 +104,7 @@ function _run_command_resolve_sudo() {
   fi
 
   if (( prefer_sudo && interactive_sudo )); then
-    _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
+    _RCRS_RUNNER=(sudo ${sudo_flags[@]+"${sudo_flags[@]}"} "$sudo_prog")
   elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
     _RCRS_RUNNER=(sudo -n "$sudo_prog")
   else
@@ -178,11 +178,11 @@ function _run_command() {
   if (( quiet )); then
     _run_command_resolve_sudo "$prog" \
       "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
-      "${probe_args[@]}" 2>/dev/null || resolver_rc=$?
+      ${probe_args[@]+"${probe_args[@]}"} 2>/dev/null || resolver_rc=$?
   else
     _run_command_resolve_sudo "$prog" \
       "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
-      "${probe_args[@]}" || resolver_rc=$?
+      ${probe_args[@]+"${probe_args[@]}"} || resolver_rc=$?
   fi
 
   if (( resolver_rc != 0 )); then
