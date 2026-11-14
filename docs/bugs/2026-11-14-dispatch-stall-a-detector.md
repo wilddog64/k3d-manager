@@ -4,6 +4,7 @@
 **Priority:** P2 (operator, 2026-11-14)
 **Waiting on:** operator decision — since 2026-11-14 (spec intent)
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
+**Release:** v1.44.1 patch (operator, 2026-11-14: "go with your recommendation"): detect and page only; the kill and the B/C hooks move to the v1.45.0 plan `dispatch-stall-recovery`
 **Intent approved:** pending
 **Introduced by:** pre-existing
 **Should have been caught by:** none
@@ -23,6 +24,33 @@ and 2, plus the notice). Children B (approval) and C (diagnosis) plug into it th
 count with a limit, and no job exists that looks. `dispatch open` (`:1275`) reads only the ledger, so it cannot tell a
 live run from a stuck one either. The existing `stall` gate (`:389-412`) counts finished unsuccessful attempts and is a
 different thing; do not reuse its name or code.
+
+## Scope for v1.44.1 (operator, 2026-11-14) — supersedes the Fix below where they differ; Acceptance to be rewritten
+
+**In:** the probe, `status` and the `stalled` subcommand (Fix 1, 2, 4), limited to the current release version; the
+watcher's capture (`ps.txt`, `log-tail.txt`, `status.txt`, `diff.patch`, `summary.txt`) and one Slack notice per
+incident with retry (Fix 5 minus the stop); the plist and install targets (Fix 6, 7); the OrbStack guard (Fix 8);
+docs (Fix 9). The watcher appends one `stall_detected` ledger event per incident (schema in
+`docs/bugs/2026-11-14-dispatch-stall-d-dashboard.md`, Fix 1, with `killed: 0`), so the v1.45.0 dashboard has history.
+
+**Out (to v1.45.0 `dispatch-stall-recovery`):** the TERM/KILL stop (Fix 5.5), the drain and diagnose hooks with their
+timeouts and env vars, the `open` row suffix (Fix 3). M3, M5's stop, M6, M9, N2 and N6's hook half are dropped.
+
+**Liveness signal: not the log.** agy writes its log only at exit (`bin/k3dm-codex-dispatch:232`); a healthy run,
+`v1.43.15/hub-promote-keeps-promoter-commits-r4.run`, had a 2-line log written 3438 s after start. The agy conversation
+store records every step. Proof, M4, 2026-11-14 ~15:30Z, agy conversation
+`~/.gemini/antigravity-cli/conversations/3d708e68-6aae-4d59-bc3b-c38bef0fb521.db` (Part B, 1435 rows in `steps`),
+step timestamps read from the `steps.metadata` blobs: one 803-minute gap from 2026-11-14 01:38:44Z, four minutes after
+correction 3 started (the 13-hour hang); the next longest gaps 21 and 13 minutes; at the same moment `agy-5.log` was
+1630 s old while the newest step was about 7 minutes old. Rule for agy: stalled when `select count(*) from steps`
+(read-only, `mode=ro`) has not grown for `K3DM_DISPATCH_STALL_SECONDS` (default 2700), tracked across ticks in
+`<run>/stall-watch.state`; no blob decoding. Open before dispatch:
+- which conversation db a first agy run uses: `$run/session` is written only at exit (`:167-170`), and resumes carry
+  `--conversation <id>` in argv; a first run needs a rule (for example, the db created after `$run/start` whose argv
+  match is unique), or falls back to the process-count rule alone;
+- codex: the session rollout under `~/.codex/sessions/` appends one JSON line per event; capture a past dispatch's
+  longest healthy gap before using its mtime;
+- the process-count rule stays as a second trigger, its 200 default replaced by a measured value.
 
 ## Fix
 

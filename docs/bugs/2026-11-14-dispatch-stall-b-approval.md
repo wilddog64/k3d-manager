@@ -4,6 +4,7 @@
 **Priority:** P2 (operator, 2026-11-14)
 **Waiting on:** operator decision — since 2026-11-14 (spec intent)
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
+**Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
 **Intent approved:** pending
 **Introduced by:** pre-existing
 **Should have been caught by:** none

@@ -1,5 +1,7 @@
 ## Handoff — 2026-11-14 ~16:20Z: P2 loop mid-flight (2 dispatches running, 1 held); live checks wait on a promote — START HERE
 
+- **Stall recovery split (2026-11-14):** v1.44.1 = A detect+page (Acceptance rewrite pending, liveness = agy conversation step count); v1.45.0 plan 5 = B/C/D + safe stop.
+
 - **Objective (in progress):** finish all v1.44.0 P2 bugs (operator 2026-11-13: dispatch pairs, verify, then live-verify with the operator).
 - **Landed this session (pushed, head 46c217ce):** promtool Part B 6f7187ab (+ N3 anchor 42fe44fa, kine docker-skip 0a9e053c), offline_tested; repo-sync-push-guard 22ca679c, verify pass; lib-foundation v0.5.6 tagged/released, subtree 79caba45 (bash 3.2 `_run_command`).
 - **Decisions:** N3 P3 folded into promtool land without triage (blocked the land); fast gate skipped for promtool land (kine docker test, since fixed); repo-sync Fable finding 1 handled operationally (reinstall plist with the promote), lasting guard = hub-deploy idea row.

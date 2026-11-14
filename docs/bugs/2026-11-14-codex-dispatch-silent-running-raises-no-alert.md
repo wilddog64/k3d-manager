@@ -96,3 +96,13 @@ the stall ledger events that A, B and C must each write.
   `primary_coordinator_cost` as a row's last event (`:1306`). Credit exhaustion is not a 401. Limit `stalled` to the
   current version. Key second-stall on (version, slug). Some evidence ids are mislabelled. Phase-1 cuts: the `open`
   suffix, the drain-health probe, the expiry state machine, the cumulative ledger arithmetic.
+
+## Release split (operator, 2026-11-14: "go with your recommendation")
+
+- **v1.44.1 patch (the bug fix):** child A trimmed to detect, capture and one Slack notice; no kill, no hooks. Liveness
+  comes from the agy conversation step count, proven on the 13-hour hang (803-minute gap; healthy gaps at most 21
+  minutes): see A, "Scope for v1.44.1". This closes the bug: the operator is no longer the detector.
+- **v1.45.0 plan 5 `dispatch-stall-recovery` (the feature):** the safe stop, C (diagnosis), B (Slack approval and
+  resume) and D (dashboard), as the parts of `docs/plans/v1.45.0-dispatch-stall-recovery.md`. It starts with real stall
+  directories from v1.44.1. Cost of the split: if v1.45.0 is cut after 2026-12-08, diagnosis runs on ordinary API
+  spend, not the $100 credit.
