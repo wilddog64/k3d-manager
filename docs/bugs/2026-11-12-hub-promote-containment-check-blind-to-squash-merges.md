@@ -6,7 +6,7 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** dispatch — since 2026-11-14 (spec being written; intents need approval)
+**Waiting on:** dispatch — since 2026-11-14 (held: Makefile is open in parallel-offline-tests-b)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 
 ## Symptom
