@@ -1,9 +1,9 @@
 # Bug: machine-setup's promtool install fails under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
 **Status:** OPEN
-**Priority:** P3
+**Priority:** P2
 **Waiting on:** operator decision — since 2026-11-14
-**Severity:** low. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2 (a fresh Mac before Homebrew bash is first on `PATH`), the new `install_promtool` step in `bin/k3dm-machine-setup` reports `promtool missing (see installer output)` and sets `failed=1`. Setup still runs to the end. Workaround: rerun once Homebrew bash is on `PATH`.
+**Severity:** medium; blocks the promtool Part B land. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2 (a fresh Mac before Homebrew bash is first on `PATH`), the new `install_promtool` step in `bin/k3dm-machine-setup` reports `promtool missing (see installer output)` and sets `failed=1`. Setup still runs to the end. Workaround: rerun once Homebrew bash is on `PATH`.
 **Filed:** 2026-11-14
 **Detected by:** Fable review of the promtool Part B diff (finding M1), 2026-11-14
 **Introduced by:** promtool Part B (uncommitted worktree diff, `docs/bugs/2026-11-09-promtool-tests-need-pinned-install-on-every-host.md`): its first `_run_command` call on the macOS path. The root cause, empty-array expansion in lib-foundation `_run_command`, is pre-existing.
@@ -25,3 +25,14 @@ Fable, m4-air, 2026-11-14, in a scratch copy of the Part B worktree:
 
 - **A. Guard the script.** Add the `BASH_VERSINFO` check from `scripts/k3d-manager:16` to `bin/k3dm-machine-setup`. But machine-setup is the bootstrap that installs Homebrew, so a guard could block its first run.
 - **B. Make `_run_command` 3.2-safe upstream.** Change `"${probe_args[@]}"` to `${probe_args[@]+"${probe_args[@]}"}` in lib-foundation, then subtree-pull. This is the option the 2026-11-05 doc deferred.
+
+## Update 2026-11-14: blocks the promtool Part B land
+
+Claude, m4-air, 2026-11-14. The promtool land (`f5d1eb5a`, rebased onto `feb41165`) was refused: `machine_setup_acceptance.bats` "N4: report output has no username and no home path" failed. The leaking line is this crash, from a hub setup run with no flags:
+
+    <land TMPDIR>/bats-run-*/test/1/tree/scripts/lib/foundation/scripts/lib/system.sh: line 183: probe_args[@]: unbound variable
+
+- The suite's `ms` helper runs `/bin/bash "$TREE/bin/k3dm-machine-setup"` under `env -i`. So the repo's own acceptance harness expects machine-setup to work on Apple's bash 3.2, and Part B breaks that on every console and hub setup run.
+- Under a normal TMPDIR the crash still happens, but its path has no `/Users/<user>`, so N4 passed in every earlier run. It showed up only because land sets `TMPDIR` under the operator's home.
+- The same test passes on base `feb41165` under the same TMPDIR, so Part B introduced it.
+- Option A (guard the script) cannot work: the harness runs bash 3.2 on purpose. That leaves option B (make `_run_command` 3.2-safe in lib-foundation, subtree-pull), which could go in the pending lib-foundation v0.5.6 with the ACG fix. Or Part B could avoid `_run_command` on the macOS path.
