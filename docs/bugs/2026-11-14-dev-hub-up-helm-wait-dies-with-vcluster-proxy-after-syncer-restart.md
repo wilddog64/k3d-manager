@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-14 (operator: file as P2, dispatch to Luna when a slot is free)
+**Waiting on:** fix running — since 2026-11-14 (`dev-hub-proxy-retry`, Luna)
 **Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
