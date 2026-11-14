@@ -751,3 +751,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-14 15:40Z: operator merged lib-foundation PR #85 (d18f4fe); Claude tagged + released v0.5.6, subtree pulled into k3d-manager (79caba45), bash 3.2 _run_command ok; bash-3.2 bug LANDED. repo-sync-push-guard (Luna) exited: verifying. Next: promtool re-land.
 
 - 2026-11-14 ~21:00Z: `dev-hub-proxy-retry` (Luna) dispatched for docs/bugs/2026-11-14-dev-hub-up-helm-wait-dies-with-vcluster-proxy-after-syncer-restart.md; WIP 3/3 (Part B, D, proxy-retry). Queue unchanged: next free slot → A (Flash, after Part B frees Makefile) / Trivy investigation (Luna).
+
+- 2026-11-14 22:15Z: dispatch-stall-d-dashboard LANDED 09d12e68; live E5 (Stall recovery row on hub Grafana) after `make hub-promote`. Grafana Trivy target awaiting operator (12.4.15 recommended). Part B running after hung probe killed.

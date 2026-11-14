@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Agent dispatch dashboard:** a collapsed *Stall recovery* row shows hangs detected, silence before detection, diagnoses and their cost, approve/deny decisions, outcomes and clean phase-2 approvals for the selected window.
 
 - Add an isolated development vCluster on the hub with a memory quota, preemptible workload priority, read-only status and low-memory/quota alerts; run ArgoCD and Grafana inside it, sync only pushed-branch dashboards, and read hub Prometheus through a replicated Service.
 

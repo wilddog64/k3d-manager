@@ -1,8 +1,8 @@
 # Bug (child D): stall recovery is invisible on the Agent Dispatch dashboard
 
-**Status:** OPEN
+**Status:** LANDED — 09d12e68 on k3d-manager-v1.44.0, 2026-11-14
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
+**Waiting on:** live check — since 2026-11-14 (E5 after hub-promote)
 **Approval:** operator 2026-11-14 asked for a dashboard to track the stall-recovery loop ("maybe we can build a dashboard to track"); spec drafted by Claude, intent not yet approved
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
 **Intent approved:** operator, 2026-11-14
@@ -164,3 +164,13 @@ never match and every version-filtered panel was blank on the default view. Corr
 - Incidents and every join (diagnosis, decision, resume, outcome, clean approval) are keyed on `(slug, stall)`, never
   `stall` alone. Per incident, the last diagnosis and the last decision win; one incident counts once in outcomes and
   clean approvals however many `stall_resume rc=0` events it has; events are ordered by ledger position, not `ts`.
+
+## Landed (Claude, 2026-11-14)
+
+Three correction runs. Run 2 passed an Opus mutation re-verify for all 14 review defects, which also found a new display
+defect: `X or vector(0)` always added a stray `{}` 0 series (labels window/version/job/instance), proven with promtool
+3.1.0. Run 3 aggregates before the fallback on stat panels 126/128/130/132 (`max`/`sum`), drops the fallback from bar
+gauges 127/129/131, adds a promtool rule-unit test, and closes the median-format and negative/NaN guard test gaps plus
+dedupe after label sanitising. Claude re-ran: pytest 220 passed, dashboard bats 52/52, abandon bats 10/10; independent
+mutant (fallback restored in panel 127) gave not ok 3. Land test via `--allow-out-of-scope` (abandon bats and guide md).
+E5 (live dashboard) pending a hub-promote.
