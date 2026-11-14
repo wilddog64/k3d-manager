@@ -58,6 +58,98 @@ function _dev_hub_child_helm() {
   _run_command -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" "$@"
 }
 
+function _dev_hub_read_history() {
+  local release="$1" namespace="$2" temp_dir="$3" max_one="$4" allow_not_found="$5"
+  local stderr_file="${temp_dir}/helm-history.stderr" stderr_output history_output history_rc
+  : >"${stderr_file}" || _err "dev-hub could not create Helm history stderr file for release '${release}'"
+  if [[ "${max_one}" == 1 ]]; then
+    if history_output="$(_run_command --soft --quiet -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+      history "${release}" -n "${namespace}" --max 1 -o json 2>"${stderr_file}")"; then
+      _run_command --soft --quiet -- rm -f -- "${stderr_file}" || true
+      printf '%s' "${history_output}"
+      return 0
+    else
+      history_rc=$?
+    fi
+  else
+    if history_output="$(_run_command --soft --quiet -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+      history "${release}" -n "${namespace}" -o json 2>"${stderr_file}")"; then
+      _run_command --soft --quiet -- rm -f -- "${stderr_file}" || true
+      printf '%s' "${history_output}"
+      return 0
+    else
+      history_rc=$?
+    fi
+  fi
+  stderr_output="$(_run_command --soft --quiet -- cat "${stderr_file}")" || stderr_output=""
+  _run_command --soft --quiet -- rm -f -- "${stderr_file}" || true
+  if [[ "${allow_not_found}" == 1 && "${stderr_output,,}" == *"release: not found"* ]]; then
+    printf '[]'
+    return 0
+  fi
+  _err "dev-hub could not read Helm history for release '${release}' (exit ${history_rc}): ${stderr_output}"
+}
+
+function _dev_hub_history_status() {
+  local release="$1" history_json="$2" status
+  if ! _run_command --soft --quiet -- jq -e 'type == "array"' <<<"${history_json}" >/dev/null 2>&1; then
+    _err "dev-hub received invalid Helm history for release '${release}'"
+  fi
+  if [[ "$(_run_command --soft --quiet -- jq -r 'length' <<<"${history_json}")" == 0 ]]; then
+    printf 'absent'
+    return 0
+  fi
+  if ! status="$(_run_command --soft --quiet -- jq -er \
+    '.[0].status | select(type == "string" and length > 0)' <<<"${history_json}")"; then
+    _err "dev-hub received missing status in Helm history for release '${release}'"
+  fi
+  printf '%s' "${status}"
+}
+
+function _dev_hub_recover_pending_release() {
+  local release="$1" namespace="$2" temp_dir="$3" history_json target_revision
+  history_json="$(_dev_hub_read_history "${release}" "${namespace}" "${temp_dir}" 0 0)" || return 1
+  if ! _run_command --soft --quiet -- jq -e 'type == "array"' <<<"${history_json}" >/dev/null 2>&1; then
+    _err "dev-hub received invalid Helm history for release '${release}'"
+  fi
+  if ! target_revision="$(_run_command --soft --quiet -- jq -r \
+    '[.[] | select(.status == "deployed" or .status == "superseded")]
+     | if length == 0 then empty else max_by(.revision | tonumber).revision end' \
+    <<<"${history_json}")"; then
+    _err "dev-hub could not select a rollback revision for release '${release}'"
+  fi
+  if [[ -n "${target_revision}" ]]; then
+    if ! _run_command --soft -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+      rollback "${release}" "${target_revision}" -n "${namespace}"; then
+      _err "dev-hub could not recover pending Helm release '${release}'"
+    fi
+  else
+    if ! _run_command --soft -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+      uninstall "${release}" -n "${namespace}"; then
+      _err "dev-hub could not recover pending Helm release '${release}'"
+    fi
+  fi
+}
+
+function _dev_hub_recover_release() {
+  local release="$1" namespace="$2" temp_dir="$3" history_output status
+  history_output="$(_dev_hub_read_history "${release}" "${namespace}" "${temp_dir}" 1 1)" || return 1
+  status="$(_dev_hub_history_status "${release}" "${history_output}")" || return 1
+  case "${status}" in
+    pending-install|uninstalling)
+      if ! _run_command --soft -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+        uninstall "${release}" -n "${namespace}"; then
+        _err "dev-hub could not recover pending Helm release '${release}'"
+      fi
+      ;;
+    pending-upgrade|pending-rollback)
+      _dev_hub_recover_pending_release "${release}" "${namespace}" "${temp_dir}" || return 1
+      ;;
+    absent|deployed|failed|superseded|uninstalled) ;;
+    *) _err "dev-hub found unexpected Helm status '${status}' for release '${release}'" ;;
+  esac
+}
+
 function _dev_hub_grafana_password() {
   local password restore_trace=0 stored_password
   case $- in *x*) restore_trace=1; set +x ;; esac
@@ -86,7 +178,7 @@ function _dev_hub_grafana_password() {
 }
 
 function _dev_hub_install_charts() (
-  local temp_dir password secret_file
+  local temp_dir password secret_file helm_timeout="${DEV_HUB_HELM_TIMEOUT:-10m}"
   set +x
   temp_dir="$(_run_command -- mktemp -d "${TMPDIR:-/tmp}/k3dm-dev-hub.XXXXXX")" || return 1
   [[ -n "${temp_dir}" ]] || return 1
@@ -107,10 +199,12 @@ stringData:
   admin-password: '${yaml_password}'
 EOF
   unset password
+  _dev_hub_recover_release argocd cicd "${temp_dir}" || return 1
   if ! _dev_hub_child_helm repo add --force-update argo https://argoproj.github.io/argo-helm \
     || ! _dev_hub_child_helm repo add --force-update grafana https://grafana.github.io/helm-charts \
     || ! _dev_hub_child_helm upgrade --install argocd argo/argo-cd -n cicd --create-namespace \
       --version "${DEV_HUB_ARGOCD_VERSION}" -f "${DEV_HUB_CONFIG_DIR}/argocd-values.yaml" --wait \
+      --rollback-on-failure --timeout "${helm_timeout}" \
     || ! _dev_hub_child_kubectl apply -f "${DEV_HUB_CONFIG_DIR}/argocd-project.yaml"; then
     return 1
   fi
@@ -118,9 +212,11 @@ EOF
     _dev_hub_child_kubectl apply -f -; then
     return 1
   fi
+  _dev_hub_recover_release dev-hub-grafana monitoring "${temp_dir}" || return 1
   if ! _dev_hub_child_kubectl apply -f "${secret_file}" \
     || ! _dev_hub_child_helm upgrade --install dev-hub-grafana grafana/grafana -n monitoring \
-      --version "${DEV_HUB_GRAFANA_VERSION}" -f "${DEV_HUB_CONFIG_DIR}/grafana-values.yaml" --wait; then
+      --version "${DEV_HUB_GRAFANA_VERSION}" -f "${DEV_HUB_CONFIG_DIR}/grafana-values.yaml" --wait \
+      --rollback-on-failure --timeout "${helm_timeout}"; then
     return 1
   fi
 )

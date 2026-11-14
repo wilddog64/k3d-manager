@@ -146,6 +146,69 @@ setup() {
         *"create namespace monitoring"*) printf 'apiVersion: v1\nkind: Namespace\nmetadata:\n  name: monitoring\n' ;;
         *) : ;;
       esac
+    elif [[ "${command_name}" == helm && "$(cat "${CALL_LOG}" | tail -1)" == *" history "* ]]; then
+      # Helm v4.3.1 pkg/cmd/history.go releaseHistory JSON fields: revision, updated,
+      # status, chart, app_version, description.
+      local helm_history_call helm_history_release helm_status_var helm_full_var helm_error_var
+      helm_history_call="$(cat "${CALL_LOG}" | tail -1)"
+      if [[ "${helm_history_call}" == *" history dev-hub-grafana "* ]]; then
+        helm_history_release=dev-hub-grafana
+        helm_status_var="${HELM_GRAFANA_STATUS:-${HELM_RELEASE_STATUS:-absent}}"
+        helm_full_var="${HELM_GRAFANA_FULL_HISTORY_JSON:-${HELM_FULL_HISTORY_JSON:-}}"
+        helm_error_var="${HELM_GRAFANA_HISTORY_ERROR:-${HELM_HISTORY_ERROR:-}}"
+      else
+        helm_history_release=argocd
+        helm_status_var="${HELM_ARGOCD_STATUS:-${HELM_RELEASE_STATUS:-absent}}"
+        helm_full_var="${HELM_ARGOCD_FULL_HISTORY_JSON:-${HELM_FULL_HISTORY_JSON:-}}"
+        helm_error_var="${HELM_ARGOCD_HISTORY_ERROR:-${HELM_HISTORY_ERROR:-}}"
+      fi
+      if [[ "${helm_history_call}" == *" --max 1 "* && -n "${HELM_HISTORY_MAX_ERROR:-}" ]]; then
+        helm_error_var="${HELM_HISTORY_MAX_ERROR}"
+      elif [[ "${helm_history_call}" != *" --max 1 "* && -n "${HELM_HISTORY_FULL_ERROR:-}" ]]; then
+        helm_error_var="${HELM_HISTORY_FULL_ERROR}"
+      fi
+      if [[ -n "${helm_error_var}" ]]; then
+        printf '%s' "${helm_error_var}" >&2
+        rc="${HELM_HISTORY_RC:-1}"
+      elif [[ "${helm_status_var}" == absent ]]; then
+        printf 'Error: release: not found' >&2
+        rc=1
+      elif [[ "${helm_status_var}" == empty ]]; then
+        printf '[]'
+      elif [[ "${HELM_HISTORY_WARNING:-0}" == 1 ]]; then
+        printf 'WARNING: fixture history warning\n' >&2
+        if [[ "${HELM_STATUS_MISSING:-0}" == 1 ]]; then
+          printf '[{"revision":3,"updated":"2026-11-13T00:00:00Z","chart":"fixture-1.0.0","app_version":"1.0.0","description":"fixture"}]'
+        elif [[ "${helm_history_call}" == *" --max 1 "* ]]; then
+          printf '[{"revision":3,"updated":"2026-11-13T00:00:00Z","status":"%s","chart":"fixture-1.0.0","app_version":"1.0.0","description":"fixture"}]' \
+            "${helm_status_var}"
+        elif [[ -n "${helm_full_var}" ]]; then
+          printf '%s' "${helm_full_var}"
+        else
+          printf '[{"revision":3,"updated":"2026-11-13T00:00:00Z","status":"%s","chart":"fixture-1.0.0","app_version":"1.0.0","description":"fixture"}]' \
+            "${helm_status_var}"
+        fi
+      elif [[ "${HELM_STATUS_MISSING:-0}" == 1 ]]; then
+        printf '[{"revision":3,"updated":"2026-11-13T00:00:00Z","chart":"fixture-1.0.0","app_version":"1.0.0","description":"fixture"}]'
+      elif [[ "$(cat "${CALL_LOG}" | tail -1)" == *" --max 1 "* ]]; then
+        printf '[{"revision":3,"updated":"2026-11-13T00:00:00Z","status":"%s","chart":"fixture-1.0.0","app_version":"1.0.0","description":"fixture"}]' \
+          "${helm_status_var}"
+      elif [[ -n "${helm_full_var}" ]]; then
+        printf '%s' "${helm_full_var}"
+      else
+        printf '[{"revision":3,"updated":"2026-11-13T00:00:00Z","status":"%s","chart":"fixture-1.0.0","app_version":"1.0.0","description":"fixture"}]' \
+          "${helm_status_var}"
+      fi
+    elif [[ "${command_name}" == helm && "${FAIL_HELM_RECOVERY:-}" == uninstall \
+      && "$(cat "${CALL_LOG}" | tail -1)" == *" uninstall "* ]] \
+      && { [[ -z "${FAIL_HELM_RECOVERY_RELEASE:-}" ]] \
+        || [[ "$(cat "${CALL_LOG}" | tail -1)" == *" ${FAIL_HELM_RECOVERY_RELEASE} "* ]]; }; then
+      rc=43
+    elif [[ "${command_name}" == helm && "${FAIL_HELM_RECOVERY:-}" == rollback \
+      && "$(cat "${CALL_LOG}" | tail -1)" == *" rollback "* ]] \
+      && { [[ -z "${FAIL_HELM_RECOVERY_RELEASE:-}" ]] \
+        || [[ "$(cat "${CALL_LOG}" | tail -1)" == *" ${FAIL_HELM_RECOVERY_RELEASE} "* ]]; }; then
+      rc=43
     elif [[ "${command_name}" == helm && "${FAIL_HELM:-}" == grafana \
       && "$(cat "${CALL_LOG}" | tail -1)" == *"upgrade --install dev-hub-grafana"* ]]; then
       rc=42
@@ -256,7 +319,245 @@ teardown() {
   [ "$(grep -c '^vcluster-create dev-hub' "${CALL_LOG}")" -eq 1 ]
   grep -F 'upgrade --install argocd argo/argo-cd' "${CALL_LOG}" | grep -F -- "--version ${argocd_version} " | grep -F -- '--wait'
   grep -E '^kubectl --kubeconfig .* apply -f .*/argocd-project.yaml$' "${CALL_LOG}"
-  grep -E '^helm .*upgrade --install dev-hub-grafana grafana/grafana .*--version 8\.8\.2 .*--wait$' "${CALL_LOG}"
+  local grafana_call
+  grafana_call="$(grep -F 'upgrade --install dev-hub-grafana ' "${CALL_LOG}")"
+  [[ " ${grafana_call} " == *' --version 8.8.2 '* ]]
+  [[ " ${grafana_call} " == *' --wait '* ]]
+  [[ " ${grafana_call} " == *' --rollback-on-failure '* ]]
+  [[ " ${grafana_call} " == *' --timeout 10m '* ]]
+}
+
+@test "M1/N1 dev-hub values disable controller-manager leader election" {
+  source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+  local python_yaml
+  python_yaml="$(k3dm_python_yaml)"
+  "${python_yaml}" - "${SCRIPT_DIR}/etc/vcluster/values-dev-hub.yaml" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    actual = yaml.safe_load(handle)
+assert actual["controlPlane"]["distro"]["k8s"]["controllerManager"]["extraArgs"] == ["--leader-elect=false"]
+del actual["controlPlane"]["distro"]
+expected = yaml.safe_load("""
+controlPlane:
+  statefulSet:
+    scheduling:
+      priorityClassName: k3dm-dev-preemptible
+    resources:
+      requests: {cpu: 200m, memory: 256Mi}
+      limits: {cpu: 500m, memory: 768Mi}
+    persistence:
+      volumeClaim: {enabled: true, size: 2Gi, storageClass: local-path}
+  coredns:
+    deployment:
+      resources:
+        requests: {cpu: 20m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 128Mi}
+sync:
+  toHost:
+    priorityClasses: {enabled: false}
+    configMaps: {all: false}
+    pods: {priorityClassName: k3dm-dev-preemptible}
+  fromHost:
+    priorityClasses: {enabled: false}
+networking:
+  replicateServices:
+    fromHost:
+      - {from: monitoring/kube-prometheus-stack-prometheus, to: monitoring/hub-prometheus}
+""")
+assert actual == expected, "other values-dev-hub.yaml keys changed"
+print("controller-manager leader election disabled; remaining values unchanged")
+PY
+}
+
+@test "M2/N2 both chart installs have rollback-on-failure and explicit timeout" {
+  dev_hub_up
+  local call
+  for release in argocd dev-hub-grafana; do
+    call="$(grep -F "upgrade --install ${release} " "${CALL_LOG}")"
+    [[ " ${call} " == *' --wait '* ]]
+    [[ " ${call} " == *' --rollback-on-failure '* ]]
+    [[ " ${call} " == *' --timeout 10m '* ]]
+  done
+}
+
+@test "M3 pending-install releases are uninstalled before their chart install" {
+  for status in pending-install uninstalling; do
+    export HELM_RELEASE_STATUS="${status}"
+    : >"${CALL_LOG}"
+    dev_hub_up
+    for spec in "argocd cicd" "dev-hub-grafana monitoring"; do
+      read -r release namespace <<<"${spec}"
+      recovery="$(grep -nF "uninstall ${release} -n ${namespace}" "${CALL_LOG}" | cut -d: -f1)"
+      install="$(grep -nF "upgrade --install ${release} " "${CALL_LOG}" | cut -d: -f1)"
+      [ -n "${recovery}" ] && [ -n "${install}" ] && [ "${recovery}" -lt "${install}" ]
+    done
+  done
+}
+
+@test "M4 pending releases roll back to newest deployed or superseded revision" {
+  for recovery_case in \
+    'pending-upgrade 1 [{"revision":1,"updated":"2026-11-10T00:00:00Z","status":"superseded","chart":"fixture-1.0.0","app_version":"1.0.0","description":"old"},{"revision":2,"updated":"2026-11-11T00:00:00Z","status":"failed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"failed"},{"revision":3,"updated":"2026-11-12T00:00:00Z","status":"pending-upgrade","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]' \
+    'pending-upgrade 2 [{"revision":1,"updated":"2026-11-09T00:00:00Z","status":"superseded","chart":"fixture-1.0.0","app_version":"1.0.0","description":"older"},{"revision":2,"updated":"2026-11-10T00:00:00Z","status":"deployed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"newest-good"},{"revision":3,"updated":"2026-11-11T00:00:00Z","status":"failed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"failed"},{"revision":4,"updated":"2026-11-12T00:00:00Z","status":"pending-upgrade","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]' \
+    'pending-rollback 4 [{"revision":4,"updated":"2026-11-10T00:00:00Z","status":"deployed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"old"},{"revision":5,"updated":"2026-11-11T00:00:00Z","status":"failed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"failed"},{"revision":6,"updated":"2026-11-12T00:00:00Z","status":"pending-rollback","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]'; do
+    IFS=' ' read -r status target_revision history <<<"${recovery_case}"
+    export HELM_RELEASE_STATUS="${status}" HELM_FULL_HISTORY_JSON="${history}"
+    : >"${CALL_LOG}"
+    dev_hub_up
+    for spec in "argocd cicd" "dev-hub-grafana monitoring"; do
+      read -r release namespace <<<"${spec}"
+      recovery="$(grep -nF "rollback ${release} ${target_revision} -n ${namespace}" "${CALL_LOG}" | cut -d: -f1)"
+      install="$(grep -nF "upgrade --install ${release} " "${CALL_LOG}" | cut -d: -f1)"
+      [ -n "${recovery}" ] && [ -n "${install}" ] && [ "${recovery}" -lt "${install}" ]
+    done
+  done
+  export HELM_RELEASE_STATUS=pending-upgrade
+  export HELM_FULL_HISTORY_JSON='[{"revision":3,"updated":"2026-11-12T00:00:00Z","status":"pending-upgrade","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]'
+  : >"${CALL_LOG}"
+  dev_hub_up
+  for spec in "argocd cicd" "dev-hub-grafana monitoring"; do
+    read -r release namespace <<<"${spec}"
+    recovery="$(grep -nF "uninstall ${release} -n ${namespace}" "${CALL_LOG}" | cut -d: -f1)"
+    install="$(grep -nF "upgrade --install ${release} " "${CALL_LOG}" | cut -d: -f1)"
+    [ -n "${recovery}" ] && [ -n "${install}" ] && [ "${recovery}" -lt "${install}" ]
+  done
+  if grep -F 'rollback ' "${CALL_LOG}"; then return 1; fi
+}
+
+@test "M5 DEV_HUB_HELM_TIMEOUT overrides both chart timeouts" {
+  export DEV_HUB_HELM_TIMEOUT=3m
+  dev_hub_up
+  for release in argocd dev-hub-grafana; do
+    call="$(grep -F "upgrade --install ${release} " "${CALL_LOG}")"
+    [[ " ${call} " == *' --timeout 3m '* ]]
+  done
+}
+
+@test "history warnings on stderr do not corrupt status or full-history JSON" {
+  export HELM_HISTORY_WARNING=1
+  for status in deployed pending-install; do
+    export HELM_RELEASE_STATUS="${status}"
+    : >"${CALL_LOG}"
+    dev_hub_up
+    for spec in "argocd cicd" "dev-hub-grafana monitoring"; do
+      read -r release namespace <<<"${spec}"
+      install="$(grep -nF "upgrade --install ${release} " "${CALL_LOG}" | cut -d: -f1)"
+      [ -n "${install}" ]
+      if [[ "${status}" == pending-install ]]; then
+        recovery="$(grep -nF "uninstall ${release} -n ${namespace}" "${CALL_LOG}" | cut -d: -f1)"
+        [ -n "${recovery}" ] && [ "${recovery}" -lt "${install}" ]
+      else
+        if grep -F "uninstall ${release} -n ${namespace}" "${CALL_LOG}"; then return 1; fi
+      fi
+    done
+  done
+
+  export HELM_RELEASE_STATUS=pending-upgrade
+  export HELM_FULL_HISTORY_JSON='[{"revision":7,"updated":"2026-11-10T00:00:00Z","status":"deployed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"deployed"},{"revision":8,"updated":"2026-11-12T00:00:00Z","status":"pending-upgrade","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]'
+  : >"${CALL_LOG}"
+  dev_hub_up
+  for release in argocd dev-hub-grafana; do
+    rollback="$(grep -nF "rollback ${release} 7 " "${CALL_LOG}" | cut -d: -f1)"
+    install="$(grep -nF "upgrade --install ${release} " "${CALL_LOG}" | cut -d: -f1)"
+    [ -n "${rollback}" ] && [ -n "${install}" ] && [ "${rollback}" -lt "${install}" ]
+  done
+}
+
+@test "history with a missing status fails loudly before chart install" {
+  export HELM_RELEASE_STATUS=deployed HELM_STATUS_MISSING=1
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* && "${output}" == *"missing status"* ]]
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
+}
+
+@test "N3 absent deployed and failed releases are left untouched with installed controls" {
+  for status in absent empty deployed failed; do
+    export HELM_RELEASE_STATUS="${status}"
+    : >"${CALL_LOG}"
+    dev_hub_up
+    if grep -E '^helm .* (uninstall|rollback) ' "${CALL_LOG}"; then return 1; fi
+    grep -F 'upgrade --install argocd ' "${CALL_LOG}"
+    grep -F 'upgrade --install dev-hub-grafana ' "${CALL_LOG}"
+  done
+}
+
+@test "N4 failed pending-release recovery stops before upgrade-install" {
+  export HELM_RELEASE_STATUS=pending-install FAIL_HELM_RECOVERY=uninstall
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* ]]
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
+
+  : >"${CALL_LOG}"
+  export HELM_RELEASE_STATUS=pending-upgrade FAIL_HELM_RECOVERY=rollback
+  export HELM_FULL_HISTORY_JSON='[{"revision":1,"updated":"2026-11-10T00:00:00Z","status":"deployed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"old"},{"revision":2,"updated":"2026-11-12T00:00:00Z","status":"pending-upgrade","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]'
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* ]]
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
+
+  : >"${CALL_LOG}"
+  export HELM_ARGOCD_STATUS=deployed HELM_GRAFANA_STATUS=pending-install
+  export FAIL_HELM_RECOVERY=uninstall FAIL_HELM_RECOVERY_RELEASE=dev-hub-grafana
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"dev-hub-grafana"* ]]
+  grep -F 'upgrade --install argocd ' "${CALL_LOG}"
+  if grep -F 'upgrade --install dev-hub-grafana ' "${CALL_LOG}"; then return 1; fi
+}
+
+@test "N5 unexpected statuses and history errors stop both chart installs" {
+  export HELM_RELEASE_STATUS=unrecognized-status
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* && "${output}" == *"unrecognized-status"* ]]
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
+  : >"${CALL_LOG}"
+  export HELM_HISTORY_ERROR='Kubernetes API unavailable' HELM_HISTORY_RC=23
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* && "${output}" == *"exit 23"* \
+    && "${output}" == *"Kubernetes API unavailable"* ]]
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
+
+  : >"${CALL_LOG}"
+  export HELM_ARGOCD_STATUS=deployed HELM_GRAFANA_STATUS=unrecognized-status
+  unset HELM_HISTORY_ERROR
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"dev-hub-grafana"* && "${output}" == *"unrecognized-status"* ]]
+  grep -F 'upgrade --install argocd ' "${CALL_LOG}"
+  if grep -F 'upgrade --install dev-hub-grafana ' "${CALL_LOG}"; then return 1; fi
+
+  : >"${CALL_LOG}"
+  export HELM_ARGOCD_STATUS=deployed HELM_GRAFANA_HISTORY_ERROR='Error: Kubernetes API unavailable'
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"dev-hub-grafana"* ]]
+  grep -F 'upgrade --install argocd ' "${CALL_LOG}"
+  if grep -F 'upgrade --install dev-hub-grafana ' "${CALL_LOG}"; then return 1; fi
+
+  : >"${CALL_LOG}"
+  unset HELM_ARGOCD_STATUS HELM_GRAFANA_STATUS HELM_GRAFANA_HISTORY_ERROR
+  export HELM_RELEASE_STATUS=pending-upgrade HELM_HISTORY_FULL_ERROR='full history backend failed' HELM_HISTORY_RC=29
+  export HELM_FULL_HISTORY_JSON='[{"revision":1,"updated":"2026-11-10T00:00:00Z","status":"deployed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"old"}]'
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* && "${output}" == *"exit 29"* \
+    && "${output}" == *"full history backend failed"* ]]
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
+}
+
+@test "invalid rollback revision fails without cleanup or chart install" {
+  export HELM_RELEASE_STATUS=pending-upgrade
+  export HELM_FULL_HISTORY_JSON='[{"revision":"not-a-number","updated":"2026-11-10T00:00:00Z","status":"deployed","chart":"fixture-1.0.0","app_version":"1.0.0","description":"bad revision"},{"revision":2,"updated":"2026-11-12T00:00:00Z","status":"pending-upgrade","chart":"fixture-1.0.0","app_version":"1.0.0","description":"pending"}]'
+  run dev_hub_up
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"argocd"* && "${output}" == *"rollback revision"* ]]
+  if grep -E '^helm .* (uninstall|rollback) ' "${CALL_LOG}"; then return 1; fi
+  if grep -F 'upgrade --install argocd ' "${CALL_LOG}"; then return 1; fi
 }
 
 @test "priority class manifest omits preemptionPolicy and keeps its priority value" {
@@ -568,6 +869,7 @@ import yaml
 
 with open(sys.argv[1], encoding="utf-8") as handle:
     actual = yaml.safe_load(handle)
+    actual["controlPlane"].pop("distro", None)
 actual["coredns"] = actual["controlPlane"].pop("coredns")
 expected = yaml.safe_load("""
 controlPlane:
@@ -927,7 +1229,12 @@ PY
   dev_hub_up
   grep -F 'upgrade --install argocd argo/argo-cd' "${CALL_LOG}" | grep -F -- "--version ${argocd_version} " | grep -F -- '--wait'
   grep -E '^kubectl --kubeconfig .* apply -f .*/argocd-project\.yaml$' "${CALL_LOG}"
-  grep -E '^helm .*upgrade --install dev-hub-grafana grafana/grafana .*--version 8\.8\.2 .*--wait$' "${CALL_LOG}"
+  local grafana_call
+  grafana_call="$(grep -F 'upgrade --install dev-hub-grafana ' "${CALL_LOG}")"
+  [[ " ${grafana_call} " == *' --version 8.8.2 '* ]]
+  [[ " ${grafana_call} " == *' --wait '* ]]
+  [[ " ${grafana_call} " == *' --rollback-on-failure '* ]]
+  [[ " ${grafana_call} " == *' --timeout 10m '* ]]
 }
 
 @test "dev-hub Argo CD default chart version comes from vars.sh" {

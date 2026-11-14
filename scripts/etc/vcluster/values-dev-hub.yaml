@@ -1,4 +1,9 @@
 controlPlane:
+  distro:
+    k8s:
+      controllerManager:
+        extraArgs:
+          - --leader-elect=false
   statefulSet:
     scheduling:
       priorityClassName: k3dm-dev-preemptible
