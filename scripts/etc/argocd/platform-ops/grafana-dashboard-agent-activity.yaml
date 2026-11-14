@@ -369,7 +369,7 @@ data:
           "id": 100,
           "type": "stat",
           "title": "Wasted re-read share",
-          "description": "Share of reads that re-read content identical to the pre-compaction read.",
+          "description": "Share of reads that re-read content identical to the pre-compaction read. A lower bound: a re-read counts only when it reads the same file and range and returns identical output; a re-read of a different range counts as changed even if the file did not change.",
           "gridPos": {"h": 6, "w": 24, "x": 0, "y": 13},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_claude_reads{window=\"$window\",kind=\"reread_unchanged\"} / ignoring(kind) (k3dm_claude_reads{window=\"$window\",kind=\"all\"} > 0)", "instant": true}],
