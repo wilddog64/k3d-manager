@@ -1,8 +1,8 @@
 # Bug: dev-hub-up fails when the syncer restarts mid-install: the vCluster background proxy dies and Helm loses the cluster
 
-**Status:** OPEN — captured 2026-11-14 by Claude
+**Status:** LANDED — 9676d0af on k3d-manager-v1.44.0, 2026-11-14 (captured 2026-11-14 by Claude)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-14 (`dev-hub-proxy-retry`, Luna)
+**Waiting on:** live check — since 2026-11-14 (E5 after hub-promote)
 **Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
@@ -110,3 +110,15 @@ interface:
   - "make dev-hub-up (unchanged command; new stderr line on the retry path)"
   - "docs/howto/dev-hub.md recovery paragraph"
 ```
+
+## Landed (Claude, 2026-11-14)
+
+`dev-hub-proxy-retry` landed as 9676d0af after three runs. Run 2 passed its own tests but an independent Opus verifier
+failed it: the first Helm attempt was a hard `_run_command`, so under the real wrapper (`system.sh`
+`_run_command_handle_failure`) `_err` exited before the retry, and the bats stub special-cased that one call; `&&`
+assertion chains also let a "retry deleted" mutant survive. Run 3 made both attempts `--soft`, removed the stub special
+case, added a test that sources the real `_run_command`, and split every assertion. Evidence: Claude's real-wrapper
+repro (fake helm always failing) now shows refresh, recovery and one retry, then rc 1; `dev_hub.bats` 76/76 (land gate
+28 s); shellcheck clean; fresh Opus verifier PASS with every requested mutant killed. Non-blocking: the refresh-failure
+`_err` (`dev_hub.sh:70`) is not exercised by any test. E5 (live) pending: needs `make hub-promote`, then dev-hub
+down/up with pod `dev-hub-0` deleted during the argocd install.
