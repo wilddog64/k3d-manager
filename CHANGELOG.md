@@ -6,6 +6,10 @@
 
 - Add an isolated development vCluster on the hub with a memory quota, preemptible workload priority, read-only status and low-memory/quota alerts; run ArgoCD and Grafana inside it, sync only pushed-branch dashboards, and read hub Prometheus through a replicated Service.
 
+### Fixed
+
+- **Vault unseal watchdog:** retry up to 12 times (5-second interval) when Vault is unreachable (rc 1) during startup before skipping, preventing post-restart unseal delays.
+
 ## [1.43.15] - 2026-11-12
 
 ### Fixed
