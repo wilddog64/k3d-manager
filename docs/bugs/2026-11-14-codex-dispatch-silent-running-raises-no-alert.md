@@ -70,3 +70,29 @@ Three subsystems, so three child specs and one integration check. Children land 
 | C | `docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md` | Headless `claude -p --bare --output-format json --max-budget-usd <cap> --permission-mode dontAsk --allowedTools ...` reading the stall evidence, writing `correction.md` and a diagnosis; key from the M4 Keychain `k3dm-anthropic-api-key` into the environment; usage logged for the agent-cost dashboard; 401 and budget-hit surface as Slack lines. CLI flags proven from Claude Code 2.1.323 `--help`, captured on the M4 2026-11-14. |
 
 Integration check (live, Claude and operator): a staged toy dispatch that hangs, on the M4, end to end to a Slack approval and a resumed run.
+
+## Spec review 2026-11-14 (Fable; blockers checked by Claude)
+
+Verdict: A and C not dispatchable, B needs fixes; D (dashboard, added 2026-11-14 at the operator's request) defines
+the stall ledger events that A, B and C must each write.
+
+- **A blocker, confirmed.** agy writes its log only at exit (`--output-format json >"$run/agy.log"`,
+  `bin/k3dm-codex-dispatch:232`). A healthy run, `v1.43.15/hub-promote-keeps-promoter-commits-r4.run`, had a 2-line
+  log written 3438 s after start, so a 45-minute silence rule would have killed it. Liveness must come from another
+  signal (newest mtime under the worktree and `$run/state`, or process-tree CPU time). Replay the rule against existing
+  `*.run` dirs before dispatch, and capture agy's TERM behaviour (prove-external-behaviour rule).
+- **C blocker, confirmed.** `--add-dir <directories...>` takes several values (Claude Code 2.1.323 `--help`, line 11),
+  so a prompt after it is read as a directory. Use stdin or a tool-less single turn: inline the evidence and pass
+  `--tools ""`, which also removes the Read-anywhere injection path (finding 8).
+- **A major, open.** Matching by worktree path in argv also kills editors, verifier `git -C` runs and other agy
+  dispatches whose prompt names the path. Target the worker pid's descendants instead.
+- **A major, open.** Rescans can kill the worker's own `git rev-parse HEAD` (`:253`), which writes `violation`.
+- **A/B major, open.** An agy run killed before its final JSON has no `$run/session` (`:1353`, `:167-170`), so resume
+  fails. Size the grace from a measured TERM-to-JSON time, and have B withhold the card when there's no session.
+- **A/B major, open.** A launchd-started resume runs on the plist PATH, not the direnv toolchain. Use `direnv exec`.
+- **B major, open.** The card shows the diagnosis but not the correction that becomes the next agent's prompt, and
+  model text is unescaped mrkdwn. Show the capped correction in full and escape `&<>`.
+- **Minor, open.** Drain timeout 240 s vs a 300 s resume timeout. `_dispatch_open` would show
+  `primary_coordinator_cost` as a row's last event (`:1306`). Credit exhaustion is not a 401. Limit `stalled` to the
+  current version. Key second-stall on (version, slug). Some evidence ids are mislabelled. Phase-1 cuts: the `open`
+  suffix, the drain-health probe, the expiry state machine, the cumulative ledger arithmetic.

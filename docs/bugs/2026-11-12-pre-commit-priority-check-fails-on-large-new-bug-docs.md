@@ -3,11 +3,11 @@
 **Status:** OPEN — captured 2026-11-12
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The pre-commit hook falsely blocks committing large new bug documentation files with a valid Priority line due to SIGPIPE under `pipefail`, degrading the commit workflow with a two-step commit workaround.)
-**Waiting on:** operator decision — since 2026-11-12
+**Waiting on:** dispatch — since 2026-11-14
 **Introduced by:** `edfc9a5c` (2026-10-11, the Priority check in `.githooks/pre-commit`)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — exact-slug glob empty; grep of `docs/bugs/` for pre-commit plus pipefail found only unrelated docs; `make find-similar-docs` not run
-**Approval:** none (captured only)
+**Approval:** operator 2026-11-14 ("yes, please"): fix in the next Luna dispatch, paired with the hub-promote containment-check bug
 **Filed:** 2026-11-12
 **Detected by:** Claude, 2026-11-12, committing the two wave 1 batch specs
 
@@ -41,3 +41,27 @@ looks at added files (`--diff-filter=A`). Used for the two wave 1 batch specs on
 The three stall-recovery child specs (`docs/bugs/2026-11-14-dispatch-stall-{a-detector,b-approval,c-diagnose}.md`,
 25-30 KB) failed the same way, rc 141 five times out of five each on the M4. Committed with the header-first
 workaround. Third time in three days: the workaround now costs a commit per large spec.
+
+## Fix
+
+`.githooks/pre-commit:14`: let grep read the whole stream: `git show ":${bug_doc}" | grep -E '^\*\*Priority:\*\* P[0-3]\b' >/dev/null`.
+No other `| grep -q` exists in `.githooks/` (grep, 2026-11-14).
+
+## Files
+
+- `.githooks/pre-commit`
+- `scripts/tests/bin/pre_commit_priority.bats` (new; or the existing pre-commit suite if the worker finds one)
+
+## Acceptance
+
+```yaml
+must:
+  M1: a new staged bug doc over 64 KB whose line 4 is a valid Priority passes the hook
+must_not:
+  N1: a new staged bug doc of any size with no Priority line passes (positive control for M1's test, run with the same 64 KB body)
+  N2: the test touches the real repo index or hooks (it runs in a scratch git repo, asserted first)
+evidence:
+  - {id: E1, proves: [M1, N1, N2], kind: offline, intent: "You will see a bats test make a scratch git repo (checked not to be this one), copy in the hook, stage a 70 KB bug doc with a Priority line and commit it successfully, then stage the same doc without the line and see the commit refused. On today's hook the first commit fails with 'needs **Priority:**', so the test fails before the fix."}
+interface:
+  - ".githooks/pre-commit exit code and message"
+```
