@@ -2,7 +2,7 @@
 
 **Status:** LANDED (22ca679c on k3d-manager-v1.44.0)
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
-**Waiting on:** live check — since 2026-11-14 (E5 after the promote and `make install-repo-sync` on the M5)
+**Waiting on:** live check — since 2026-11-14 (E5 second half: operator deletes the stale m4-air group on the M5, then Claude confirms it stays gone)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** unknown
@@ -255,3 +255,15 @@ Order matters. Run on the hub (M5), in the operator's tmux, right after the prom
 - Fable finding 1 (medium, not fixed here): after the promote the hub runs the new script with the old installed plist (no URL) and stops pushing until `make install-repo-sync`; a frozen `deploy_pending=1` could keep `K3dmDeployPending` firing. Run `make install-repo-sync` on the M5 in the same session as the promote. The lasting guard (reinstall an agent when its plist template changed) is the hub-deploy row in `docs/ideas.md`.
 - Fable finding 3 (low, accepted): `make hub-sync` no longer pushes, so the moved checkout's sample waits for the next launchd run (≤5 min).
 - E5 (live): m5-air `push_time_seconds` advancing after the reinstall, and no m4-air group.
+
+## Live check 2026-11-14 (Claude, read-only over ssh to m5-air.local)
+
+After the promote of `6ba89b3f` (contains `22ca679c`) and `make install-repo-sync` on the M5 (~14:40Z):
+
+- **Hub half passes.** The M5 plist has `PUSHGATEWAY_URL => http://localhost:19094`; `instance="m5-air"` `push_time_seconds`
+  advanced on consecutive runs, 14:47:40Z then 14:53:02Z; no `PUSHGATEWAY_URL is not set` line in the M5 log.
+- **A stale `instance="m4-air"` group is present**, last pushed 13:52:27Z and unchanged at 14:53:36Z. The fix reached
+  the M4 checkout by fast-forward at 13:50:03Z, so that push is most likely a run that started on the old script; the M4
+  job has run about 11 times since (log written 14:42Z) without pushing. E5's "no m4-air group" therefore needs the
+  group deleted once (rollout residual): `curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air`
+  on the M5 (operator, hub write), then one more check that it does not return.
