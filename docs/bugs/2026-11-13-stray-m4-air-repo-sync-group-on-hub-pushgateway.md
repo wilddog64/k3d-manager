@@ -1,8 +1,7 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** LANDED (22ca679c on k3d-manager-v1.44.0)
+**Status:** VERIFIED — live 2026-11-14 by Claude (landed 22ca679c); m4-air group deleted by operator and absent across a full tick
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
-**Waiting on:** live check — since 2026-11-14 (E5 second half: operator deletes the stale m4-air group on the M5, then Claude confirms it stays gone)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** unknown
@@ -267,3 +266,9 @@ After the promote of `6ba89b3f` (contains `22ca679c`) and `make install-repo-syn
   job has run about 11 times since (log written 14:42Z) without pushing. E5's "no m4-air group" therefore needs the
   group deleted once (rollout residual): `curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air`
   on the M5 (operator, hub write), then one more check that it does not return.
+
+## Verified 2026-11-14 (Claude)
+
+After the operator's DELETE on the M5 (`/metrics/job/k3dm_repo_sync/instance/m4-air`), two samples of the hub
+Pushgateway (localhost:19094) six minutes apart showed only `instance="m5-air"`: 14:55:26Z (push 14:53:02Z) and
+15:01:27Z (push 14:58:21Z). The M4 job wrote its log at 15:00:13Z within that window and did not push. E5 passes.
