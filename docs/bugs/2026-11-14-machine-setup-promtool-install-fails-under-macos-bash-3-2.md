@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-14 (lib-foundation v0.5.6 release, then subtree pull)
+**Waiting on:** fix running — since 2026-11-14 (fix in lib-foundation PR #85; then tag v0.5.6 and subtree pull)
 **Severity:** medium; blocks the promtool Part B land. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2 (a fresh Mac before Homebrew bash is first on `PATH`), the new `install_promtool` step in `bin/k3dm-machine-setup` reports `promtool missing (see installer output)` and sets `failed=1`. Setup still runs to the end. Workaround: rerun once Homebrew bash is on `PATH`.
 **Filed:** 2026-11-14
 **Detected by:** Fable review of the promtool Part B diff (finding M1), 2026-11-14
