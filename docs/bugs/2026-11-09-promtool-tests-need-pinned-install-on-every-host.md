@@ -118,6 +118,7 @@ overlap is gone.
 - `scripts/tests/plugins/e2e_observability.bats`
 - `scripts/tests/plugins/grafana_dashboard_appsets.bats`
 - `CHANGELOG.md` (one `### Fixed` bullet)
+- Added 2026-11-14 by Claude after review: `scripts/tests/bin/machine_setup_acceptance.bats` (its complete-host fixture needs a promtool), `scripts/tests/bin/test_promtool_helper.py` (Python resolver contract), `scripts/tests/lib/promtool_helper.bats` (new, bash resolver contract); `.github/workflows/ci.yml` also covers the `alertmanager-behaviour` job, which runs the two `observability/` files.
 
 Acceptance items M1, N1, N3 and E1 were proven by Part A upstream (lib-foundation #83); E2 is Claude's live check.
 The worker proves M2 (machine-setup half; CI half is E5 on the PR), M3, M4, N2, E3 and E4.
