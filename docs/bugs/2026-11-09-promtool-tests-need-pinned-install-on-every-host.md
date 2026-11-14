@@ -1,6 +1,7 @@
 # Bug: promtool tests fail or skip on every Mac because only CI installs promtool
 
 **Status:** OPEN — child C2 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
+**Part A:** done upstream — `_install_promtool` merged in lib-foundation #83 (`5d301c1`), released v0.5.5 (#84) and subtree-pulled here in `5f832339` (Claude, 2026-11-14). Part B (k3d-manager) remains.
 **Priority:** P2
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only issue where `promtool`-dependent tests fail or skip on local Macs while CI still runs them and runtime behavior is unaffected); Claude proposed P2. Claude's higher P2 stands until the operator decides.
 **Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
