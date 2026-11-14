@@ -55,7 +55,9 @@ The fix below is therefore diagnostics first. The next recurrence names its caus
    - A screenshot failure prints `screenshot=failed` and never changes the return value.
 3. **Reason on the final message.** In `acg_session_check.js`, the `ACG_SESSION_EXPIRED:` line gains ` reason=<reason>`. The reason is the `loginWithPage` result reason (`login_form_unavailable`, `mfa_required`, `login_failed`, `no_creds`), or `no_attempt` when no credentials exist. `_autoLogin` returns the result object, not only `ok`. The thrown `Error('ACG_SESSION_EXPIRED')` message is unchanged.
 
-## Files (lib-foundation)
+## Files
+
+All paths are in lib-foundation (`release/v0.5.6`).
 
 - `scripts/lib/acg/playwright/lib/pluralsight_login.js`
 - `scripts/lib/acg/acg_session_check.js`
