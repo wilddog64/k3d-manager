@@ -460,19 +460,19 @@ STUB
   ms --role console
   grep -qE '^make .*install-repo-sync' "$CALLS"
   while read -r line; do
-    t="$(echo "$line" | grep -oE 'install-[a-z0-9-]+' | head -1)"
+    t="$(echo "$line" | grep -oE '(^| )install-[a-z0-9-]+' | head -1 | tr -d ' ')"
     grep -qxF "$t" "$TREE/scripts/etc/machine/agents.console.list"
     if grep -qxF "$t" "$TREE/scripts/etc/machine/agents.hub.list" && ! grep -qxF "$t" "$TREE/scripts/etc/machine/agents.worker.list"; then false; fi
-  done < <(grep -E '^make .*install-' "$CALLS" || true)
+  done < <(grep -E '^make .* install-' "$CALLS" || true)
   [ -z "$(ls "$HOME_FX/Library/LaunchAgents" 2>/dev/null)" ]
 }
 
 @test "N3: worker only runs install-* named in agents.worker.list" {
   ms --role worker
   while read -r line; do
-    t="$(echo "$line" | grep -oE 'install-[a-z0-9-]+' | head -1)"
+    t="$(echo "$line" | grep -oE '(^| )install-[a-z0-9-]+' | head -1 | tr -d ' ')"
     grep -qxF "$t" "$TREE/scripts/etc/machine/agents.worker.list"
-  done < <(grep -E '^make .*install-' "$CALLS" || true)
+  done < <(grep -E '^make .* install-' "$CALLS" || true)
 }
 
 @test "N3: no role ever uninstalls an agent (no bootout/unload/remove/rm of plists)" {
