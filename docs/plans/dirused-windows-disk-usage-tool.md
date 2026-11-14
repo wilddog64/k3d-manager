@@ -271,6 +271,7 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 - **Audience:** private, possibly used at the operator's company; no public release.
 - **Name:** `dirused` (operator, 2026-11-06), changed from the draft's `diruse`. The new name also avoids a clash with Microsoft's old `diruse.exe` on some servers.
 - **Stack:** C#/.NET.
+- **ACG fleet script:** lives in the dirused repo (operator, 2026-11-13: "probably just its own repo: dirused"). k3d-manager adds no Windows variant of its ACG provisioning; dirused may copy patterns from `scripts/plugins/acg.sh`, not call it.
 
 ## Open before any company use
 
