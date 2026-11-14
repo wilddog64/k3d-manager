@@ -151,6 +151,13 @@ Evidence:
 - The real `~/.local/state/k3d-manager/acg-diag` did not exist before or after any run.
 - **Land:** the lib-foundation mirror doc shares this spec's path, which land always treats as out of scope, so it landed
   with `--allow-out-of-scope`. It was the only out-of-scope file.
+- **Independent verifier (Opus, Fix and Acceptance sections only, own node harness, no jest tests read):** 8/8 PASS on
+  `c7384ff`. N1–N4 cannot fail on pre-fix `23a5753`, because pre-fix has no DIAG or screenshot code. Instead each has a
+  positive control, a mutant the check caught: a screenshot on `login_failed` (N1), a raw URL plus an unredacted title
+  (N2). N3's control is the throwing screenshot call, which was seen to run. M3: pre-fix prints no `reason=`. M4: after 8
+  runs exactly the newest 5 screenshots by mtime remain, and an unrelated file is kept. With a symlinked `acg-diag` the
+  line says `screenshot=failed` and nothing is written through the link. Real `acg-diag` absent before and after; both
+  repo trees clean.
 - **E2 (live): pending.** It needs the lib-foundation v0.5.6 release, the subtree pull here, and the next lapsed
   Pluralsight session on the M5.
 
