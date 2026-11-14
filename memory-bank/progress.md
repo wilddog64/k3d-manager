@@ -623,3 +623,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - [x] 2026-11-13 plan 1 Part B dispatched to Flash 3.8 (slug parallel-offline-tests-b); split part already landed 24b8924a.
 - 2026-11-13: dirused ACG fleet script placed in the dirused repo (operator); recorded in plan Decided list. k3d-manager still adds no dirused code.
 - 2026-11-13: helm-wait correction 4 verified (bats 69/69, shellcheck, if-count <=8, both mutants red); committed 7cc5821c through pre-commit audit; LANDED f1eeeb26, pushed; offline_tested marked. Next: CI green -> operator hub-promote f1eeeb26 + make dev-hub-up (NO down) = live test on stuck argocd pending-install.
+- 2026-11-13: Part B correction 1 exited (Flash, 54m). Claude: makefile_test_all 17/17, pytest metrics+dashboard 40 passed, shellcheck clean; Flash pre-fix control 15/17 not ok. Fable review of correction 1 running. Then land, then E2 live serial vs parallel on M4.
