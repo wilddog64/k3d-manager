@@ -5,7 +5,7 @@
 **Priority:** P2
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only issue where `promtool`-dependent tests fail or skip on local Macs while CI still runs them and runtime behavior is unaffected); Claude proposed P2. Claude's higher P2 stands until the operator decides.
 **Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** dispatch — since 2026-11-12 (Part B; Files added 2026-11-14)
 **Introduced by:** `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` fix (v1.43.5), which
 installed promtool in the CI `lint` job only
 **Should have been caught by:** spec (the 2026-10-24 fix covered one environment; its 2026-10-30 Recurrence named
@@ -96,6 +96,31 @@ in `scripts/etc/machine/brew.*.list`. `k3dm-machine-setup` already installs Linu
 pinned installer (`homebrew-install.linux.pin`), so those lists already reach it. A blanket conversion would
 reimplement Homebrew's upgrades and dependencies tool by tool. Recorded as an idea row if the operator wants it
 groomed.
+
+## Files
+
+Part B only (Part A is done upstream; `_install_promtool` is in the subtree at `scripts/lib/foundation`, loaded by
+`scripts/lib/system.sh`). Added 2026-11-14 by Claude; C1 (`d96547df`) has landed, so the `e2e_observability.bats`
+overlap is gone.
+
+- `bin/k3dm-machine-setup` (new `_install_promtool` step for `control`, `console`, `hub`; not `worker`)
+- `scripts/tests/bin/machine_setup.bats` (the new step runs for the three roles and not for `worker`, `_install_promtool` stubbed)
+- `.github/workflows/ci.yml` (the "Install promtool" step near line 91: source `scripts/lib/system.sh`, call `_install_promtool`, keep appending `$HOME/.local/bin` to `GITHUB_PATH`)
+- `scripts/tests/promtool_helper.py` (new, `resolve_promtool()`)
+- `scripts/tests/promtool.bash` (new, `k3dm_promtool`)
+- `scripts/tests/bin/test_dashboard_queries.py`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/tests/bin/test_orbstack_metrics.py`
+- `scripts/tests/bin/test_vectordb_bug_metrics.py`
+- `scripts/tests/observability/test_kine_compaction_stalled.py`
+- `scripts/tests/observability/test_cve_fix_available_alert.py`
+- `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
+- `scripts/tests/plugins/e2e_observability.bats`
+- `scripts/tests/plugins/grafana_dashboard_appsets.bats`
+- `CHANGELOG.md` (one `### Fixed` bullet)
+
+Acceptance items M1, N1, N3 and E1 were proven by Part A upstream (lib-foundation #83); E2 is Claude's live check.
+The worker proves M2 (machine-setup half; CI half is E5 on the PR), M3, M4, N2, E3 and E4.
 
 ## Contract readers
 
