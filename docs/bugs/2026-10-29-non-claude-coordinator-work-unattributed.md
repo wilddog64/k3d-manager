@@ -1,10 +1,10 @@
 # Bug: Sol and Terra coordinator work is unattributed because coordinator identity is opt-in
 
-**Status:** OPEN
+**Status:** LANDED — 9b97486c, 2026-11-14
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Coordinator attribution telemetry is degraded (recording `unreported` by default), but a functional workaround exists by explicitly passing `--coordinator VENDOR/MODEL` and adding commit trailers manually); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
-**Waiting on:** fix running — since 2026-11-14 (Luna)
+**Waiting on:** live check — since 2026-11-14 (one Sol-coordinated dispatch with K3DM_COORDINATOR set; independent verifier running)
 **Severity:** medium — dispatch, cost and quality metrics describe almost all recent work as coming from an unknown coordinator, so the Opus-vs-Sol/Terra comparison the operator needs cannot be made
 **Release:** v1.44.0 (carried by grooming 2026-11-12)
 **Branch:** `k3d-manager-v1.44.0`
@@ -102,3 +102,25 @@ interface:
   - ledger.jsonl start/resume events, field coordinator_identity
   - bin/k3dm-dispatch-metrics (Pushgateway text output from a fixture ledger)
 ```
+
+## Verification — 2026-11-14 (Claude)
+
+Landed as `9b97486c` (Luna, gpt-6-luna; one correction round).
+
+- **Spec defect, fixed before landing:** Files named `scripts/etc/grafana/dashboards/`, which holds no Agent Dispatch
+  dashboard. The real file is `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`; Files was
+  amended (028ed738) to name it, its suite `agent_dispatch_dashboard.bats`, and `codex_dispatch_helpers.bash`. Land ran
+  with `--allow-out-of-scope` limited to those three files (the run snapshot predates the amendment) and
+  `--allow-instruction-files` for the `AGENTS.md` rule required by Fix item 3.
+- **Fable review r1:** production code correct on every probed path. Test gaps fixed in correction 1:
+  `K3DM_COORDINATOR` leaked into `codex_dispatch_agy.bats` (helper `setup()` now unsets it); the env filter in metrics
+  (N2) had no test that could fail; resume edge cases (flag precedence, missing, invalid) untested; warning stream and
+  count weakly asserted; unreported share untested for legacy rows, resume events, window scope and empty windows. An
+  empty window now emits no share series ("No data") instead of 0.
+- **Evidence (outside the sandbox, scratch HOME, Pushgateway 127.0.0.1:9):** bats `codex_dispatch_*.bats` +
+  `agent_dispatch_dashboard.bats` 172/172 with the variable unset; `codex_dispatch_*.bats` 122/122 with
+  `K3DM_COORDINATOR=openai/gpt-6.1-sol` exported; pytest `test_dispatch_metrics.py` 209 passed; shellcheck,
+  `k3dm-check-agent-docs`, `git diff --check` rc 0. Run-1 tests on pre-fix code: ledger 22, 23, dashboard 2, 14, 32 and
+  3 pytest tests red.
+- **E3 (live): pending** — one Sol-coordinated dispatch with `K3DM_COORDINATOR` set; its ledger start event names Sol
+  and its commit carries the `Coordinator:` trailer.
