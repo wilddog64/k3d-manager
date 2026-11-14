@@ -10,14 +10,14 @@
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
 to post the repair again, or `bin/k3dm-hermes approve <id>` on the hub
 **Approval:** operator, 2026-11-08 ("approved those two requests")
-**Intent approved:** operator, 2026-11-08
+**Intent approved:** pending — E1 amended 2026-11-13 with M4/N2 from the 2026-11-11 recurrence (original E1/E2 approved by operator, 2026-11-08)
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack `#grafana-notification`, 2026-11-08. The k3d-manager card for `r9-d9add2e2` was posted
 at 11:14 PST; the operator pressed Deny before running `/hermes-auth`. The card then read only "🔐 Re-authenticate
 first: run `/hermes-auth` (valid for 24h)", with the card's own 11:14 timestamp and no "Only visible to you" label;
 after `/hermes-auth` (11:47) the card no longer existed to deny (operator: "the 11:14 does not exist any more").
 **Affected:** `workers/slack-relay/index.js`
-**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
+**Branch:** `k3d-manager-v1.44.0` (carried by grooming 2026-11-12; was v1.43.16)
 **Related:** `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md` (also edits
 `workers/slack-relay/index.js`; dispatch the two together); `docs/guides/hermes.md` setup step 3
 
@@ -70,14 +70,18 @@ must:
     text: "the not-allowlisted and approvals-not-configured replies are also ephemeral with replace_original false"
   - id: M3
     text: "Approve and Deny with a reauth key still replace the card (replace_original true), as today (control)"
+  - id: M4
+    text: "each refusal reply (approvals not configured, not allowlisted, no reauth key) names the pressed action (Approve or Deny) and the proposal ID and contains 'NOT recorded'; a successful Deny replaces the card with text naming the denier, as Approve does"
 must_not:
   - id: N1
     text: "a guard reply to a block action omits replace_original or sets it true (red on pre-fix code, which omits it; paired with M3)"
+  - id: N2
+    text: "a refusal reply omits the proposal ID or the words 'NOT recorded' (red on pre-fix code, whose reply is only the reauth prompt)"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1]
+    proves: [M1, M2, M3, M4, N1, N2]
     kind: offline
-    intent: "tests click a Hermes card's buttons as a user who has not re-authenticated, as one not on the approver list, and on a relay with no approvals store, and check each reply tells Slack to leave the card in place; a re-authenticated Approve and Deny still replace the card"
+    intent: "tests click a Hermes card's buttons as a user who has not re-authenticated, as one not on the approver list, and on a relay with no approvals store, and check each reply tells Slack to leave the card in place and says plainly that your Deny (or Approve) of that proposal was NOT recorded; a re-authenticated Approve and Deny still replace the card and name who decided"
   - id: E2
     proves: [M1]
     kind: live

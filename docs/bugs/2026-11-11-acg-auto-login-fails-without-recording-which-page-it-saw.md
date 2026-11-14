@@ -9,7 +9,8 @@
 **Should have been caught by:** live check
 **Severity:** medium — unattended cluster-up depends on a human at the M5's screen every few days; each recurrence of this flow is diagnosed by guessing
 **Approval:** operator 2026-11-11: "can you investigate this and file bug if necessary"
-**Intent approved:** operator, 2026-11-11 ("approve ACG auto-login P2")
+**Intent approved:** operator, 2026-11-11
+**Intent approval words:** "approve ACG auto-login P2"
 **Prior art:** `scripts/lib/foundation/docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md`, `2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md`, `2026-09-12-acg-session-check-false-green-on-signed-out-page.md`, `2026-07-07-acg-session-check-render-race-false-negative.md` — read, same flow, different root causes, all FIXED; this is the fifth failure of the flow and the first filed for missing diagnostics (`make find-similar-docs` not run: vector store unreachable from the M4)
 **Filed:** 2026-11-11
 **Detected by:** Claude, reviewing operator Slack job `eebeb490` on the M5

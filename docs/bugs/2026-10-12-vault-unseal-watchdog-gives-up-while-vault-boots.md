@@ -1,15 +1,16 @@
 # Bug: the Vault unseal watchdog gives up while Vault is still booting
 
 **Filed:** 2026-10-12
-**Branch:** `k3d-manager-v1.46.0`
+**Branch:** `k3d-manager-v1.44.0`
 **Status:** OPEN
 **Priority:** P2 — Vault, and every secret read through it, stays sealed up to 5 minutes longer than needed after a restart; it recovers on its own
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Post-restart unsealing is delayed by one 5-minute CronJob interval when Vault is still booting, after which the next scheduled run automatically unseals it); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
 **Waiting on:** dispatch — since 2026-11-12
-**Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
+**Release:** v1.44.0 (carried by grooming 2026-11-12; was v1.46.0 per backlog triage, Claude, 2026-10-22)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** medium
+**Intent approved:** pending — proposed 2026-11-13
 
 ## Symptom
 
@@ -88,6 +89,40 @@ Gates: `bats scripts/tests/etc/vault_unseal_watchdog.bats`, `make test` (read th
 
 The next hub restart (an OrbStack update or a rebuild): the first watchdog run after Vault's pod
 starts logs `retry <n>/12` lines followed by `unseal succeeded`, in the same run.
+
+## Acceptance
+
+```yaml
+interface:
+  - "scripts/etc/vault/unseal-watchdog.yaml.tmpl rendered with envsubst; the CronJob's inline script extracted and run with sh, a stub vault on PATH, a stub sleep, and the shard path pointed at a temp file"
+must:
+  - id: M1
+    text: "vault status returns 1, 1, then 2: in the same run the stub sees exactly one 'operator unseal' call, output contains 'retry 1/12' and 'retry 2/12', and the run exits 0."
+  - id: M2
+    text: "vault status returns 1 every time: exactly 12 status calls and 11 'sleep 5' calls, then a line ending in '— skipping', rc 0, no 'operator unseal' call."
+  - id: M3
+    text: "vault status returns 0 first: 'vault already unsealed', one status call, no sleep. Returns 2 first: the unseal path runs with no 'retry' line and no sleep."
+  - id: M4
+    text: "The extracted script passes 'sh -n'; the rendered CronJob keeps schedule '*/5 * * * *', activeDeadlineSeconds 150, backoffLimit and image unchanged from the pre-fix template; the shard file's content never appears in stdout or stderr in any M1-M3 scenario."
+must_not:
+  - id: N1
+    text: "When vault status returns 1 then 0, the watchdog does not print '— skipping' and does not exit before the second status call. (Pre-fix: skips after one call.)"
+  - id: N2
+    text: "When vault status returns 1, 1, then 2, the watchdog does not exit without calling 'operator unseal'. (Pre-fix: exits 0 with no unseal.)"
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, M4, N1, N2]
+    kind: offline
+    intent: "You will see tests where a stub Vault answers 'unreachable' a few times and then 'sealed': the watchdog retries, unseals in the same run, and never prints the shard. Today it gives up on the first 'unreachable'."
+  - id: E2
+    proves: [N1, N2]
+    kind: offline
+    intent: "You will see the same retry tests run against today's template and fail, so they can catch the bug."
+  - id: E3
+    proves: [M1]
+    kind: live
+    intent: "After the next hub restart (OrbStack update or rebuild), you will see one watchdog run log 'retry n/12' lines followed by 'unseal succeeded', with no 5-minute sealed gap."
+```
 
 ## What NOT to Do
 
