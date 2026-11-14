@@ -947,7 +947,6 @@ def _stall_scope_metrics(events, all_events, window):
         version_label = _label_value(version)
         detected = [(i, e) for i, e in rows if e.get("event") == "stall_detected"]
         diagnoses = [(i, e) for i, e in rows if e.get("event") == "stall_diagnosis"]
-        proposals = [(i, e) for i, e in rows if e.get("event") == "stall_proposal"]
         decisions = [(i, e) for i, e in rows if e.get("event") == "stall_decision"]
         resumes = [(i, e) for i, e in rows if e.get("event") == "stall_resume" and e.get("rc") == 0]
 
