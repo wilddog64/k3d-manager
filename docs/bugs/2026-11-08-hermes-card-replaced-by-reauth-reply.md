@@ -139,3 +139,7 @@ Landed as `09ea1d02` (Luna, gpt-6-luna; Fable lows applied by Claude before land
   is part of E3.
 - **E3 (live): pending.** Run `make deploy-worker`, then press Approve on a Hermes card without a fresh `/hermes-auth`.
   Expected: the card and its buttons stay, and an ephemeral reply names the action, the ID and "NOT recorded".
+- **Independent verifier (Opus, Acceptance block only, own harness with signed Slack requests):** fix gave
+  `SUMMARY M1=PASS M2=PASS M3=PASS M4=PASS N1=PASS N2=PASS` (rc 0). Pre-fix gave `M1=FAIL M2=FAIL M3=PASS M4=FAIL
+  N1=FAIL N2=FAIL` (rc 1); M3 is the unchanged success-path control. The repo suite passed 49/49 and the tree was clean.
+  Errors seen: smartcd `cd` hook (rc 127) and an unquoted zsh separator, both from the verifier's own shell, not the code.
