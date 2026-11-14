@@ -1,8 +1,8 @@
 # Bug: promoted PrometheusRule changes never reach the hub Prometheus; `K3dmPromoteWaiting` is not loaded
 
-**Status:** OPEN — captured 2026-11-13 by Claude while running plan 3 E6 (live)
+**Status:** LANDED — `a4460629` (Luna; Claude review fixes). Offline: independent Opus verifier pass (M1-M5, N1-N4 with positive controls), pre-fix 3/3 red, 11 appset mutants red, Fable review nothing above medium. Live E5-E7 pending
 **Priority:** P2 (new and changed alerts silently absent after a promote; workaround `make prometheus-rules` on the M5)
-**Waiting on:** fix running — since 2026-11-14 (Luna, dispatch prometheus-rules-argocd-app)
+**Waiting on:** live check — since 2026-11-14 (promote incl. a4460629, then `make appsets-reapply APPSETS_STAGE=hub`, E5/E6)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** pre-existing (rules apply only through `make prometheus-rules` / observability deploy); exposed by `c763e239` (v1.44.0 plan 3)
 **Should have been caught by:** spec (plan 3 lists no deploy step for its rule; E6 is the first live check that needs it)
