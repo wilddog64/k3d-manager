@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.5.6] — 2026-11-14
+
+### Fixed
+- ACG unattended login records which page it saw when it fails: an `ACG_LOGIN_DIAG` line (URL without query, sanitized title, challenge flag, selector counts) on `login_form_unavailable` and `login_failed`, and a 0600 screenshot only when no credential field was filled (newest 5 kept). `ACG_SESSION_EXPIRED` carries `reason=`. `fill()` errors are rethrown as `fill_failed` without Playwright's call log, which echoed the typed password. Reference: `docs/bugs/2026-11-11-acg-auto-login-fails-without-recording-which-page-it-saw.md`.
+- `_run_command` and `_run_command_resolve_sudo` run under macOS `/bin/bash` 3.2 with `set -u`: empty `probe_args` (any call without `--probe`) and empty `sudo_flags` (interactive sudo on a TTY) aborted with `unbound variable`. Reference: k3d-manager `docs/bugs/2026-11-14-machine-setup-promtool-install-fails-under-macos-bash-3-2.md`.
+
 ## [v0.5.5] — 2026-11-12
 
 ### Added
