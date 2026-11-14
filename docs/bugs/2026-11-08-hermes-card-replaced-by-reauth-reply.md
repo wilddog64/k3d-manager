@@ -4,13 +4,14 @@
 **Priority:** P2 — raised from P3 2026-11-11 (operator: "go ahead with your recommendation"): the Slack Promote button (part 3 of the promote-smoothing idea) needs Hermes buttons to record every press; this bug drops a Deny. Target: v1.44.0, before part 3.
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Clicking a Hermes card without an active re-auth destroys the card's approval buttons, degrading the Slack approval flow, though workarounds exist (running `/hermes-auth` beforehand or approving via CLI on the hub)); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** fix running — since 2026-11-13
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
 to post the repair again, or `bin/k3dm-hermes approve <id>` on the hub
 **Approval:** operator, 2026-11-08 ("approved those two requests")
-**Intent approved:** pending — E1 amended 2026-11-13 with M4/N2 from the 2026-11-11 recurrence (original E1/E2 approved by operator, 2026-11-08)
+**Intent approved:** operator, 2026-11-13
+**Intent approval words:** "apporve three intents and you can dispatch them" (vault-unseal, hermes-card amended E1, coordinator-unattributed)
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack `#grafana-notification`, 2026-11-08. The k3d-manager card for `r9-d9add2e2` was posted
 at 11:14 PST; the operator pressed Deny before running `/hermes-auth`. The card then read only "🔐 Re-authenticate

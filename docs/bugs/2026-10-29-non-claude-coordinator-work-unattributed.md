@@ -4,13 +4,14 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Coordinator attribution telemetry is degraded (recording `unreported` by default), but a functional workaround exists by explicitly passing `--coordinator VENDOR/MODEL` and adding commit trailers manually); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** dispatch — since 2026-11-13 (queued: WIP 3 until Part B lands)
 **Severity:** medium — dispatch, cost and quality metrics describe almost all recent work as coming from an unknown coordinator, so the Opus-vs-Sol/Terra comparison the operator needs cannot be made
 **Release:** v1.44.0 (carried by grooming 2026-11-12)
 **Branch:** `k3d-manager-v1.44.0`
 **Filed:** 2026-10-29, operator: "we need to consider other models like OpenAI Sol6.1 and Terra 6.1 as primary coordinators as we are not capturing their work like yours"
 **Approval:** operator, 2026-11-12 (grooming: carry → v1.44.0)
-**Intent approved:** pending — proposed 2026-11-13
+**Intent approved:** operator, 2026-11-13
+**Intent approval words:** "apporve three intents and you can dispatch them" (vault-unseal, hermes-card amended E1, coordinator-unattributed)
 **Component:** `bin/k3dm-codex-dispatch`, git commit attribution, `AGENTS.md`, Agent Dispatch dashboard
 **Related:** [`2026-10-26-primary-coordinator-and-handoff-telemetry.md`](2026-10-26-primary-coordinator-and-handoff-telemetry.md) (fix `9424c32a`, works only when a coordinator is declared), [`v1.47.0-coordinator-rotation-trial.md`](../plans/v1.47.0-coordinator-rotation-trial.md), [`v1.47.0-dispatch-agent-five-hour-window-usage.md`](../plans/v1.47.0-dispatch-agent-five-hour-window-usage.md)
 
