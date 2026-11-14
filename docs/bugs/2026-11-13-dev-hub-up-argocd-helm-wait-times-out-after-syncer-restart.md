@@ -6,7 +6,7 @@
 **Introduced by:** b2067ad3 or later Part B commit that added the Argo CD install with `--wait` and no `--timeout` (unknown which)
 **Should have been caught by:** live check (offline tests cannot see startup timing)
 **Fix commit:** `f1eeeb26`
-**Waiting on:** live check — since 2026-11-14 (E2 steps 2-3 never recorded: `make dev-hub-down` then `make dev-hub-up` in one run, and the `dev-hub-0` syncer log showing `--leader-elect=false` with no container restart; step 1 passed 2026-11-13; dev-hub is down on the M5 as of 2026-11-14 ~20:10Z)
+**Waiting on:** live check — since 2026-11-14 (run 2 on 2026-11-14: leader-elect=false confirmed; run failed on a new cause, see Live run 2; closes when a dev-hub-up finishes in one run with no syncer restart)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` not run (vector store context missing on m4-air)
 **Approval:** operator, 2026-11-13: "go ahead"
 **Dispatch go:** operator, 2026-11-13: "go ahead"
@@ -177,3 +177,7 @@ code and failed with `UPGRADE FAILED: another operation (install/upgrade/rollbac
 no `dev-hub-down` in between, `make dev-hub-up` printed `release "argocd" uninstalled`, then installed argocd
 (`STATUS: deployed`, 18:06:41) and dev-hub-grafana (`STATUS: deployed`, 18:07:07) with no error. The pending-install
 recovery path is proven on the real stuck release. The rollback path (pending-upgrade) is proven offline only.
+
+## Live run 2 (operator, 2026-11-14 ~20:21Z, m5-air.local, checkout 849ddfcf)
+
+`make dev-hub-up` from no dev-hub namespace. Step 3 half passed: the `dev-hub-0` syncer log shows `Starting controller-manager` with `--leader-elect=false`. Step 2 and the rest of step 3 failed: the syncer was killed once by its liveness probe at 20:25:55Z (exit 137) while the vCluster apiserver stalled, the background proxy on 127.0.0.1:11444 died with it, and Helm failed `cluster unreachable`. No leader-election loss appears in the log, so this run does not reopen M1. The new cause is filed as `docs/bugs/2026-11-14-dev-hub-up-helm-wait-dies-with-vcluster-proxy-after-syncer-restart.md`; this bug stays VERIFIED until a dev-hub-up finishes in one run.
