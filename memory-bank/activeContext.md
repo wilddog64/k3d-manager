@@ -19,6 +19,7 @@
 7. hub-deploy-one-command live check on the next real promote: `make hub-deploy REF=<sha>; make hub-promote-status`.
 8. Smaller: Argon classification of new P3s + helm-wait bug; fix docs/plans/v1.44.0-dev-hub-vcluster.md:166-167 (preemptionPolicy); log Fable trial rows in docs/process-metrics.md (gauge 22%); grooming 2026-11-15.
 
+- 2026-11-14 ~07:20Z: CVE independent verifier PASS 7/7 (N1/N2 red pre-fix, positive control). Live E3 after promote remains.
 - 2026-11-14 ~07:05Z: ACG auto-login P2 dispatched to Luna in lib-foundation (new branch release/v0.5.6 from main 23a5753; spec Files heading renamed to exact '## Files'). WIP 2/3 (Part B, ACG). Promtool doc: Part A already done upstream (#83, v0.5.5, subtree 5f832339); Part B remains. CVE verifier running.
 - 2026-11-14 ~06:50Z: CVE fix LANDED 80eb95e0 (Luna + Claude test fixes from Fable review: un-failable && assertion split; 3 new guards). bats 52/52, 8 mutations red, offline_tested marked (duplicate mark row, harmless). Independent Opus verifier running. WIP 1/3 (Part B). Coordinator fix still waits for Part B.
 - 2026-11-14 ~06:20Z: CVE Luna resume 1 complete (last-message-2): bats 51/51 outside sandbox (incl. real-curl test), shellcheck clean. Pre-fix run red on 40 tests (stub format change, not meaningful). Claude mutations on scratch copy: score fallback->0 red 30/31/34/35; drop UNKNOWN from --severity red 33; awk no-upgrade red 33; digest off red 35; restore identical. Fable side-by-side review running; land after.
