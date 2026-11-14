@@ -35,3 +35,9 @@ makes the pipeline fail, so the `if !` branch reports a missing Priority. Small 
 
 Commit the new doc's header first (small enough to pass), then the full text as a modification: the check only
 looks at added files (`--diff-filter=A`). Used for the two wave 1 batch specs on 2026-11-12.
+
+## Recurrence 2026-11-14
+
+The three stall-recovery child specs (`docs/bugs/2026-11-14-dispatch-stall-{a-detector,b-approval,c-diagnose}.md`,
+25-30 KB) failed the same way, rc 141 five times out of five each on the M4. Committed with the header-first
+workaround. Third time in three days: the workaround now costs a commit per large spec.
