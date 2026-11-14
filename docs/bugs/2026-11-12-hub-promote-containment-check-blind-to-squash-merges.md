@@ -166,11 +166,31 @@ New line:
 
 `:298-304` (the containment refusal that BREAK_GLASS bypasses) is unchanged: BREAK_GLASS now bypasses only the uncontained-commits refusal. `show_and_confirm` and `record_move` (`mode: break-glass`) are unchanged. `rollback` never called `check_runs` and is unchanged.
 
-Consequence the operator must accept (open question 1): during a GitHub outage `BREAK_GLASS=1` no longer promotes, because `check_runs` dies on lookup failure (`:84`).
+Instead of the bare line above, the worker writes the block in section 2a, which keeps `check_runs "$new"` as the default path.
+
+## 2a. Explicit outage flag `SKIP_CHECK_RUNS` (operator, 2026-11-14: "so make an explicit flag for this")
+
+The GitHub-outage case gets its own flag, separate from BREAK_GLASS, so each bypass is named for the one gate it skips.
+
+- `promote` takes a fourth positional argument `SKIP_CHECK_RUNS` (default `${SKIP_CHECK_RUNS:-0}`, must be `0` or `1`, same validation as BREAK_GLASS at `:282`). Usage strings at `:261` and `:280` gain `[SKIP_CHECK_RUNS=1]`.
+- With `SKIP_CHECK_RUNS=1`, `SKIP_CHECK_RUNS_REASON` must be set, non-empty after trimming and single-line (no newline). Otherwise `die 'SKIP_CHECK_RUNS=1 needs SKIP_CHECK_RUNS_REASON="<why>" (one line)'` before any fetch, confirmation or push.
+- Replacement for `:305`:
+
+```bash
+      if [[ "$skip_checks" == 1 ]]; then
+        printf '[hub-promote] WARNING: check-run gate skipped for %s: %s\n' "$new" "$SKIP_CHECK_RUNS_REASON" >&2
+      else
+        check_runs "$new"
+      fi
+```
+
+- `record_move` gains a sixth parameter `skip_checks="${6:-0}"`. When it is 1, it appends `mode: skip-check-runs` and `reason: <SKIP_CHECK_RUNS_REASON>` to the tag message, after the existing break-glass line. The promote call at `:307` passes it. `rollback` is unchanged.
+- It does not bypass the containment refusal (that stays BREAK_GLASS), the typed confirmation, origin reachability or the lease. A combined outage-plus-uncontained promote needs both flags, and the tag carries both mode lines.
+- `Makefile` `hub-promote` (`:477-478`) becomes `@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}" "$${SKIP_CHECK_RUNS:-0}"`. `bin/k3dm-hub-deploy` needs no change: it calls `promote "$ref"`, and the defaults read the environment, so `make hub-deploy REF=... SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...` passes through. E10 proves that.
 
 ## 3. Docs
 
-`docs/howto/hub-promote.md:81-83`, replace "`BREAK_GLASS=1` skips the check-run gate and the containment refusal" so it says: `BREAK_GLASS=1` skips only the uncontained-commits refusal; the green check-run gate, `origin` reachability, the typed confirmation and the promotion record still apply. Add one sentence: a deploy/hub whose commits were squash-merged into the target is recognised by content (`git merge-tree --write-tree`, git 2.38 or newer) and needs no BREAK_GLASS; on older git the old refusal applies.
+`docs/howto/hub-promote.md:81-83`, replace "`BREAK_GLASS=1` skips the check-run gate and the containment refusal" so it says: `BREAK_GLASS=1` skips only the uncontained-commits refusal; the green check-run gate, `origin` reachability, the typed confirmation and the promotion record still apply. Add one sentence: a deploy/hub whose commits were squash-merged into the target is recognised by content (`git merge-tree --write-tree`, git 2.38 or newer) and needs no BREAK_GLASS; on older git the old refusal applies. Document `SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON="..."` as the GitHub-outage path (skips only the check-run gate; recorded in the tag), and say an outage with an uncontained commit needs both flags.
 
 ## Contract readers
 
@@ -198,6 +218,7 @@ must:
   M2: `status` does not report "uncontained commits on deploy/hub" for that same squash-merged situation
   M3: BREAK_GLASS=1 still bypasses the uncontained-commits refusal (genuinely uncontained promoter commit, green checks, confirmation typed): promotes and records "mode: break-glass"
   M4: a stderr note says the commits were matched by content (squash merge) when the tree check is what accepted them
+  M5: SKIP_CHECK_RUNS=1 with a one-line SKIP_CHECK_RUNS_REASON promotes when the check-run lookup fails (or runs are missing, pending or failed), after the typed confirmation, and the tag records "mode: skip-check-runs" and "reason: <text>"
 must_not:
   N1: BREAK_GLASS=1 skips the check-run gate: with BREAK_GLASS=1 and checks missing, pending, failed or the lookup failing, promote refuses, deploy/hub is unchanged and no promotion tag is created (red on today's code: today it promotes)
   N2: a genuinely uncontained commit on deploy/hub (content absent from the target) is accepted without BREAK_GLASS, including when the same hub also carries squash-merged commits (regression guard; positive control is M1)
@@ -205,6 +226,8 @@ must_not:
   N4: a merge-tree failure (non-zero exit, e.g. git older than 2.38 or unrelated histories) is treated as contained; promote must refuse exactly as before (regression guard; positive control is M1)
   N5: a git cherry error stops failing closed ("cannot check deploy/hub containment")
   N6: BREAK_GLASS=1 stops requiring the typed confirmation or the origin-reachability check
+  N7: SKIP_CHECK_RUNS=1 with SKIP_CHECK_RUNS_REASON unset, empty, whitespace-only or multi-line promotes; it must refuse with deploy/hub and tags untouched
+  N8: SKIP_CHECK_RUNS=1 bypasses the uncontained-commits refusal or the typed confirmation (regression guard; positive control is M5)
 evidence:
   - {id: E1, proves: [M1, M4], kind: offline, intent: "You will see a test where deploy/hub holds two commits that were squash-merged into the new release; a normal make hub-promote with green checks moves deploy/hub, and the tag has no break-glass line. Today it refuses and lists both commits."}
   - {id: E2, proves: [M2], kind: offline, intent: "You will see make hub-promote-status print nothing about uncontained commits for the squash-merged case. Today it lists them."}
@@ -213,11 +236,14 @@ evidence:
   - {id: E5, proves: [N2], kind: offline, intent: "You will see a squash-merged release that also carries one real promoter commit on deploy/hub get refused, with that commit named."}
   - {id: E6, proves: [N3, N4], kind: offline, intent: "You will see a conflicting change on both sides, and a merge-tree that fails, both end in the usual refusal, never in a promote."}
   - {id: E7, proves: [N5], kind: offline, intent: "You will see the existing git-cherry-failure test still fail closed and then succeed once restored."}
+  - {id: E9, proves: [M5, N7], kind: offline, intent: "You will see a test where GitHub's check-run lookup fails: SKIP_CHECK_RUNS=1 with a one-line reason promotes after the typed confirmation and the tag shows mode skip-check-runs and the reason; with the reason missing, blank or two lines it refuses and nothing moves. Today the flag does not exist, so the first case refuses."}
+  - {id: E10, proves: [N8, M5], kind: offline, intent: "You will see SKIP_CHECK_RUNS=1 still refuse a real promoter commit unless BREAK_GLASS=1 is also given (then the tag has both mode lines), still refuse without a TTY, and make hub-promote and make hub-deploy both pass the flag and reason through."}
   - {id: E8, proves: [M1], kind: live, intent: "You will see the operator's next first-promote of a squash-merged release (git on the M5 is 2.38 or newer) go through make hub-promote with no BREAK_GLASS. Operator or Claude only, never Gemini."}
 interface:
   - "bin/k3dm-hub-promote promote REF [BREAK_GLASS]"
   - "bin/k3dm-hub-promote status"
-  - "make hub-promote REF=... [BREAK_GLASS=1]"
+  - "make hub-promote REF=... [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...]"
+  - "make hub-deploy REF=... [SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...]"
   - "make hub-promote-status"
 ```
 
@@ -232,13 +258,17 @@ Test design (all in `scripts/tests/bin/hub_promote.bats`, existing fixture: scra
 - E6: (a) conflict: put `conflict.txt` on `initial` is not needed; create `shared.txt` with different content on `deploy/hub` and on the release branch, assert `merge-tree` rc is 1 in the fixture, promote with `0`/`success` refuses and names the hub commit. (b) squash case with env `MERGE_TREE_FAIL=1`: extend the git stub (`setup`, next to the `CHERRY_FAIL` branch at `:~58`) with `if [[ "${MERGE_TREE_FAIL:-0}" == 1 && " $* " == *" merge-tree "* ]]; then echo "stubbed git merge-tree failure" >&2; exit 129; fi`; promote refuses with the cherry list. Positive control: the same scenario without the env var succeeds (E1).
 - E7: existing test `:302-315` unchanged (its scenario has an empty cherry list on the first call... confirm the worker leaves it green; it must still produce "cannot check deploy/hub containment" under `CHERRY_FAIL=1`).
 - Existing test `:773-780` (Makefile pass-through): change `GH_STUB_MODE=empty` to `GH_STUB_MODE=success` so it still reaches the TTY refusal; otherwise it now dies at `check_runs`.
-- Mutants the worker must run (record rc): (m1) revert `:305` to the BREAK_GLASS conditional: E4 red. (m2) make `tree_contained` ignore rc and compare only the first line: E6a red. (m3) make `tree_contained` always `return 0`: E5 red. Restore after each (snapshot + `cmp`).
+- E9: `_make_candidate`, gh mode `lookup-fail`, `SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON='github outage'` via `_run_promoter_tty`: status 0, hub moved, tag data has both lines; then three refusals (reason unset, `'   '`, `$'a\nb'`): non-zero, hub unchanged, no new tag.
+- E10: `_create_promoter_commit_on_hub` + `SKIP_CHECK_RUNS=1` with a reason and `BREAK_GLASS=0`: refused naming the commit; same with `BREAK_GLASS=1`: promotes, tag has `mode: break-glass` and `mode: skip-check-runs`; without a TTY: `confirmation requires a TTY`. Makefile pass-through like `:773-780` for `hub-promote`, and a `hub_deploy.bats` case asserting the promote stub receives `SKIP_CHECK_RUNS=1` in its environment.
+- Mutants the worker must run (record rc): (m1) revert `:305` to the BREAK_GLASS conditional: E4 red. (m2) make `tree_contained` ignore rc and compare only the first line: E6a red. (m3) make `tree_contained` always `return 0`: E5 red. (m4) drop the reason check: E9 refusals red. Restore after each (snapshot + `cmp`).
 
 ## Files
 
 | File | Change |
 |---|---|
-| `bin/k3dm-hub-promote` | `tree_contained` + `uncontained_commits` (`:21-27`); `check_runs` unconditional (`:305`) |
+| `bin/k3dm-hub-promote` | `tree_contained` + `uncontained_commits` (`:21-27`); `check_runs` unless `SKIP_CHECK_RUNS=1` with a reason (`:305`); `record_move` mode/reason lines; usage strings |
+| `Makefile` | `hub-promote` passes `SKIP_CHECK_RUNS` (`:477-478`) |
+| `scripts/tests/bin/hub_deploy.bats` | E10 pass-through case |
 | `scripts/tests/bin/hub_promote.bats` | helper `_make_squash_release`; stub `MERGE_TREE_FAIL`; E1, E2, E4 (replaces H4), E5, E6; `:773-780` stub mode |
 | `docs/howto/hub-promote.md` | `:81-83` BREAK_GLASS semantics, squash-merge sentence |
 
@@ -246,10 +276,10 @@ Test design (all in `scripts/tests/bin/hub_promote.bats`, existing fixture: scra
 
 - Change only the files above. Scratch HOME, no network, no live cluster or hub, no push to the real `origin` (the tests use the bare scratch origin; `git` stub refuses non-fixture targets). Show E1, E2 and E4(a) red on today's code, then green; paste N2, N3 and N4 passing on both (they are regression guards).
 - Run `bats scripts/tests/bin/hub_promote.bats scripts/tests/bin/hub_deploy.bats scripts/tests/bin/repo_sync_promote_backlog.bats` from the repo root, plus `shellcheck bin/k3dm-hub-promote`, and paste command, rc and the proving lines for each. Mutants m1 to m3 with their rc.
-- Run `git status` and confirm only the three files changed. Leave changes uncommitted. Claude lands them.
+- Run `git status` and confirm only the five files in the table changed. Leave changes uncommitted. Claude lands them.
 
 ## Open questions
 
-1. Operator: separating `check_runs` from BREAK_GLASS means BREAK_GLASS no longer works while GitHub is down (`check_runs` dies on lookup failure, `bin/k3dm-hub-promote:84`), though `docs/howto/hub-promote.md:81-83` names that outage as a BREAK_GLASS use. Accept, or add a separate explicit flag later? This spec accepts it, per the decision.
-2. Operator or Claude, before dispatch: what git does the M5 hub run? `merge-tree --write-tree` needs 2.38 or newer (probed only on m4-air, 2.56.1). The fallback to the old refusal is safe, but E8 only passes on 2.38+. `ubuntu-24.04` CI git was not probed.
+1. **Resolved (operator, 2026-11-14): explicit flag, section 2a.** Was: separating `check_runs` from BREAK_GLASS means BREAK_GLASS no longer works while GitHub is down (`check_runs` dies on lookup failure, `bin/k3dm-hub-promote:84`), though `docs/howto/hub-promote.md:81-83` names that outage as a BREAK_GLASS use. Accept, or add a separate explicit flag later? This spec accepts it, per the decision.
+2. **Resolved (Claude, 2026-11-14): M5 runs git 2.56.0 (`/opt/homebrew/bin/git`).** Was: what git does the M5 hub run? `merge-tree --write-tree` needs 2.38 or newer (probed only on m4-air, 2.56.1). The fallback to the old refusal is safe, but E8 only passes on 2.38+. `ubuntu-24.04` CI git was not probed.
 3. Tag bookkeeping: should the tag record that tree-containment accepted the old commits (for audit)? Not in this spec; the stderr note is the only trace.
