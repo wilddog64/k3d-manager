@@ -1,10 +1,10 @@
 # Bug: ACG unattended login fails with `ACG_LOGIN_FIELDS_MISSING` and records nothing about the page it saw
 
-**Status:** OPEN
+**Status:** LANDED — lib-foundation `c7384ff` on `release/v0.5.6`, 2026-11-14; reaches k3d-manager after the lib-foundation v0.5.6 release and subtree pull
 **Priority:** P2 — `/cluster-up aws` from Slack fails at step 1 whenever the Pluralsight session lapses; workaround: sign in by hand on the M5's CDP Chrome (:9222) and rerun
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unattended ACG auto-login fails without diagnostic logging when the session expires, but operators can work around it by signing in manually on the host's CDP Chrome); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-14 (next lapsed Pluralsight session, after the subtree pull)
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Severity:** medium — unattended cluster-up depends on a human at the M5's screen every few days; each recurrence of this flow is diagnosed by guessing
@@ -121,3 +121,36 @@ interface:
 2. For each `must_not`: break the guard, show its test red, restore it, show it green. List any that stayed green.
 3. "No read-only real-data run possible": a real run needs a signed-out Pluralsight session.
 4. List every choice the spec did not decide.
+
+## Verification — 2026-11-14 (Claude)
+
+Landed in lib-foundation as `c7384ff` (Luna, gpt-6-luna; one correction round), pushed to `release/v0.5.6`.
+
+Fable's review of run 1 found, and correction round 1 fixed:
+- **HIGH (pre-existing):** when a sign-in field was visible but disabled or read-only, Playwright's `fill()` timeout error
+  carried its call log, `- fill("<password>")`, and `acg_session_check.js` printed it (`INFO: auto-login error: …`), which
+  reaches the Slack cluster-up output. Fable reproduced it with real Playwright 1.60.0. `fillIfVisible` now throws
+  `fill_failed: <field>` with none of the original text.
+- **MEDIUM:** one new test never pointed `XDG_STATE_HOME` at a scratch dir, so each jest run wrote fake screenshots into
+  the operator's real `~/.local/state/k3d-manager/acg-diag` and ran retention there. Claude removed the 5 `fake-png`
+  files. The tests now set a scratch dir in `beforeEach`, and a guard test asserts it.
+- The title is now stripped of control characters, has the username replaced by `[redacted]`, and is printed quoted.
+  `ACG_SESSION_EXPIRED` reports `login_error` for a throw and `post_login_probe_failed` when login succeeded but the
+  follow-up check did not. The screenshot path is kept when retention fails; a symlinked `acg-diag` is refused; a relative
+  `XDG_STATE_HOME` is ignored.
+
+Evidence:
+- **E1:** `npx jest` in `scripts/lib/acg`, outside the sandbox with a scratch `HOME`: 8 suites, 66/66. `npm run check` and
+  `git diff --check` rc 0.
+- **Pre-fix:** run 1's new tests on `23a5753` failed 7 of 8. N4 passed there as expected, because pre-fix never prints a
+  DIAG line.
+- **Mutants:** each turned a test red. Claude: fill error rethrown raw; scratch `XDG_STATE_HOME` removed (the screenshots
+  then landed in the scratch `HOME`); username redaction off. Luna: retention sorted ascending; directory mode 0755; the
+  Cloudflare iframe check dropped; title truncation dropped; control-character strip dropped; screenshot allowed after
+  the email field was filled.
+- The real `~/.local/state/k3d-manager/acg-diag` did not exist before or after any run.
+- **Land:** the lib-foundation mirror doc shares this spec's path, which land always treats as out of scope, so it landed
+  with `--allow-out-of-scope`. It was the only out-of-scope file.
+- **E2 (live): pending.** It needs the lib-foundation v0.5.6 release, the subtree pull here, and the next lapsed
+  Pluralsight session on the M5.
+
