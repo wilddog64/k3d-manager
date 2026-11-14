@@ -7,6 +7,7 @@
 - **Verification status:** offline done for promtool + repo-sync; live pending (below).
 
 **Next, in order:**
+2026-11-14 ~17:00Z: prometheus-rules-argocd-app EXITED (Luna). Claude outside sandbox: DoD suites 26/26 rc 0; pre-fix new test 3/3 red; 7 appset mutants each 2 red; kubeconform valid; scope = 3 spec files. Claude fix in worktree: `rg -q` -> `grep -Eq` (rg not installed in CI; with rg missing the placeholder guard was a no-op, E3 control status=0 — proven with a 127 shim). Independent Opus verifier + Fable review running; land after both.
 0. 2026-11-14 ~16:40Z resume: both dispatches still running, watchers restarted; CI on 6790e0c7 in progress (promote ask waits for green; 22ca679c not yet in deploy/hub).
 1. Watchers die with /clear — re-check: `bin/k3dm-codex-dispatch status prometheus-rules-argocd-app` (Luna, dispatched 16:05Z from docs/bugs/2026-11-13-promoted-prometheus-rules-never-applied.md) and `status parallel-offline-tests-b` (Flash, correction 3). Start a background until-loop on each still running.
 2. On each exit: verify outside the sandbox (pre-fix red, mutant, independent Opus verifier from Acceptance only + Fable diff review), commit worktree, land alone, push, mark + `dispatch verify` (evidence format: header fields + pre_fix_* triples + `---`; see `_dispatch_validate_evidence`).

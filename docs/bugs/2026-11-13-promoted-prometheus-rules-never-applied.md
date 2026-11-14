@@ -169,6 +169,7 @@ No change to the Makefile, `observability.sh`, `bin/k3dm-repo-sync`, the AppProj
 1. Land the change on the release branch, CI green; `make hub-promote REF=<commit>`; `make appsets-check`; `make platform-ops` (the usual sequence).
 2. One-time: the new ApplicationSet is not on the cluster until applied. Run `make appsets-reapply APPSETS_STAGE=hub` (operator tmux; `Makefile:467-470`), then `make appsets-check`. After that, later rule changes need only the promote.
 3. Live checks E5 and E6. If E6 shows OutOfSync because of field-manager conflicts with the old client-side-applied objects, force one sync (`argocd app sync hub-prometheus-rules --force`) and file a bug; do not add `ignoreDifferences`.
+   Also for E6 (Fable review 2026-11-14): `kubectl get prometheusrule host-disk -n monitoring --show-managed-fields -o yaml` after the first sync; a remaining `kubectl-client-side-apply` manager means a later removed group or label can stay live. Record it; `make prometheus-rules` re-adds that manager.
 4. Probes: `make prometheus-rules` (or `deploy_observability`) remains the way to change `public-endpoint-probes.yaml`.
 5. Rule files removed from deploy/hub before this ships stay in the cluster untracked; delete by hand if any exist.
 
