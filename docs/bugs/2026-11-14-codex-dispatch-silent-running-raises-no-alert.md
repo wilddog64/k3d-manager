@@ -1,8 +1,8 @@
 # Bug: a dispatch that stays `running` with a silent log raises no alert
 
 **Status:** OPEN
-**Priority:** P3 (Claude proposes P2: cost a night and a WIP slot on 2026-11-13; operator to confirm)
-**Waiting on:** operator decision — since 2026-11-14 (P2 confirmation and spec intent)
+**Priority:** P2 (operator, 2026-11-14; was P3)
+**Waiting on:** operator decision — since 2026-11-14 (spec intent)
 **Approval:** captured by Claude 2026-11-14; operator 2026-11-14 chose the design below: headless Claude diagnosis paid by the API credit, gated by a Slack approval ("if we want to make this safe then we can post an approval request to slack"). Spec not yet written or approved
 **Introduced by:** pre-existing
 **Should have been caught by:** none
@@ -55,6 +55,18 @@ The operator should not have to be the detector. Phase 1, approval-gated:
 
 Phase 2 (auto-resume without approval) only after several phase-1 corrections the operator approved unchanged.
 
-Open for the spec: Hermes's host versus the dispatch host (the key is on the M5 today; dispatches run on the M4), and
+Host (operator, 2026-11-14): detector and headless diagnosis run on the M4; the operator adds an M4 Keychain copy of the key. Open for the spec:
 every reader of `k3dm-anthropic-api-key` (contract readers rule). Key expires about 2026-12-13 and the credit
 2026-12-08: a 401 must surface as a rotate-key alert, not a silent failure.
+
+## Decomposition (Claude, 2026-11-14; complex-bug decomposition trial)
+
+Three subsystems, so three child specs and one integration check. Children land in this order; each is useful alone.
+
+| Child | Spec | Scope |
+|---|---|---|
+| A | `docs/bugs/2026-11-14-dispatch-stall-a-detector.md` | `stalled` state in `bin/k3dm-codex-dispatch` status/open; `bin/k3dm-dispatch-stall-watch` on launchd every 5 min on the M4: detect, capture evidence into `<run>/stall-<ts>/`, kill only that worktree's processes, post a plain Slack notice; runs the drain from B and the diagnosis from C when present. Only child that edits the Makefile (install target), so it waits for Part B. |
+| B | `docs/bugs/2026-11-14-dispatch-stall-b-approval.md` | Relay accepts a `d<N>-<hex8>` action id beside Hermes's `r<N>-<hex8>` (`workers/slack-relay/index.js:4`); `fetch_approvals` gets an id-pattern parameter, Hermes's default unchanged (`scripts/lib/hermes/approvals.py:14,23`); M4 drain posts the proposal with `post_interactive`, re-checks the precondition on Approve, one attempt per stall, then `codex-dispatch resume --reason correction`. Relay redeploy by the operator. |
+| C | `docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md` | Headless `claude -p --bare --output-format json --max-budget-usd <cap> --permission-mode dontAsk --allowedTools ...` reading the stall evidence, writing `correction.md` and a diagnosis; key from the M4 Keychain `k3dm-anthropic-api-key` into the environment; usage logged for the agent-cost dashboard; 401 and budget-hit surface as Slack lines. CLI flags proven from Claude Code 2.1.323 `--help`, captured on the M4 2026-11-14. |
+
+Integration check (live, Claude and operator): a staged toy dispatch that hangs, on the M4, end to end to a Slack approval and a resumed run.
