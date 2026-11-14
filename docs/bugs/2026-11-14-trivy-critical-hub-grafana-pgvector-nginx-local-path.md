@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** investigation — since 2026-11-14 (priority provisional: a critical CVE in a pinned image calls for a patch release, per CLAUDE.md "Pins get reviewed"; upstream noise would drop it)
+**Waiting on:** dispatch — since 2026-11-14 (operator approved the investigation; Luna, read-only, after Part B frees a slot)
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); no bug doc names these images with Trivy

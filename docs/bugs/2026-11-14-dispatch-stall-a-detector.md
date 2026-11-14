@@ -2,10 +2,10 @@
 
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** operator decision — since 2026-11-14 (spec intent)
+**Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
 **Release:** v1.44.1 patch (operator, 2026-11-14: "go with your recommendation"): detect and page only; the kill and the B/C hooks move to the v1.45.0 plan `dispatch-stall-recovery`
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
 **Should have been caught by:** none
 **Prior art:** docs/bugs/2026-11-14-codex-dispatch-silent-running-raises-no-alert.md (parent) — child spec

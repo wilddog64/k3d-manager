@@ -2,10 +2,10 @@
 
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** operator decision — since 2026-11-14 (spec intent)
+**Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
 **Approval:** operator 2026-11-14 asked for a dashboard to track the stall-recovery loop ("maybe we can build a dashboard to track"); spec drafted by Claude, intent not yet approved
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
-**Intent approved:** no
+**Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
 **Should have been caught by:** none
 **Prior art:** exact-slug glob: none; `docs/bugs/2026-10-11-dispatch-dashboard-no-per-spec-cost-or-time.md` read, different scope (per-spec cost columns, landed); `make find-similar-docs` unavailable on the M4 (vector store needs the hub context)
@@ -99,7 +99,7 @@ same append-one-line-with-flock behaviour where they are Python; a failed write 
 - `scripts/tests/plugins/agent_dispatch_dashboard.bats`
 - `docs/howto/agent-dispatch-dashboard.md` if it exists, otherwise the dashboard section of `docs/guides/` that
   describes the Agent Dispatch dashboard (worker greps and names the file it edits)
-- `CHANGELOG.md`
+- (not `CHANGELOG.md`: `parallel-offline-tests-b` has it open; Claude adds the entry at land, operator 2026-11-14)
 
 ## Contract readers
 
