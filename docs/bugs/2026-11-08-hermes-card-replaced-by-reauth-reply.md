@@ -1,10 +1,10 @@
 # Bug: clicking a Hermes card without a fresh `/hermes-auth` replaces the card with the reauth prompt, and its buttons are lost
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** LANDED — 09ea1d02, 2026-11-14 (filed 2026-11-08)
 **Priority:** P2 — raised from P3 2026-11-11 (operator: "go ahead with your recommendation"): the Slack Promote button (part 3 of the promote-smoothing idea) needs Hermes buttons to record every press; this bug drops a Deny. Target: v1.44.0, before part 3.
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Clicking a Hermes card without an active re-auth destroys the card's approval buttons, degrading the Slack approval flow, though workarounds exist (running `/hermes-auth` beforehand or approving via CLI on the hub)); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** fix running — since 2026-11-13
+**Waiting on:** live check — since 2026-11-14 (operator runs `make deploy-worker`, then presses a card without /hermes-auth)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
@@ -124,3 +124,18 @@ Before your last message, do all of these and paste the evidence:
   A successful Deny should also reply as plainly as Approve does (`replaceResponseUrl … denied by <@user>`).
   Acceptance: a test per refusal path (no KV, not allowed, no re-auth) asserting the reply contains the action ID and
   "NOT recorded".
+
+## Verification — 2026-11-14 (Claude)
+
+Landed as `09ea1d02` (Luna, gpt-6-luna; Fable lows applied by Claude before land).
+
+- **E1 (offline):** `node --test workers/slack-relay/test/relay.test.mjs` passed 49/49 outside the sandbox. The new
+  refusal test loops over 3 refusal cases × Approve/Deny. It asserts exactly one `response_url` post, ephemeral,
+  `replace_original === false`, the literal `Your <decision> of r2-0123abcd was NOT recorded`, and no KV writes.
+- **E2 (offline, pre-fix red):** the same tests against the pre-fix `index.js` gave 48/49, with the refusal test red.
+- **Mutants:** dropping `replace_original: false` on the reauth path, dropping "NOT recorded", removing the body line,
+  and a second card-replacing post after the refusal each turn exactly one test red.
+- **Fable review:** nothing above low; L1, L2, L4 and L5 applied. L3 (cards posted inside a thread) is unverified and
+  is part of E3.
+- **E3 (live): pending.** Run `make deploy-worker`, then press Approve on a Hermes card without a fresh `/hermes-auth`.
+  Expected: the card and its buttons stay, and an ephemeral reply names the action, the ID and "NOT recorded".
