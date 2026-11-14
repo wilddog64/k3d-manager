@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2030,SC2031
 
 setup() {
   PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
@@ -8,6 +9,7 @@ setup() {
   mkdir -p "$SCRATCH/bin" "$SCRATCH/home/.config/k3d-manager" "$SCRATCH/state"
   printf 'worker\n' > "$SCRATCH/home/.config/k3d-manager/machine-role"
   export HOME="$SCRATCH/home" XDG_CONFIG_HOME="$SCRATCH/home/.config"
+  unset PUSHGATEWAY_URL
   export K3DM_REPO_SYNC_STATE_DIR="$SCRATCH/state" K3DM_REPO_SYNC_TIMEOUT=3
   export K3DM_REPO_SYNC_REPOS="$SCRATCH/clone"
   REAL_GIT="$(command -v git)"
@@ -81,10 +83,12 @@ SH
   cat > "$SCRATCH/stubs/curl" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$CURL_LOG"
+printf 'call\n' >> "$CURL_CALLS"
 while (($#)); do
   if [[ "$1" == --data-binary ]]; then shift; printf '%s\n' "$1" > "$CURL_BODY"; fi
   shift
 done
+if [[ -n "${CURL_BODY_CAPTURE:-}" ]]; then cp "$CURL_BODY" "$CURL_BODY_CAPTURE"; fi
 SH
   # launchctl print gui/<uid>/com.k3d-manager.webhook shows a tab-indented "pid = 42174" line and
   # ps -o lstart= shows "Sun Nov  8 17:12:36 2026" (captured read-only on m5-air, 2026-11-10).
@@ -109,9 +113,10 @@ SH
   export PATH="$SCRATCH/stubs:$PATH"
   export GIT_LOG="$SCRATCH/git.log" SSH_LOG="$SCRATCH/ssh.log" SSH_ENV_LOG="$SCRATCH/ssh-env.log"
   export MAKE_LOG="$SCRATCH/make.log" CURL_LOG="$SCRATCH/curl.log" CURL_BODY="$SCRATCH/curl.body"
+  export CURL_CALLS="$SCRATCH/curl-calls.log"
   export LAUNCHCTL_LOG="$SCRATCH/launchctl.log" PS_LOG="$SCRATCH/ps.log"
   export SIDE_EFFECT_LOG="$SCRATCH/side-effects.log"
-  touch "$GIT_LOG" "$SSH_LOG" "$SSH_ENV_LOG" "$MAKE_LOG" "$CURL_LOG" "$SIDE_EFFECT_LOG" "$LAUNCHCTL_LOG" "$PS_LOG"
+  touch "$GIT_LOG" "$SSH_LOG" "$SSH_ENV_LOG" "$MAKE_LOG" "$CURL_LOG" "$CURL_CALLS" "$SIDE_EFFECT_LOG" "$LAUNCHCTL_LOG" "$PS_LOG"
   [ "$(command -v git)" = "$SCRATCH/stubs/git" ]
   [ "$(command -v ssh)" = "$SCRATCH/stubs/ssh" ]
   [ "$(command -v make)" = "$SCRATCH/stubs/make" ]
@@ -244,10 +249,66 @@ run_sync() {
   [[ "$PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
   run_sync "$HUB_ROOT"
   [ "$status" -eq 0 ]
+  [ "$(wc -l < "$CURL_CALLS" | tr -d ' ')" -eq 1 ]
+  grep -q -- '-X PUT' "$CURL_LOG"
+  expected_url="http://127.0.0.1:9/metrics/job/k3dm_repo_sync/instance/$(hostname | cut -d. -f1)"
+  grep -Fq -- "$expected_url" "$CURL_LOG"
   grep -q 'metrics/job/k3dm_repo_sync/instance/' "$CURL_LOG"
   grep -q 'k3dm_repo_sync_behind_commits{repo="k3d-manager"}' "$CURL_BODY"
   grep -q 'k3dm_repo_sync_last_success_timestamp_seconds{repo="k3d-manager"}' "$CURL_BODY"
   grep -q 'k3dm_repo_sync_result{repo="k3d-manager",result="current"} 1' "$CURL_BODY"
+}
+
+@test "hub skips Pushgateway when URL is unset or empty" {
+  install_stubs
+  prepare_hub_checkout
+  echo next >> "$SCRATCH/seed/file"
+  git -C "$SCRATCH/seed" commit -am next >/dev/null
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+  expected_head="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  [ "$(command -v curl)" = "$SCRATCH/stubs/curl" ]
+
+  unset PUSHGATEWAY_URL
+  [ -z "${PUSHGATEWAY_URL:-}" ]
+  run_sync "$HUB_ROOT"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CURL_LOG" ]
+  [ ! -s "$CURL_CALLS" ]
+  [[ "$output" == *"PUSHGATEWAY_URL is not set"* ]]
+  [ "$(printf '%s\n' "$output" | grep -c 'PUSHGATEWAY_URL is not set')" -eq 1 ]
+  [ -s "$SCRATCH/state/state.json" ]
+  [ "$(git -C "$HUB_ROOT" rev-parse HEAD)" = "$expected_head" ]
+
+  : > "$CURL_LOG"
+  export PUSHGATEWAY_URL=""
+  [ -z "${PUSHGATEWAY_URL:-}" ]
+  run_sync "$HUB_ROOT"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CURL_LOG" ]
+  [ ! -s "$CURL_CALLS" ]
+  [ "$(printf '%s\n' "$output" | grep -c 'PUSHGATEWAY_URL is not set')" -eq 1 ]
+  [ -s "$SCRATCH/state/state.json" ]
+  [ "$(git -C "$HUB_ROOT" rev-parse HEAD)" = "$expected_head" ]
+}
+
+@test "worker never pushes or warns regardless of Pushgateway URL" {
+  install_stubs
+  printf 'worker\n' > "$XDG_CONFIG_HOME/k3d-manager/machine-role"
+  [ "$(command -v curl)" = "$SCRATCH/stubs/curl" ]
+
+  unset PUSHGATEWAY_URL
+  run_sync
+  [ "$status" -eq 0 ]
+  [ ! -s "$CURL_LOG" ]
+  [ ! -s "$CURL_CALLS" ]
+  [[ "$output" != *"Pushgateway"* ]]
+
+  export PUSHGATEWAY_URL=http://127.0.0.1:9
+  run_sync
+  [ "$status" -eq 0 ]
+  [ ! -s "$CURL_LOG" ]
+  [ ! -s "$CURL_CALLS" ]
+  [[ "$output" != *"Pushgateway"* ]]
 }
 
 @test "webhook update sets restart pending and unrelated update does not" {

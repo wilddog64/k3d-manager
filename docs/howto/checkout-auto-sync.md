@@ -6,4 +6,6 @@ The sync never switches branches, rebases, stashes, cleans, deploys, or restarts
 
 State is written to `~/.local/share/k3d-manager/repo-sync/state.json`. Each repository has its path, branch, result, before/after behind counts, old/new commit and run time. Hub state also reports pending deployment steps and steps it could not determine. `deployed-platform-ops` records the commit last applied by `make platform-ops`.
 
+The hub launchd job gets `PUSHGATEWAY_URL` from its plist. After pulling a change to this template, re-run `make install-repo-sync` on the hub; a manual or SSH-triggered hub run without the variable skips its Pushgateway update. If the hub stops pushing, `K3dmRepoSyncStale` fires after about 70 minutes; check `repo-sync.log` for the cause.
+
 Pause automatic sync with `make uninstall-repo-sync`; install again with `make install-repo-sync`. `bin/k3dm-repo-sync --check` reports intended actions without fetching or merging.
