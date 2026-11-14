@@ -1,6 +1,26 @@
-## Handoff — 2026-11-14 ~16:20Z: P2 loop mid-flight (2 dispatches running, 1 held); live checks wait on a promote — START HERE
+## Handoff — 2026-11-14 15:50Z (real clock; earlier labels today ran 1-3 h fast): stall work split and specced; Part B correction 4 running — START HERE
 
-- **Stall recovery split (2026-11-14):** v1.44.1 = A detect+page (Acceptance rewrite pending, liveness = agy conversation step count); v1.45.0 plan 5 = B/C/D + safe stop.
+- **Objective (in progress):** finish the v1.44.0 P2 bug loop (operator 2026-11-13: dispatch pairs, verify, then live-verify with the operator). Side objective done this session: stall-recovery design, specs, review, release split.
+- **Running:** `parallel-offline-tests-b` correction 4 (= resume 5, agy gemini-3.8-flash-medium, conversation 3d708e68, started about 15:03Z (label from before the clock fix; first resume-5 log line is authoritative)). Prompt: scratchpad `part-b-correction-4.md` (P1 item 0: serial `test-all` must honour STAGE_* + recursion guard, red proofs; item 1: run 3's items 1-6; every make/bats under `perl -e 'alarm shift; exec @ARGV' 1800`). **Watcher dies with /clear: restart it.** Liveness = agy conversation step count, NOT agy-N.log mtime (agy writes its log only at exit):
+  `sqlite3 "file:$HOME/.gemini/antigravity-cli/conversations/3d708e68-6aae-4d59-bc3b-c38bef0fb521.db?mode=ro" 'select count(*) from steps'` unchanged >2700 s = stall; also stop on status != running or >60 `bats-exec` under the worktree.
+- **WIP:** 1 dispatch open (Part B). Landed earlier today: prometheus-rules-argocd-app a4460629 (Waiting on live check), repo-sync-push-guard 22ca679c, promtool Part B 6f7187ab; stray-m4-air bug VERIFIED (e62c74b9).
+- **Decisions this session (operator):**
+  - Stall bug P2, M4 hosts detector + diagnosis; Slack approval via relay with `d<N>-<hex8>` ids (Hermes keeps `r`).
+  - **Release split** ("go with your recommendation"): **v1.44.1 patch** = child A trimmed to detect + capture + one Slack notice, no kill, writes `stall_detected` ledger event; **v1.45.0 plan 5 `dispatch-stall-recovery`** = safe stop + C diagnose + B approve/resume + D dashboard (`docs/plans/v1.45.0-dispatch-stall-recovery.md`, roadmap updated).
+  - Dashboard = D: "Stall recovery" row on Agent Dispatch + retitle "Stalled tasks" -> "Repeated failed attempts" (`docs/bugs/2026-11-14-dispatch-stall-d-dashboard.md`).
+  - Pre-commit SIGPIPE hook bug (`docs/bugs/2026-11-12-pre-commit-priority-check-fails-on-large-new-bug-docs.md`) approved: dispatch with the containment-check bug to Luna. Until fixed, commit new large bug docs header-first.
+  - `/clear` hooks added (this commit): SessionEnd/SessionStart `clear` append to `~/.local/share/k3d-manager/claude-session-clears.jsonl` (ts, kind, session, context_tokens); SessionStart `clear` injects this first section. First real /clear = live check: confirm two log lines and this handoff in context.
+- **Evidence:** Fable review of A/B/C on the parent bug ("Spec review 2026-11-14"); blockers verified (agy log only at exit, healthy run 3438 s silent; `claude --add-dir` variadic eats the prompt). agy liveness proof: 803-min step gap at 2026-11-14 01:38:44Z = the 13 h hang; healthy gaps <= 21 min.
+- **Open questions:** A before dispatch: first-run agy conversation id (no `$run/session` until exit), codex rollout healthy-gap capture, measured proc limit, Acceptance rewrite, then operator intent approval. B/C/D wait for v1.45.0. Tool-counter hook shares `/tmp/claude_tool_counter` across sessions (P3 not filed yet).
+
+**Next, in order:**
+1. Restart the Part B watcher (above). On exit: verify outside the sandbox (pre-fix red, mutants, independent Opus verifier from Acceptance + Fable diff review), commit worktree, land alone, push, `dispatch mark`/`verify`.
+2. After Part B lands: dispatch to Luna the containment-check bug (`docs/bugs/2026-11-12-hub-promote-containment-check-blind-to-squash-merges.md`) + the pre-commit SIGPIPE fix (needs `**Intent approved:**` from operator for its E1).
+3. Live items waiting on a promote (ask operator: `make hub-promote REF=<sha>`, `make appsets-check`, `make platform-ops`, confirm `make hub-promote-status`): prometheus-rules E5/E6; M5 `make install-repo-sync` + repo-sync E5; M5 machine-setup promtool E2; M2 console setup (switch to k3d-manager-v1.44.0 first).
+4. Rewrite child A for v1.44.1 (scope section in the doc), bring intents to operator.
+5. Still owed: Argon classification of new P3s; grooming 2026-11-15 (Sunday); file tool-counter P3; older live items (coordinator/Hermes/vault-unseal/CVE E3, ACG E2, dev-hub P1s, bash 3.2 check).
+
+## Previous handoff — 2026-11-14 (labels ~2 h fast): P2 loop mid-flight (2 dispatches running, 1 held); live checks wait on a promote — START HERE
 
 - **Objective (in progress):** finish all v1.44.0 P2 bugs (operator 2026-11-13: dispatch pairs, verify, then live-verify with the operator).
 - **Landed this session (pushed, head 46c217ce):** promtool Part B 6f7187ab (+ N3 anchor 42fe44fa, kine docker-skip 0a9e053c), offline_tested; repo-sync-push-guard 22ca679c, verify pass; lib-foundation v0.5.6 tagged/released, subtree 79caba45 (bash 3.2 `_run_command`).
