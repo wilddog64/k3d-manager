@@ -4,7 +4,7 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Coordinator attribution telemetry is degraded (recording `unreported` by default), but a functional workaround exists by explicitly passing `--coordinator VENDOR/MODEL` and adding commit trailers manually); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-13 (queued: WIP 3 until Part B lands)
+**Waiting on:** fix running — since 2026-11-14 (Luna)
 **Severity:** medium — dispatch, cost and quality metrics describe almost all recent work as coming from an unknown coordinator, so the Opus-vs-Sol/Terra comparison the operator needs cannot be made
 **Release:** v1.44.0 (carried by grooming 2026-11-12)
 **Branch:** `k3d-manager-v1.44.0`
