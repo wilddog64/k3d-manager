@@ -1,8 +1,8 @@
 # Bug: machine-setup's promtool install fails under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
-**Status:** OPEN
+**Status:** LANDED (lib-foundation v0.5.6, subtree pull 79caba45)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-14 (fix in lib-foundation PR #85; then tag v0.5.6 and subtree pull)
+**Waiting on:** live check — since 2026-11-14 (promtool Part B re-land, then machine-setup on a bash 3.2 Mac)
 **Severity:** medium; blocks the promtool Part B land. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2 (a fresh Mac before Homebrew bash is first on `PATH`), the new `install_promtool` step in `bin/k3dm-machine-setup` reports `promtool missing (see installer output)` and sets `failed=1`. Setup still runs to the end. Workaround: rerun once Homebrew bash is on `PATH`.
 **Filed:** 2026-11-14
 **Detected by:** Fable review of the promtool Part B diff (finding M1), 2026-11-14
@@ -43,3 +43,9 @@ Claude, m4-air, 2026-11-14. The promtool land (`f5d1eb5a`, rebased onto `feb4116
 - lib-foundation `45d7dae` on `release/v0.5.6` (Claude): every `"${sudo_flags[@]}"` and the two unguarded `"${probe_args[@]}"` calls in `_run_command` become `${arr[@]+"${arr[@]}"}`. Three new `system.bats` tests run under `/bin/bash` 3.2.57 with `set -euo pipefail`: plain and `--quiet` `_run_command` without `--probe`, `_install_promtool` with the fixture, and the resolver's interactive-sudo branch on a TTY (BSD `script`). All three were red on `c7384ff` (`probe_args[@]` / `sudo_flags[@]: unbound variable`) and green on `45d7dae`. They skip on bash 4.4 or newer (CI's Linux runner), since newer bash no longer errors.
 - `make bats` in lib-foundation: 232/232 (m4-air, 2026-11-14). shellcheck clean.
 - Remaining: lib-foundation v0.5.6 release (with the ACG fix `c7384ff`), subtree pull into k3d-manager, then rerun the promtool land.
+
+## Landed 2026-11-14
+
+- lib-foundation PR #85 merged by the operator (`d18f4fe`), tagged and released as v0.5.6 (Claude).
+- Subtree pulled into k3d-manager at `79caba45`. Under `/bin/bash` 3.2.57 with `set -euo pipefail`, `source scripts/lib/system.sh; _run_command --quiet -- true` now returns 0 (Claude, m4-air).
+- Next: re-land promtool Part B, whose N4 acceptance test caught this crash.
