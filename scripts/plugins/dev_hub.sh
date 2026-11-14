@@ -58,6 +58,50 @@ function _dev_hub_child_helm() {
   _run_command -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" "$@"
 }
 
+function _dev_hub_probe_ready() {
+  _run_command --soft --quiet -- kubectl --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+    --request-timeout=5s get --raw=/readyz >/dev/null 2>&1
+}
+
+function _dev_hub_ensure_connection() {
+  local ready_rc=0 attempt
+  _dev_hub_probe_ready && return 0
+  if ! ( _vcluster_refresh_connection "${DEV_HUB_NAME}" ); then
+    _err "dev-hub connection refresh failed for vCluster '${DEV_HUB_NAME}'; run make dev-hub-status to inspect it"
+  fi
+  for attempt in 1 2 3 4 5; do
+    ready_rc=0
+    _dev_hub_probe_ready || ready_rc=$?
+    (( ready_rc == 0 )) && return 0
+    (( attempt < 5 )) && _run_command -- sleep 2
+  done
+  _err "dev-hub is unreachable; run make dev-hub-status to inspect the vCluster"
+}
+
+function _dev_hub_helm_install() {
+  local release="$1" namespace="$2" temp_dir="$3" helm_rc=0 retry_rc=0
+  shift 3
+  if _run_command --soft -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+    upgrade --install "${release}" "$@"; then
+    return 0
+  else
+    helm_rc=$?
+  fi
+  if _dev_hub_probe_ready; then
+    return "${helm_rc}"
+  fi
+  _dev_hub_ensure_connection || return 1
+  printf 'dev-hub: refreshing vCluster connection after Helm lost cluster for release %s\n' "${release}" >&2
+  _dev_hub_recover_release "${release}" "${namespace}" "${temp_dir}" || return 1
+  if _run_command --soft -- helm --kubeconfig "${DEV_HUB_KUBECONFIG}" \
+    upgrade --install "${release}" "$@"; then
+    return 0
+  else
+    retry_rc=$?
+    return "${retry_rc}"
+  fi
+}
+
 function _dev_hub_read_history() {
   local release="$1" namespace="$2" temp_dir="$3" max_one="$4" allow_not_found="$5"
   local stderr_file="${temp_dir}/helm-history.stderr" stderr_output history_output history_rc
@@ -199,10 +243,11 @@ stringData:
   admin-password: '${yaml_password}'
 EOF
   unset password
+  _dev_hub_ensure_connection || return 1
   _dev_hub_recover_release argocd cicd "${temp_dir}" || return 1
   if ! _dev_hub_child_helm repo add --force-update argo https://argoproj.github.io/argo-helm \
     || ! _dev_hub_child_helm repo add --force-update grafana https://grafana.github.io/helm-charts \
-    || ! _dev_hub_child_helm upgrade --install argocd argo/argo-cd -n cicd --create-namespace \
+    || ! _dev_hub_helm_install argocd cicd "${temp_dir}" argo/argo-cd -n cicd --create-namespace \
       --version "${DEV_HUB_ARGOCD_VERSION}" -f "${DEV_HUB_CONFIG_DIR}/argocd-values.yaml" --wait \
       --rollback-on-failure --timeout "${helm_timeout}" \
     || ! _dev_hub_child_kubectl apply -f "${DEV_HUB_CONFIG_DIR}/argocd-project.yaml"; then
@@ -212,9 +257,10 @@ EOF
     _dev_hub_child_kubectl apply -f -; then
     return 1
   fi
+  _dev_hub_ensure_connection || return 1
   _dev_hub_recover_release dev-hub-grafana monitoring "${temp_dir}" || return 1
   if ! _dev_hub_child_kubectl apply -f "${secret_file}" \
-    || ! _dev_hub_child_helm upgrade --install dev-hub-grafana grafana/grafana -n monitoring \
+    || ! _dev_hub_helm_install dev-hub-grafana monitoring "${temp_dir}" grafana/grafana -n monitoring \
       --version "${DEV_HUB_GRAFANA_VERSION}" -f "${DEV_HUB_CONFIG_DIR}/grafana-values.yaml" --wait \
       --rollback-on-failure --timeout "${helm_timeout}"; then
     return 1
@@ -256,8 +302,7 @@ function _dev_hub_wait_ready() {
   local ready_rc=0 attempt
   for attempt in 1 2 3 4 5; do
     ready_rc=0
-    _run_command --soft --quiet -- kubectl --kubeconfig "${DEV_HUB_KUBECONFIG}" \
-      --request-timeout=5s get --raw=/readyz >/dev/null 2>&1 || ready_rc=$?
+    _dev_hub_probe_ready || ready_rc=$?
     if (( ready_rc == 0 )); then
       break
     fi

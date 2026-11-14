@@ -18,6 +18,11 @@ make dev-hub-down
 the vCluster on local port 11444. It is safe to run again: existing namespace and vCluster are retained, and the
 quota and defaults are reconciled. The vCluster kubeconfig is `~/.kube/vclusters/dev-hub.yaml`.
 
+If the vCluster syncer restarts during a chart install and Helm loses its connection, `make dev-hub-up` checks
+`/readyz`, refreshes the local vCluster connection, recovers the pending release and retries that Helm install
+once. If the vCluster remains unreachable, run `make dev-hub-status` to inspect it; recovery is through
+`make dev-hub-up`, not a private helper.
+
 `dev-hub-down` deletes only the vCluster, its host namespace, its local proxy container and its kubeconfig. It
 does not run the shared `vcluster_destroy` path, which deregisters resources from hub ArgoCD. The PriorityClass
 remains installed and has no effect when no matching pods exist.

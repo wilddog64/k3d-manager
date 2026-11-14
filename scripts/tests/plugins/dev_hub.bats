@@ -20,13 +20,26 @@ setup_file() {
 setup() {
   TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dev-hub-bats.XXXXXX")"
   export TEST_ROOT HOME="${TEST_ROOT}/home" SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
+  export PATH_STUB_DIR="${TEST_ROOT}/stub-bin"
   SOURCE_SCRIPTS_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
   export SOURCE_SCRIPTS_DIR
-  mkdir -p "${HOME}/.kube/vclusters" "${TEST_ROOT}/repo"
+  mkdir -p "${HOME}/.kube/vclusters" "${TEST_ROOT}/repo" "${PATH_STUB_DIR}"
+  export PATH="${PATH_STUB_DIR}:${PATH}"
   export CALL_LOG="${TEST_ROOT}/calls.log" REPO_ROOT="${TEST_ROOT}/repo"
   export APPLY_LOG="${TEST_ROOT}/applied-files.log" TEMP_PATH_LOG="${TEST_ROOT}/temp-paths.log"
   export WRAPPER_LOG="${TEST_ROOT}/wrapper-flags.log"
+  export PATH_STUB_LOG="${TEST_ROOT}/unexpected-tool-calls.log"
   : >"${CALL_LOG}" "${APPLY_LOG}" "${TEMP_PATH_LOG}" "${WRAPPER_LOG}"
+  : >"${PATH_STUB_LOG}"
+  local tool
+  for tool in helm kubectl vcluster docker security; do
+    cat >"${PATH_STUB_DIR}/${tool}" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$0 $*" >>"${PATH_STUB_LOG}"
+exit 99
+EOF
+    chmod +x "${PATH_STUB_DIR}/${tool}"
+  done
   [ -d "${HOME}" ] && [ -d "${REPO_ROOT}" ]
 
   _run_command() {
@@ -113,7 +126,9 @@ setup() {
         *"get --raw=/readyz"*)
           local ready_attempts
           ready_attempts="$(grep -c 'get --raw=/readyz' "${CALL_LOG}" || true)"
-          if [[ "${READY_ALWAYS_FAIL:-0}" == 1 || "${ready_attempts}" -le "${READY_FAIL_COUNT:-0}" ]]; then
+          if [[ "${READY_ALWAYS_FAIL:-0}" == 1 \
+            || ( -f "${TEST_ROOT}/proxy-dead" && ! -f "${TEST_ROOT}/proxy-refreshed" ) \
+            || "${ready_attempts}" -le "${READY_FAIL_COUNT:-0}" ]]; then
             printf 'The connection to the server localhost:11444 was refused'
             rc=1
           else
@@ -209,6 +224,22 @@ setup() {
       && { [[ -z "${FAIL_HELM_RECOVERY_RELEASE:-}" ]] \
         || [[ "$(cat "${CALL_LOG}" | tail -1)" == *" ${FAIL_HELM_RECOVERY_RELEASE} "* ]]; }; then
       rc=43
+    elif [[ "${command_name}" == helm && "${FAIL_HELM_RELEASE:-}" == argocd \
+      && "$(cat "${CALL_LOG}" | tail -1)" == *"upgrade --install argocd"* ]]; then
+      local argocd_installs
+      argocd_installs="$(grep -c 'upgrade --install argocd' "${CALL_LOG}" || true)"
+      if [[ "${argocd_installs}" -le "${FAIL_HELM_COUNT:-1}" ]]; then
+        [[ "${FAIL_HELM_PROXY_DEATH:-0}" != 1 ]] || : >"${TEST_ROOT}/proxy-dead"
+        rc=42
+      fi
+    elif [[ "${command_name}" == helm && "${FAIL_HELM_RELEASE:-}" == dev-hub-grafana \
+      && "$(cat "${CALL_LOG}" | tail -1)" == *"upgrade --install dev-hub-grafana"* ]]; then
+      local grafana_installs
+      grafana_installs="$(grep -c 'upgrade --install dev-hub-grafana' "${CALL_LOG}" || true)"
+      if [[ "${grafana_installs}" -le "${FAIL_HELM_COUNT:-1}" ]]; then
+        [[ "${FAIL_HELM_PROXY_DEATH:-0}" != 1 ]] || : >"${TEST_ROOT}/proxy-dead"
+        rc=42
+      fi
     elif [[ "${command_name}" == helm && "${FAIL_HELM:-}" == grafana \
       && "$(cat "${CALL_LOG}" | tail -1)" == *"upgrade --install dev-hub-grafana"* ]]; then
       rc=42
@@ -224,6 +255,11 @@ setup() {
       esac
     else
       :
+    fi
+    if (( rc == 0 )) && [[ "${command_name}" == helm \
+      && "$(cat "${CALL_LOG}" | tail -1)" == *"upgrade --install argocd"* \
+      && "${PROXY_DIES_AFTER_ARGOCD:-0}" == 1 ]]; then
+      : >"${TEST_ROOT}/proxy-dead"
     fi
     if (( rc != 0 )); then
       if (( soft )); then return "${rc}"; fi
@@ -253,7 +289,10 @@ setup() {
     fi
   }
   _vcluster_remove_proxy() { printf 'remove-proxy %s\n' "$1" >>"${CALL_LOG}"; }
-  _vcluster_refresh_connection() { printf 'refresh-connection %s\n' "$1" >>"${CALL_LOG}"; }
+  _vcluster_refresh_connection() {
+    printf 'refresh-connection %s\n' "$1" >>"${CALL_LOG}"
+    [[ ! -f "${TEST_ROOT}/proxy-dead" ]] || : >"${TEST_ROOT}/proxy-refreshed"
+  }
   if [[ -r "${SCRIPT_DIR}/plugins/dev_hub.sh" ]]; then
     # shellcheck source=../../plugins/dev_hub.sh
     source "${SCRIPT_DIR}/plugins/dev_hub.sh"
@@ -277,7 +316,171 @@ setup() {
     fi
   }
   _vcluster_remove_proxy() { printf 'remove-proxy %s\n' "$1" >>"${CALL_LOG}"; }
-  _vcluster_refresh_connection() { printf 'refresh-connection %s\n' "$1" >>"${CALL_LOG}"; }
+  _vcluster_refresh_connection() {
+    printf 'refresh-connection %s\n' "$1" >>"${CALL_LOG}"
+    if [[ -f "${TEST_ROOT}/proxy-dead" && "${REFRESH_UNHEALTHY:-0}" != 1 ]]; then
+      : >"${TEST_ROOT}/proxy-refreshed"
+    fi
+  }
+}
+
+_assert_offline_target() {
+  [ "${HOME}" = "${TEST_ROOT}/home" ]
+  [ "${PATH%%:*}" = "${PATH_STUB_DIR}" ]
+  [ -d "${PATH_STUB_DIR}" ]
+  [ -x "${PATH_STUB_DIR}/helm" ]
+  [ -x "${PATH_STUB_DIR}/kubectl" ]
+  [ -x "${PATH_STUB_DIR}/vcluster" ]
+  [ -x "${PATH_STUB_DIR}/docker" ]
+  [ -x "${PATH_STUB_DIR}/security" ]
+}
+
+@test "argocd proxy loss refreshes, recovers and retries once before Grafana" {
+  _assert_offline_target
+  export FAIL_HELM_RELEASE=argocd FAIL_HELM_PROXY_DEATH=1
+  run dev_hub_up
+  [ ! -s "${PATH_STUB_LOG}" ]
+  [ "${status}" -eq 0 ]
+  local argocd_failed refresh recovery argocd_retry grafana_install
+  argocd_failed="$(grep -n 'upgrade --install argocd' "${CALL_LOG}" | sed -n '1p' | cut -d: -f1)"
+  [ "$(grep -c 'upgrade --install argocd' "${CALL_LOG}")" -eq 2 ]
+  refresh="$(grep -n '^refresh-connection dev-hub$' "${CALL_LOG}" | tail -n1 | cut -d: -f1)"
+  recovery="$(grep -n 'history argocd -n cicd --max 1' "${CALL_LOG}" | tail -n1 | cut -d: -f1)"
+  argocd_retry="$(grep -n 'upgrade --install argocd' "${CALL_LOG}" | sed -n '2p' | cut -d: -f1)"
+  grafana_install="$(grep -n 'upgrade --install dev-hub-grafana' "${CALL_LOG}" | tail -n1 | cut -d: -f1)"
+  [ -n "${argocd_failed}" ]
+  [ -n "${refresh}" ]
+  [ -n "${recovery}" ]
+  [ "${argocd_failed}" -lt "${refresh}" ]
+  [ "${refresh}" -lt "${recovery}" ]
+  [ "${recovery}" -lt "${argocd_retry}" ]
+  [ "${argocd_retry}" -lt "${grafana_install}" ]
+  [[ "${output}" == *"refreshing vCluster connection after Helm lost cluster for release argocd"* ]]
+  [ "$(printf '%s\n' "${output}" | grep -c 'refreshing vCluster connection after Helm lost cluster for release argocd')" -eq 1 ]
+}
+
+@test "Grafana proxy loss refreshes, recovers and retries once" {
+  _assert_offline_target
+  export FAIL_HELM_RELEASE=dev-hub-grafana FAIL_HELM_PROXY_DEATH=1
+  run dev_hub_up
+  [ ! -s "${PATH_STUB_LOG}" ]
+  [ "${status}" -eq 0 ]
+  local grafana_calls refresh recovery
+  grafana_calls="$(grep -n 'upgrade --install dev-hub-grafana' "${CALL_LOG}")"
+  [ "$(grep -c 'upgrade --install dev-hub-grafana' "${CALL_LOG}")" -eq 2 ]
+  [ "$(printf '%s\n' "${grafana_calls}" | wc -l | tr -d ' ')" -eq 2 ]
+  refresh="$(grep -n '^refresh-connection dev-hub$' "${CALL_LOG}" | tail -n1 | cut -d: -f1)"
+  recovery="$(grep -n 'history dev-hub-grafana -n monitoring --max 1' "${CALL_LOG}" | tail -n1 | cut -d: -f1)"
+  [ -n "${refresh}" ]
+  [ -n "${recovery}" ]
+  [ "${refresh}" -lt "${recovery}" ]
+  [[ "${output}" == *"refreshing vCluster connection after Helm lost cluster for release dev-hub-grafana"* ]]
+  [ "$(printf '%s\n' "${output}" | grep -c 'refreshing vCluster connection after Helm lost cluster for release dev-hub-grafana')" -eq 1 ]
+}
+
+@test "Grafana proxy is probed and refreshed before its first Helm history call" {
+  _assert_offline_target
+  export PROXY_DIES_AFTER_ARGOCD=1
+  run dev_hub_up
+  [ ! -s "${PATH_STUB_LOG}" ]
+  [ "${status}" -eq 0 ]
+  local argocd_install ready_probe refresh grafana_history
+  argocd_install="$(grep -n 'upgrade --install argocd' "${CALL_LOG}" | tail -n1 | cut -d: -f1)"
+  ready_probe="$(awk -v start="${argocd_install}" 'NR > start && /get --raw=\/readyz/ { print NR; exit }' "${CALL_LOG}")"
+  refresh="$(awk -v start="${argocd_install}" 'NR > start && /^refresh-connection dev-hub$/ { print NR; exit }' "${CALL_LOG}")"
+  grafana_history="$(awk -v start="${argocd_install}" 'NR > start && /history dev-hub-grafana/ { print NR; exit }' "${CALL_LOG}")"
+  [ -n "${ready_probe}" ]
+  [ -n "${refresh}" ]
+  [ -n "${grafana_history}" ]
+  [ "${argocd_install}" -lt "${ready_probe}" ]
+  [ "${ready_probe}" -lt "${refresh}" ]
+  [ "${refresh}" -lt "${grafana_history}" ]
+}
+
+@test "healthy cluster chart failure is returned without refresh or retry" {
+  _assert_offline_target
+  export FAIL_HELM_RELEASE=argocd FAIL_HELM_COUNT=1
+  run dev_hub_up
+  [ ! -s "${PATH_STUB_LOG}" ]
+  [ "${status}" -ne 0 ]
+  [ "$(grep -c 'upgrade --install argocd' "${CALL_LOG}")" -eq 1 ]
+  local failed_install post_failure_refresh post_failure_history
+  failed_install="$(grep -n 'upgrade --install argocd' "${CALL_LOG}" | cut -d: -f1)"
+  post_failure_refresh="$(awk -v start="${failed_install}" 'NR > start && /^refresh-connection dev-hub$/ { print NR; exit }' "${CALL_LOG}")"
+  post_failure_history="$(awk -v start="${failed_install}" 'NR > start && /history argocd/ { print NR; exit }' "${CALL_LOG}")"
+  [ -z "${post_failure_refresh}" ]
+  [ -z "${post_failure_history}" ]
+}
+
+@test "failed retry stops after two helm calls for the release" {
+  _assert_offline_target
+  export FAIL_HELM_RELEASE=argocd FAIL_HELM_COUNT=2 FAIL_HELM_PROXY_DEATH=1
+  run dev_hub_up
+  [ ! -s "${PATH_STUB_LOG}" ]
+  [ "${status}" -ne 0 ]
+  [ "$(grep -c 'upgrade --install argocd' "${CALL_LOG}")" -eq 2 ]
+}
+
+@test "unreachable vCluster after refresh reports status and does not retry Helm" {
+  _assert_offline_target
+  export FAIL_HELM_RELEASE=argocd FAIL_HELM_PROXY_DEATH=1 REFRESH_UNHEALTHY=1
+  run dev_hub_up
+  [ ! -s "${PATH_STUB_LOG}" ]
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"make dev-hub-status"* ]]
+  [ "$(grep -c 'upgrade --install argocd' "${CALL_LOG}")" -eq 1 ]
+}
+
+@test "real command wrapper returns first Helm failure so argocd retry can complete" {
+  _assert_offline_target
+  export REAL_CALL_LOG="${TEST_ROOT}/real-wrapper-calls.log"
+  export REAL_REFRESH_MARKER="${TEST_ROOT}/real-wrapper-refreshed"
+  : >"${REAL_CALL_LOG}"
+  cat >"${PATH_STUB_DIR}/helm" <<'EOF'
+#!/bin/bash
+printf 'helm %s\n' "$*" >>"${REAL_CALL_LOG}"
+if [[ "$*" == *"upgrade --install argocd"* ]] \
+  && [[ "$(grep -c 'upgrade --install argocd' "${REAL_CALL_LOG}")" -eq 1 ]]; then
+  exit 1
+fi
+exit 0
+EOF
+  cat >"${PATH_STUB_DIR}/kubectl" <<'EOF'
+#!/bin/bash
+printf 'kubectl %s\n' "$*" >>"${REAL_CALL_LOG}"
+if [[ "$*" == *"get --raw=/readyz"* && ! -f "${REAL_REFRESH_MARKER}" ]]; then
+  exit 1
+fi
+exit 0
+EOF
+  chmod +x "${PATH_STUB_DIR}/helm" "${PATH_STUB_DIR}/kubectl"
+  [ "${HOME}" = "${TEST_ROOT}/home" ]
+  [ "${PATH%%:*}" = "${PATH_STUB_DIR}" ]
+  source "${SOURCE_SCRIPTS_DIR}/lib/foundation/scripts/lib/system.sh"
+  source "${SOURCE_SCRIPTS_DIR}/plugins/dev_hub.sh"
+  DEV_HUB_KUBECONFIG="${HOME}/.kube/vclusters/dev-hub.yaml"
+  _vcluster_refresh_connection() {
+    printf 'refresh %s\n' "$1" >>"${REAL_CALL_LOG}"
+    : >"${REAL_REFRESH_MARKER}"
+  }
+  _dev_hub_recover_release() {
+    printf 'recover %s %s\n' "$1" "$2" >>"${REAL_CALL_LOG}"
+  }
+  run _dev_hub_helm_install argocd cicd "${TEST_ROOT}" argo/argo-cd -n cicd --wait
+  [ "${status}" -eq 0 ]
+  [ "$(grep -c 'upgrade --install argocd' "${REAL_CALL_LOG}")" -eq 2 ]
+  local first_install refresh recovery second_install
+  first_install="$(grep -n 'upgrade --install argocd' "${REAL_CALL_LOG}" | sed -n '1p' | cut -d: -f1)"
+  refresh="$(grep -n '^refresh dev-hub$' "${REAL_CALL_LOG}" | cut -d: -f1)"
+  recovery="$(grep -n '^recover argocd cicd$' "${REAL_CALL_LOG}" | cut -d: -f1)"
+  second_install="$(grep -n 'upgrade --install argocd' "${REAL_CALL_LOG}" | sed -n '2p' | cut -d: -f1)"
+  [ -n "${first_install}" ]
+  [ -n "${refresh}" ]
+  [ -n "${recovery}" ]
+  [ -n "${second_install}" ]
+  [ "${first_install}" -lt "${refresh}" ]
+  [ "${refresh}" -lt "${recovery}" ]
+  [ "${recovery}" -lt "${second_install}" ]
 }
 
 setup_sync_repo() {
@@ -1183,7 +1386,7 @@ PY
 @test "new dev hub installs charts after readiness succeeds on the third probe" {
   export READY_FAIL_COUNT=2
   dev_hub_up
-  [ "$(grep -c 'get --raw=/readyz' "${CALL_LOG}")" -eq 3 ]
+  [ "$(grep -c 'get --raw=/readyz' "${CALL_LOG}")" -eq 5 ]
   [ "$(grep -c '^sleep 2$' "${CALL_LOG}")" -eq 2 ]
   grep -F 'upgrade --install argocd argo/argo-cd' "${CALL_LOG}"
 }
