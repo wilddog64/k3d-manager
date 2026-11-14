@@ -8,9 +8,12 @@ import subprocess
 import time
 from pathlib import Path
 from urllib.request import Request, urlopen
+import sys
 
 import pytest
 import yaml
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from promtool_helper import resolve_promtool  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -20,7 +23,7 @@ _notify_spec = importlib.util.spec_from_file_location(
 notify = importlib.util.module_from_spec(_notify_spec)
 assert _notify_spec.loader is not None
 _notify_spec.loader.exec_module(notify)
-pytestmark = pytest.mark.external("runs pinned Prometheus and Alertmanager images in Docker")
+pytestmark = pytest.mark.external("runs pinned promtool and the Alertmanager fixture")
 
 
 @pytest.fixture
@@ -43,7 +46,7 @@ def _rule_test(tmp_path: Path) -> Path:
     rules_path.write_text(yaml.safe_dump({"groups": source["spec"]["groups"]}, sort_keys=False))
     test_path = tmp_path / "kine-test.yaml"
     test_path.write_text(yaml.safe_dump({
-        "rule_files": ["/tmp/rules.yaml"],
+        "rule_files": ["rules.yaml"],
         "evaluation_interval": "1m",
         "tests": [
             {
@@ -87,15 +90,8 @@ def _kine_rule() -> dict:
 
 def test_rule_fires_only_for_stale_compaction_and_api_stays_healthy(tmp_path: Path) -> None:
     test_path = _rule_test(tmp_path)
-    try:
-        run("docker", "run", "--rm", "-v", f"{test_path}:/tmp/kine-test.yaml:ro",
-            "-v", f"{test_path.parent / 'rules.yaml'}:/tmp/rules.yaml:ro",
-            "--entrypoint=promtool", "quay.io/prometheus/prometheus:v3.1.0", "test", "rules",
-            "/tmp/kine-test.yaml")
-    except subprocess.CalledProcessError as exc:
-        if "permission denied" in (exc.stderr or "").lower() or "cannot connect" in (exc.stderr or "").lower():
-            pytest.skip(f"Docker unavailable: {exc.stderr.strip()}")
-        raise
+    subprocess.run([resolve_promtool(), "test", "rules", str(test_path)], check=True,
+                   capture_output=True, text=True)
 
 
 def test_notification_reaches_platform_warning_only(alertmanager) -> None:

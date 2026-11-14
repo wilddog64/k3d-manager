@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 import yaml
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from promtool_helper import resolve_promtool  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "bin" / "k3dm-orbstack-metrics"
@@ -106,16 +108,8 @@ def test_alert_route_and_dashboard_contract():
 
 
 def _promtool(tmp_path, *args):
-    import shutil
-    if shutil.which("promtool"):
-        return subprocess.run(["promtool", *args], capture_output=True, text=True, cwd=tmp_path, check=False)
-    if shutil.which("docker"):
-        result = subprocess.run(["docker", "run", "--rm", "-v", f"{tmp_path}:/r", "-w", "/r",
-                                 "--entrypoint=promtool", "quay.io/prometheus/prometheus:v3.1.0", *args],
-                                capture_output=True, text=True, check=False)
-        if "cannot connect" not in result.stderr.lower() and "permission denied" not in result.stderr.lower():
-            return result
-    pytest.skip("promtool unavailable")
+    return subprocess.run([resolve_promtool(), *args], capture_output=True, text=True,
+                          cwd=tmp_path, check=False)
 
 
 import pytest  # noqa: E402

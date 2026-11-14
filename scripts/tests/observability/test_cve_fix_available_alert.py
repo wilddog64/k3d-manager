@@ -1,18 +1,22 @@
 """Promtool regression for the persistent fixable critical CVE alert."""
-import shutil
 import subprocess
 from pathlib import Path
+import sys
+
+import yaml
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from promtool_helper import resolve_promtool  # noqa: E402
+# agent-audit: allow assert-removed removed assert lived in the docker fallback branch the spec deletes; the promtool run keeps check=True
 
 import pytest
-import yaml
 
-pytestmark = pytest.mark.external("runs promtool or pinned Prometheus image")
+pytestmark = pytest.mark.external("runs pinned promtool")
 
 RULES = Path(__file__).resolve().parents[3] / "scripts/etc/argocd/platform-ops/prometheusrule.yaml"
 
 
 def test_fixable_critical_survives_digest_change(tmp_path):
-    promtool = shutil.which("promtool")
+    promtool = resolve_promtool()
     source = yaml.safe_load(RULES.read_text())
     rule = next(r for g in source["spec"]["groups"] for r in g["rules"]
                 if r.get("alert") == "CriticalCVEFixAvailableNotRemediated")
@@ -32,17 +36,4 @@ def test_fixable_critical_survives_digest_change(tmp_path):
             }]},
         ]}]}
     (tmp_path / "test.yml").write_text(yaml.safe_dump(test))
-    if promtool:
-        subprocess.run([promtool, "test", "rules", str(tmp_path / "test.yml")], check=True)
-    else:
-        docker = shutil.which("docker")
-        if not docker:
-            pytest.skip("promtool and Docker unavailable")
-        result = subprocess.run([docker, "run", "--rm", "-v", f"{tmp_path}:/work:ro",
-                                 "-w", "/work", "--entrypoint=promtool",
-                                 "quay.io/prometheus/prometheus:v3.1.0", "test", "rules", "test.yml"],
-                                text=True, capture_output=True)
-        if result.returncode and ("cannot connect" in result.stderr.lower() or
-                                  "permission denied" in result.stderr.lower()):
-            pytest.skip(f"Docker unavailable: {result.stderr.strip()}")
-        assert result.returncode == 0, result.stdout + result.stderr
+    subprocess.run([promtool, "test", "rules", str(tmp_path / "test.yml")], check=True)

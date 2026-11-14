@@ -82,6 +82,8 @@ complete_machine() {
   fi
   mkdir -p "$HOME_FX/.local/bin"
   for x in agy gemini; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/bin/$x"; chmod +x "$HOME_FX/.local/bin/$x"; done
+  printf '#!/bin/bash\nprintf "promtool, version 3.1.0 (branch: HEAD, revision: fixture)\\n"\n' > "$HOME_FX/.local/bin/promtool"
+  chmod +x "$HOME_FX/.local/bin/promtool"
   mkdir -p "$HOME_FX/Library/LaunchAgents" "$HOME_FX/.claude/.git" "$HOME_FX/.codex/.git" "$HOME_FX/.gemini/.git" "$HOME_FX/.copilot/.git" "$HOME_FX/.smartcd/lib/core" "$HOME_FX/src/gitrepo/personal/zshdotfiles"
   touch "$HOME_FX/.smartcd/lib/core/smartcd" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshrc" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshenv"
   ln -sfn "$HOME_FX/src/gitrepo/personal/zshdotfiles" "$HOME_FX/.zsh"

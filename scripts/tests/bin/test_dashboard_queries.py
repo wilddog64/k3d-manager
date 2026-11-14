@@ -5,20 +5,22 @@ import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 from unittest.mock import patch
 from pathlib import Path
+import sys
 
 import yaml
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from promtool_helper import resolve_promtool  # noqa: E402
+
 ROOT = Path(__file__).parents[3]
 DASHBOARD = Path(os.environ.get(
     "BUG_DASHBOARD_PATH", ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"))
 GUIDE = ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md"
-PROMETHEUS_IMAGE = "prom/prometheus:v3.1.0"
 REPO_SYNC_RULES = Path(os.environ.get(
     "REPO_SYNC_RULES_PATH", ROOT / "scripts/etc/prometheus/rules/repo-sync.yaml"))
 REPO_SYNC_PRODUCER = Path(os.environ.get("REPO_SYNC_PRODUCER_PATH", ROOT / "bin/k3dm-repo-sync"))
@@ -236,16 +238,7 @@ def substitute_variables(expr, dashboard, series):
 
 
 def promtool_command(tmp_path):
-    local = shutil.which("promtool")
-    if local:
-        return [local, "test", "rules", "tests.yml"]
-    docker = shutil.which("docker")
-    if docker:
-        if any(part.startswith("k3dm-tripwire.") for part in Path(docker).parts):
-            pytest.skip("SKIP: the test tripwire blocks Docker; real PromQL evaluation unavailable")
-        return [docker, "run", "--rm", "-v", f"{tmp_path}:/work", "-w", "/work",
-                "--entrypoint=promtool", PROMETHEUS_IMAGE, "test", "rules", "tests.yml"]
-    pytest.skip("SKIP: neither local promtool nor Docker is available; real PromQL evaluation unavailable")
+    return [resolve_promtool(), "test", "rules", "tests.yml"]
 
 
 @pytest.mark.external
@@ -348,9 +341,6 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
     (tmp_path / "tests.yml").write_text("\n".join(tests) + "\n")
     command = promtool_command(tmp_path)
     result = subprocess.run(command, cwd=tmp_path, text=True, capture_output=True)
-    if result.returncode and "permission denied" in result.stderr.lower() and "docker" in command[0]:
-        pytest.skip("SKIP: Docker is installed but its daemon is unavailable to this user; "
-                    "real PromQL evaluation did not run")
     assert result.returncode == 0, result.stdout + result.stderr
 
     table_panels = [panel for panel in dashboard["panels"] if panel.get("type") == "table"]

@@ -2,6 +2,7 @@
 
 setup() {
   source "${BATS_TEST_DIRNAME}/../python_yaml.bash"
+  source "${BATS_TEST_DIRNAME}/../promtool.bash"
 }
 
 EXPORTER="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
@@ -371,7 +372,6 @@ PY
 }
 
 @test "e2e staleness is fresh if any runner passed recently" {
-  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
   rules_file="${BATS_TEST_TMPDIR}/e2e-rules.yml"
   test_file="${BATS_TEST_TMPDIR}/e2e-staleness.test.yml"
   "$(k3dm_python_yaml)" - "${RULE}" "${rules_file}" <<'PY'
@@ -419,12 +419,11 @@ tests:
               description: 'No passing e2e run for product-catalog on the vcluster substrate on any runner in over 3 days; the verification signal is stale.'
 """)
 PY
-  run promtool test rules "${test_file}"
+  run k3dm_promtool test rules "${test_file}"
   echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "E2EResultsMissing fires only when the hub has no e2e results" {
-  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
   rules_file="${BATS_TEST_TMPDIR}/e2e-rules-missing.yml"
   test_file="${BATS_TEST_TMPDIR}/e2e-missing.test.yml"
   "$(k3dm_python_yaml)" - "${RULE}" "${rules_file}" <<'PY'
@@ -443,7 +442,7 @@ PY
     printf '%s\n' '  - interval: 1m' '    input_series:' '      - series: '\''e2e_last_run_pass{tier="vcluster", exported_service="basket", project="api+flows", runner="m2"}'\''' '        values: '\''0x420'\''' '    alert_rule_test:'
     printf '%s\n' '      - eval_time: 7h' '        alertname: E2EResultsMissing' '        exp_alerts: []'
   } > "${test_file}"
-  run promtool test rules "${test_file}"
+  run k3dm_promtool test rules "${test_file}"
   echo "$output"; [ "${status}" -eq 0 ]
 }
 

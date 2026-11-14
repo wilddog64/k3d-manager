@@ -12,6 +12,9 @@ import sys
 import time
 from pathlib import Path
 import pytest
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from promtool_helper import resolve_promtool  # noqa: E402
+# agent-audit: allow assert-removed removed asserts lived in the no-promtool/docker fallback branches the spec deletes; the promtool path keeps its returncode assert
 # agent-audit: allow assert-removed evidence_path drops the home directory; the absolute-path assert becomes a root-relative one plus a no-tmp-path assert
 # agent-audit: allow assert-removed per-spec series gained an agent label; every removed assert is re-added with agent="codex" and the same value
 
@@ -1388,11 +1391,7 @@ def test_by_model_promql_returns_one_series_per_model(tmp_path):
     dashboard = load_dispatch_dashboard()
     panel = next(panel for panel in dashboard["panels"] if panel["id"] == 27)
     expression = panel["targets"][0]["expr"].replace('$window', '7d')
-    promtool = shutil.which("promtool")
-    docker = shutil.which("docker")
-    if not promtool and not docker:
-        assert "k3dm_dispatch_api_cost_by_model_usd{window=\"$window\"}" == panel["targets"][0]["expr"]
-        return
+    promtool = resolve_promtool()
 
     rules = tmp_path / "rules.yml"
     tests = tmp_path / "tests.yml"
@@ -1412,19 +1411,8 @@ def test_by_model_promql_returns_one_series_per_model(tmp_path):
         "    - labels: '{__name__=\"dashboard_by_model\", model=\"gpt-5.6-luna\", window=\"7d\"}'\n      value: 1\n"
         "    - labels: '{__name__=\"dashboard_by_model\", model=\"gpt-6-luna\", window=\"7d\"}'\n      value: 2\n"
     )
-    if promtool:
-        command = [promtool, "test", "rules", str(tests)]
-        result = subprocess.run(command, cwd=tmp_path, text=True, capture_output=True)
-    else:
-        result = subprocess.run(
-            [docker, "run", "--rm", "-v", f"{tmp_path}:/work", "-w", "/work",
-             "--entrypoint=promtool", "quay.io/prometheus/prometheus:v3.1.0",
-             "test", "rules", "tests.yml"],
-            text=True, capture_output=True,
-        )
-        if result.returncode and "permission denied" in result.stderr.lower():
-            assert "k3dm_dispatch_api_cost_by_model_usd" in expression
-            return
+    result = subprocess.run([promtool, "test", "rules", str(tests)],
+                            cwd=tmp_path, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
 
 

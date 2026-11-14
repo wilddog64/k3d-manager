@@ -3,7 +3,6 @@ import json
 import re
 import runpy
 import subprocess
-import shutil
 import sys
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -13,6 +12,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+sys.path.insert(0, str(ROOT / "scripts" / "tests"))
+from promtool_helper import resolve_promtool  # noqa: E402
 
 
 @pytest.fixture
@@ -348,9 +349,7 @@ def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_pat
 
 @pytest.mark.parametrize("release_mode", [0, 1])
 def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode):
-    promtool = os.environ.get("PROMTOOL") or shutil.which("promtool")
-    if not promtool:
-        pytest.skip("promtool is required for offline Plans query evaluation")
+    promtool = resolve_promtool()
     dashboard = json.loads((ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml")
                            .read_text().split("  k3dm-bugs.json: |\n", 1)[1])
     query = next(panel for panel in dashboard["panels"] if panel["id"] == 107)["targets"][0]["expr"]

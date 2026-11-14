@@ -1,4 +1,6 @@
 #!/usr/bin/env bats
+# shellcheck source=../promtool.bash
+source "${BATS_TEST_DIRNAME}/../promtool.bash"
 
 ACG="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-acg.yaml"
 HUB="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
@@ -457,14 +459,12 @@ for start in calls:
             if depth == 0: break
     if depth != 0 or commas != 4: sys.exit(1)
 if len(calls) != s.count("label_replace("): sys.exit(1)' "$expr" || return 1
-    if command -v promtool >/dev/null 2>&1; then
-      local rules_file="${BATS_TEST_TMPDIR}/panel-13-rules.yml"
-      python3 -c 'import json,re,sys
+    local rules_file="${BATS_TEST_TMPDIR}/panel-13-rules.yml"
+    python3 -c 'import json,re,sys
 expr=sys.argv[1].replace("$__rate_interval","5m")
 expr=re.sub(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?",".*",expr)
 print(json.dumps({"groups":[{"name":"panel13","rules":[{"alert":"Panel13QueryParse","expr":expr}]}]}))' "$expr" >"$rules_file" || return 1
-      promtool check rules "$rules_file" >/dev/null || return 1
-    fi
+    k3dm_promtool check rules "$rules_file" >/dev/null || return 1
   done < <(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -r '.panels[].targets[]?.expr // empty')
 }
 
