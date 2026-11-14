@@ -96,9 +96,9 @@ must:
   M4: when the retried helm call fails again, dev_hub_up exits non-zero after exactly two helm calls for that release
   M5: when the vCluster stays unreachable after the refresh, dev_hub_up exits non-zero with a message naming make dev-hub-status, and runs no further helm upgrade
   M6: the retry path prints one stderr line naming the release
-must_not:
-  N1: a proxy death during the argocd helm step (helm fails, readyz fails) ends dev_hub_up with a failure and no refresh-and-retry
-  N2: a proxy that is dead when the argocd step finishes makes the Grafana recovery or install run against it without a readyz probe and refresh first
+must_not:  # each item is a failure that must NOT happen after the fix; each is what today's code does
+  N1: "gives up on a dead proxy" (today's behaviour, forbidden after the fix): after a proxy death during the argocd helm step (helm fails, readyz fails), dev_hub_up exits non-zero without having called _vcluster_refresh_connection and a second argocd helm install. M1 is the required behaviour for the same scenario; N1 is the failure mode it replaces, red on pre-fix code
+  N2: "Grafana against a dead proxy" (today's behaviour, forbidden after the fix): when the proxy dies after argocd deploys, the first Grafana helm call (history, recovery or install) runs with no readyz probe and refresh between the argocd install and it
   N3: any test runs real helm, kubectl, vcluster, docker or security, or reads the real HOME or ~/.kube
 evidence:
   - {id: E1, proves: [M1, M2, M6, N1, N2], kind: offline, intent: "You will see dev_hub.bats run dev_hub_up with stub helm, kubectl and vcluster that write every call to a log. The stub helm fails the first argocd (then, in a second test, Grafana) install, and the stub readyz probe fails until the refresh is called. The test reads the call log and finds, in order: the failed install, the refresh, the release recovery, the second install, then Grafana. On today's code dev_hub_up stops at the first failure, so these tests fail."}
