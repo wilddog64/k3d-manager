@@ -2,11 +2,11 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-14 (investigation done by Claude, read-only; pick a disposition per image)
+**Waiting on:** operator decision — since 2026-11-14 (Grafana target: no 11.x clears the criticals; 12.4.15 does)
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); no bug doc names these images with Trivy
-**Approval:** none yet (capture only)
+**Approval:** operator, 2026-11-14 ("go with your suggestion" on the four dispositions)
 
 ## Symptom
 
@@ -47,3 +47,25 @@ Proposed disposition (operator decides; CLAUDE.md: critical/high CVE -> patch re
    tag at the next loki chart bump.
 4. **local-path-provisioner: accept until the next k3s bump**, documented; the path-traversal fix (0.0.34) arrives with
    a newer k3s image, which is release-sized work, not a patch.
+
+## Decision and follow-up (2026-11-14)
+
+Operator approved all four dispositions. Applied:
+
+- **pgvector:** pin filed as P3 `docs/bugs/2026-11-14-vectordb-pgvector-image-floating-tag.md` (running digest = `0.8.7-pg17`; the
+  existing bats test asserts the floating tag and changes with it). CVE accepted, not reachable.
+- **nginx-unprivileged (loki-gateway):** accepted, not reachable; pin a dated tag at the next loki chart bump.
+- **local-path-provisioner:** accepted until the next k3s image bump.
+- **Grafana:** fixed-tag proof (Claude, local `trivy` 0.76.2, `--platform linux/arm64 --severity CRITICAL`, 2026-11-14):
+
+  | Tag | Criticals | High |
+  |---|---|---|
+  | 11.4.0 (running) | 9 | — |
+  | 11.6.16 (newest 11.x) | 2: GHSA-r277-6w6q-xmqw kin-openapi 0.132.0 (auth fail-open), CVE-2026-111497 brotli-libs | — |
+  | 12.4.15 (newest 12.x) | 0 | 2 |
+  | 13.3.1 (newest) | 0 | 20 |
+
+  No 11.x tag clears the criticals, so the approved "fixed 11.x" target does not exist. Our dashboards use no Angular
+  panel types (`graph`, `singlestat`, `table-old`, piechart/worldmap plugins: none found in `scripts/etc` or `docs`), and
+  `kube-prometheus-stack-values.yaml` sets no Grafana image today. Pending operator choice: 12.4.15 (major bump) or
+  11.6.16 (accept the kin-openapi finding).
