@@ -1,4 +1,25 @@
-## Handoff — 2026-11-13 ~20:00Z: v1.44.0 live checks done; next = P2 bug dispatch loop — START HERE
+## Handoff — 2026-11-14 ~16:20Z: P2 loop mid-flight (2 dispatches running, 1 held); live checks wait on a promote — START HERE
+
+- **Objective (in progress):** finish all v1.44.0 P2 bugs (operator 2026-11-13: dispatch pairs, verify, then live-verify with the operator).
+- **Landed this session (pushed, head 46c217ce):** promtool Part B 6f7187ab (+ N3 anchor 42fe44fa, kine docker-skip 0a9e053c), offline_tested; repo-sync-push-guard 22ca679c, verify pass; lib-foundation v0.5.6 tagged/released, subtree 79caba45 (bash 3.2 `_run_command`).
+- **Decisions:** N3 P3 folded into promtool land without triage (blocked the land); fast gate skipped for promtool land (kine docker test, since fixed); repo-sync Fable finding 1 handled operationally (reinstall plist with the promote), lasting guard = hub-deploy idea row.
+- **Open questions:** none blocking. Operator to say if the N3 fold-in should be re-triaged.
+- **Verification status:** offline done for promtool + repo-sync; live pending (below).
+
+**Next, in order:**
+1. Watchers die with /clear — re-check: `bin/k3dm-codex-dispatch status prometheus-rules-argocd-app` (Luna, dispatched 16:05Z from docs/bugs/2026-11-13-promoted-prometheus-rules-never-applied.md) and `status parallel-offline-tests-b` (Flash, correction 3). Start a background until-loop on each still running.
+2. On each exit: verify outside the sandbox (pre-fix red, mutant, independent Opus verifier from Acceptance only + Fable diff review), commit worktree, land alone, push, mark + `dispatch verify` (evidence format: header fields + pre_fix_* triples + `---`; see `_dispatch_validate_evidence`).
+3. After parallel-offline-tests-b lands, dispatch docs/bugs/2026-11-12-hub-promote-containment-check-blind-to-squash-merges.md to Luna (held: both edit Makefile).
+4. Live, after a promote including 22ca679c (ask operator: `make hub-promote REF=<sha>`, `make appsets-check`, `make platform-ops`, confirm `make hub-promote-status`):
+   - On M5: `make install-repo-sync` (again — the 16:15Z run installed the OLD plist, checkout was ce164bf2) then repo-sync E5: m5-air push_time_seconds advancing, no m4-air group.
+   - On M5: `make machine-setup ROLE=hub SECRETS=skip AGENTS=skip` → expect `promtool installed`, `~/.local/bin/promtool --version` 3.1.0 (promtool E2; the 16:15Z run had no promtool line).
+   - On M2 (console, no role file yet, checkout on k3d-manager-v1.43.15): `git fetch origin; git switch k3d-manager-v1.44.0; git pull --ff-only`, then `make machine-setup ROLE=console SECRETS=skip AGENTS=skip`.
+   - CI green on the pushed head.
+5. Older live items still open: coordinator E3, Hermes E3, vault-unseal E3, CVE E3, ACG E2, test-hygiene batch items, dev-hub P1s, bash-3.2 live check (machine-setup under /bin/bash 3.2 — partly shown: _install_promtool ran under /bin/bash 3.2 on m4-air).
+6. Capture P3s: ACG_CREDENTIALS reports `empty` when Keychain is `locked`; lib-foundation run_parallel #157 CI flake. Grooming 2026-11-15 ranks the two new ideas rows.
+7. M2 note: two self-attached dtach loops (inner `dtach -A <same socket>` run inside the session) burned ~2.5 cores for 6-9 days; operator killed them 2026-11-14. Guard idea: export DTACH in the session and skip attach when set.
+
+## Previous handoff — 2026-11-13 ~20:00Z: v1.44.0 live checks done; next = P2 bug dispatch loop
 
 - **Objective (finished):** live-verify v1.44.0 landed plans. Helm-wait bug VERIFIED; dev-hub plan LIVE-VERIFIED (E2); deploy-hub-behind-alert LIVE-VERIFIED; Hermes Slack sensors E2 (non-destructive drill, Slack alert+recovery 18:39) and E4 (relay 401, debounce 0) PASS.
 - **Evidence:** commits 9b810a55, eef194d7, a7343124, 4ce31e61, c9f556e2; drill script /tmp/hermes-config-drill.py on the M5 (scratch state, may_rotate=False).
