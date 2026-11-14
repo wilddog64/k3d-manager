@@ -480,3 +480,108 @@ EOF
   done
 }
 
+@test "coordinator environment attributes start and resume while flag wins" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  export K3DM_COORDINATOR=openai/gpt-6.1-sol
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  s1_start_finished coordinator-env
+  local prompt="$BATS_TEST_TMPDIR/prompt.md"
+  printf 'continue\n' >"$prompt"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/coordinator-resume.argv" STUB_ENV="$BATS_TEST_TMPDIR/coordinator-resume.env"
+  dispatch resume --slug coordinator-env --prompt-file "$prompt" --reason continue_prompt >/dev/null
+  jq -e -s '[.[]|select(.slug=="coordinator-env" and (.event=="start" or .event=="resume"))]|length==2 and all(.[]; .coordinator_identity=={vendor:"openai",model:"gpt-6.1-sol",source:"env",status:"declared"})' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  export STUB_ARGV="$BATS_TEST_TMPDIR/coordinator-explicit.argv" STUB_ENV="$BATS_TEST_TMPDIR/coordinator-explicit.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug coordinator-explicit --coordinator anthropic/claude-opus >/dev/null
+  jq -e -s 'any(.[]; .slug=="coordinator-explicit" and .event=="start" and .coordinator_identity=={vendor:"anthropic",model:"claude-opus",source:"declared",status:"declared"})' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "missing coordinator warns and invalid env is rejected without ledger writes" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  unset K3DM_COORDINATOR
+  export STUB_ARGV="$BATS_TEST_TMPDIR/no-coordinator.argv" STUB_ENV="$BATS_TEST_TMPDIR/no-coordinator.env"
+  run --separate-stderr dispatch start --spec docs/plans/v9.9.9-demo.md --slug no-coordinator --agent agy
+  [ "$status" -eq 0 ]
+  [[ "$output" != *K3DM_COORDINATOR* && "$output" != *--coordinator* ]]
+  [ "$(grep -Ec 'K3DM_COORDINATOR|--coordinator' <<<"$stderr")" -eq 1 ]
+  jq -e -s 'any(.[]; .slug=="no-coordinator" and .event=="start" and .coordinator_identity.source=="unreported" and .coordinator_identity.vendor=="unknown")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  local run_dir="$K3DM_WORKTREE_ROOT/v9.9.9/no-coordinator.run" pid
+  for _ in {1..100}; do
+    [[ -n "${pid:-}" || ! -f "$run_dir/pid" ]] || pid="$(<"$run_dir/pid")"
+    if [[ -f "$run_dir/exit" && -n "${pid:-}" ]] && ! kill -0 "$pid" 2>/dev/null; then break; fi
+    sleep 0.1
+  done
+  export STUB_ARGV="$BATS_TEST_TMPDIR/model-worker.argv" STUB_ENV="$BATS_TEST_TMPDIR/model-worker.env" MODEL=gpt-6-luna
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug model-worker --model gpt-6-luna >/dev/null
+  jq -e -s 'any(.[]; .slug=="model-worker" and .event=="start" and .worker_identity.model=="gpt-6-luna" and .coordinator_identity.source=="unreported")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  local model_run="$K3DM_WORKTREE_ROOT/v9.9.9/model-worker.run" model_pid=""
+  for _ in {1..100}; do
+    [[ -n "$model_pid" || ! -f "$model_run/pid" ]] || model_pid="$(<"$model_run/pid")"
+    if [[ -f "$model_run/exit" && -n "$model_pid" ]] && ! kill -0 "$model_pid" 2>/dev/null; then break; fi
+    sleep 0.1
+  done
+  local before
+  before="$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  local long bad flag_output flag_status env_output env_status
+  long="$(printf '%065d' 0)"
+  for bad in 'bad-shape' "openai/$long" 'openai/bad;value'; do
+    run dispatch start --spec docs/plans/v9.9.9-demo.md --slug invalid-flag --coordinator "$bad"
+    flag_status="$status"; flag_output="$output"
+    export K3DM_COORDINATOR="$bad"
+    run dispatch start --spec docs/plans/v9.9.9-demo.md --slug invalid-env
+    env_status="$status"; env_output="$output"
+    [ "$env_status" -eq "$flag_status" ] && [ "$env_output" = "$flag_output" ]
+    [ "$env_status" -eq 2 ] && [[ "$env_output" == *"invalid coordinator"* ]]
+    [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq "$before" ]
+  done
+}
+
+@test "resume explicit coordinator overrides K3DM_COORDINATOR" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  local prompt="$BATS_TEST_TMPDIR/resume-flag.md"
+  printf 'continue safely\n' >"$prompt"
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  s1_start_finished resume-flag-wins
+  export K3DM_COORDINATOR=openai/gpt-6.1-sol
+  run --separate-stderr dispatch resume --slug resume-flag-wins --prompt-file "$prompt" --reason correction --coordinator anthropic/claude-opus
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+  jq -e -s 'any(.[]; .slug=="resume-flag-wins" and .event=="resume" and .coordinator_identity=={vendor:"anthropic",model:"claude-opus",source:"declared",status:"declared"})' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "resume without coordinator proceeds and warns once on stderr" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/fixture" ]]
+  local prompt="$BATS_TEST_TMPDIR/resume-unreported.md"
+  printf 'continue safely\n' >"$prompt"
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  export K3DM_COORDINATOR=openai/gpt-6.1-sol
+  s1_start_finished resume-unreported
+  unset K3DM_COORDINATOR
+  run --separate-stderr dispatch resume --slug resume-unreported --prompt-file "$prompt" --reason correction
+  [ "$status" -eq 0 ]
+  [[ "$output" != *K3DM_COORDINATOR* && "$output" != *--coordinator* ]]
+  [ "$(grep -Ec 'K3DM_COORDINATOR|--coordinator' <<<"$stderr")" -eq 1 ]
+  jq -e -s 'any(.[]; .slug=="resume-unreported" and .event=="resume" and .coordinator_identity.source=="unreported")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "resume rejects invalid coordinator environment without a resume row" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/worktrees" ]]
+  local prompt="$BATS_TEST_TMPDIR/resume-invalid.md"
+  printf 'continue safely\n' >"$prompt"
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  export K3DM_COORDINATOR=openai/gpt-6.1-sol
+  s1_start_finished resume-invalid
+  export K3DM_COORDINATOR='openai/bad;value'
+  local before
+  before="$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl" | tr -d ' ')"
+  run --separate-stderr dispatch resume --slug resume-invalid --prompt-file "$prompt" --reason correction
+  [ "$status" -eq 2 ]
+  [ "$output" = "" ]
+  [[ "$stderr" == *"invalid coordinator"* ]]
+  [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl" | tr -d ' ')" -eq "$before" ]
+}
+

@@ -1034,7 +1034,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 0 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed label_values and sort 8 replaced by query_result(sort_desc) and sort 0, bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 99  # agent-audit: allow assert-removed includes unpriced claude messages target
+    assert sum("$window" in expr for expr in expressions) == 100  # agent-audit: allow assert-removed includes unreported coordinator share target
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -3755,3 +3755,56 @@ def test_model_identity_allowlists_flash_fable_and_normalizes_unknown_models():
     assert 'display="openai/gpt-6-luna (selected)"' in by_slug["luna-run"]
     assert 'model="other"' in by_slug["madeup-run"]
     assert 'display="openai/other (selected)"' in by_slug["madeup-run"]
+
+
+def test_resume_env_coordinator_overrides_unreported_or_different_start_identity():
+    now = time.time()
+    sol = {"vendor": "openai", "model": "gpt-6.1-sol", "source": "env", "status": "declared"}
+    ledger = [
+        event(now - 6, "start", "resume-after-unreported", coordinator_identity={
+            "vendor": "unknown", "model": "unknown", "source": "unreported", "status": "unknown"}),
+        event(now - 5, "resume", "resume-after-unreported", coordinator_identity=sol),
+        event(now - 4, "land", "resume-after-unreported", result="landed"),
+        event(now - 3, "start", "resume-after-other", coordinator_identity={
+            "vendor": "openai", "model": "gpt-6-luna", "source": "declared", "status": "declared"}),
+        event(now - 2, "resume", "resume-after-other", coordinator_identity=sol),
+        event(now - 1, "land", "resume-after-other", result="landed"),
+    ]
+    output = dispatch_metrics.render(ledger, 0, now=now, prices={}, codex_home=Path("/nonexistent"))
+    coordinators = _identity_lines(output, "coordinator")
+    attributed = [line for line in coordinators if 'source="env"' in line]
+    assert len(attributed) == 2, output
+    assert all('vendor="openai",model="gpt-6.1-sol",source="env",status="declared"' in line
+               for line in attributed)
+
+
+def test_unreported_coordinator_share_counts_legacy_starts_and_scopes_start_events():
+    now = time.time()
+    ledger = [
+        event(now - 20, "start", "legacy"),
+        event(now - 19, "start", "env-run", coordinator_identity={
+            "vendor": "openai", "model": "gpt-6.1-sol", "source": "env", "status": "declared"}),
+        event(now - 18, "resume", "legacy", coordinator_identity={
+            "vendor": "openai", "model": "gpt-6.1-sol", "source": "env", "status": "declared"}),
+        event(now - 86401, "start", "outside-one-day"),
+    ]
+    output = dispatch_metrics.render(ledger, 0, now=now, prices={}, codex_home=Path("/nonexistent"))
+    assert 'k3dm_dispatch_coordinator_unreported_share{window="1d"} 0.5' in output
+    assert 'k3dm_dispatch_coordinator_unreported_share{window="7d"} 0.6666666666666666' in output
+
+
+def test_unreported_coordinator_share_emits_no_series_when_window_has_no_starts():
+    now = time.time()
+    output = dispatch_metrics.render([event(now - 86401, "start", "old-start")], 0,
+                                     now=now, prices={}, codex_home=Path("/nonexistent"))
+    assert 'k3dm_dispatch_coordinator_unreported_share{window="1d"}' not in output
+    assert 'k3dm_dispatch_coordinator_unreported_share{window="7d"} 1.0' in output
+    empty = dispatch_metrics.render([], 0, now=now, prices={}, codex_home=Path("/nonexistent"))
+    assert "k3dm_dispatch_coordinator_unreported_share" not in empty
+
+
+def test_dispatch_dashboard_has_unreported_coordinator_share_stat():
+    dashboard = load_dispatch_dashboard()
+    panel = next(panel for panel in dashboard["panels"] if panel.get("title") == "Unreported coordinator share")
+    assert panel["type"] == "stat"
+    assert panel["targets"][0]["expr"] == 'k3dm_dispatch_coordinator_unreported_share{window="$window"}'

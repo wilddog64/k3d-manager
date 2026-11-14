@@ -846,7 +846,7 @@ _dispatch_network_task_running() {
 }
 
 _dispatch_start() {
-  local spec="" slug="" parent="" role="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git coordinator="" coordinator_vendor="" coordinator_model="" primary_coordinator="" primary_vendor=unknown primary_model=unknown primary_source="" primary_identity_json
+  local spec="" slug="" parent="" role="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git coordinator="" coordinator_vendor="" coordinator_model="" coordinator_source=declared primary_coordinator="" primary_vendor=unknown primary_model=unknown primary_source="" primary_identity_json
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
@@ -866,6 +866,12 @@ _dispatch_start() {
     esac
   done
   [[ -n "$spec" ]] || _dispatch_error "start requires --spec PATH"
+  if [[ -z "$coordinator" && -n "${K3DM_COORDINATOR:-}" ]]; then
+    coordinator="$K3DM_COORDINATOR"
+    coordinator_source="env"
+  elif [[ -z "$coordinator" ]]; then
+    printf '%s\n' 'warning: declare coordinator with --coordinator VENDOR/MODEL or K3DM_COORDINATOR' >&2
+  fi
   if [[ -n "$coordinator" ]]; then
     [[ "$coordinator" =~ ^([A-Za-z0-9._:-]{1,64})/([A-Za-z0-9._:-]{1,64})$ ]] || _dispatch_error "invalid coordinator"
     coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
@@ -973,9 +979,9 @@ _dispatch_start() {
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" --arg parent "$parent" --arg role "$role" 'if $parent=="" then . else .parent=$parent|.role=$role end|.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg coordinator_source "$coordinator_source" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" --arg parent "$parent" --arg role "$role" 'if $parent=="" then . else .parent=$parent|.role=$role end|.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:$coordinator_source,status:"declared"} end)'
   else
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" --arg parent "$parent" --arg role "$role" 'if $parent=="" then . else .parent=$parent|.role=$role end|.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg coordinator_source "$coordinator_source" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" --arg parent "$parent" --arg role "$role" 'if $parent=="" then . else .parent=$parent|.role=$role end|.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:$coordinator_source,status:"declared"} end)'
   fi
   _dispatch_ledger_event_best_effort primary_coordinator "$version" "$slug" --arg vendor "$primary_vendor" --arg model "$primary_model" --arg source "$primary_source" \
     '.primary_coordinator_identity={vendor:$vendor,model:$model,source:$source,status:(if $source=="unknown" then "unknown" elif $source=="runtime-reported" then "runtime_reported" else "declared" end)}'
@@ -1304,7 +1310,7 @@ PYOPEN
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" reason="" rel version task run session_id n network_slug agent model="" coordinator="" coordinator_vendor="" coordinator_model="" model_source recorded_model recorded_source
+  local slug="" prompt_file="" reason="" rel version task run session_id n network_slug agent model="" coordinator="" coordinator_vendor="" coordinator_model="" coordinator_source=declared model_source recorded_model recorded_source
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -1317,6 +1323,12 @@ _dispatch_resume() {
   done
   case "$reason" in continue_prompt|clarification|correction|other) ;; *) _dispatch_error "invalid or missing resume reason" ;; esac
   [[ -n "$slug" ]] || _dispatch_error "resume requires --slug SLUG"
+  if [[ -z "$coordinator" && -n "${K3DM_COORDINATOR:-}" ]]; then
+    coordinator="$K3DM_COORDINATOR"
+    coordinator_source="env"
+  elif [[ -z "$coordinator" ]]; then
+    printf '%s\n' 'warning: declare coordinator with --coordinator VENDOR/MODEL or K3DM_COORDINATOR' >&2
+  fi
   if [[ -n "$coordinator" ]]; then
     [[ "$coordinator" =~ ^([A-Za-z0-9._:-]{1,64})/([A-Za-z0-9._:-]{1,64})$ ]] || _dispatch_error "invalid coordinator"
     coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
@@ -1357,7 +1369,7 @@ _dispatch_resume() {
   _dispatch_intervention --slug "$slug" --reason "$reason" >/dev/null
   recorded_model="$model"; recorded_source="$model_source"
   if [[ -z "$model" ]]; then recorded_model=unknown; recorded_source=unreported; fi
-  _dispatch_ledger_event_best_effort resume "$version" "$slug" --arg reason "$reason" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$recorded_model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source "$recorded_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" '.reason=$reason|.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:$model,source:$model_source,status:(if $model=="unknown" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --arg reason "$reason" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$recorded_model" --arg vendor "$( [[ "$agent" == agy ]] && echo google || echo openai )" --arg model_source "$recorded_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg coordinator_source "$coordinator_source" '.reason=$reason|.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:$model,source:$model_source,status:(if $model=="unknown" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:$coordinator_source,status:"declared"} end)'
   _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" "$model_source" </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
   _dispatch_schedule_metrics

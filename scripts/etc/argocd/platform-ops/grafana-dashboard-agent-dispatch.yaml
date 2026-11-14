@@ -2151,6 +2151,17 @@ data:
             "showHeader": true,
             "sortBy": []
           }
+        },
+        {
+          "id": 123,
+          "type": "stat",
+          "title": "Unreported coordinator share",
+          "description": "Share of start events in the selected range whose coordinator identity was unreported.",
+          "gridPos": {"h": 6, "w": 3, "x": 21, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_coordinator_unreported_share{window=\"$window\"}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.2}]}}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "none", "justifyMode": "auto"}
         }
       ]
     }

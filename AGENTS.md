@@ -11,6 +11,14 @@ Read the full spec and the current memory-bank context before acting. The `## Ac
 Every evidence item carries an operator-facing `intent`, and the spec carries `**Intent approved:**` before dispatch.
 <!-- shared:end intent-approval -->
 
+## Coordinator session attribution
+
+A session acting as the primary coordinator exports `K3DM_COORDINATOR=vendor/model` (for
+example, `openai/gpt-6.1-sol` or `openai/gpt-6.1-terra`) before dispatching or resuming work.
+An explicit `--coordinator VENDOR/MODEL` takes precedence over the environment variable.
+End each commit with a `Coordinator: <vendor/model>` trailer. Claude sessions keep their
+existing `Co-Authored-By` trailer as well.
+
 ## Test rules
 
 Never weaken, skip, or delete a test. Pair each test asserting no effect with a positive control that shows the effect when enabled. Capture external-tool stubs from real read-only output and record the host and date beside them. Before asserting a result, a fixture must assert its target (scratch HOME, stub endpoint, or fake repo root).

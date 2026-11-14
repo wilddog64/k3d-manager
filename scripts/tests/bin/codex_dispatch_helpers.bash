@@ -1,5 +1,6 @@
 # shellcheck disable=SC2034,SC2154
 setup() {
+  unset K3DM_COORDINATOR
   export FIXTURE="$BATS_TEST_TMPDIR/fixture" ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   export K3DM_WORKTREE_ROOT="$BATS_TEST_TMPDIR/worktrees" HOME="$BATS_TEST_TMPDIR/home"
   export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9" CODEX_HOME="$BATS_TEST_TMPDIR/codex-home"

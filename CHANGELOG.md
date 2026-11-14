@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **Codex dispatch attribution:** use `K3DM_COORDINATOR` when `--coordinator` is omitted, include env-declared coordinators in metrics, and show the unreported share on Agent Dispatch.
 - **App CVE scan:** normalize `UNKNOWN` findings from CVSS scores when counting deployed VulnerabilityReports and scanning candidates, and identify digest-pinned deployed images by digest.
 - **Vault unseal watchdog:** retry up to 12 times (5-second interval) when Vault is unreachable (rc 1) during startup before skipping, preventing post-restart unseal delays.
 

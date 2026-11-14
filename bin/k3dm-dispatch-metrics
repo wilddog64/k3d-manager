@@ -981,7 +981,7 @@ def _task_metrics(task_events, land_event, prices=None):
     declared_coordinators = [event.get("coordinator_identity") for _, event in ordered
                              if event.get("event") in {"start", "resume"}
                              and isinstance(event.get("coordinator_identity"), dict)
-                             and event["coordinator_identity"].get("source") == "declared"
+                             and event["coordinator_identity"].get("source") in {"declared", "env"}
                              and event["coordinator_identity"].get("status") == "declared"]
     coordinator_identity = declared_coordinators[-1] if declared_coordinators else (
         latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {})
@@ -1581,6 +1581,15 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     else:
         scoped = [event for event in source_events if _normalize_version(event.get("version")) == window]
         _render_release_duration(lines, window, scoped)
+    coordinator_starts = [event for event in scoped if event.get("event") == "start"]
+    coordinator_unreported = sum(
+        1 for event in coordinator_starts
+        if not isinstance(event.get("coordinator_identity"), dict)
+        or event["coordinator_identity"].get("source") == "unreported"
+    )
+    if coordinator_starts:
+        lines.append(f'k3dm_dispatch_coordinator_unreported_share{{window="{window}"}} '
+                     f'{coordinator_unreported / len(coordinator_starts)}')
     complexity = {}
     complexity_events = source_events if time_scope else scoped
     for task_events in _task_states(complexity_events).values():
@@ -1678,7 +1687,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         emitted_identity_labels = set()
         def identity_labels(identity, role):
             raw_source = identity.get("source")
-            source = raw_source if isinstance(raw_source, str) and raw_source in {"explicit", "default", "inherited", "runtime", "runtime-reported", "unreported", "declared", "unknown"} else "unreported"
+            source = raw_source if isinstance(raw_source, str) and raw_source in {"explicit", "default", "inherited", "runtime", "runtime-reported", "unreported", "declared", "env", "unknown"} else "unreported"
             if source == "runtime-reported":
                 source = "runtime"
             raw_vendor = identity.get("vendor")
