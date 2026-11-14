@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-14 (root capture or network reset on the M5; no code fix identified)
+**Waiting on:** operator decision — since 2026-11-14 (cleared by itself about 17:50Z; root cause unknown; decide: close as transient, or keep open and capture on recurrence)
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store needs the hub context, unreachable from the M4); read `docs/bugs/2026-11-13-hermes-ci-unknown-page-names-no-repo-or-cause.md` (different root cause: it is the evidence gap that hid this one)
@@ -45,3 +45,7 @@ Why the window never advances. Needs root on the M5: `sudo tcpdump -i en0 -w` du
 ## Fix direction
 
 Operator: capture, then reset the M5 network path, and re-run the probe table. Code-side gaps, for triage: `reachability` measures no throughput, and `argocd()` and `ci()` discard the exception (the ci half is `2026-11-13-hermes-ci-unknown-page-names-no-repo-or-cause.md`); `ci()` fetches 30 runs to read `runs[0]` (`per_page=1` would have stayed under the window).
+
+## Recovery (2026-11-14)
+
+Hermes posted to Slack (operator screenshot): "unknown 30+ min" for argocd, values_branch and ci at 08:41 PST (16:41Z); "ci check recovered" 09:56 PST (17:56Z); "argocd check recovered" and "values_branch check recovered" 10:04 PST (18:04Z). Claude re-ran the probes from m5-air at about 19:20Z (read-only): `speed.cloudflare.com/__down?bytes=2000000` 200, 2,000,000 B in 0.44 s; unpaginated `actions/runs` 200, 440,633 B in 1.55 s. The `brew upgrade` started 16:27:51Z is no longer running. No capture was taken, so why the window stopped advancing, and why it resumed, stay unknown; no operator action on the M5 network is recorded.
