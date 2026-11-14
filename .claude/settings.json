@@ -42,6 +42,14 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/handoff-on-clear.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-context-size.sh"
+          }
+        ]
       }
     ]
   }
