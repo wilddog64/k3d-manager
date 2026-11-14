@@ -1,12 +1,13 @@
 # v1.44.0 branch CI red: BSD-only `script` call in hub_promote.bats; squash merge re-dates 22 specs for spec-intent; security test needs a tripwire shim Linux no longer gets
 
-**Status:** LANDED — test-only fixes on `k3d-manager-v1.44.0`, 2026-11-12 (Claude; macOS + Ubuntu 24.04 container)
+**Status:** LIVE-VERIFIED — CI lint green on k3d-manager-v1.44.0 run 43617259300 (16cf965e, contains 3862cc65) and run 43620262854 (0fada07e), checked 2026-11-14 by Claude; LANDED — test-only fixes on `k3d-manager-v1.44.0`, 2026-11-12 (Claude; macOS + Ubuntu 24.04 container)
 **Priority:** P1 (proposed: CI red on the release branch and the pre-push hook refuses every push, no workaround short of `--no-verify`)
 **Classified:** pending second-agent classification
 **Introduced by:** (1) `c7466d65` deploy-hub batch (new "G regression" test); (2) `aa1196ed` v1.43.15 squash merge (re-dated files; latent until a push ran the suite); (3) `0b8d2b80` test-hygiene batch (`tripwire.sh` skips the shim for a tool the host lacks)
 **Should have been caught by:** (1) review (Claude verified the land on macOS only); (2) offline test (the suite was not run on the branch after the cut); (3) review (same: macOS-only land check; hidden in CI behind item 1's earlier red)
 **Prior art:** none above threshold (exact-slug glob; `find-similar-docs` vector store unavailable)
-**Waiting on:** live check
+**Live evidence:** 2026-11-14 · run 43617259300 · env github-actions/ubuntu-24.04 · scenario ci-lint-green · commit 16cf965e · proves fix
+**Fix commit:** 3862cc65
 
 ## Symptoms
 

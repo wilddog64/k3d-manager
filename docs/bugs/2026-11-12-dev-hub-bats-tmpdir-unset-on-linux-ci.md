@@ -1,12 +1,13 @@
 # dev_hub.bats fails on Linux CI: `${TMPDIR}` unset, so mktemp targets `/`
 
-**Status:** LANDED — test-only one-line fix on `k3d-manager-v1.44.0`, 2026-11-12 (Claude)
+**Status:** LIVE-VERIFIED — CI lint green on k3d-manager-v1.44.0 run 43617259300 (16cf965e, contains 6202cc45) and run 43620262854 (0fada07e), checked 2026-11-14 by Claude; LANDED — test-only one-line fix on `k3d-manager-v1.44.0`, 2026-11-12 (Claude)
 **Priority:** P1 (proposed: CI red on the release branch since dev-hub A landed; blocks `make hub-promote`, which needs green checks)
 **Classified:** pending second-agent classification
 **Introduced by:** `b2067ad3` (dev-hub Part A)
 **Should have been caught by:** review (Claude verified the land on macOS only, where `TMPDIR` is always set)
 **Prior art:** `docs/bugs/2026-11-12-v1-44-0-ci-red-linux-script-syntax-and-squash-dated-specs.md` (exact-slug glob, read) — same escape class (macOS-only land check), different root cause
-**Waiting on:** live check
+**Live evidence:** 2026-11-14 · run 43617259300 · env github-actions/ubuntu-24.04 · scenario ci-lint-green · commit 16cf965e · proves fix
+**Fix commit:** 6202cc45
 
 ## Symptom
 
