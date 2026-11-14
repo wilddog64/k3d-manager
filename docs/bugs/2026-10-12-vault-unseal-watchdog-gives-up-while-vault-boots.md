@@ -2,11 +2,11 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.44.0`
-**Status:** OPEN
+**Status:** LANDED — 55ad3a11, 2026-11-14
 **Priority:** P2 — Vault, and every secret read through it, stays sealed up to 5 minutes longer than needed after a restart; it recovers on its own
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Post-restart unsealing is delayed by one 5-minute CronJob interval when Vault is still booting, after which the next scheduled run automatically unseals it); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
-**Waiting on:** fix running — since 2026-11-13
+**Waiting on:** live check — since 2026-11-14 (next hub restart; operator applies the template)
 **Release:** v1.44.0 (carried by grooming 2026-11-12; was v1.46.0 per backlog triage, Claude, 2026-10-22)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** medium
@@ -132,3 +132,26 @@ evidence:
 - Do NOT apply the template to the live hub; the operator does that.
 - Do NOT commit, push or create a PR. Claude verifies and commits.
 - Do NOT modify files outside the Files list.
+
+## Verification — 2026-11-14 (Claude)
+
+Landed as `55ad3a11` (Flash, gemini-3.8-flash-medium). Claude made three changes before landing:
+
+- **Shard path kept fixed.** The worker made the production `SHARD_FILE` overridable by env (`${SHARD_FILE:-…}`) only
+  for testing. The test already rewrites the path with `sed`, so the change was reverted.
+- **`VAULT_CLIENT_TIMEOUT: "5s"` added to the container env** (Fable review M-1). Fable timed the real Vault 1.18.3 CLI:
+  connection refused 0 s, NXDOMAIN 1 s, blackholed SYN 30 s, TCP accepted but never answered 60 s. Without a client
+  timeout, 12 slow attempts exceed `activeDeadlineSeconds: 150`, and the Job fails with no `— skipping` line. With the
+  timeout, the worst case is about 125 s. Schedule, deadline, `backoffLimit` and image are unchanged.
+- **Tests tightened** (Fable L-2, L-3): exact `sleep 5` match; `set -u` and the timeout env asserted; a positive control
+  on the unseal path in M4.
+
+Evidence:
+- **E1:** `bats scripts/tests/etc/vault_unseal_watchdog.bats` passed 12/12.
+- **E2:** the pre-fix template failed tests 6, 7, 10, 11 and 12 (M1, M2, M4, N1, N2).
+- **Mutants:** each turned a test red: retry 12→1, the rc 2 `break` dropped, `sleep` removed, the timeout env removed,
+  `sleep 50`, `set -u` removed.
+- **Not fixed (low):** a `vault status` rc other than 0/1/2 (for example 127) runs 12 quick attempts and then the
+  unseal path. That matches pre-fix behaviour.
+- **E3 (live): pending.** On the next hub restart, one watchdog run should log `retry n/12` lines followed by
+  `unseal succeeded`.
