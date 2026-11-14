@@ -1,9 +1,9 @@
 # dev-hub: `dev-hub-up` Argo CD `helm --wait` times out when the vCluster syncer restarts during startup
 
-**Status:** OPEN
+**Status:** LANDED — f1eeeb26 (2026-11-13); live check pending (promote, then `make dev-hub-up` with no down)
 **Priority:** P1 (Claude proposal, raised 2026-11-13: a rerun cannot recover, and the only way back is down/up, which can hit the same timeout; blocks the plan E2 live check)
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** fix running — since 2026-11-13
+**Waiting on:** live check — since 2026-11-13
 **Introduced by:** b2067ad3 or later Part B commit that added the Argo CD install with `--wait` and no `--timeout` (unknown which)
 **Should have been caught by:** live check (offline tests cannot see startup timing)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` not run (vector store context missing on m4-air)
