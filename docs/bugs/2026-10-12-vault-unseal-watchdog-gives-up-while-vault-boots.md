@@ -155,3 +155,8 @@ Evidence:
   unseal path. That matches pre-fix behaviour.
 - **E3 (live): pending.** On the next hub restart, one watchdog run should log `retry n/12` lines followed by
   `unseal succeeded`.
+- **Independent verifier (Opus, Acceptance block only, own harness, real production `envsubst` allow-list):** 8/8 PASS
+  on `55ad3a11`. M1, M2, N1 and N2 were red on `55ad3a11~1`; M3a, M3b and M4 were green on both, as expected. The
+  shard marker never appeared in output (positive control: it was found in the stub's unseal call log). The only
+  rendered change outside the script is the `VAULT_CLIENT_TIMEOUT` env var. bats 12/12; the repo tree was clean after
+  the verifier moved its stray stub files out.
