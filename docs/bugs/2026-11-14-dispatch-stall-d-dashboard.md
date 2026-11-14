@@ -75,8 +75,8 @@ same append-one-line-with-flock behaviour where they are Python; a failed write 
 
 - Retitle the existing panel to **Repeated failed attempts** and set its description to "Tasks whose last two or more
   finished attempts were unsuccessful. A run that hangs without exiting shows under Stall recovery." Query unchanged.
-- New collapsed-by-default row **Stall recovery** after the row holding that panel, filtered by the dashboard's existing
-  version variable:
+- New collapsed-by-default row **Stall recovery** after the row holding that panel, filtered by the dashboard's `window`
+  variable (`{window="$window"}`; spec correction 2026-11-14: there is no version variable):
   - Stat **Hangs detected** (`sum(k3dm_dispatch_stall_incidents)`), stat **Median silence before detection**
     (minutes).
   - Bar gauge **Diagnoses by result** (`k3dm_dispatch_stall_diagnoses` by `status`).
@@ -150,3 +150,17 @@ interface:
 D reads events that A, B and C write, and works with none present (all zeros). It shares no file with A, B or C, so it
 can be dispatched beside them within the WIP limit. A, B and C each gain one event requirement when their specs are
 revised after the 2026-11-14 spec review.
+
+## Spec correction (Claude, 2026-11-14, after Fable review of run 1)
+
+Fix 3 named a version variable the dashboard does not have (its only variable is `window`: `1d`/`7d`/`30d` plus
+releases, default `7d`), and Fix 2 left the per-incident series without a scope label, so the Incidents table could
+never match and every version-filtered panel was blank on the default view. Corrected requirement:
+
+- Every stall metric except `k3dm_dispatch_stall_diagnosis_cost_usd_all_versions` is emitted once per window through
+  the exporter's existing per-window rendering (`_render_scope`), carrying a `window` label exactly like the other
+  panels' metrics, including `k3dm_dispatch_task_stall_incident`. Panels query `{window="$window"}`; tables aggregate
+  with `max by (...)`/`sum by (...)` so Pushgateway `job`/`instance` labels do not show.
+- Incidents and every join (diagnosis, decision, resume, outcome, clean approval) are keyed on `(slug, stall)`, never
+  `stall` alone. Per incident, the last diagnosis and the last decision win; one incident counts once in outcomes and
+  clean approvals however many `stall_resume rc=0` events it has; events are ordered by ledger position, not `ts`.
