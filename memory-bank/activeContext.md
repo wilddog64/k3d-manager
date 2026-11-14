@@ -7,6 +7,7 @@
 - **Verification status:** offline done for promtool + repo-sync; live pending (below).
 
 **Next, in order:**
+0. 2026-11-14 ~16:40Z resume: both dispatches still running, watchers restarted; CI on 6790e0c7 in progress (promote ask waits for green; 22ca679c not yet in deploy/hub).
 1. Watchers die with /clear — re-check: `bin/k3dm-codex-dispatch status prometheus-rules-argocd-app` (Luna, dispatched 16:05Z from docs/bugs/2026-11-13-promoted-prometheus-rules-never-applied.md) and `status parallel-offline-tests-b` (Flash, correction 3). Start a background until-loop on each still running.
 2. On each exit: verify outside the sandbox (pre-fix red, mutant, independent Opus verifier from Acceptance only + Fable diff review), commit worktree, land alone, push, mark + `dispatch verify` (evidence format: header fields + pre_fix_* triples + `---`; see `_dispatch_validate_evidence`).
 3. After parallel-offline-tests-b lands, dispatch docs/bugs/2026-11-12-hub-promote-containment-check-blind-to-squash-merges.md to Luna (held: both edit Makefile).
@@ -16,7 +17,7 @@
    - On M2 (console, no role file yet, checkout on k3d-manager-v1.43.15): `git fetch origin; git switch k3d-manager-v1.44.0; git pull --ff-only`, then `make machine-setup ROLE=console SECRETS=skip AGENTS=skip`.
    - CI green on the pushed head.
 5. Older live items still open: coordinator E3, Hermes E3, vault-unseal E3, CVE E3, ACG E2, test-hygiene batch items, dev-hub P1s, bash-3.2 live check (machine-setup under /bin/bash 3.2 — partly shown: _install_promtool ran under /bin/bash 3.2 on m4-air).
-6. Capture P3s: ACG_CREDENTIALS reports `empty` when Keychain is `locked`; lib-foundation run_parallel #157 CI flake. Grooming 2026-11-15 ranks the two new ideas rows.
+6. ~~Capture P3s~~ DONE 2026-11-14 ~16:45Z: docs/bugs/2026-11-14-acg-credentials-reports-empty-when-keychain-locked.md (cause: cdp.sh:199-200 `2>/dev/null || true`), docs/bugs/2026-11-14-lib-foundation-run-parallel-collision-test-flakes-on-linux.md (a_b result lost at collection; loop assertion can't fail). Argon classification pending. Grooming 2026-11-15 ranks the two new ideas rows.
 7. M2 note: two self-attached dtach loops (inner `dtach -A <same socket>` run inside the session) burned ~2.5 cores for 6-9 days; operator killed them 2026-11-14. Guard idea: export DTACH in the session and skip attach when set.
 
 ## Previous handoff — 2026-11-13 ~20:00Z: v1.44.0 live checks done; next = P2 bug dispatch loop
