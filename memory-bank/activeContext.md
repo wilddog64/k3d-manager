@@ -19,6 +19,7 @@
 7. hub-deploy-one-command live check on the next real promote: `make hub-deploy REF=<sha>; make hub-promote-status`.
 8. Smaller: Argon classification of new P3s + helm-wait bug; fix docs/plans/v1.44.0-dev-hub-vcluster.md:166-167 (preemptionPolicy); log Fable trial rows in docs/process-metrics.md (gauge 22%); grooming 2026-11-15.
 
+- 2026-11-14 07:22Z: promtool Part B run 1 exited (17 files; 2 outside Files: machine_setup_acceptance.bats, new test_promtool_helper.py). E2 live PASS on m4-air: real _install_promtool into scratch, promtool 3.1.0, idempotent rerun. E3/E4 suites + Fable review running.
 - 2026-11-14 06:23Z: coordinator fix independent verifier PASS (E1 43/43; N1/N2 red pre-fix). Waiting on live E3 (one Sol dispatch with K3DM_COORDINATOR).
 - 2026-11-14 06:11Z: offline-test children: C1 d96547df, C3/C4 VERIFIED in test-hygiene batch; C2 = promtool Part B, Files section added, dispatched to Luna. WIP 2/3 (parallel-offline-tests-b Flash, promtool-b Luna). Remaining P2s otherwise wait on operator decision/live check/investigation.
 - 2026-11-14 06:10Z: coordinator fix LANDED 9b97486c (correction 1 closed Fable's test gaps; 172/122 bats, pytest 209); offline_tested marked; independent Opus verifier running. Earlier ~08:30Z/~08:50Z stamps were wrong (clock was ~05:xxZ).
