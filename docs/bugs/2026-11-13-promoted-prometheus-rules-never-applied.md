@@ -1,8 +1,7 @@
 # Bug: promoted PrometheusRule changes never reach the hub Prometheus; `K3dmPromoteWaiting` is not loaded
 
-**Status:** LANDED — `a4460629` (Luna; Claude review fixes). Offline: independent Opus verifier pass (M1-M5, N1-N4 with positive controls), pre-fix 3/3 red, 11 appset mutants red, Fable review nothing above medium. Live E5-E7 pending
+**Status:** VERIFIED — live 2026-11-14 by Claude on deploy/hub `6ba89b3f` (landed `a4460629`). E5 and E6 pass; E7 not run (optional)
 **Priority:** P2 (new and changed alerts silently absent after a promote; workaround `make prometheus-rules` on the M5)
-**Waiting on:** live check — since 2026-11-14 (promote incl. a4460629, then `make appsets-reapply APPSETS_STAGE=hub`, E5/E6)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** pre-existing (rules apply only through `make prometheus-rules` / observability deploy); exposed by `c763e239` (v1.44.0 plan 3)
 **Should have been caught by:** spec (plan 3 lists no deploy step for its rule; E6 is the first live check that needs it)
@@ -179,3 +178,18 @@ No change to the Makefile, `observability.sh`, `bin/k3dm-repo-sync`, the AppProj
 - Show E1 and E2 red on today's tree (new file absent), then green; show the E3 bad-fixture runs red and the real tree green.
 - Run, from the repo root: `bats scripts/tests/plugins/prometheus_rules_appset.bats scripts/tests/plugins/argocd_appset_rollout_stage.bats scripts/tests/plugins/appset_envsubst_coverage.bats scripts/tests/plugins/platform_ops_appset_diff.bats scripts/tests/plugins/observability_public_endpoint_probes.bats` and `make validate-manifests FILES=scripts/etc/argocd/applicationsets/prometheus-rules-hub.yaml` if kubeconform is present (report if not). Paste each command, rc and proving lines, and list every error seen.
 - Leave changes uncommitted; do not push; do not run any live check (E5 to E7 belong to the operator or Claude).
+
+## Live verification (Claude, 2026-11-14)
+
+Read-only over ssh to `m5-air.local` (context `k3d-k3d-cluster`, ArgoCD v3.5.5 in `cicd`) after the operator ran
+`make hub-promote REF=6ba89b3f` (tag `hub-promote/20261114T144004Z`), `appsets-check`, `platform-ops` and
+`appsets-reapply APPSETS_STAGE=hub` (~14:40Z).
+
+- **E5 pass.** `hub-prometheus-rules` Synced/Healthy at `6ba89b3f`, target `deploy/hub`, 8 PrometheusRules Synced; the
+  two Probes from the excluded `public-endpoint-probes.yaml` still exist. Prometheus rules API: group `repo.sync` holds
+  `K3dmRepoSyncStale`, `K3dmDeployPending`, `K3dmPromoteWaiting`, `K3dmPromoteLookupFailed`; nobody ran `make prometheus-rules`.
+- **E6 pass.** All 8 objects keep their original uid and creationTimestamp (adopted, not recreated); the only field
+  manager is `argocd-controller` (`kubectl-client-side-apply` gone, so the Fable F2 concern does not apply); each carries
+  `argocd.argoproj.io/tracking-id`. Still Synced at 14:46:16Z, five minutes after the 14:41:06Z sync.
+- Ladder marks `deployed` and `live_verified` recorded. Note: `status.reconciledAt` had not moved past 14:41:06Z at 14:46Z.
+
