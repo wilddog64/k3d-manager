@@ -6,7 +6,7 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-14 (spec being written; intents need approval)
 
 ## Symptom
 
@@ -44,3 +44,7 @@ v1.43.15 history (9f5f0d89), whose squashed-away commits (fcc4fa4a, bb71f0cb, �
 `test@example.invalid`. Same root cause as this bug: individual commits outliving a squash merge. After
 `git reset --hard origin/k3d-manager-v1.44.0` (backup `refs/k3dm/manual-backup/20261112`) the tag
 `hub-promote/20261113T003457Z` pushed, and `make platform-ops` applied deploy/hub 34707659.
+
+## Decision 2026-11-14
+
+Operator, 2026-11-14: "go with your recommendations" — accept `old` as contained when `git merge-tree --write-tree new old` merges without conflict and the result's tree equals `new`'s tree (no GitHub API). `check_runs` stays independent of `BREAK_GLASS`.

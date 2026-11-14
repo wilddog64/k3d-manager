@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-13 by Claude while running plan 3 E6 (live)
 **Priority:** P2 (new and changed alerts silently absent after a promote; workaround `make prometheus-rules` on the M5)
-**Waiting on:** operator decision — since 2026-11-13
+**Waiting on:** dispatch — since 2026-11-14 (spec being written; intents need approval)
 **Introduced by:** pre-existing (rules apply only through `make prometheus-rules` / observability deploy); exposed by `c763e239` (v1.44.0 plan 3)
 **Should have been caught by:** spec (plan 3 lists no deploy step for its rule; E6 is the first live check that needs it)
 **Prior art:** exact-slug glob: none; `docs/bugs/2026-10-03-sandbox-make-up-host-alias-and-rules-crd-race.md` (title only, different). `make find-similar-docs` not run
@@ -29,3 +29,7 @@ Read-only probes of the M5 on 2026-11-13, 14:30Z:
 ## Unblock E6 now
 
 The operator runs `make prometheus-rules` on the M5. It is additive `kubectl apply` of the rule files.
+
+## Decision 2026-11-14
+
+Operator, 2026-11-14: "go with your recommendations" — **option 2**: manage the hub PrometheusRules through an ArgoCD Application that reads `deploy/hub` (like platform-ops), so a promote applies rule changes with no manual step.

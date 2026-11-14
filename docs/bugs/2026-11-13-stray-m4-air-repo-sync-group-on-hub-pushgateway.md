@@ -1,8 +1,8 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
 **Status:** OPEN — captured 2026-11-13 by Claude while watching plan 3 E6
-**Priority:** P3 (Claude proposal, revised 2026-11-13 16:25Z after the group was deleted; the earlier P2 proposal is withdrawn)
-**Waiting on:** operator decision — since 2026-11-13 (P3 confirmation, then batch with the next repo-sync dispatch)
+**Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
+**Waiting on:** dispatch — since 2026-11-14 (spec being written; intents need approval)
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; memory `feedback_pushgateway_tests_leak_to_real_hub` (same class). `make find-similar-docs` not run
@@ -51,3 +51,7 @@ The rule could also be scoped to the hub instance, but that only hides the sympt
 - The M4's launchd job is not the source: `~/.config/k3d-manager/machine-role` is `worker` (unchanged since 2026-11-13 08:19 local), and `repo-sync.log` holds only worker sync lines.
 - Agent work running on the M4 between 06:3xZ and 06:59Z: the promtool Part B Luna dispatch (06:11Z–07:22Z) and the parallel-offline-tests Part B Flash dispatch. Not yet proven which (if either) ran `bin/k3dm-repo-sync` with a hub role.
 - The fix shape from the 16:25Z update still stands: push only when `PUSHGATEWAY_URL` is set. A second recurrence within a day argues for P2 (Claude proposal): every recurrence pages falsely until the operator deletes the group.
+
+## Decision 2026-11-14
+
+Operator, 2026-11-14: "go with your recommendations" — raise to **P2** (recurred 2026-11-14, false page each time) and take the fix shape from the 2026-11-13 16:25Z update: push only when `PUSHGATEWAY_URL` is set; the hub's launchd plist template sets it.
