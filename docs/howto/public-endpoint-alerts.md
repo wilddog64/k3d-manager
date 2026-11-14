@@ -9,6 +9,10 @@ The default `CF_DOMAIN` comes from `scripts/etc/vars.sh`; exporting `CF_DOMAIN` 
 `deploy_observability` renders `scripts/etc/prometheus/rules/*.yaml` through `envsubst`, so a new
 rule file may use `${CF_DOMAIN}`, but any other new placeholder must be added to the allowlist in
 `scripts/plugins/observability.sh`.
+On the hub, PrometheusRule files are applied by ArgoCD from `deploy/hub`; only
+`public-endpoint-probes.yaml` still needs `make prometheus-rules`. Running `make prometheus-rules` or
+`deploy_observability` from a checkout that differs from `deploy/hub` is undone by ArgoCD self-heal within
+minutes; promote a rule change to test it on the hub.
 
 The exporter must be running and selected by the hub Prometheus before `probe_success`,
 `probe_http_status_code`, or these alerts can exist. Each Probe carries the
