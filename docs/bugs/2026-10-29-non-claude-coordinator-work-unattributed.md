@@ -4,7 +4,7 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Coordinator attribution telemetry is degraded (recording `unreported` by default), but a functional workaround exists by explicitly passing `--coordinator VENDOR/MODEL` and adding commit trailers manually); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (cost-dashboard batch) — grooming 2026-11-12, operator.
-**Waiting on:** live check — since 2026-11-14 (one Sol-coordinated dispatch with K3DM_COORDINATOR set; independent verifier running)
+**Waiting on:** live check — since 2026-11-14 (one Sol-coordinated dispatch with K3DM_COORDINATOR set)
 **Severity:** medium — dispatch, cost and quality metrics describe almost all recent work as coming from an unknown coordinator, so the Opus-vs-Sol/Terra comparison the operator needs cannot be made
 **Release:** v1.44.0 (carried by grooming 2026-11-12)
 **Branch:** `k3d-manager-v1.44.0`
@@ -124,3 +124,11 @@ Landed as `9b97486c` (Luna, gpt-6-luna; one correction round).
   3 pytest tests red.
 - **E3 (live): pending** — one Sol-coordinated dispatch with `K3DM_COORDINATOR` set; its ledger start event names Sol
   and its commit carries the `Coordinator:` trailer.
+- **Independent verifier (Opus, Acceptance block only, own harness with stubbed codex/agy and a scratch ledger):**
+  PASS on `9b97486c`. E1 43/43 on post-fix; on `9b97486c~1`, 32 of 43 fail (the 11 passes are the unchanged flag and
+  no-inference paths). N1 and N2 are red on pre-fix: env runs recorded `unreported`, and metrics labelled the task
+  `unknown`. M6: 13 invalid values each rejected the same way via env and via flag (rc 2, no ledger write, no
+  worktree), with a 64-character boundary accepted. M5: share 0.5 on a 4-start fixture; the panel expr matches the
+  exporter. M4: the docs state the env var, the precedence and the trailer, and a drift negative control on
+  `k3dm-check-agent-docs` gave rc 1. The repo tree and the real ledger were untouched. Noted, not a failure: with
+  `--coordinator` passed, an invalid env value is never checked (the flag wins).
