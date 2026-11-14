@@ -3,11 +3,11 @@
 AGENT_DASHBOARD_DIR="${AGENT_DASHBOARD_DIR:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops}"
 FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/agent-dispatch-dashboard-pre-split.yaml"
 BASELINE_FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/agent-dispatch-dashboard-028b898f.yaml"
-EXPORTER="${BATS_TEST_DIRNAME}/../../../bin/k3dm-dispatch-metrics"
+export EXPORTER="${EXPORTER:-${BATS_TEST_DIRNAME}/../../../bin/k3dm-dispatch-metrics}"
 
 @test "agent dispatch dashboard: valid ConfigMap JSON and datasource" {
   run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
-import json, sys
+import json, re, sys
 from pathlib import Path
 base=Path(sys.argv[1])
 for filename,key,uid in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json","k3dm-agent-dispatch"),
@@ -63,14 +63,98 @@ baseline_json = json.loads("\n".join(line[4:] for line in baseline_text.split(" 
 assert next(item for item in baseline_json["panels"] if item["id"] == 105)["type"] == "bargauge"
 old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
-assert set(new) == set(old) | {123}
+assert set(new) == set(old) | {123,124}
 assert new[123]["title"] == "Unreported coordinator share"
-for panel_id in old.keys() - {105, 12}:
+for panel_id in old.keys() - {105, 12, 103}:
     assert old[panel_id] == new[panel_id], panel_id
 print("ok: verification ladder contract; other panels unchanged")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok: verification ladder contract; other panels unchanged"* ]]
+}
+
+@test "agent dispatch dashboard: stall recovery row and metrics match the contract" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json, re, sys
+from pathlib import Path
+d=json.loads("\n".join(x[4:] for x in Path(sys.argv[1]).read_text().split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panels={p["id"]:p for p in d["panels"]}
+old=panels[103]
+assert old["title"] == "Repeated failed attempts"
+assert old["description"] == "Tasks whose last two or more finished attempts were unsuccessful. A run that hangs without exiting shows under Stall recovery."
+assert old["targets"][0]["expr"] == "sum(k3dm_dispatch_stalled_tasks)"
+fixture_path=Path(sys.argv[1]).parents[3]/"tests/fixtures/agent-dispatch-dashboard-028b898f.yaml"
+fixture=json.loads("\n".join(x[4:] for x in fixture_path.read_text().split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+original=next(p for p in fixture["panels"] if p["id"]==103)
+for field in ("gridPos","fieldConfig","options"): assert old[field]==original[field],field
+row=panels[124]
+assert row["title"] == "Stall recovery" and row["collapsed"] is True
+children={p["title"]:p for p in row["panels"]}
+expected={"Hangs detected":"sum(k3dm_dispatch_stall_incidents{window=\"$window\"}) or vector(0)",
+"Median silence before detection":"max(k3dm_dispatch_stall_silent_seconds_median{window=\"$window\"} / 60) or vector(0)",
+"Diagnoses by result":"sum by (status) (k3dm_dispatch_stall_diagnoses{window=\"$window\"})",
+"Diagnosis spend, all releases":"max(k3dm_dispatch_stall_diagnosis_cost_usd_all_versions) or vector(0)",
+"Operator decisions":"sum by (decision) (k3dm_dispatch_stall_decisions{window=\"$window\"})",
+"Median minutes to decide":"max(k3dm_dispatch_stall_decision_minutes_median{window=\"$window\"}) or vector(0)",
+"After resume":"sum by (outcome) (k3dm_dispatch_stall_outcomes{window=\"$window\"})",
+"Clean approvals (phase 2 gate)":"sum(k3dm_dispatch_stall_clean_approvals{window=\"$window\"}) or vector(0)",
+"Incidents":"max by (slug,stall,reason,diagnosis,decision,outcome) (k3dm_dispatch_task_stall_incident{window=\"$window\"}) / 60"}
+assert set(children)==set(expected)
+for title,expr in expected.items(): assert children[title]["targets"][0]["expr"]==expr,(title,children[title]["targets"])
+for title,panel in children.items():
+    for target in panel.get("targets",[]):
+        expr=target.get("expr","")
+        if "or vector(0)" in expr:
+            assert re.fullmatch(r"(?:sum|max)\s*\(.+\) or vector\(0\)",expr),(title,expr)
+spend=children["Diagnosis spend, all releases"]
+assert spend["description"] == "Paid from the $100 API credit, which expires 2026-12-08."
+assert spend["fieldConfig"]["defaults"]["thresholds"]["steps"] == [{"color":"green","value":None},{"color":"yellow","value":50},{"color":"red","value":80}]
+print("ok: stall recovery dashboard contract")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: stall recovery dashboard contract"* ]]
+}
+
+@test "agent dispatch dashboard: fixture exporter series satisfy every stall selector label" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" <<'PY'
+import json, os, re, subprocess, sys, tempfile, time
+from pathlib import Path
+dashboard_path, exporter = Path(sys.argv[1]), Path(sys.argv[2])
+d=json.loads("\n".join(x[4:] for x in dashboard_path.read_text().split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+row=next(p for p in d["panels"] if p.get("title")=="Stall recovery")
+now=time.time(); version="v1.44.0"; slug="fixture-incident"; stall="stall-fixture"
+with tempfile.TemporaryDirectory(prefix="stall-dashboard-") as scratch:
+    fixture=Path(scratch); root=fixture/"worktrees"; home=fixture/"home"; root.mkdir(); home.mkdir()
+    ledger=root/"ledger.jsonl"
+    rows=[
+      {"ts":now-30,"event":"start","version":version,"slug":slug},
+      {"ts":now-20,"event":"stall_detected","version":version,"slug":slug,"stall":stall,"reason":"silent","silent_s":120},
+      {"ts":now-19,"event":"stall_diagnosis","version":version,"slug":slug,"stall":stall,"status":"ok","cost_usd":0.42},
+      {"ts":now-18,"event":"stall_proposal","version":version,"slug":slug,"stall":stall},
+      {"ts":now-17,"event":"stall_decision","version":version,"slug":slug,"stall":stall,"decision":"approved"},
+      {"ts":now-16,"event":"stall_resume","version":version,"slug":slug,"stall":stall,"rc":0},
+      {"ts":now-15,"event":"land","version":version,"slug":slug},
+    ]
+    ledger.write_text("\n".join(json.dumps(x) for x in rows)+"\n")
+    env=os.environ.copy(); env.update({"K3DM_WORKTREE_ROOT":str(root),"HOME":str(home),"XDG_CACHE_HOME":str(home/"cache"),"K3DM_DISPATCH_PUSHGATEWAY_URL":"http://127.0.0.1:9","K3DM_PUSHGATEWAY_URL":"http://127.0.0.1:9"})
+    assert Path(env["K3DM_WORKTREE_ROOT"])==root and ledger.parent==root and Path(env["HOME"])==home
+    assert env["K3DM_DISPATCH_PUSHGATEWAY_URL"]==env["K3DM_PUSHGATEWAY_URL"]=="http://127.0.0.1:9"
+    output=subprocess.run([sys.executable,str(exporter),"--dry-run","--codex-home",str(home/".codex"),"--claude-projects",str(home/".claude"),"--claude-cache",str(home/"claude.json"),"--claude-usage-cache",str(home/"usage.json")],env=env,check=True,capture_output=True,text=True).stdout
+    series={}
+    for line in output.splitlines():
+        match=re.match(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?\s+\S+$',line)
+        if not match: continue
+        labels=dict(re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"',match.group(2) or ""))
+        series.setdefault(match.group(1),[]).append(labels)
+    for panel in row["panels"]:
+        for target in panel.get("targets",[]):
+            for metric,selector in re.findall(r'(k3dm_dispatch_stall_[a-z0-9_]+|k3dm_dispatch_task_stall_incident)\{([^}]*)\}',target.get("expr","")):
+                wanted={k:("7d" if v=="$window" else v) for k,v in re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"',selector)}
+                assert any(all(labels.get(k)==v for k,v in wanted.items()) for labels in series.get(metric,[])),(panel["title"],metric,wanted,series.get(metric,[]))
+print("ok: fixture series satisfy stall panel selectors")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: fixture series satisfy stall panel selectors"* ]]
 }
 
 @test "agent dispatch dashboard: every queried metric is exported" {
@@ -81,7 +165,11 @@ base=Path(sys.argv[1]); dashboards=[]
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
     text=(base/filename).read_text(); dashboards.append(json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines())))
 exporter=Path(sys.argv[2]).read_text()
-queries="\n".join(t.get("expr","") for d in dashboards for p in d["panels"] for t in p.get("targets",[]))
+def all_panels(panels):
+    for panel in panels:
+        yield panel
+        yield from all_panels(panel.get("panels",[]))
+queries="\n".join(t.get("expr","") for d in dashboards for p in all_panels(d["panels"]) for t in p.get("targets",[]))
 for metric in set(re.findall(r"\bk3dm_(?:dispatch|claude|codex|agy)_[a-z0-9_]+",queries)):
     assert metric in exporter,metric
 print("ok")
@@ -278,14 +366,15 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106,123}|set(range(42,49))
+all_ids += [p["id"] for d in new for row in d["panels"] if row.get("type")=="row" for p in row.get("panels",[])]
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106,123,124}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,116,117,118,119,120,121,122}
 assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 107 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 117 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -298,7 +387,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123):
+    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -778,7 +867,7 @@ props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for
 for field in ["Worker model","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
     opts=props[field]["mappings"][0]["options"]
     assert opts=={"unknown":{"text":"not recorded"}}
-assert len(d["panels"])==36
+assert len(d["panels"])==37
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -1065,17 +1154,19 @@ d = json.loads("\n".join(x[4:] for x in open(sys.argv[1]).read().split("  agent-
 exporter = Path(sys.argv[2]).read_text()
 panels = {p["title"]: p for p in d["panels"]}
 
-expected_panels = ["Stalled tasks", "Live verification pending", "Verification ladder", "Split work"]
+expected_panels = ["Repeated failed attempts", "Live verification pending", "Verification ladder", "Split work"]
 for title in expected_panels:
     assert title in panels, f"missing panel: {title}"
     desc = panels[title].get("description", "").lower()
-    assert "self-reported and advisory" in desc, f"{title} description missing advisory note: {desc}"
+    if title != "Repeated failed attempts":
+        assert "self-reported and advisory" in desc, f"{title} description missing advisory note: {desc}"
 
 series_by_panel = {
-    "Stalled tasks": "k3dm_dispatch_stalled_tasks",
+    "Repeated failed attempts": "k3dm_dispatch_stalled_tasks",
     "Live verification pending": "k3dm_dispatch_live_pending_tasks",
     "Verification ladder": "k3dm_dispatch_ladder_tasks",
 }
+assert panels["Repeated failed attempts"].get("description") == "Tasks whose last two or more finished attempts were unsuccessful. A run that hangs without exiting shows under Stall recovery."
 for title, series in series_by_panel.items():
     exprs = "\n".join(t.get("expr", "") for t in panels[title].get("targets", []))
     assert series in exprs, f"{title} targets do not query {series}: {exprs}"

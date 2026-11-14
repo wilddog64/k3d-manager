@@ -38,6 +38,29 @@ load codex_dispatch_helpers
   [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$before" ]
 }
 
+@test "codex dispatch: stall recovery events do not close a task for open or abandon readers" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/stalled-task"
+  git -C "$FIXTURE" branch task/v9.9.9/stalled-task
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/stalled-task" task/v9.9.9/stalled-task >/dev/null
+  cat >"$K3DM_WORKTREE_ROOT/ledger.jsonl" <<'JSON'
+{"ts":1,"event":"start","version":"v9.9.9","slug":"stalled-task","repo":"k3d-manager"}
+{"ts":2,"event":"stall_detected","version":"v9.9.9","slug":"stalled-task","stall":"stall-2","reason":"silent","silent_s":120}
+{"ts":3,"event":"stall_diagnosis","version":"v9.9.9","slug":"stalled-task","stall":"stall-2","status":"ok","cost_usd":0.42}
+{"ts":4,"event":"stall_decision","version":"v9.9.9","slug":"stalled-task","stall":"stall-2","decision":"approved"}
+{"ts":5,"event":"stall_resume","version":"v9.9.9","slug":"stalled-task","stall":"stall-2","rc":0}
+JSON
+  run dispatch open
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"v9.9.9 stalled-task"* ]]
+  run dispatch abandon --slug stalled-task --yes
+  [ "$status" -eq 0 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/stalled-task" ]
+  run jq -c 'select(.event == "abandon" and .slug == "stalled-task")' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$status" -eq 0 ]
+}
+
 @test "codex dispatch: abandon --version of an older release preserves current release worktree and branch (N3)" {
   [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR"* ]]
   [[ "$FIXTURE" == "$BATS_TEST_TMPDIR"* ]]

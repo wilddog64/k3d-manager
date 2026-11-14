@@ -18,7 +18,7 @@ from promtool_helper import resolve_promtool  # noqa: E402
 # agent-audit: allow assert-removed evidence_path drops the home directory; the absolute-path assert becomes a root-relative one plus a no-tmp-path assert
 # agent-audit: allow assert-removed per-spec series gained an agent label; every removed assert is re-added with agent="codex" and the same value
 
-SCRIPT = Path(__file__).parents[3] / "bin" / "k3dm-dispatch-metrics"
+SCRIPT = Path(os.environ.get("DISPATCH_METRICS_SCRIPT", Path(__file__).parents[3] / "bin" / "k3dm-dispatch-metrics"))
 SPEC = importlib.util.spec_from_loader("dispatch_metrics", importlib.machinery.SourceFileLoader("dispatch_metrics", str(SCRIPT)))
 dispatch_metrics = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = dispatch_metrics
@@ -57,6 +57,184 @@ def load_dispatch_dashboard():
 
 def event(ts, name, slug="one", **extra):
     return {"ts": ts, "event": name, "version": "9.9.9", "slug": slug, **extra}
+
+
+STALL_BASE = 1794614400
+
+
+def stall(ts, name, slug="one", incident="stall-a", version="v1.44.0", **extra):
+    return event(STALL_BASE + ts, name, slug=slug, version=version, stall=incident, **extra)
+
+
+def test_stall_metrics_are_scoped_to_window_and_release_and_join_by_slug_and_stall():
+    rows = [
+        stall(0, "start", slug="a"),
+        stall(10, "stall_detected", slug="a", reason="silent", silent_s=900),
+        stall(11, "stall_diagnosis", slug="a", status="old", cost_usd=0.1),
+        stall(12, "stall_proposal", slug="a"),
+        stall(13, "stall_decision", slug="a", decision="denied"),
+        stall(14, "stall_diagnosis", slug="a", status="ok", cost_usd=0.32),
+        stall(15, "stall_decision", slug="a", decision="approved"),
+        stall(20, "stall_resume", slug="a", rc=0),
+        stall(20, "stall_resume", slug="a", rc=0),
+        stall(20, "land", slug="a"),
+        stall(30, "stall_detected", slug="b", reason="weird", silent_s=120),
+        stall(31, "stall_decision", slug="b", decision="denied"),
+    ]
+    output = dispatch_metrics.render(rows, 0, now=STALL_BASE + 100)
+    assert 'k3dm_dispatch_stall_incidents{window="7d",version="v1.44.0",reason="silent"} 1' in output
+    assert 'k3dm_dispatch_stall_incidents{window="7d",version="v1.44.0",reason="weird"} 1' in output
+    assert 'k3dm_dispatch_stall_incidents{window="7d",version="v1.44.0",reason="procs"} 0' in output
+    assert 'k3dm_dispatch_stall_diagnoses{window="7d",version="v1.44.0",status="ok"} 1' in output
+    assert 'k3dm_dispatch_stall_diagnosis_cost_usd{window="7d",version="v1.44.0"} 0.42' in output
+    assert 'k3dm_dispatch_stall_decisions{window="7d",version="v1.44.0",decision="denied"} 2' in output
+    assert 'k3dm_dispatch_stall_decision_minutes_median{window="7d",version="v1.44.0"} 0.03333333333333333' in output
+    assert 'k3dm_dispatch_stall_outcomes{window="7d",version="v1.44.0",outcome="landed"} 1' in output
+    assert 'k3dm_dispatch_stall_clean_approvals{window="7d",version="v1.44.0"} 1' in output
+    assert 'k3dm_dispatch_stall_clean_approvals{window="v1.44.0",version="v1.44.0"} 1' in output
+    assert 'window="7d",version="v1.44.0",slug="a",stall="stall-a",reason="silent",diagnosis="ok",decision="approved",outcome="landed"} 900' in output
+    assert 'window="7d",version="v1.44.0",slug="b",stall="stall-a",reason="weird",diagnosis="unknown",decision="denied",outcome="none"} 120' in output
+    assert output.count('slug="a",stall="stall-a"') == 4  # one series for each time window and the release scope
+
+
+def test_stall_outcomes_cover_abandoned_pending_and_ignore_failed_resumes():
+    rows = [
+        stall(1, "stall_detected", slug="ab", incident="stall-ab", reason="silent", silent_s=5),
+        stall(2, "stall_resume", slug="ab", incident="stall-ab", rc=0),
+        stall(3, "abandon", slug="ab"),
+        stall(4, "stall_detected", slug="pending", incident="stall-p", reason="procs", silent_s=6),
+        stall(5, "stall_resume", slug="pending", incident="stall-p", rc=0),
+        stall(6, "stall_detected", slug="failed", incident="stall-f", reason="silent", silent_s=7),
+        stall(7, "stall_resume", slug="failed", incident="stall-f", rc=1),
+    ]
+    output = dispatch_metrics.render(rows, 0, now=STALL_BASE + 20)
+    assert 'k3dm_dispatch_stall_outcomes{window="7d",version="v1.44.0",outcome="abandoned"} 1' in output
+    assert 'k3dm_dispatch_stall_outcomes{window="7d",version="v1.44.0",outcome="pending"} 1' in output
+    assert 'k3dm_dispatch_task_stall_incident{window="7d",version="v1.44.0",slug="failed",stall="stall-f",reason="silent",diagnosis="unknown",decision="unknown",outcome="none"} 7' in output
+
+
+def test_stall_correction_resume_prevents_clean_approval_but_keeps_landed_outcome():
+    rows = [stall(1, "stall_detected", reason="silent", silent_s=9),
+            stall(2, "stall_decision", decision="approved"),
+            stall(3, "stall_resume", rc=0),
+            stall(4, "resume", reason="correction"),
+            stall(5, "land")]
+    output = dispatch_metrics.render(rows, 0, now=STALL_BASE + 10)
+    assert 'k3dm_dispatch_stall_outcomes{window="7d",version="v1.44.0",outcome="landed"} 1' in output
+    assert 'k3dm_dispatch_stall_clean_approvals{window="7d",version="v1.44.0"} 0' in output
+
+
+def test_stall_recovery_cli_dry_run_uses_only_asserted_scratch_targets(tmp_path, monkeypatch):
+    root = tmp_path / "scratch-worktrees"
+    home = tmp_path / "scratch-home"
+    ledger = root / "ledger.jsonl"
+    home.mkdir()
+    root.mkdir()
+    rows = [event(1794614401, "stall_detected", stall="stall-cli", reason="silent", silent_s=60),
+            event(1794614402, "stall_diagnosis", stall="stall-cli", status="ok", cost_usd=0.42),
+            event(1794614403, "stall_proposal", stall="stall-cli"),
+            event(1794614404, "stall_decision", stall="stall-cli", decision="approved"),
+            event(1794614405, "stall_resume", stall="stall-cli", rc=0),
+            event(1794614406, "land")]
+    ledger.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(home / "cache"))
+    assert Path(os.environ["K3DM_WORKTREE_ROOT"]) == root
+    assert ledger.parent == root and Path(os.environ["HOME"]) == home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    assert os.environ["K3DM_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    result = subprocess.run([sys.executable, str(SCRIPT), "--dry-run", "--codex-home", str(home / ".codex"),
+                             "--claude-projects", str(home / ".claude"), "--claude-cache", str(home / "claude.json"),
+                             "--claude-usage-cache", str(home / "usage.json")],
+                            check=True, capture_output=True, text=True, env=os.environ.copy())
+    for metric in ("k3dm_dispatch_stall_incidents", "k3dm_dispatch_stall_silent_seconds_median",
+                   "k3dm_dispatch_stall_diagnoses", "k3dm_dispatch_stall_diagnosis_cost_usd",
+                   "k3dm_dispatch_stall_diagnosis_cost_usd_all_versions", "k3dm_dispatch_stall_decisions",
+                   "k3dm_dispatch_stall_decision_minutes_median", "k3dm_dispatch_stall_outcomes",
+                   "k3dm_dispatch_stall_clean_approvals", "k3dm_dispatch_task_stall_incident"):
+        assert metric in result.stdout
+    assert 'k3dm_dispatch_stall_clean_approvals{window="7d",version="9.9.9"} 1' in result.stdout
+
+
+def test_stall_diagnosis_cost_all_versions_has_cutoff_and_scope_costs():
+    rows = [stall(-1, "stall_diagnosis", slug="old", incident="old", version="v1.0.0", cost_usd=1.0),
+            stall(1, "stall_diagnosis", slug="one", incident="one", version="v1.0.0", cost_usd=0.42),
+            stall(2, "stall_diagnosis", slug="two", incident="two", version="v2.0.0", cost_usd=1.25)]
+    output = dispatch_metrics.render(rows, 0, now=STALL_BASE + 3)
+    assert 'k3dm_dispatch_stall_diagnosis_cost_usd{window="7d",version="v1.0.0"} 1.42' in output
+    assert 'k3dm_dispatch_stall_diagnosis_cost_usd{window="7d",version="v2.0.0"} 1.25' in output
+    assert 'k3dm_dispatch_stall_diagnosis_cost_usd_all_versions 1.67' in output
+
+
+def test_stall_labels_are_sanitized():
+    rows = [stall(1, "stall_detected", version='v1"\\\n.44.0', slug='bad"\\\nslug',
+                  incident='stall"\\\n', reason='silent"\\\n', silent_s=10),
+            stall(2, "stall_diagnosis", version='v1"\\\n.44.0', slug='bad"\\\nslug',
+                  incident='stall"\\\n', status='ok"\\\n', cost_usd=0.1),
+            stall(3, "stall_decision", version='v1"\\\n.44.0', slug='bad"\\\nslug',
+                  incident='stall"\\\n', decision='approved"\\\n')]
+    output = dispatch_metrics.render(rows, 0, now=STALL_BASE + 5)
+    labels = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_stall_incident{") and 'window="1d"' in line)
+    assert 'window="1d",version="v1.44.0",slug="badslug",stall="stall",reason="silent",diagnosis="ok",decision="approved",outcome="none"' in labels
+    assert 'status="ok"' in next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_stall_diagnoses{"))
+    assert 'decision="approved"' in next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_stall_decisions{"))
+    assert any('reason="silent"' in line for line in output.splitlines() if line.startswith("k3dm_dispatch_stall_incidents{"))
+    assert "\n" not in labels and "\\" not in labels and 'slug="bad"' not in labels
+
+
+def test_malformed_stall_values_do_not_abort_or_drop_valid_stall_or_existing_metrics(tmp_path):
+    rows = [stall(0, "start", slug="good", incident="good"),
+            stall(1, "stall_detected", slug="good", incident="good", reason="silent", silent_s=2),
+            stall(2, "stall_diagnosis", slug="good", incident="good", cost_usd=2.5, status="ok"),
+            stall(3, "stall_diagnosis", slug="bad-cost", incident="bad-cost", cost_usd="bad", status="failed"),
+            stall(4, "stall_detected", slug="bad-silence", incident="bad-silence", reason="silent", silent_s=float("inf")),
+            stall(5, "stall_detected", slug="negative-silence", incident="negative-silence", reason="silent", silent_s=-2),
+            stall(6, "stall_diagnosis", slug="negative-cost", incident="negative-cost", cost_usd=-1, status="failed"),
+            {"ts": float("inf"), "event": "stall_diagnosis", "version": "v1.44.0", "slug": "infinite-ts", "stall": "infinite-ts", "cost_usd": 8.0},
+            {"ts": float("nan"), "event": "stall_detected", "version": "v1.44.0", "slug": "nan-ts", "stall": "nan-ts", "reason": "silent", "silent_s": 8}]
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+    parsed, bad = dispatch_metrics.read_ledger(ledger)
+    output = dispatch_metrics.render(parsed, bad, now=STALL_BASE + 10)
+    assert "k3dm_dispatch_ledger_bad_lines 6" in output
+    assert "k3dm_dispatch_stall_diagnosis_cost_usd_all_versions 2.5" in output
+    assert 'k3dm_dispatch_stall_diagnosis_cost_usd{window="v1.44.0",version="v1.44.0"} 2.5' in output
+    assert "k3dm_dispatch_delivered" in output
+    assert 'k3dm_dispatch_stall_incidents{window="7d",version="v1.44.0",reason="silent"} 1' in output
+
+
+def test_stall_silent_seconds_format_preserves_large_values():
+    output = dispatch_metrics.render(
+        [stall(1, "stall_detected", reason="silent", silent_s=1_234_567)],
+        0, now=STALL_BASE + 10)
+    assert 'k3dm_dispatch_stall_silent_seconds_median{window="7d",version="v1.44.0"} 1234567.0' in output
+
+
+def test_stall_incident_series_dedupe_after_label_sanitizing():
+    rows = [stall(1, "stall_detected", slug="same", incident="stall-10", reason="silent", silent_s=10),
+            stall(2, "stall_detected", slug="same", incident='stall-"10', reason="silent", silent_s=10)]
+    output = dispatch_metrics.render(rows, 0, now=STALL_BASE + 10)
+    table_rows = [line for line in output.splitlines()
+                  if line.startswith('k3dm_dispatch_task_stall_incident{window="7d"')]
+    assert len(table_rows) == 1
+    assert 'stall="stall-10"' in table_rows[0]
+
+
+def test_stall_events_do_not_change_existing_metrics_and_land_is_positive_control():
+    baseline = [event(1, "start"), event(2, "codex_exit", rc=0)]
+    stalls = [event(3, "stall_detected", stall="s", reason="silent", silent_s=9),
+              event(4, "stall_diagnosis", stall="s", status="ok", cost_usd=0),
+              event(5, "stall_proposal", stall="s"), event(6, "stall_decision", stall="s", decision="approved"),
+              event(7, "stall_resume", stall="s", rc=1)]
+    def non_stall(rows):
+        return [line for line in dispatch_metrics.render(rows, 0, now=10).splitlines()
+                if not line.startswith("k3dm_dispatch_stall_") and not line.startswith("k3dm_dispatch_task_stall_incident")]
+    assert "k3dm_dispatch_stall_incidents" in dispatch_metrics.render(baseline + stalls, 0, now=10)
+    assert non_stall(baseline) == non_stall(baseline + stalls)
+    assert non_stall(baseline) != non_stall(baseline + [event(8, "land")])
 
 
 def write_session(home, session, started, now, cwd=None, usage=None):
@@ -1413,6 +1591,65 @@ def test_by_model_promql_returns_one_series_per_model(tmp_path):
     )
     result = subprocess.run([promtool, "test", "rules", str(tests)],
                             cwd=tmp_path, text=True, capture_output=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_stall_dashboard_promql_aggregates_versions_before_zero_fallback(tmp_path):
+    try:
+        promtool = resolve_promtool()
+    except RuntimeError:
+        pytest.skip("promtool is not installed; skipping stall dashboard PromQL rule test")
+
+    row = next(panel for panel in load_dispatch_dashboard()["panels"] if panel.get("title") == "Stall recovery")
+    panels = {panel["id"]: panel for panel in row["panels"]}
+    panel_ids = (125, 126, 127, 128, 129, 130, 131, 132)
+    expressions = {panel_id: panels[panel_id]["targets"][0]["expr"].replace("$window", "7d")
+                   for panel_id in panel_ids}
+    push_labels = ',job="pushgateway",instance="localhost"'
+    input_series = []
+
+    def add(metric, version, labels, value):
+        scope_labels = f'window="7d",version="{version}"' if version else ""
+        all_labels = ",".join(part for part in (scope_labels, labels.lstrip(","), push_labels.lstrip(",")) if part)
+        input_series.append({"series": f"{metric}{{{all_labels}}}",
+                             "values": str(value)})
+
+    for version, count, silence, clean in (("v1.44.0", 1, 240, 1), ("v1.45.0", 2, 300, 2)):
+        add("k3dm_dispatch_stall_incidents", version, ',reason="silent"', count)
+        add("k3dm_dispatch_stall_silent_seconds_median", version, "", silence)
+        add("k3dm_dispatch_stall_clean_approvals", version, "", clean)
+        add("k3dm_dispatch_stall_diagnoses", version, ',status="ok"', count)
+        add("k3dm_dispatch_stall_diagnoses", version, ',status="failed"', 1)
+        add("k3dm_dispatch_stall_decisions", version, ',decision="approved"', count)
+        add("k3dm_dispatch_stall_decisions", version, ',decision="denied"', 1)
+        add("k3dm_dispatch_stall_decisions", version, ',decision="expired"', 0)
+        add("k3dm_dispatch_stall_decisions", version, ',decision="precondition_failed"', 0)
+        add("k3dm_dispatch_stall_decision_minutes_median", version, "", 10 if count == 1 else 15)
+        for outcome, value in (("landed", count - 1), ("stalled_again", 0), ("abandoned", 0), ("pending", count)):
+            add("k3dm_dispatch_stall_outcomes", version, f',outcome="{outcome}"', value)
+    input_series.append({"series": 'k3dm_dispatch_stall_diagnosis_cost_usd_all_versions{job="pushgateway",instance="localhost"}',
+                         "values": "42"})
+
+    expected = {
+        125: [("{}", 3)], 126: [("{}", 5)], 127: [('{status="failed"}', 2), ('{status="ok"}', 3)],
+        128: [("{}", 42)],
+        129: [('{decision="approved"}', 3), ('{decision="denied"}', 2),
+              ('{decision="expired"}', 0), ('{decision="precondition_failed"}', 0)],
+        130: [("{}", 15)],
+        131: [('{outcome="abandoned"}', 0), ('{outcome="landed"}', 1),
+              ('{outcome="pending"}', 3), ('{outcome="stalled_again"}', 0)],
+        132: [("{}", 3)],
+    }
+    promql_expr_test = []
+    for panel_id in panel_ids:
+        samples = [{"labels": labels, "value": value} for labels, value in expected[panel_id]]
+        promql_expr_test.append({"expr": expressions[panel_id], "eval_time": "0m", "exp_samples": samples})
+    rule_test = {"rule_files": [], "evaluation_interval": "1m", "tests": [{
+        "interval": "1m", "input_series": input_series, "promql_expr_test": promql_expr_test}]}
+    test_file = tmp_path / "stall-dashboard-rules.yml"
+    test_file.write_text(json.dumps(rule_test))
+    result = subprocess.run([promtool, "test", "rules", str(test_file)], cwd=tmp_path,
+                            text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
 
 

@@ -52,6 +52,10 @@ The **Per run evidence** table's **Log** cell opens **k3dm Agent Run Log** for t
 
 The Agent Dispatch **Per spec** table includes a **Repo** column. Per-task metrics carry the origin repository name as a `repo` label; legacy or invalid labels are exported as `k3d-manager`. Aggregate series do not include this label.
 
+## Stall recovery
+
+The collapsed **Stall recovery** row records hangs detected by the dispatch watchdog, diagnosis results and API cost, operator decisions, and outcomes after resume. **Diagnosis spend, all releases** is the cumulative diagnosis cost since 2026-11-14, paid from the $100 API credit expiring 2026-12-08. **Clean approvals (phase 2 gate)** counts approved corrections that landed without another human correction; it is the evidence threshold for considering automatic resume. **Incidents** shows the stall reason, silence duration, diagnosis, decision, and outcome for each resumed incident. **Repeated failed attempts** remains a separate count of tasks whose last two or more finished attempts failed; a run that hangs without exiting appears in Stall recovery.
+
 Each land attempt retains its own `land-test.<N>.log`; `land-test.log` points to the latest attempt. Refused test runs show the test count and first failure in the Result label, with a link to that attempt’s log. Older events continue to use `land-test.log`.
 
 ## Verification ladder
