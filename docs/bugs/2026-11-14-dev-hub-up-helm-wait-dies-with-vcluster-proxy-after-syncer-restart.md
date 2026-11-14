@@ -37,3 +37,7 @@ Grafana was never reached.
 1. `dev_hub_up` (`scripts/plugins/dev_hub.sh`): check the proxy before each Helm step and refresh it with `_vcluster_refresh_connection` (`scripts/plugins/vcluster.sh`) as e2e does; or run Helm against a kubeconfig that does not depend on the background proxy.
 2. Raise the syncer CPU limit (or drop the CPU limit, keep the request) once the throttle sample proves it; the stall is what triggers the restart.
 3. Recovery today: `make dev-hub-up` again. `_dev_hub_wait_ready` (`scripts/plugins/dev_hub.sh:252`) already calls `_vcluster_refresh_connection` before the charts, so the proxy is only unprotected during the Helm steps; the pending-install recovery from `f1eeeb26` should handle the release. (`_vcluster_refresh_connection` is private and the dispatcher refuses it.)
+
+## Recurrence check: run 3 (2026-11-14 ~20:39Z-20:42:36Z)
+
+The plain `make dev-hub-up` rerun recovered: proxy refreshed by `_dev_hub_wait_ready`, pending argocd release uninstalled, argocd and Grafana deployed, no syncer restart. Syncer `cpu.stat` across the run (Claude's 4 s sampler caught only the end; the earlier idle read gives the baseline): from `nr_periods 5528 / nr_throttled 79 / throttled_usec 6963984` to `9823 / 208 / 23217018` at 20:42:32Z, so 129 of 4295 periods throttled (3%), 16.3 s throttled. Inconclusive for the stall: this install reused the three Argo CD CRDs, and the run-2 stall happened during CRD install. A fresh `dev-hub-down` plus `dev-hub-up` with the sampler running from the start is still the test.
