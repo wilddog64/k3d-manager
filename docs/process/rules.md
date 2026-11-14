@@ -92,6 +92,8 @@ Full text. `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` carry a short summary in the
   operator's tmux (Keychain), then confirm `kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter`.
   Rollback: `make hub-rollback`.
 
+Hub promote enforcement (moved from `CLAUDE.md` 2026-11-14; the rule is operator 2026-11-07, superseding 2026-07-24): green check runs and typed confirmation are enforced by `bin/k3dm-hub-promote` (`check_runs`, `show_and_confirm`); `k3dm.k3d.io/rollout-stage` on every ApplicationSet by `scripts/tests/plugins/argocd_appset_rollout_stage.bats`.
+
 ## Environment Constraints
 
 <a id="environment-constraints"></a>
@@ -106,7 +108,15 @@ Full text. `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` carry a short summary in the
 <a id="bug-priority-and-escape-origin"></a>
 ### Bug priority and escape origin
 
-Kept verbatim in `CLAUDE.md` (shared `bug-priority` block).
+Full text (moved from the shared block 2026-11-14; `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` carry a summary):
+
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
+without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
+new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+**Escape origin (operator, 2026-11-07).** Every bug filed from 2026-11-07 also carries
+`**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**`
+one of `spec`, `offline test`, `review`, `deploy step`, `live check` or `none`: the first safety net that
+should have stopped it. Write `unknown` rather than guess. Each retro counts them by release and by net.
 
 <a id="waiting-on-line"></a>
 ### Waiting on line
@@ -203,4 +213,48 @@ dispatched tests:
 ## Security Rules
 
 <a id="security-rules"></a>
-Kept verbatim in `CLAUDE.md` (shared `security` block, including **Pins get reviewed, not only set (operator, 2026-11-07)**).
+Full text (moved from the shared block 2026-11-14; the agent files carry a summary):
+
+
+**Shell Injection (OWASP A03)**
+- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments.
+- Never pass external or user-supplied input to `eval`.
+- Use `--` to separate options from arguments in CLI calls where arguments may contain hyphens.
+- Variables expanded via `envsubst` in `*.yaml.tmpl` must not contain shell metacharacters — validate before substitution.
+
+**Least Privilege (OWASP A01)**
+- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
+- New Kubernetes ServiceAccounts must not use `cluster-admin`. Use namespace-scoped Role + RoleBinding.
+- New ClusterRoles must be justified — prefer namespace-scoped resources.
+- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is explicitly required.
+
+**Cryptographic Failures (OWASP A02)**
+- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only. Never introduce in production config paths.
+- Vault PKI leaf cert TTL must stay short (≤720h). Do not increase `VAULT_PKI_ROLE_TTL` without justification.
+- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
+
+**Secret Hygiene (OWASP A02)**
+- Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
+- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in lib-foundation's `scripts/lib/system.sh` (change it upstream, then subtree-pull; `scripts/lib/system.sh` here only loads it).
+- Test credentials (`alice/password`, etc.) are dev-only — never reference in production config paths.
+- No secrets in `kubectl exec` command strings that appear in logs.
+
+**Security Misconfiguration (OWASP A05)**
+- Every new deployed service must use its own namespace — never `default`.
+- New Helm chart installations must pin chart versions explicitly — no floating `latest`.
+
+**Supply Chain Integrity (OWASP A08)**
+- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
+- New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
+- **Pins get reviewed, not only set (operator, 2026-11-07).** A pinned chart or image never moves by itself: the
+  observability stack sat at kube-prometheus-stack `67.9.0` (Grafana 11.4.0) for nearly two years. Severity sets the
+  response. A critical or high CVE in a pinned image calls for a patch release. An upstream bug that hurts us and has a
+  cheap workaround gets the workaround, with `**Fixed upstream in:** <component> <version>` in its bug doc. An upstream
+  bug with no workaround, or several fixed-upstream bugs piling up, calls for an upgrade release. Absent any of those,
+  review the pinned stack versions once a quarter and plan an upgrade when one is more than about two minor versions
+  behind.
+
+**Existing protections — do not remove or weaken:**
+- `_run_command` handles sudo probing and escalation safely.
+- `_args_have_sensitive_flag` disables trace for commands with `--password`, `--token`, `--username`.
+- ESO syncs credentials from Vault without exposing them in git.
