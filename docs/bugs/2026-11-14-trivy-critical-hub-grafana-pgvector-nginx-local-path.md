@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-14 (Grafana target: no 11.x clears the criticals; 12.4.15 does)
+**Waiting on:** dispatch — since 2026-11-14 (Grafana 12.4.15 approved; fix in docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md)
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); no bug doc names these images with Trivy
@@ -69,3 +69,5 @@ Operator approved all four dispositions. Applied:
   panel types (`graph`, `singlestat`, `table-old`, piechart/worldmap plugins: none found in `scripts/etc` or `docs`), and
   `kube-prometheus-stack-values.yaml` sets no Grafana image today. Pending operator choice: 12.4.15 (major bump) or
   11.6.16 (accept the kin-openapi finding).
+
+Operator chose Grafana 12.4.15 (2026-11-14). Fix spec: `docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md`.
