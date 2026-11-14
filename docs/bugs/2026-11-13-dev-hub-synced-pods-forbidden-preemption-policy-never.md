@@ -1,10 +1,11 @@
 # dev-hub: every synced pod is forbidden — PriorityClass `preemptionPolicy: Never` conflicts with the pod spec vCluster copies
 
-**Status:** VERIFIED — 3e0ee4ac live on m5-air (2026-11-13)
+**Status:** LIVE-VERIFIED — 3e0ee4ac live on m5-air (2026-11-13)
 **Priority:** P1 (Claude proposal: no pod inside the dev hub can run, so CoreDNS, Argo CD and Grafana never start; blocks dev-hub plan E2 in the open v1.44.0 release)
 **Classified:** pending (Argon, from this doc alone)
 **Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/dev-hub/priorityclass.yaml`)
 **Should have been caught by:** live check (host admission is invisible to offline tests; the first live run stopped earlier, at the coredns schema bug)
+**Fix commit:** `3e0ee4ac`
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing); related, different root cause: docs/bugs/2026-11-13-dev-hub-up-fails-vcluster-rejects-top-level-coredns.md
 **Approval:** operator, 2026-11-13: "go ahead to have the proposed fix"
 **Dispatch go:** operator, 2026-11-13: "go ahead to have the proposed fix"
@@ -104,3 +105,5 @@ The PriorityClass name does not change; only its preemption policy does.
 ## Live verification (2026-11-13)
 
 m5-air, operator, after `make hub-promote REF=5c253d1b`, `git pull --ff-only`, `make dev-hub-down`, `make dev-hub-up` (which reached the Grafana `--wait` install): `kubectl --context k3d-k3d-cluster get priorityclass k3dm-dev-preemptible -o jsonpath='{.preemptionPolicy}'` gave `PreemptLowerPriority`. Host namespace `dev-hub` lists 8 pods. Seven were copied from the vCluster (Argo CD x5, Grafana, and `coredns-7c7ccd6944-xfgqv-x-kube-system-x-dev-hub` at a `128Mi` memory limit), plus `dev-hub-0` at 768Mi. Mark live_verified recorded at 3e0ee4ac. Errors seen: none.
+
+**Live evidence:** 2026-11-13 · run operator-m5-dev-hub-up · env hub · scenario synced-pods-admitted-preemptlowerpriority · commit 5c253d1b · proves E2

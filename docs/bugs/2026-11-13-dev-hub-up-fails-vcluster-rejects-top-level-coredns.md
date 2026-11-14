@@ -1,10 +1,11 @@
 # dev-hub-up fails: vCluster 0.32.1 rejects the top-level `coredns` key in values-dev-hub.yaml
 
-**Status:** VERIFIED — 8c2bfc5f live on m5-air (2026-11-13)
+**Status:** LIVE-VERIFIED — 8c2bfc5f live on m5-air (2026-11-13)
 **Priority:** P1 (Claude proposal: `make dev-hub-up` cannot create the dev hub, no workaround short of editing the file; blocks dev-hub plan E2 in the open v1.44.0 release)
 **Classified:** pending (Argon, from this doc alone)
 **Introduced by:** b2067ad3 (dev-hub Part A, `scripts/etc/vcluster/values-dev-hub.yaml`)
 **Should have been caught by:** offline test (no test validates the values file against the pinned chart schema; the plan's source table cites `coredns` values ~521–530, which sit under `controlPlane`)
+**Fix commit:** `8c2bfc5f`
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing)
 **Approval:** operator, 2026-11-13: "go ahead to fix coredns"
 **Dispatch go:** operator, 2026-11-13: "go ahead to fix coredns"
@@ -90,3 +91,5 @@ interface: scripts/etc/vcluster/values-dev-hub.yaml
 ## Live verification (2026-11-13)
 
 m5-air, operator, after `make hub-promote REF=5c253d1b`, `git pull --ff-only`, `make dev-hub-down`, `make dev-hub-up` (which reached the Grafana `--wait` install): `kubectl --context k3d-k3d-cluster get priorityclass k3dm-dev-preemptible -o jsonpath='{.preemptionPolicy}'` gave `PreemptLowerPriority`. Host namespace `dev-hub` lists 8 pods. Seven were copied from the vCluster (Argo CD x5, Grafana, and `coredns-7c7ccd6944-xfgqv-x-kube-system-x-dev-hub` at a `128Mi` memory limit), plus `dev-hub-0` at 768Mi. Mark live_verified recorded at 8c2bfc5f. Errors seen: none.
+
+**Live evidence:** 2026-11-13 · run operator-m5-dev-hub-up · env hub · scenario dev-hub-up-past-coredns-schema · commit 5c253d1b · proves E2

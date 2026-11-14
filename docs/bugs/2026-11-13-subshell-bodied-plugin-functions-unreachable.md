@@ -1,9 +1,10 @@
 # Bug: public plugin functions with a subshell body are unreachable through the dispatcher (`make dev-hub-sync`, `make snapshot`)
 
-**Status:** VERIFIED — live E4 2026-11-13 on deploy/hub 9a579a05 (dispatch mark live_verified); LANDED — d1c2c441 on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of dev-hub B (Opus verifier; Claude reproduced)
+**Status:** LIVE-VERIFIED — live E4 2026-11-13 on deploy/hub 9a579a05 (dispatch mark live_verified); LANDED — d1c2c441 on k3d-manager-v1.44.0 2026-11-13 (Claude verified: pre-fix red, mutant red, Fable review no high/medium); originally captured 2026-11-13 from the independent Acceptance verification of dev-hub B (Opus verifier; Claude reproduced)
 **Priority:** P1 (dev-hub E2 `make dev-hub-sync` cannot work; no workaround through the interface; blocks the v1.44.0 release PR)
 **Introduced by:** `65e4799f` (v1.44.0 dev-hub B, `dev_hub_sync`); `6974f426` (v1.43.8, `hub_snapshot_capture`)
 **Should have been caught by:** offline test (dev_hub.bats and hub_snapshot.bats source the plugin directly and never go through the dispatcher)
+**Fix commit:** `d1c2c441`
 **Prior art:** exact-slug glob: none. `make find-similar-docs` not run
 **Approval:** operator, 2026-11-13: "go ahead for those three fix intents"
 **Dispatch go:** operator, 2026-11-13: "go ahead for those three fix intents"
@@ -66,3 +67,5 @@ interface:
 ## Live verification 2026-11-13
 
 E4 PASS after the operator promoted 9a579a05 (appsets-check + platform-ops): make dev-hub-sync on m5-air reached dev_hub_sync and stopped at the child apply (no dev-hub kubeconfig: dev-hub-up not run first), not "Function not found". Recorded with `bin/k3dm-codex-dispatch mark --state live_verified --sha 9a579a05...`.
+
+**Live evidence:** 2026-11-13 · run operator-m5-dev-hub-sync · env hub · scenario dev-hub-sync-reaches-function · commit 9a579a05 · proves E4
