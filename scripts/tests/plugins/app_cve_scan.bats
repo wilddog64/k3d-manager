@@ -112,10 +112,14 @@ case "${_last}" in
     _count=0
     ;;
 esac
-printf 'K3DM_SCAN_RESULT_V1\n'
+printf 'K3DM_SCAN_RESULT_%s\n' "${TEST_TRIVY_HEADER:-V2}"
+if [ -n "${TEST_TRIVY_OUTPUT+x}" ]; then
+  printf '%s' "${TEST_TRIVY_OUTPUT}"
+  exit 0
+fi
 _i=0
 while [ "${_i}" -lt "${_count}" ]; do
-  printf '%s\n' "${TEST_LATEST_SEVERITY:-HIGH}"
+  printf '%s|%s \n' "${TEST_LATEST_SEVERITY:-HIGH}" "${TEST_LATEST_SCORE:-8.5}"
   _i=$((_i + 1))
 done
 EOF
@@ -351,28 +355,30 @@ case "$*" in
     printf '%s' "${TEST_SECRET_CONFIG_B64}"
     exit 0
     ;;
-  "get vulnerabilityreports.aquasecurity.github.io -A --no-headers -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,REPO:.report.artifact.repository,TAG:.report.artifact.tag,CRITICAL:.report.summary.criticalCount,HIGH:.report.summary.highCount")
-    printf '%s\n' "${TEST_REPORT_ROWS:-}"
+  "get vulnerabilityreports.aquasecurity.github.io -A -o json")
+    if [ -n "${TEST_REPORT_JSON:-}" ]; then printf '%s\n' "${TEST_REPORT_JSON}"; exit 0; fi
+    printf '%s\n' "${TEST_REPORT_ROWS:-}" | jq -Rn --arg rows "${TEST_REPORT_ROWS:-}" '
+      [$rows | split("\n")[] | select(length > 0) | split(" ") as $r | {
+        metadata:{namespace:$r[0],name:$r[1]},
+        report:{artifact:{repository:$r[2],tag:(if $r[3] == "" then null else $r[3] end),digest:"sha256:fixture"},
+          vulnerabilities:([range(0;($r[4]|tonumber)) | {severity:"CRITICAL",score:9.6,vulnerabilityID:("CVE-fixture-" + tostring),fixedVersion:"1.0"}]
+            + [range(0;($r[5]|tonumber)) | {severity:"HIGH",score:7.5,vulnerabilityID:("CVE-fixture-" + tostring),fixedVersion:"1.0"}])}
+      }] | {items:.}'
     exit 0
     ;;
-  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io basket-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
-    printf '%s' "${TEST_REPORT_DETAILS_basket_report:-}"
-    exit 0
-    ;;
-  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io frontend-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
-    printf '%s' "${TEST_REPORT_DETAILS_frontend_report:-}"
-    exit 0
-    ;;
-  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io order-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
-    printf '%s' "${TEST_REPORT_DETAILS_order_report:-}"
-    exit 0
-    ;;
-  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io payment-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
-    printf '%s' "${TEST_REPORT_DETAILS_payment_report:-}"
-    exit 0
-    ;;
-  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io product-catalog-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
-    printf '%s' "${TEST_REPORT_DETAILS_product_catalog_report:-}"
+  -n\ shopping-cart-apps\ get\ vulnerabilityreport.aquasecurity.github.io\ *\ -o\ json)
+    if [ -n "${TEST_REPORT_JSON:-}" ]; then printf '%s\n' "${TEST_REPORT_JSON}" | jq --arg name "${5:-}" '.items[] | select(.metadata.name == $name)'; exit 0; fi
+    _name="${5:-}"
+    case "${_name}" in
+      basket-report) _details="${TEST_REPORT_DETAILS_basket_report:-}" ;;
+      frontend-report) _details="${TEST_REPORT_DETAILS_frontend_report:-}" ;;
+      order-report) _details="${TEST_REPORT_DETAILS_order_report:-}" ;;
+      payment-report) _details="${TEST_REPORT_DETAILS_payment_report:-}" ;;
+      product-catalog-report) _details="${TEST_REPORT_DETAILS_product_catalog_report:-}" ;;
+      *) _details="" ;;
+    esac
+    printf '%s\n' "${_details}" | jq -Rn --arg details "${_details}" '
+      {report:{vulnerabilities:[$details | split("\n")[] | select(length > 0) | split("|") as $f | {severity:$f[0],score:(if $f[0] == "CRITICAL" then 9.6 elif $f[0] == "HIGH" then 7.5 else 0 end),vulnerabilityID:$f[1],fixedVersion:$f[2]}]}}'
     exit 0
     ;;
   -n\ platform-ops\ get\ configmap\ app-cve-scan-rebuild-state\ *)
@@ -432,6 +438,14 @@ _assert_no_candidate_promotion_or_rebuild() {
   [ "${status}" -eq 1 ]
   run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
   [ "${status}" -eq 1 ]
+}
+
+_make_report_fixture() {
+  local findings="$1" tag="${2-sha-old}" digest="${3:-sha256:fixture}"
+  export TEST_REPORT_JSON
+  TEST_REPORT_JSON="$(jq -cn --argjson vulnerabilities "${findings}" --arg tag "${tag}" --arg digest "${digest}" '{items:[{metadata:{namespace:"shopping-cart-apps",name:"basket-report"},report:{artifact:{repository:"ghcr.io/wilddog64/shopping-cart-basket",tag:$tag,digest:$digest},summary:{criticalCount:0,highCount:0,unknownCount:2},vulnerabilities:$vulnerabilities}}]}')"
+  jq -e '.items | length == 1' <<<"${TEST_REPORT_JSON}" >/dev/null
+  jq -e '.items[0].report.artifact.repository == "ghcr.io/wilddog64/shopping-cart-basket"' <<<"${TEST_REPORT_JSON}" >/dev/null
 }
 
 _run_basket_candidate_scan() {
@@ -1056,6 +1070,144 @@ _run_basket_candidate_scan() {
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"deployed image ghcr.io/wilddog64/shopping-cart-payment:sha-old has no HIGH/CRITICAL findings"* ]]
   run ! grep -q 'actions/workflows' "${WGET_LOG}"
+}
+
+@test "UNKNOWN score 9.6 counts as CRITICAL and proceeds to candidate resolution" {
+  _make_report_fixture '[{"severity":"UNKNOWN","score":9.6,"vulnerabilityID":"CVE-UNKNOWN-96","fixedVersion":"1.2.3"}]'
+  export APP_SERVICES="shopping-cart-basket" TEST_NO_CANDIDATE=1
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"has no HIGH/CRITICAL findings"* ]]
+  [[ "${output}" == *"failed to resolve immutable sha-* candidate"* ]]
+  grep -q 'CRITICAL|CVE-UNKNOWN-96|1.2.3' "${NOTIFY_LOG}"
+  grep -q '/v2/wilddog64/shopping-cart-basket/tags/list' "${CURL_LOG}"
+}
+
+@test "UNKNOWN scores normalize to HIGH, while low and unscored findings stay below the gate" {
+  _make_report_fixture '[{"severity":"UNKNOWN","score":8.8,"vulnerabilityID":"CVE-UNKNOWN-88","fixedVersion":"2.0"}]'
+  export APP_SERVICES="shopping-cart-basket" TEST_NO_CANDIDATE=1
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"has no HIGH/CRITICAL findings"* ]]
+  grep -q 'HIGH|CVE-UNKNOWN-88|2.0' "${NOTIFY_LOG}"
+
+  _make_report_fixture '[{"severity":"UNKNOWN","score":5.0,"vulnerabilityID":"CVE-UNKNOWN-50","fixedVersion":"3.0"}]'
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"has no HIGH/CRITICAL findings"* ]]
+  _make_report_fixture '[{"severity":"UNKNOWN","vulnerabilityID":"CVE-UNKNOWN-NONE","fixedVersion":"4.0"}]'
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"has no HIGH/CRITICAL findings"* ]]
+}
+
+@test "vendor severity wins over score" {
+  _make_report_fixture '[{"severity":"HIGH","score":9.8,"vulnerabilityID":"CVE-VENDOR-HIGH","fixedVersion":"1.0"}]'
+  export APP_SERVICES="shopping-cart-basket" TEST_NO_CANDIDATE=1
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  grep -q '1 HIGH/CRITICAL CVE(s)' "${NOTIFY_LOG}"
+  grep -q 'HIGH|CVE-VENDOR-HIGH|1.0' "${NOTIFY_LOG}"
+  run grep -q 'CRITICAL|CVE-VENDOR-HIGH' "${NOTIFY_LOG}"
+  [ "${status}" -eq 1 ]
+
+  _make_report_fixture '[{"severity":"LOW","score":9.8,"vulnerabilityID":"CVE-VENDOR-LOW","fixedVersion":"1.0"}]'
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"has no HIGH/CRITICAL findings"* ]]
+}
+
+@test "lowercase unknown severity and a string score normalize like the exporter" {
+  _make_report_fixture '[{"severity":"unknown","score":9.6,"vulnerabilityID":"CVE-LOWER-UNKNOWN","fixedVersion":"1.0"},{"severity":"UNKNOWN","score":"7.5","vulnerabilityID":"CVE-STRING-SCORE","fixedVersion":"2.0"}]'
+  export APP_SERVICES="shopping-cart-basket" TEST_NO_CANDIDATE=1
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  grep -q '2 HIGH/CRITICAL CVE(s)' "${NOTIFY_LOG}"
+  grep -q 'CRITICAL|CVE-LOWER-UNKNOWN|1.0' "${NOTIFY_LOG}"
+  grep -q 'HIGH|CVE-STRING-SCORE|2.0' "${NOTIFY_LOG}"
+  run grep -q 'CRITICAL|CVE-STRING-SCORE' "${NOTIFY_LOG}"
+  [ "${status}" -eq 1 ]
+}
+
+@test "candidate V2 parser normalizes UNKNOWN scores and rejects V1" {
+  local functions="${BATS_TEST_TMPDIR}/app-cve-functions.sh"
+  awk '/^# === MAIN ===/ { exit } { print }' "${TEST_SCAN_SCRIPT}" >"${functions}"
+  [ -s "${functions}" ]
+  _scan_candidate() {
+    local header="$1" lines="$2"
+    TEST_TRIVY_HEADER="${header}" TEST_TRIVY_OUTPUT="${lines}" TRIVY_LOG="${TRIVY_LOG}" PATH="${PATH}" \
+      /bin/sh -c '. "$1"; _scan_image ghcr.io/wilddog64/shopping-cart-basket:sha-test' _ "${functions}"
+  }
+  run _scan_candidate V2 $'UNKNOWN|9.1 \n'
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "1" ]
+  run _scan_candidate V2 $'UNKNOWN|\n'
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "0" ]
+  run _scan_candidate V2 $'HIGH|7.5 \n'
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "1" ]
+  run _scan_candidate V2 $'UNKNOWN|6.0 8.8 \n'
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "1" ]
+  run _scan_candidate V2 $'MEDIUM|9.9 \n'
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "0" ]
+  run _scan_candidate V1 $'UNKNOWN|9.1 \n'
+  [ "${status}" -eq 1 ]
+  [ "${output}" = "failure=invalid-output" ]
+  grep -q -- '--severity UNKNOWN,HIGH,CRITICAL' "${TRIVY_LOG}"
+}
+
+@test "scanner normalization agrees with the exporter's real severity_for" {
+  _make_report_fixture '[{"severity":"HIGH","score":9.8,"vulnerabilityID":"CVE-HIGH"},{"severity":"CRITICAL","score":8.0,"vulnerabilityID":"CVE-CRIT"},{"severity":"UNKNOWN","score":9.6,"vulnerabilityID":"CVE-U96"},{"severity":"UNKNOWN","score":8.8,"vulnerabilityID":"CVE-U88"},{"severity":"UNKNOWN","score":5.0,"vulnerabilityID":"CVE-U50"},{"severity":"UNKNOWN","vulnerabilityID":"CVE-U0"}]'
+  export APP_SERVICES="shopping-cart-basket" TEST_NO_CANDIDATE=1
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  grep -q '4 HIGH/CRITICAL CVE(s)' "${NOTIFY_LOG}"
+  local report_fixture="${BATS_TEST_TMPDIR}/exporter-agreement-report.json"
+  printf '%s\n' "${TEST_REPORT_JSON}" >"${report_fixture}"
+  jq -e '.items[0].report.vulnerabilities | length == 6' "${report_fixture}" >/dev/null
+  run env REPORT_FILE="${report_fixture}" /bin/sh -c 'awk "/^# === MAIN ===/ { exit } { print }" "$1" >"$2"; . "$2"; _app_kubectl() { cat "${REPORT_FILE}"; }; _find_report_row ghcr.io/wilddog64/shopping-cart-basket' _ "${TEST_SCAN_SCRIPT}" "${BATS_TEST_TMPDIR}/functions-only.sh"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *" 2 2" ]]
+  local scanner_counts
+  scanner_counts="$(awk '{print $(NF-1), $NF}' <<<"${output}")"
+  local exporter_script="${BATS_TEST_TMPDIR}/extract-severity.py"
+  cat >"${exporter_script}" <<'PY'
+import json, pathlib, sys, textwrap
+source = pathlib.Path(sys.argv[1]).read_text()
+lines = source.splitlines()
+start = next(i for i, line in enumerate(lines) if line.startswith("    def severity_for(finding):"))
+end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("    def ")), len(lines))
+block = textwrap.dedent("\n".join(lines[start:end]))
+assert block.strip(), "severity_for extraction is empty"
+namespace = {}
+exec(block, namespace)
+severity_for = namespace["severity_for"]
+assert severity_for({"severity":"UNKNOWN", "score":9.6}) == "CRITICAL"
+report = json.loads(sys.argv[2])["items"][0]["report"]["vulnerabilities"]
+counts = {"CRITICAL":0, "HIGH":0}
+for finding in report:
+    severity = severity_for(finding)
+    if severity in counts:
+        counts[severity] += 1
+print(counts["CRITICAL"], counts["HIGH"])
+PY
+  run python3 "${exporter_script}" "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml" "${TEST_REPORT_JSON}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "2 2" ]
+  [ "${output}" = "${scanner_counts}" ]
+}
+
+@test "empty report tag uses repository digest in log and notice" {
+  _make_report_fixture '[{"severity":"UNKNOWN","score":9.6,"vulnerabilityID":"CVE-DIGEST","fixedVersion":"1.0"}]' "" "sha256:abc123"
+  export APP_SERVICES="shopping-cart-basket" TEST_LATEST_CVES_shopping_cart_basket=1
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ghcr.io/wilddog64/shopping-cart-basket@sha256:abc123"* ]]
+  [[ "${output}" != *":<none>"* ]]
+  grep -q 'ghcr.io/wilddog64/shopping-cart-basket@sha256:abc123' "${NOTIFY_LOG}"
 }
 
 @test "missing immutable candidate notifies without failing the batch" {

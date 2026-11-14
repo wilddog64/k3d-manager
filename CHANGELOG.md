@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **App CVE scan:** normalize `UNKNOWN` findings from CVSS scores when counting deployed VulnerabilityReports and scanning candidates, and identify digest-pinned deployed images by digest.
 - **Vault unseal watchdog:** retry up to 12 times (5-second interval) when Vault is unreachable (rc 1) during startup before skipping, preventing post-restart unseal delays.
 
 ## [1.43.15] - 2026-11-12
