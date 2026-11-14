@@ -3,7 +3,7 @@
 **Status:** OPEN — captured 2026-11-13 by Claude while running plan 3 E6 (live)
 **Priority:** P2 (new and changed alerts silently absent after a promote; workaround `make prometheus-rules` on the M5)
 **Waiting on:** dispatch — since 2026-11-14 (spec being written; intents need approval)
-**Intent approved:** pending — operator, Acceptance intents below
+**Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** pre-existing (rules apply only through `make prometheus-rules` / observability deploy); exposed by `c763e239` (v1.44.0 plan 3)
 **Should have been caught by:** spec (plan 3 lists no deploy step for its rule; E6 is the first live check that needs it)
 **Prior art:** exact-slug glob: none; `docs/bugs/2026-10-03-sandbox-make-up-host-alias-and-rules-crd-race.md` (title only, different). `make find-similar-docs` not run

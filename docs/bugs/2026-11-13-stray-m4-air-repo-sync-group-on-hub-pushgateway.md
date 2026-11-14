@@ -2,8 +2,8 @@
 
 **Status:** OPEN — captured 2026-11-13 by Claude while watching plan 3 E6
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
-**Waiting on:** dispatch — since 2026-11-14 (spec being written; intents need approval)
-**Intent approved:** pending — operator, Acceptance intents below
+**Waiting on:** fix running — since 2026-11-14 (Luna, dispatch repo-sync-push-guard)
+**Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; memory `feedback_pushgateway_tests_leak_to_real_hub` (same class). `make find-similar-docs` not run
