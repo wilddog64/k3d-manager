@@ -1,9 +1,8 @@
 # dev-hub: `dev-hub-up` Argo CD `helm --wait` times out when the vCluster syncer restarts during startup
 
-**Status:** LANDED — f1eeeb26 (2026-11-13); live check pending (promote, then `make dev-hub-up` with no down)
+**Status:** VERIFIED — f1eeeb26 live on the M5 2026-11-13 (operator): stuck pending-install argocd uninstalled, argocd and Grafana installed, no down in between
 **Priority:** P1 (Claude proposal, raised 2026-11-13: a rerun cannot recover, and the only way back is down/up, which can hit the same timeout; blocks the plan E2 live check)
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** live check — since 2026-11-13
 **Introduced by:** b2067ad3 or later Part B commit that added the Argo CD install with `--wait` and no `--timeout` (unknown which)
 **Should have been caught by:** live check (offline tests cannot see startup timing)
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` not run (vector store context missing on m4-air)
@@ -168,3 +167,11 @@ Fable read the vCluster v0.32.1 and Helm v4.3.1 upstream source; Claude re-check
   2. Then `make dev-hub-down` and `make dev-hub-up` finish in one run.
   3. On that second run, the `dev-hub-0` syncer log line `Starting controller-manager` shows `--leader-elect=false`, and the container does not restart during the install (proves M1).
   A failing install can now take about 20 minutes: a 10m wait plus a 10m rollback.
+
+## Live verification (operator, 2026-11-13, m5-air.local)
+
+Hub checkout at ce164bf2 (contains f1eeeb26). The first `make dev-hub-up`, run before the checkout synced, used the old
+code and failed with `UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress`. After the sync, with
+no `dev-hub-down` in between, `make dev-hub-up` printed `release "argocd" uninstalled`, then installed argocd
+(`STATUS: deployed`, 18:06:41) and dev-hub-grafana (`STATUS: deployed`, 18:07:07) with no error. The pending-install
+recovery path is proven on the real stuck release. The rollback path (pending-upgrade) is proven offline only.
