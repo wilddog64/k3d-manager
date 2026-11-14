@@ -19,6 +19,7 @@
 7. hub-deploy-one-command live check on the next real promote: `make hub-deploy REF=<sha>; make hub-promote-status`.
 8. Smaller: Argon classification of new P3s + helm-wait bug; fix docs/plans/v1.44.0-dev-hub-vcluster.md:166-167 (preemptionPolicy); log Fable trial rows in docs/process-metrics.md (gauge 22%); grooming 2026-11-15.
 
+- 2026-11-14 ~08:50Z: coordinator fix run 1 done (suites green; new tests red on pre-fix). Fable: code correct; K3DM_COORDINATOR leaks into codex_dispatch_agy.bats (helpers setup), N2 filter untested, resume edge cases untested, share empty-window/legacy untested. Spec Files amended (real dashboard path + helpers.bash). Resumed Luna (correction 1).
 - 2026-11-14 ~08:30Z: ACG independent verifier PASS 8/8 on c7384ff (positive controls for N1-N4). Next: lib-foundation v0.5.6 PR + subtree pull.
 - 2026-11-14 ~08:15Z: coordinator-unattributed P2 dispatched to Luna (shares only CHANGELOG + dashboards dir with Part B, different dashboard file). WIP 2/3 (Part B, coordinator). Promtool Part B still blocked: no ## Files section; waits on C1.
 - 2026-11-14 ~08:10Z: ACG auto-login LANDED lib-foundation c7384ff (release/v0.5.6, pushed); offline_tested marked; independent verifier running. Next: lib-foundation v0.5.6 PR + subtree pull, then live E2. WIP 1/3 (Part B).

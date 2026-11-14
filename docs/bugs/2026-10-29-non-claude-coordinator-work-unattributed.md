@@ -45,8 +45,9 @@ Out of scope: inferring the coordinator from `agent`/`model` (the 10-26 spec for
 
 - `bin/k3dm-codex-dispatch`
 - `bin/k3dm-dispatch-metrics`
-- the Agent Dispatch dashboard JSON under `scripts/etc/grafana/dashboards/`
+- the Agent Dispatch dashboard: `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` (amended 2026-11-14 by Claude: the original path `scripts/etc/grafana/dashboards/` holds no Agent Dispatch dashboard) and its suite `scripts/tests/plugins/agent_dispatch_dashboard.bats`
 - `AGENTS.md`, `docs/howto/codex-dispatch.md`, `CHANGELOG.md`
+- `scripts/tests/bin/codex_dispatch_helpers.bash` (added 2026-11-14: `setup()` must unset `K3DM_COORDINATOR`)
 - tests: `scripts/tests/bin/codex_dispatch_ledger.bats` (or a new `codex_dispatch_coordinator_env.bats`), `scripts/tests/bin/test_dispatch_metrics.py`
 
 ## Contract readers
