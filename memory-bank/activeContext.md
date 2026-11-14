@@ -20,7 +20,7 @@
 4. Rewrite child A for v1.44.1 (scope section in the doc), bring intents to operator.
 5. Still owed: Argon classification of new P3s; grooming 2026-11-15 (Sunday); file tool-counter P3; older live items (coordinator/Hermes/vault-unseal/CVE E3, ACG E2, dev-hub P1s, bash 3.2 check).
 
-## Previous handoff — 2026-11-14 (labels ~2 h fast): P2 loop mid-flight (2 dispatches running, 1 held); live checks wait on a promote — START HERE
+## Previous handoff — 2026-11-14 (labels ~2 h fast): P2 loop mid-flight (2 dispatches running, 1 held); live checks wait on a promote
 
 - **Objective (in progress):** finish all v1.44.0 P2 bugs (operator 2026-11-13: dispatch pairs, verify, then live-verify with the operator).
 - **Landed this session (pushed, head 46c217ce):** promtool Part B 6f7187ab (+ N3 anchor 42fe44fa, kine docker-skip 0a9e053c), offline_tested; repo-sync-push-guard 22ca679c, verify pass; lib-foundation v0.5.6 tagged/released, subtree 79caba45 (bash 3.2 `_run_command`).
