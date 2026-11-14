@@ -1,6 +1,7 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** VERIFIED — live 2026-11-14 by Claude (landed 22ca679c); m4-air group deleted by operator and absent across a full tick
+**Status:** OPEN — recurred 2026-11-14 from a pre-fix dispatch worktree (was VERIFIED live 2026-11-14, landed 22ca679c)
+**Waiting on:** operator decision — since 2026-11-14 (second guard; delete the group after Part B lands)
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** unknown
@@ -272,3 +273,16 @@ After the promote of `6ba89b3f` (contains `22ca679c`) and `make install-repo-syn
 After the operator's DELETE on the M5 (`/metrics/job/k3dm_repo_sync/instance/m4-air`), two samples of the hub
 Pushgateway (localhost:19094) six minutes apart showed only `instance="m5-air"`: 14:55:26Z (push 14:53:02Z) and
 15:01:27Z (push 14:58:21Z). The M4 job wrote its log at 15:00:13Z within that window and did not push. E5 passes.
+
+## Recurrence (Claude, 2026-11-14)
+
+K3dmPromoteLookupFailed (12:19 PST) and K3dmRepoSyncStale (12:59 PST) fired again on `instance="m4-air"`. Hub
+Pushgateway read (ssh m5-air.local, `curl 127.0.0.1:19094/metrics`, 2026-11-14): `promote_lookup_failed{instance="m4-air"} 1`,
+`{instance="m5-air"} 0`; pushed once at 19:39:30Z. Source: the Part B dispatch worktree
+(`worktrees/v1.44.0/parallel-offline-tests-b`) is based on f9051926; `git merge-base --is-ancestor 22ca679c HEAD` → NO_FIX.
+Its `bin/k3dm-repo-sync:502` still falls back to `localhost:19094`, and its old `repo_sync.bats` hub-role tests set no URL;
+on the M4, 19094 is an ssh forward to the hub. The landed fix protects only checkouts that contain it.
+
+Proposed second guard (operator decision): publish repo-sync metrics only when the host is the hub host, and/or scope the
+rules to `instance="m5-air"`; or base dispatch worktrees on the current release head. Operator, after Part B lands, on the
+M5: `curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air` (earlier it comes back).
