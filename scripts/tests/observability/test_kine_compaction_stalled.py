@@ -29,6 +29,9 @@ pytestmark = pytest.mark.external("runs pinned promtool and the Alertmanager fix
 @pytest.fixture
 def alertmanager(tmp_path):
     """Reuse the existing pinned Alertmanager fixture and fake Sink."""
+    reason = notify.docker_reason()
+    if reason:
+        pytest.skip(reason)
     try:
         yield from notify.alertmanager.__wrapped__(tmp_path)
     except PermissionError as exc:
