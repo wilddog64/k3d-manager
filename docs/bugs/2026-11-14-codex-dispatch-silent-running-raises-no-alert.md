@@ -1,9 +1,9 @@
 # Bug: a dispatch that stays `running` with a silent log raises no alert
 
 **Status:** OPEN
-**Priority:** P3
-**Waiting on:** operator decision — since 2026-11-14
-**Approval:** captured by Claude 2026-11-14 (operator "go ahead" to capturing it); fix not approved
+**Priority:** P3 (Claude proposes P2: cost a night and a WIP slot on 2026-11-13; operator to confirm)
+**Waiting on:** operator decision — since 2026-11-14 (P2 confirmation and spec intent)
+**Approval:** captured by Claude 2026-11-14; operator 2026-11-14 chose the design below: headless Claude diagnosis paid by the API credit, gated by a Slack approval ("if we want to make this safe then we can post an approval request to slack"). Spec not yet written or approved
 **Introduced by:** pre-existing
 **Should have been caught by:** none
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable (vector store needs the hub context, not on the M4); grep of codex-dispatch bug docs for stuck/hang/silent: 2026-10-09 metrics, scope, land and stdout docs, read, different root cause
@@ -34,8 +34,27 @@ count (more than 60 `bats-exec` processes under the worktree). Get the log mtime
 time-(stat shift)[9]'`: on the M4, GNU `stat` and `date` come first on PATH, so the BSD flags fail. Correction prompts
 now require every `make`/`bats` command to run under `perl -e 'alarm shift; exec @ARGV' 1800`.
 
-## Possible fix (not specified)
+## Chosen direction (operator, 2026-11-14) — to be specified
 
-`status` (and `dispatch open`) reports `stalled` when a running run's log has not changed for N minutes, with its
-age and process count. Optionally a Pushgateway gauge of log age, plus an alert. Restarting a stalled run automatically
-is not proposed: a correction is needed first (see `feedback_no_rerun_without_fix`).
+The operator should not have to be the detector. Phase 1, approval-gated:
+
+1. **Detect** — a launchd job on the dispatch host (M4) every 5 minutes: a dispatch still `running` whose log is silent
+   for more than 45 minutes, or whose worktree has more than a set number of processes, is stalled. `status` and
+   `dispatch open` report `stalled` with log age and process count.
+2. **Capture, then stop** — save process tree, log tail and `git diff` into the `.run` directory, then kill only the
+   processes under that slug's worktree so `status` records the exit.
+3. **Diagnose** — headless `claude -p` in the repo, API key from Keychain `k3dm-anthropic-api-key` into the
+   environment (never argv), tools limited to read plus writing one correction prompt, a turn cap, tokens logged to the
+   agent-cost dashboard. Output: a diagnosis and `correction-N.md`.
+4. **Approve in Slack** — new Hermes repair `r10` "Resume stalled dispatch with Claude's correction", posted with
+   `post_interactive` / `interactive_blocks` (`scripts/lib/hermes/slack.py:47`, `approvals.py:57`). Its precondition,
+   re-checked on approval: the dispatch is exited, same run number, worktree unchanged since the correction was
+   written. One attempt per incident (existing `repairs.py` rule): a second stall pages the operator, no proposal.
+5. **Resume** — on Approve, `codex-dispatch resume --reason correction` with that prompt. Landing still needs the
+   normal independent verify.
+
+Phase 2 (auto-resume without approval) only after several phase-1 corrections the operator approved unchanged.
+
+Open for the spec: Hermes's host versus the dispatch host (the key is on the M5 today; dispatches run on the M4), and
+every reader of `k3dm-anthropic-api-key` (contract readers rule). Key expires about 2026-12-13 and the credit
+2026-12-08: a 401 must surface as a rotate-key alert, not a silent failure.
