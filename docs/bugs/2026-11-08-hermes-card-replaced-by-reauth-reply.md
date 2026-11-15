@@ -4,7 +4,7 @@
 **Priority:** P2 — raised from P3 2026-11-11 (operator: "go ahead with your recommendation"): the Slack Promote button (part 3 of the promote-smoothing idea) needs Hermes buttons to record every press; this bug drops a Deny. Target: v1.44.0, before part 3.
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Clicking a Hermes card without an active re-auth destroys the card's approval buttons, degrading the Slack approval flow, though workarounds exist (running `/hermes-auth` beforehand or approving via CLI on the hub)); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** live check — since 2026-11-14 (operator runs `make deploy-worker`, then presses a card without /hermes-auth)
+**Waiting on:** live check — since 2026-11-14 (relay deployed 2026-11-15, version 2684d74b from 234bc2d1; needs the next real Hermes incident card, which a single degraded sensor cannot produce)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
@@ -143,3 +143,13 @@ Landed as `09ea1d02` (Luna, gpt-6-luna; Fable lows applied by Claude before land
   `SUMMARY M1=PASS M2=PASS M3=PASS M4=PASS N1=PASS N2=PASS` (rc 0). Pre-fix gave `M1=FAIL M2=FAIL M3=PASS M4=FAIL
   N1=FAIL N2=FAIL` (rc 1); M3 is the unchanged success-path control. The repo suite passed 49/49 and the tree was clean.
   Errors seen: smartcd `cd` hook (rc 127) and an unquoted zsh separator, both from the verifier's own shell, not the code.
+
+## Live check attempt (Claude, 2026-11-15) — no card; relay deployed
+
+The operator ran `make deploy-worker` on the M5 at checkout `234bc2d1` (contains `09ea1d02`): `k3dm-slack-relay` Current
+Version ID `2684d74b-a204-486d-ba3c-2eb4c36afd02`. To force a card, CI run `43724397763` was re-run and its attempt 2
+cancelled (R4 precondition), but no card can follow from that alone: `Correlator.process`
+(`scripts/lib/hermes/correlator.py:17`) opens an incident only when two or more sensors are degraded within the last 3
+cycles, and proposals are posted only on an incident or escalation (`bin/k3dm-hermes:283`). Attempt 3 restored CI.
+Hermes also still holds `r9-d9add2e2` (the card this bug destroyed on 2026-11-08) in `pending_repairs`, so pending
+proposals do not expire.
