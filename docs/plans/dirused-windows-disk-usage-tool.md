@@ -92,7 +92,7 @@ command line part:
   are unproven:
   - A Windows ARM guest under this stack is not proven on the M4. `stromweld/windows-11` publishes a VirtualBox arm64 build (read from Vagrant Cloud 2026-11-06), the M2 holds a copy and Windows 11 Arm VMs, and the operator's Ansible repo uses it, but none were booted for this check. M1 proves it first: boot, WinRM, a shared folder and `\\localhost\c$`.
   - The box is a third-party image. Using it for development is a start; anything nearer company use should come from a box built from Microsoft's Windows 11 ARM64 ISO.
-  - Licence fit. The operator holds a Windows 11 Pro retail licence (2026-11-06; the key is never recorded in a repo, plan or command). A Pro key activates only Pro, the box's edition is unread, and the terms for a VirtualBox Arm guest are unread. It does not settle company use.
+  - Licence fit. The operator holds a Windows 11 Pro retail licence (2026-11-06; the key is never recorded in a repo, plan or command). A Pro key activates only Pro, the box's edition is Windows 11 Enterprise (read 2026-11-15 from stromweld/windows-11 202511.21.0; likely an evaluation build, so the Pro key does not apply to it), and the terms for a VirtualBox Arm guest are unread. It does not settle company use.
   If VirtualBox fails that check, the fallback is `vagrant_utm`, already installed on the M4, then
   VMware Fusion with `apter-tech/vagrant-windows-11-arm64`.
 - **ARM versus x64.** Apple Silicon runs Windows on ARM, where an x64 build runs under emulation.

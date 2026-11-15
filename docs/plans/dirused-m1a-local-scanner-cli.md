@@ -1,6 +1,6 @@
 # M1a: local scanner and read-only CLI, with the windows-latest CI gate
 
-**Status:** OPEN — not dispatched
+**Status:** LIVE-VERIFIED — landed on dirused m1a-local-scanner (b00fd06 Luna, e4ca415 Claude test-cleanup fix), PR wilddog64/dirused#1 to main; E1–E7 CI run 43750903297, can-fail mutation run 43751127370 (2 red), E8 live on the Vagrant VM 2026-11-15 (/all volume lines match Get-Volume: D: exact, C: 0.005%)
 **Milestone:** M1 (first half). M1b adds UNC targets, `\\node`, `/file`, `/summary`, `/timeout`, `/parallel`.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Stack, Command line, Scan correctness, Multiple drives)
 **Intent approved:** operator, 2026-11-15
