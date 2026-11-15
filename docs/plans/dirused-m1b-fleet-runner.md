@@ -6,7 +6,7 @@ specs share no file.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness: multiple targets, slow links)
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
 **Intent approved:** operator, 2026-11-15
-**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0. Scope item 7 added 2026-11-15 on the operator's "yes" to `//server/share` targets.
+**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0. Scope item 7 added 2026-11-15 on the operator's "yes" to `//server/share` targets; item 8 and E5 (`/help`) added 2026-11-15 on "go ahead to add /help too".
 **Implementer:** Flash (agy `gemini-3.8-flash-medium`). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1b-fleet-runner` from `main` after phase 0 merges.
 
@@ -52,7 +52,14 @@ None needed beyond phase 0's: this phase uses only .NET (`Task`, `SemaphoreSlim`
    the switch branch, so `//server/share` is a target (phase 1a makes `TargetParser` accept it). `/all` and every switch are
    unchanged. Test in `tests/Dirused.Tests.Portable/FleetRunnerTests.cs`: `//server/share` no longer gives `Unknown switch`
    (red on pre-fix code), and `/top 5` still parses as a switch (positive control).
-8. **README:** usage lines for the four switches, with a sample `targets.txt`.
+8. **`/help` (operator, 2026-11-15: "go ahead to add /help too"):** replace the two-line `UsageText` with full help: every
+   switch available after M1b (`/top`, `/json`, `/csv`, `/all`, `/file`, `/summary`, `/timeout`, `/parallel`, `/help`), one
+   line each with its argument and default; the target forms (`.`, relative paths, `C:\x` or `c:/x`, `C:`, `\\server\share`
+   or `//server/share`, `\\node` or `//node`, `/all`); that switches take `/`, `-` or `--` in any case; and the exit codes
+   (0, 1, 3). Plain text, under 80 columns, no switch listed that is still refused (`/purge`, `/monitor`, `/gui`). The
+   short usage line printed on a usage error stays one line plus "Run dirused /help for more." Merge this branch after
+   phase 1a, so help never names a target form that does not work yet.
+9. **README:** usage lines for the four switches, with a sample `targets.txt`.
 
 ## Files
 
@@ -81,11 +88,13 @@ must:
   - "a target that exceeds /timeout keeps its partial results, is marked TIMED OUT, and the run exits 3"
   - "/parallel n never runs more than n scans at once, and output order equals input order"
   - "one target's exception does not stop the other targets"
+  - "/help lists every available switch, the target forms and the exit codes"
 must_not:
   - "/file, /summary, /timeout or /parallel exits 1 with 'not available yet (M1b)'"
   - "a timed-out or failed target is reported complete or the run exits 0"
   - "/summary enumerates any directory"
   - "more than /parallel scans run at the same time"
+  - "/help omits an available switch or lists a refused one"
 evidence:
   - id: E1
     proves: [ "/file reads one target per line, skipping blank and # lines, after the typed targets", "/file, /summary, /timeout or /parallel exits 1 with 'not available yet (M1b)'" ]
@@ -107,4 +116,9 @@ evidence:
     kind: offline
     how: "xUnit with a fake scan that records max concurrent calls and finishes in reverse order: Parallel 2 over 8 targets gives max 2 and results in input order; positive control: Parallel 8 reaches more than 2"
     intent: "dirused scans only as many machines at once as you allow, and the report always comes out in your order."
+  - id: E5
+    proves: [ "/help lists every available switch, the target forms and the exit codes", "/help omits an available switch or lists a refused one" ]
+    kind: offline
+    how: "Portable xUnit: ArgParser /help -> Usage; the help text contains /top, /json, /csv, /all, /file, /summary, /timeout, /parallel, //server/share, c:/ and 'exit' (fails on the pre-fix two-line text), contains none of /purge, /monitor, /gui, and every line is under 80 columns; positive control: an invalid target still prints the short usage line"
+    intent: "dirused /help shows every switch and path form you can use, and nothing that isn't ready yet."
 ```
