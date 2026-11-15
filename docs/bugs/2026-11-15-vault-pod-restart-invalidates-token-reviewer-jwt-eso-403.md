@@ -6,7 +6,8 @@
 **Should have been caught by:** deploy step
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-15 (hub repaired 16:37Z; intent approved; Argon + Fable spec review running, then dispatch to Flash `gemini-3.8-flash-high`)
-**Intent approved:** operator, 2026-11-15 ("approved"; revised E2, E4, E5 re-approved "ok")
+**Intent approved:** operator, 2026-11-15
+**Intent approval note:** "approved"; revised E2, E4, E5 re-approved "ok" the same day
 **Spec review:** risk medium (hub Vault auth) — Argon + Fable blind, 2026-11-15: both CHANGES, same main finding (test_vault token sites); all confirmed findings applied; Argon's here-string xtrace claim refuted by test (see Fix)
 **Prior art:** `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md` and `docs/bugs/2026-10-25-deploy-vault-rejected-unseal-cache-triggers-destructive-reinit.md:163` (grep `token_reviewer`) — appended as the third recurrence; the 2026-10-25 doc says "file it separately if it recurs"
 
@@ -135,11 +136,26 @@ must_not:
   - id: N3
     text: "No kubectl argument and no trap string set by test_vault (including the _cleanup_vault_test calls it triggers) contains the root token value."
 evidence:
-  - {id: E1, proves: [M1, N1, N2], kind: offline, intent: "You will see a bats test drive each of the four writer functions with Vault and kubectl stubbed, capture exactly what each sends to Vault (argv and stdin), and fail if it contains token_reviewer_jwt= or disable_local_ca_jwt=true, or lacks kubernetes_host and kubernetes_ca_cert; it fails on today's code for all four, and a positive control shows the capture really sees a planted token_reviewer_jwt."}
-  - {id: E2, proves: [M2, N3], kind: offline, intent: "You will see a bats test run test_vault with a fake root token string, record every kubectl argument including those from its cleanup trap, and fail if the fake token appears in any argument, in the trap text, or in the xtrace output of a run under set -x, while showing it does arrive on stdin; it fails on today's test.sh."}
-  - {id: E3, proves: [M3], kind: offline, intent: "You will see the existing hub_data.bats, orbstack_upgrade.bats and vault_role_policy_merge.bats suites pass unchanged."}
-  - {id: E4, proves: [M1, N1], kind: live, intent: "After the operator-approved repair on the M5 hub, Claude shows vault read auth/kubernetes/config with token_reviewer_jwt_set false and disable_local_ca_jwt false, both ESO stores Ready, 9/9 ExternalSecrets synced, and the vault ServiceAccount allowed to create TokenReviews (host, time, Vault version)."}
-  - {id: E5, proves: [M1], kind: live, intent: "At the next vault-0 restart (operator present to unseal), Claude shows ESO stores return Ready after unseal (on their own refresh, or after a reconcile annotation) with no write to auth/kubernetes/config in between."}
+  - id: E1
+    proves: [M1, N1, N2]
+    kind: offline
+    intent: "You will see a bats test drive each of the four writer functions with Vault and kubectl stubbed, capture exactly what each sends to Vault (argv and stdin), and fail if it contains token_reviewer_jwt= or disable_local_ca_jwt=true, or lacks kubernetes_host and kubernetes_ca_cert; it fails on today's code for all four, and a positive control shows the capture really sees a planted token_reviewer_jwt."
+  - id: E2
+    proves: [M2, N3]
+    kind: offline
+    intent: "You will see a bats test run test_vault with a fake root token string, record every kubectl argument including those from its cleanup trap, and fail if the fake token appears in any argument, in the trap text, or in the xtrace output of a run under set -x, while showing it does arrive on stdin; it fails on today's test.sh."
+  - id: E3
+    proves: [M3]
+    kind: offline
+    intent: "You will see the existing hub_data.bats, orbstack_upgrade.bats and vault_role_policy_merge.bats suites pass unchanged."
+  - id: E4
+    proves: [M1, N1]
+    kind: live
+    intent: "After the operator-approved repair on the M5 hub, Claude shows vault read auth/kubernetes/config with token_reviewer_jwt_set false and disable_local_ca_jwt false, both ESO stores Ready, 9/9 ExternalSecrets synced, and the vault ServiceAccount allowed to create TokenReviews (host, time, Vault version)."
+  - id: E5
+    proves: [M1]
+    kind: live
+    intent: "At the next vault-0 restart (operator present to unseal), Claude shows ESO stores return Ready after unseal (on their own refresh, or after a reconcile annotation) with no write to auth/kubernetes/config in between."
 interface:
   - "scripts/plugins/vault.sh: _vault_set_eso_reader, _vault_configure_secret_reader_role"
   - "scripts/plugins/hub_data.sh: _hub_data_repoint_vault"
