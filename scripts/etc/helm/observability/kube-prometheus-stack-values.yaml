@@ -78,6 +78,9 @@ prometheus:
             action: keep
 
 grafana:
+  image:
+    tag: "12.4.15"
+    sha: "2894082f6cf7081aefdc1389265c04000812309208c190d75e8c65f7a30e4b7e"
   serviceMonitor:
     labels:
       release: kube-prometheus-stack

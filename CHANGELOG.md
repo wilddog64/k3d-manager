@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- **Hub Grafana:** pin the image to 12.4.15 by digest to address critical vulnerabilities in the chart's default image.
 - **dev-hub-up:** when the vCluster syncer restarts mid-install and its background proxy dies, refresh the connection, recover the release and retry the Helm install once instead of failing; an unreachable vCluster after refresh points to `make dev-hub-status`.
 - **Codex dispatch attribution:** use `K3DM_COORDINATOR` when `--coordinator` is omitted, include env-declared coordinators in metrics, and show the unreported share on Agent Dispatch.
 - **App CVE scan:** normalize `UNKNOWN` findings from CVSS scores when counting deployed VulnerabilityReports and scanning candidates, and identify digest-pinned deployed images by digest.
