@@ -6,7 +6,7 @@
 **Priority:** P2 — Vault, and every secret read through it, stays sealed up to 5 minutes longer than needed after a restart; it recovers on its own
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Post-restart unsealing is delayed by one 5-minute CronJob interval when Vault is still booting, after which the next scheduled run automatically unseals it); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
-**Waiting on:** live check — since 2026-11-14 (next hub restart; operator applies the template)
+**Waiting on:** live check — since 2026-11-14 (fixed template applied to the hub 2026-11-15; unseal half blocked by docs/bugs/2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed.md)
 **Release:** v1.44.0 (carried by grooming 2026-11-12; was v1.46.0 per backlog triage, Claude, 2026-10-22)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** medium
@@ -160,3 +160,10 @@ Evidence:
   shard marker never appeared in output (positive control: it was found in the stub's unseal call log). The only
   rendered change outside the script is the `VAULT_CLIENT_TIMEOUT` env var. bats 12/12; the repo tree was clean after
   the verifier moved its stray stub files out.
+
+## Live attempt (Claude, 2026-11-15) — template applied; unseal blocked by a separate bug
+
+The fixed template had never been applied to the hub (the live CronJob had no retry lines). Claude applied it at
+`234bc2d1` and deleted `vault-0` at 15:24:45Z. Jobs ran every 5 minutes and reached `replaying shard`, but the Secret's
+shard was rejected, so E3's `unseal succeeded` could not happen. See
+`docs/bugs/2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed.md`. The operator unsealed by hand at about 15:37Z.
