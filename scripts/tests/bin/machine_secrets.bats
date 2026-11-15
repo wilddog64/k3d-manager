@@ -354,11 +354,12 @@ SH
 @test "N5: export does not leave plaintext records on disk" {
   printf 'k3dm-cloudflare-api-token\tk3dm\t74657374\n' > "$FIXTURE"
   encrypted="$TMP/n5.enc"
-  run "$SCRIPT" export --role hub --out "$encrypted"
+  mkdir -p "$TMP/script-tmp"
+  TMPDIR="$TMP/script-tmp" run "$SCRIPT" export --role hub --out "$encrypted"
   [ "$status" -eq 0 ]
   [[ "$output" == *'exported k3dm-cloudflare-api-token k3dm'* ]]
   [[ "$output" != *'74657374'* ]]
-  leaks="$(grep -rlF -e 74657374 "$TMP" "${TMPDIR:-/tmp}"/k3dm-* 2>/dev/null | grep -vxF -e "$FIXTURE" -e "$K3DM_SECRETS_PASSPHRASE_FILE" || true)"
+  leaks="$(grep -rlF -e 74657374 "$TMP" 2>/dev/null | grep -vxF -e "$FIXTURE" -e "$K3DM_SECRETS_PASSPHRASE_FILE" || true)"
   [ -z "$leaks" ] || { printf "leak: %s\n" "$leaks"; return 1; }
 }
 
