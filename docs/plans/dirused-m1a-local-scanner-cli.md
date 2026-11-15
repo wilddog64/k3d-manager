@@ -63,6 +63,21 @@ explicit. Claude pushes the branch and feeds CI errors back. Do not try to insta
 7. **Exit codes:** 0 success, 1 failure/usage error, 3 partial (any target incomplete). (2 is reserved for M3's threshold.)
 8. **README:** add a "Usage (M1a)" section listing the commands above.
 
+## Files
+
+Paths are in the dirused repo.
+
+- `dirused.sln`
+- `global.json`
+- `Directory.Build.props`
+- `Directory.Packages.props`
+- `src/Dirused.Core/*`
+- `src/Dirused.Cli/*`
+- `tests/Dirused.Tests/*`
+- `.github/workflows/ci.yml`
+- `README.md`
+- `.gitignore`
+
 ## Out of scope
 
 UNC, `\\node`, `/file`, `/summary`, `/timeout`, `/parallel` (M1b); any delete, purge or plan (M2); threshold and monitor (M3); GUI.
