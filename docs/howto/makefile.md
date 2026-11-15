@@ -219,7 +219,7 @@ the store rather than truncating it. See
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make fast-gate [BASE=<rev>]` | `scripts/ci/fast_gate.sh` | Changed-file lint and selected tests in under a minute; the pre-push hook and `codex-dispatch land` run it. See [fast gate](fast-gate.md) |
-| `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard |
+| `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard; `PARALLEL=1` runs suites in parallel |
 | `make bug-tally` | Count bug documents by release, status and priority | Deterministic bug inventory; use `RELEASE=vX.Y.Z` or `JSON=1` |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
@@ -272,8 +272,14 @@ suite's real exit code travels in the `k3dm_test_exit_code` metric rather than t
 wrapper's status. `make test-all` itself remains a gate and returns the original
 suite status after publishing, so use it when the caller must fail on a test failure.
 
+Serial and parallel `test-all` both run all three stages (`test`, `test-bin`,
+`test-python`) even when an earlier stage fails, exiting non-zero if any stage
+failed. A stage only omits its completion marker if it aborted or was killed.
+Pass `PARALLEL=1` to run test files concurrently via `_run_parallel` with
+per-job tripwire isolation and automatic retries for failed items.
+
 The raw log path is echoed by `test-all`; the log itself is kept under
-`${TMPDIR:-/tmp}/k3dm-test-all-<epoch>.log`.
+`${TMPDIR:-/tmp}/k3dm-test-all-<pid>-<epoch>.log`.
 
 ---
 

@@ -126,7 +126,7 @@ def test_panel_descriptions(dashboard_json):
     assert failed_cases is not None, "Missing 'Failed cases' panel"
 
     assert "OfflineSuiteRunIncomplete" in run_complete.get("description", "")
-    assert "stops at a red stage counts only the stages that ran" in run_complete.get("description", "")
+    assert "a stage aborted counts only the stages that ran" in run_complete.get("description", "")  # agent-audit: allow assert-removed panel text reworded, same check
 
     for p in (total_cases, failed_cases):
         desc = p.get("description", "")

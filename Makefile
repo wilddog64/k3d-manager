@@ -1631,20 +1631,521 @@ endef
 
 ## Run every offline suite: BATS (dispatcher) + BATS bin + Python, then publish the result
 test-all:
-	@set -o pipefail; \
-	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$(date -u +%s).log"; \
+	@if [ -n "$${K3DM_MAKEFILE_TEST_ALL_NESTED:-}" ] && \
+	    [ "$${K3DM_MAKEFILE_TEST_ALL_NESTED:-0}" -ge 1 ] && \
+	    [ -f scripts/tests/bin/makefile_test_all.bats ] && \
+	    [ -z "$${STAGE_TEST_FILES+x}" ] && \
+	    [ -z "$${STAGE_TEST_BIN_FILES+x}" ] && \
+	    [ -z "$${STAGE_TEST_PYTHON_FILES+x}" ] && \
+	    [ -z "$${STAGE_TEST_PYTHON_UNIT_FILES+x}" ] && \
+	    [ -z "$${STAGE_TEST_PYTEST_FILES+x}" ] && \
+	    { [ "$${PARALLEL:-}" != "1" ] || [ -z "$${K3DM_TESTS_DIR+x}" ]; }; then \
+	  echo "[make] nested make test-all without non-empty STAGE_* overrides blocked by recursion guard" >&2; \
+	  exit 2; \
+	fi; \
+	set -o pipefail; \
+	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$$$-$$(date -u +%s).log"; \
 	_start=$$(date -u +%s); \
-	{ $(MAKE) --no-print-directory test && \
-	  echo "[test-all] stage-complete test" && \
-	  $(MAKE) --no-print-directory test-bin && \
-	  echo "[test-all] stage-complete test-bin" && \
-	  $(MAKE) --no-print-directory test-python && \
-	  echo "[test-all] stage-complete test-python"; \
+	_stage_failed=0; \
+	{ if [ "$${PARALLEL:-}" = "1" ]; then \
+	  _system_lib="scripts/lib/system.sh"; \
+	  [ -f "$$_system_lib" ] || _system_lib="$(CURDIR)/scripts/lib/system.sh"; \
+	  . "$$_system_lib"; \
+	  _jobs_opt=(); [ -n "$${JOBS:-}" ] && _jobs_opt=(--jobs "$$JOBS"); \
+	  _cache_dir="$${XDG_CACHE_HOME:-$$HOME/.cache}/k3d-manager"; \
+	  _order_file="$$_cache_dir/test-times.txt"; \
+	  _parallel_out="$${TMPDIR:-/tmp}/k3dm-parallel-$$$$-$$(date -u +%s)"; \
+	  mkdir -p "$$_parallel_out"; \
+	  _tripwire="scripts/tests/tripwire.sh"; \
+	  [ -f "$$_tripwire" ] || _tripwire="$(CURDIR)/scripts/tests/tripwire.sh"; \
+	  _stage1_bats_shell="$${BATS_SHELL:-}"; \
+	  if [ -z "$$_stage1_bats_shell" ]; then \
+	    if [ -x /opt/homebrew/bin/bash ]; then \
+	      _stage1_bats_shell="/opt/homebrew/bin/bash"; \
+	    elif [ -x /usr/local/bin/bash ]; then \
+	      _stage1_bats_shell="/usr/local/bin/bash"; \
+	    else \
+	      _stage1_bats_shell="$$(command -v bash 2>/dev/null || printf 'bash')"; \
+	    fi; \
+	  fi; \
+	  _run_stage_parallel() { \
+	    local _stage="$$1"; shift; \
+	    local _files=($$@); \
+	    if [ "$${#_files[@]}" -eq 0 ]; then \
+	      echo "[make] no test files found for stage $$_stage" >&2; \
+	      _stage_failed=1; \
+	      return 0; \
+	    fi; \
+	    for _f in "$${_files[@]}"; do \
+	      if [ ! -e "$$_f" ]; then \
+	        echo "[make] test file not found: $$_f" >&2; \
+	        _stage_failed=1; \
+	        return 0; \
+	      fi; \
+	    done; \
+	    local _stage_dir="$$_parallel_out/$$_stage"; \
+	    mkdir -p "$$_stage_dir"; \
+	    local _order_opt=(); \
+	    if [ -s "$$_order_file" ]; then \
+	      _order_opt=(--order-by "$$_order_file"); \
+	    fi; \
+	    local _wrapper="$$_stage_dir/runner.sh"; \
+	    printf '%s\n' \
+	      '#!/usr/bin/env bash' \
+	      'set -u' \
+	      '_item="$$1"' \
+	      'shift' \
+	      '_job_tmp="$${TMPDIR:-/tmp}/k3dm-job-$$$$"' \
+	      'mkdir -p "$$_job_tmp"' \
+	      'export TMPDIR="$$_job_tmp"' \
+	      'trap "rm -rf \"$$_job_tmp\"" EXIT' \
+	      'if [ -n "$${K3DM_PARALLEL_STAGE1:-}" ]; then' \
+	      '  export BATS_SHELL="$${K3DM_RESOLVED_BATS_SHELL:-$$(type -p bash || echo /bin/bash)}"' \
+	      '  export CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}"' \
+	      'fi' \
+	      '_tripwire="$${TRIPWIRE_BIN:-$$_tripwire}"' \
+	      'case "$$_item" in' \
+	      '  *.bats)' \
+	      '    "$$_tripwire" bats "$$_item"' \
+	      '    ;;' \
+	      '  *.py)' \
+	      '    _bname="$$(basename "$$_item")"' \
+	      '    case "$$_bname" in' \
+	      '      conftest.py)' \
+	      '        true' \
+	      '        ;;' \
+	      '      test_*.py)' \
+	      '        _py_cmd=($${K3DM_RESOLVED_PYTEST:-pytest})' \
+	      '        "$$_tripwire" "$${_py_cmd[@]}" "$$_item"' \
+	      '        ;;' \
+	      '      *)' \
+	      '        echo "[make] python3 $$_item"' \
+	      '        "$$_tripwire" python3 "$$_item"' \
+	      '        ;;' \
+	      '    esac' \
+	      '    ;;' \
+	      '  *)' \
+	      '    "$$_tripwire" "$$_item"' \
+	      '    ;;' \
+	      'esac' \
+	      '_rc=$$?' \
+	      'exit "$$_rc"' > "$$_wrapper"; \
+	    chmod +x "$$_wrapper"; \
+	    if [ -n "$${K3DM_JUNIT_XML:-}" ]; then \
+	      echo "[test-all] K3DM_JUNIT_XML ignored in PARALLEL mode"; \
+	    fi; \
+	    local _stage_rc=0; \
+	    export TRIPWIRE_BIN="$$_tripwire"; \
+	    export K3DM_PARALLEL_STAGE1="$$([ "$$_stage" = "test" ] && echo 1 || echo "")"; \
+	    export K3DM_RESOLVED_BATS_SHELL="$$_stage1_bats_shell"; \
+	    [ -n "$${K3DM_RESOLVED_PYTEST:-}" ] && export K3DM_RESOLVED_PYTEST; \
+	    local _summary_file="$$_stage_dir/summary.txt"; \
+	    printf '%s\0' "$${_files[@]}" | \
+	      _run_parallel "$${_jobs_opt[@]}" --out "$$_stage_dir" \
+	        "$${_order_opt[@]}" --retry-failed -- "$$_wrapper" | tee "$$_summary_file" || _stage_rc=$$?; \
+	    if [ "$$_stage_rc" -ne 0 ]; then \
+	      _stage_failed=1; \
+	    fi; \
+	    grep '^FLAKY ' "$$_summary_file" >> "$$_parallel_out/flaky.accum" 2>/dev/null || true; \
+	    grep '^FAIL ' "$$_summary_file" >> "$$_parallel_out/failed.accum" 2>/dev/null || true; \
+	    for _l in "$$_stage_dir"/*.log; do \
+	      case "$$_l" in *.try1.log) continue;; esac; \
+	      [ -f "$$_l" ] && cat "$$_l"; \
+	    done; \
+	    local _total_files="$${#_files[@]}"; \
+	    local _completed_count=0; \
+	    for _rc_file in "$$_stage_dir"/*.rc; do \
+	      if [ -f "$$_rc_file" ]; then \
+	        local _val="$$(cat "$$_rc_file" 2>/dev/null || echo 128)"; \
+	        if [ "$$_val" -lt 126 ] && [ "$$_val" -ne 2 ]; then \
+	          _completed_count=$$((_completed_count + 1)); \
+	        fi; \
+	      fi; \
+	    done; \
+	    if [ "$$_completed_count" -eq "$$_total_files" ]; then \
+	      echo "[test-all] stage-complete $$_stage"; \
+	    else \
+	      _stage_failed=1; \
+	    fi; \
+	    if [ -s "$$_stage_dir/times.txt" ]; then \
+	      cat "$$_stage_dir/times.txt" >> "$$_parallel_out/test-times.accum"; \
+	    fi; \
+	  }; \
+	  _stage1_files=(); \
+	  if [ -n "$${STAGE_TEST_FILES+x}" ]; then \
+	    _stage1_files=($$STAGE_TEST_FILES); \
+	  elif [ -n "$${K3DM_TESTS_DIR+x}" ]; then \
+	    while IFS= read -r -d '' f; do _stage1_files+=("$$f"); done < <(find "$$K3DM_TESTS_DIR" -name "*.bats" -print0 | sort -z); \
+	  else \
+	    _stage1_dirs=(); \
+	    for _d in scripts/tests/lib scripts/tests/core scripts/tests/plugins scripts/tests/etc; do \
+	      [ -d "$$_d" ] && _stage1_dirs+=("$$_d"); \
+	    done; \
+	    if [ "$${#_stage1_dirs[@]}" -gt 0 ]; then \
+	      while IFS= read -r -d '' f; do _stage1_files+=("$$f"); done < <(find "$${_stage1_dirs[@]}" -maxdepth 1 -type f -name "*.bats" -print0 | sort -z); \
+	    fi; \
+	  fi; \
+	  _run_stage_parallel test "$${_stage1_files[@]}"; \
+	  _stage2_files=(); \
+	  if [ -n "$${STAGE_TEST_BIN_FILES+x}" ]; then \
+	    _stage2_files=($$STAGE_TEST_BIN_FILES); \
+	  elif [ -n "$${K3DM_TESTS_DIR+x}" ]; then \
+	    while IFS= read -r -d '' f; do _stage2_files+=("$$f"); done < <(find "$$K3DM_TESTS_DIR" -name "*.bats" -print0 | sort -z); \
+	  else \
+	    while IFS= read -r -d '' f; do _stage2_files+=("$$f"); done < <(find scripts/tests/bin -maxdepth 1 -name "*.bats" -print0 | sort -z); \
+	  fi; \
+	  _run_stage_parallel test-bin "$${_stage2_files[@]}"; \
+	  _stage3_files=(); \
+	  if [ -n "$${STAGE_TEST_PYTHON_FILES+x}" ]; then \
+	    _stage3_files=($$STAGE_TEST_PYTHON_FILES); \
+	  elif [ -n "$${STAGE_TEST_PYTHON_UNIT_FILES+x}" ] || [ -n "$${STAGE_TEST_PYTEST_FILES+x}" ]; then \
+	    _stage3_files=($${STAGE_TEST_PYTHON_UNIT_FILES:-} $${STAGE_TEST_PYTEST_FILES:-}); \
+	  elif [ -n "$${K3DM_TESTS_DIR+x}" ]; then \
+	    while IFS= read -r -d '' f; do \
+	      case "$$(basename "$$f")" in conftest.py) continue;; *) _stage3_files+=("$$f");; esac; \
+	    done < <(find "$$K3DM_TESTS_DIR" -name "*.py" -print0 | sort -z); \
+	  else \
+	    for _f in scripts/tests/bin/*.py; do \
+	      [ -f "$$_f" ] || continue; \
+	      case "$$(basename "$$_f")" in \
+	        conftest.py) continue;; \
+	        *) _stage3_files+=("$$_f");; \
+	      esac; \
+	    done; \
+	    if [ -d scripts/tests/hermes ]; then \
+	      while IFS= read -r -d '' f; do \
+	        case "$$(basename "$$f")" in \
+	          test_*.py) _stage3_files+=("$$f");; \
+	          *) continue;; \
+	        esac; \
+	      done < <(find scripts/tests/hermes -maxdepth 1 -name "test_*.py" -print0 | sort -z); \
+	    fi; \
+	  fi; \
+	  _stage3_failed=0; \
+	  if ! ./bin/k3dm-check-agent-docs; then \
+	    _stage_failed=1; \
+	    _stage3_failed=1; \
+	  fi; \
+	  if [ "$$_stage3_failed" -eq 0 ]; then \
+	    _unittest_found=0; \
+	    for _f in "$${_stage3_files[@]}"; do \
+	      case "$$(basename "$$_f")" in test_*) continue;; esac; \
+	      _unittest_found=1; \
+	      if [ -f "$$_f" ] && grep -q '^def test_' "$$_f" && ! grep -Eq 'unittest\.main\(\)|pytest\.main\(' "$$_f"; then \
+	        echo "[make] $$_f defines bare test functions but has no main hook —" >&2; \
+	        echo "[make] running it as a script executes nothing. Rename it to test_*.py" >&2; \
+	        echo "[make] so make test-pytest collects it." >&2; \
+	        _stage_failed=1; \
+	        _stage3_failed=1; \
+	        break; \
+	      fi; \
+	    done; \
+	  fi; \
+	  if [ "$$_stage3_failed" -eq 0 ] && [ -z "$${STAGE_TEST_PYTHON_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTHON_UNIT_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTEST_FILES+x}" ] && [ "$$_unittest_found" -eq 0 ]; then \
+	    echo "[make] no unittest suites found" >&2; \
+	    _stage_failed=1; \
+	    _stage3_failed=1; \
+	  fi; \
+	  if [ -n "$${STAGE_TEST_PYTEST_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTEST_FILES}" ]; then \
+	    echo "[make] no pytest files specified" >&2; \
+	    _stage_failed=1; \
+	    _stage3_failed=1; \
+	  fi; \
+	  if [ "$$_stage3_failed" -eq 0 ]; then \
+	    _has_pytest_files=0; \
+	    for _f in "$${_stage3_files[@]}"; do \
+	      case "$$(basename "$$_f")" in test_*.py) _has_pytest_files=1; break;; esac; \
+	    done; \
+	    if [ "$$_has_pytest_files" -eq 1 ]; then \
+	      if [ -n "$${K3DM_RESOLVED_PYTEST:-}" ]; then \
+	        _pytest_cmd="$$K3DM_RESOLVED_PYTEST"; \
+	      elif [ -n "$${PYTEST:-}" ]; then \
+	        _pytest_cmd="$$PYTEST"; \
+	      elif command -v pytest >/dev/null 2>&1; then \
+	        _pytest_cmd="pytest"; \
+	      elif python3 -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="python3 -m pytest"; \
+	      elif [ -x "$$HOME/.pyenv/shims/python3" ] \
+	           && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="$$HOME/.pyenv/shims/python3 -m pytest"; \
+	      else \
+	        echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
+	        echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
+	        echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
+	        echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	        _stage_failed=1; \
+	        _stage3_failed=1; \
+	      fi; \
+	      export K3DM_RESOLVED_PYTEST="$$_pytest_cmd"; \
+	    fi; \
+	  fi; \
+	  if [ "$$_stage3_failed" -eq 0 ]; then \
+	    _run_stage_parallel test-python "$${_stage3_files[@]}"; \
+	  fi; \
+	  if [ "$$_stage_failed" -eq 0 ] && [ -z "$${STAGE_TEST_FILES+x}" ] && [ -z "$${STAGE_TEST_BIN_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTHON_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTHON_UNIT_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTEST_FILES+x}" ] && [ -z "$${K3DM_TESTS_DIR+x}" ]; then \
+	    if [ -s "$$_parallel_out/test-times.accum" ]; then \
+	      mkdir -p "$$_cache_dir"; \
+	      sort -u -k2,2 "$$_parallel_out/test-times.accum" > "$$_order_file.tmp" && mv "$$_order_file.tmp" "$$_order_file"; \
+	    fi; \
+	  fi; \
+	  if [ -s "$$_parallel_out/flaky.accum" ]; then \
+	    echo "[test-all] flaky:"; \
+	    cat "$$_parallel_out/flaky.accum"; \
+	  fi; \
+	  if [ -s "$$_parallel_out/failed.accum" ] || [ "$$_stage_failed" -ne 0 ]; then \
+	    echo "[test-all] failed:"; \
+	    if [ -s "$$_parallel_out/failed.accum" ]; then \
+	      cat "$$_parallel_out/failed.accum"; \
+	    fi; \
+	  fi; \
+	  rm -rf "$$_parallel_out"; \
+	else \
+	  _stage1_override=0; \
+	  [ -n "$${STAGE_TEST_FILES+x}" ] && _stage1_override=1; \
+	  if [ "$$_stage1_override" -eq 1 ]; then \
+	    _files=($$STAGE_TEST_FILES); \
+	    if [ "$${#_files[@]}" -eq 0 ]; then \
+	      echo "[make] no test files found for stage test" >&2; \
+	      _stage_failed=1; \
+	    else \
+	      _missing=0; \
+	      for _f in "$${_files[@]}"; do \
+	        if [ ! -e "$$_f" ]; then \
+	          echo "[make] test file not found: $$_f" >&2; \
+	          _missing=1; \
+	          _stage_failed=1; \
+	          break; \
+	        fi; \
+	      done; \
+	      if [ "$$_missing" -eq 0 ]; then \
+	        if ! command -v bats >/dev/null 2>&1; then \
+	          echo "[make] bats not found — install with: brew install bats-core" >&2; \
+	          _stage_failed=1; \
+	        else \
+	          _s_rc=0; \
+	          CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}" scripts/tests/tripwire.sh bats "$${_files[@]}" || _s_rc=$$?; \
+	          if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
+	            echo "[test-all] stage-complete test"; \
+	          fi; \
+	          if [ "$$_s_rc" -ne 0 ]; then \
+	            _stage_failed=1; \
+	          fi; \
+	        fi; \
+	      fi; \
+	    fi; \
+	  else \
+	    _s_rc=0; \
+	    scripts/tests/tripwire.sh ./scripts/k3d-manager test all || _s_rc=$$?; \
+	    if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
+	      echo "[test-all] stage-complete test"; \
+	    fi; \
+	    if [ "$$_s_rc" -ne 0 ]; then \
+	      _stage_failed=1; \
+	    fi; \
+	  fi; \
+	  _stage2_override=0; \
+	  [ -n "$${STAGE_TEST_BIN_FILES+x}" ] && _stage2_override=1; \
+	  if [ "$$_stage2_override" -eq 1 ]; then \
+	    _files=($$STAGE_TEST_BIN_FILES); \
+	    if [ "$${#_files[@]}" -eq 0 ]; then \
+	      echo "[make] no test files found for stage test-bin" >&2; \
+	      _stage_failed=1; \
+	    else \
+	      _missing=0; \
+	      for _f in "$${_files[@]}"; do \
+	        if [ ! -e "$$_f" ]; then \
+	          echo "[make] test file not found: $$_f" >&2; \
+	          _missing=1; \
+	          _stage_failed=1; \
+	          break; \
+	        fi; \
+	      done; \
+	      if [ "$$_missing" -eq 0 ]; then \
+	        if ! command -v bats >/dev/null 2>&1; then \
+	          echo "[make] bats not found — install with: brew install bats-core" >&2; \
+	          _stage_failed=1; \
+	        else \
+	          _s_rc=0; \
+	          CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}" scripts/tests/tripwire.sh bats "$${_files[@]}" || _s_rc=$$?; \
+	          if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
+	            echo "[test-all] stage-complete test-bin"; \
+	          fi; \
+	          if [ "$$_s_rc" -ne 0 ]; then \
+	            _stage_failed=1; \
+	          fi; \
+	        fi; \
+	      fi; \
+	    fi; \
+	  else \
+	    if ! command -v bats >/dev/null 2>&1; then \
+	      echo "[make] bats not found — install with: brew install bats-core" >&2; \
+	      _stage_failed=1; \
+	    else \
+	      _s_rc=0; \
+	      scripts/tests/tripwire.sh bats scripts/tests/bin || _s_rc=$$?; \
+	      if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
+	        echo "[test-all] stage-complete test-bin"; \
+	      fi; \
+	      if [ "$$_s_rc" -ne 0 ]; then \
+	        _stage_failed=1; \
+	      fi; \
+	    fi; \
+	  fi; \
+	  _unit_files=(); \
+	  _pytest_files=(); \
+	  _has_py_override=0; \
+	  [ -n "$${STAGE_TEST_PYTHON_FILES+x}" ] && _has_py_override=1; \
+	  [ -n "$${STAGE_TEST_PYTHON_UNIT_FILES+x}" ] && _has_py_override=1; \
+	  [ -n "$${STAGE_TEST_PYTEST_FILES+x}" ] && _has_py_override=1; \
+	  if [ "$$_has_py_override" -eq 1 ]; then \
+	    if [ -n "$${STAGE_TEST_PYTHON_UNIT_FILES+x}" ]; then \
+	      _unit_files=($$STAGE_TEST_PYTHON_UNIT_FILES); \
+	    elif [ -n "$${STAGE_TEST_PYTHON_FILES+x}" ]; then \
+	      for _f in $$STAGE_TEST_PYTHON_FILES; do \
+	        case "$$(basename "$$_f")" in test_*) continue;; *) _unit_files+=("$$_f");; esac; \
+	      done; \
+	    fi; \
+	    if [ -n "$${STAGE_TEST_PYTEST_FILES+x}" ]; then \
+	      _pytest_files=($$STAGE_TEST_PYTEST_FILES); \
+	    elif [ -n "$${STAGE_TEST_PYTHON_FILES+x}" ]; then \
+	      for _f in $$STAGE_TEST_PYTHON_FILES; do \
+	        case "$$(basename "$$_f")" in test_*.py) _pytest_files+=("$$_f");; esac; \
+	      done; \
+	    fi; \
+	  else \
+	    for _f in scripts/tests/bin/*.py; do \
+	      [ -f "$$_f" ] || continue; \
+	      case "$$(basename "$$_f")" in \
+	        test_*) continue;; \
+	        conftest.py) continue;; \
+	        *) _unit_files+=("$$_f");; \
+	      esac; \
+	    done; \
+	    if [ -d scripts/tests/hermes ]; then \
+	      _pytest_files+=("scripts/tests/hermes"); \
+	    fi; \
+	    for _f in scripts/tests/bin/test_*.py; do \
+	      [ -f "$$_f" ] && _pytest_files+=("$$_f"); \
+	    done; \
+	  fi; \
+	  _stage3_killed=0; \
+	  _stage3_err=0; \
+	  if [ -n "$${STAGE_TEST_PYTHON_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTHON_FILES}" ]; then \
+	    echo "[make] no python files specified" >&2; \
+	    _stage_failed=1; \
+	    _stage3_err=1; \
+	  fi; \
+	  if [ -n "$${STAGE_TEST_PYTEST_FILES+x}" ] && [ -z "$${STAGE_TEST_PYTEST_FILES}" ]; then \
+	    echo "[make] no pytest files specified" >&2; \
+	    _stage_failed=1; \
+	    _stage3_err=1; \
+	  fi; \
+	  for _f in "$${_unit_files[@]}"; do \
+	    if [ ! -e "$$_f" ]; then \
+	      echo "[make] python test file not found: $$_f" >&2; \
+	      _stage_failed=1; \
+	      _stage3_err=1; \
+	      break; \
+	    fi; \
+	  done; \
+	  if [ "$$_has_py_override" -eq 1 ]; then \
+	    for _f in "$${_pytest_files[@]}"; do \
+	      if [ ! -e "$$_f" ]; then \
+	        echo "[make] python test file not found: $$_f" >&2; \
+	        _stage_failed=1; \
+	        _stage3_err=1; \
+	        break; \
+	      fi; \
+	    done; \
+	  fi; \
+	  if [ "$$_stage3_err" -eq 0 ]; then \
+	    for _f in "$${_unit_files[@]}"; do \
+	      if grep -q '^def test_' "$$_f" && ! grep -Eq 'unittest\.main\(\)|pytest\.main\(' "$$_f"; then \
+	        echo "[make] $$_f defines bare test functions but has no main hook —" >&2; \
+	        echo "[make] running it as a script executes nothing. Rename it to test_*.py" >&2; \
+	        echo "[make] so make test-pytest collects it." >&2; \
+	        _stage_failed=1; \
+	        _stage3_err=1; \
+	        break; \
+	      fi; \
+	    done; \
+	  fi; \
+	  if [ "$$_stage3_err" -eq 0 ]; then \
+	    for _f in "$${_unit_files[@]}"; do \
+	      echo "[make] python3 $$_f"; \
+	      _u_rc=0; \
+	      scripts/tests/tripwire.sh python3 "$$_f" || _u_rc=$$?; \
+	      if [ "$$_u_rc" -ge 126 ]; then \
+	        _stage3_killed=1; \
+	        _stage_failed=1; \
+	        break; \
+	      elif [ "$$_u_rc" -eq 2 ]; then \
+	        _stage3_err=1; \
+	        _stage_failed=1; \
+	        break; \
+	      elif [ "$$_u_rc" -ne 0 ]; then \
+	        _stage_failed=1; \
+	      fi; \
+	    done; \
+	  fi; \
+	  if [ "$$_stage3_killed" -eq 0 ] && [ "$$_stage3_err" -eq 0 ]; then \
+	    if ! ./bin/k3dm-check-agent-docs; then \
+	      _stage_failed=1; \
+	      _stage3_err=1; \
+	    fi; \
+	  fi; \
+	  if [ "$${#_pytest_files[@]}" -gt 0 ] && [ "$$_stage3_killed" -eq 0 ] && [ "$$_stage3_err" -eq 0 ]; then \
+	      if [ -n "$${K3DM_RESOLVED_PYTEST:-}" ]; then \
+	        _pytest_cmd="$$K3DM_RESOLVED_PYTEST"; \
+	      elif [ -n "$${PYTEST:-}" ]; then \
+	        _pytest_cmd="$$PYTEST"; \
+	      elif command -v pytest >/dev/null 2>&1; then \
+	        _pytest_cmd="pytest"; \
+	      elif python3 -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="python3 -m pytest"; \
+	      elif [ -x "$$HOME/.pyenv/shims/python3" ] \
+	           && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="$$HOME/.pyenv/shims/python3 -m pytest"; \
+	      else \
+	        echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
+	        echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
+	        echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
+	        echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	        _stage_failed=1; \
+	        _stage3_err=1; \
+	      fi; \
+	      if [ "$$_stage3_err" -eq 0 ]; then \
+	        if [ -n "$${K3DM_JUNIT_XML:-}" ]; then \
+	          _pytest_cmd="$$_pytest_cmd --junitxml $$K3DM_JUNIT_XML -o junit_logging=no"; \
+	        fi; \
+	        echo "[make] $$_pytest_cmd (pytest suites)"; \
+	        _p_rc=0; \
+	        scripts/tests/tripwire.sh $$_pytest_cmd "$${_pytest_files[@]}" || _p_rc=$$?; \
+	        if [ "$$_p_rc" -ge 126 ]; then \
+	          _stage3_killed=1; \
+	          _stage_failed=1; \
+	        elif [ "$$_p_rc" -eq 2 ]; then \
+	          _stage3_err=1; \
+	          _stage_failed=1; \
+	        elif [ "$$_p_rc" -ne 0 ]; then \
+	          _stage_failed=1; \
+	        fi; \
+	      fi; \
+	    fi; \
+	  if [ "$$_stage3_killed" -eq 0 ] && [ "$$_stage3_err" -eq 0 ]; then \
+	    echo "[test-all] stage-complete test-python"; \
+	  fi; \
+	fi; \
+	if [ "$$_stage_failed" -ne 0 ]; then \
+	  exit 2; \
+	fi; \
 	} 2>&1 | tee "$${_log}"; \
 	_rc=$${PIPESTATUS[0]}; \
 	_dur=$$(( $$(date -u +%s) - _start )); \
-	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}" \
-	  --expected-stages test,test-bin,test-python || true; \
+	if [ -z "$${K3DM_MAKEFILE_TEST_ALL_NESTED:-}" ]; then \
+	  ./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}" \
+	    --expected-stages test,test-bin,test-python || true; \
+	fi; \
 	echo "[test-all] metrics log: $${_log}"; \
 	exit "$${_rc}"
 
@@ -1769,7 +2270,7 @@ help:
 	@echo "    make test          Run all BATS test suites"
 	@echo "    make index-docs    Embed docs/ into the vector store (DRY_RUN=1, LIMIT=n)"
 	@echo "    make find-similar-docs Q=\"...\" [K=5]  Find prior art by similarity (advisory)"
-	@echo "    make test-all      Run every offline suite (BATS dispatcher + bin BATS + Python)"
+	@echo "    make test-all      Run every offline suite (BATS dispatcher + bin BATS + Python; PARALLEL=1 [JOBS=N])"
 	@echo "    make test-bin      Run the BATS suites under scripts/tests/bin"
 	@echo "    make test-host     Run real-host BATS suites (macOS; real Keychain tool, restores your keychain search list)"
 	@echo "    make test-python   Run every Python suite (unittest + pytest)"

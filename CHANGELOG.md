@@ -6,6 +6,7 @@
 
 - **Agent dispatch dashboard:** a collapsed *Stall recovery* row shows hangs detected, silence before detection, diagnoses and their cost, approve/deny decisions, outcomes and clean phase-2 approvals for the selected window.
 - Add an isolated development vCluster on the hub with a memory quota, preemptible workload priority, read-only status and low-memory/quota alerts; run ArgoCD and Grafana inside it, sync only pushed-branch dashboards, and read hub Prometheus through a replicated Service.
+- Parallel offline test run: `make test-all PARALLEL=1` runs test suites concurrently through `_run_parallel` with per-job tripwire, failure retries, and timing cache; serial and parallel `test-all` both run all stages even when an earlier stage fails.
 
 ### Fixed
 
