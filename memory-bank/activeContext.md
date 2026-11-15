@@ -753,3 +753,10 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-14 ~21:00Z: `dev-hub-proxy-retry` (Luna) dispatched for docs/bugs/2026-11-14-dev-hub-up-helm-wait-dies-with-vcluster-proxy-after-syncer-restart.md; WIP 3/3 (Part B, D, proxy-retry). Queue unchanged: next free slot → A (Flash, after Part B frees Makefile) / Trivy investigation (Luna).
 
 - 2026-11-14 22:15Z: dispatch-stall-d-dashboard LANDED 09d12e68; live E5 (Stall recovery row on hub Grafana) after `make hub-promote`. Grafana Trivy target awaiting operator (12.4.15 recommended). Part B running after hung probe killed.
+
+## Handoff 2026-11-14 ~17:30 PST (before /clear)
+- CI green on 160f0539 → operator to run `make hub-promote REF=160f0539 && make appsets-check && make platform-ops`; then E5 live checks for stall-D (docs/bugs/2026-11-14-dispatch-stall-d-dashboard.md) and proxy-retry.
+- Grafana 12.4.15 pin dispatched to Luna: slug grafana-12-4-15-pin (spec docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md). Watch exit, verify E1/E2, land with lint-python in the land test.
+- Part B correction 7 (resume 8) running (Flash): verify R1 red proof verbatim + R2 test-bin, then Opus verifier + Fable review, land; then Part A to Flash. After land, operator deletes the m4-air repo-sync group on M5 (stray doc Recurrence).
+- Alerts: operator to run `make install-test-metrics` on M5 (PyYAML); new P2 dev test-all overwrites nightly metrics, awaiting operator decision.
+- M4 disk 72%: ~94 GB is 232 leftover /private/tmp/bats-run-* dirs (interrupted bats runs; machine_setup_acceptance copies the repo per test, ~2.6 GB/run). Cleanup offered to operator (older than 1 day only); capture a P3 for the leak.
