@@ -154,6 +154,8 @@ test shown red against the pre-fix code; an independent verifier (a separately t
 its own tests from the Acceptance section only, never the fix spec or the diff, and both test sets
 must pass; live evidence is run by the operator or Claude, never Gemini. Example:
 `docs/bugs/2026-10-13-e2e-sandbox-does-not-provision-missing-acg-cluster.md`.
+The whole ladder (spec, worker, gate rerun, pre-fix red, verifier, blind review, land, live) is explained in
+[`verification-and-review.md`](verification-and-review.md).
 
 <a id="intent-approval"></a>
 ### Intent approval
