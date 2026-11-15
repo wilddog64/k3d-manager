@@ -7,6 +7,7 @@
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
 **Waiting on:** investigation — since 2026-11-15 (operator chose option (a): respec on PR-head ancestry; Sol run 2 not landed)
+**Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 
 ## Symptom

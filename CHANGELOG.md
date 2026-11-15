@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-11-15
+
 ### Added
 
 - **Agent dispatch dashboard:** a collapsed *Stall recovery* row shows hangs detected, silence before detection, diagnoses and their cost, approve/deny decisions, outcomes and clean phase-2 approvals for the selected window.
@@ -19,6 +21,24 @@
 - **App CVE scan:** normalize `UNKNOWN` findings from CVSS scores when counting deployed VulnerabilityReports and scanning candidates, and identify digest-pinned deployed images by digest.
 - **Vault unseal watchdog:** retry up to 12 times (5-second interval) when Vault is unreachable (rc 1) during startup before skipping, preventing post-restart unseal delays.
 - **PromQL tests:** install pinned promtool 3.1.0 through machine setup and CI, and fail affected checks with setup instructions when it is missing instead of falling back to Docker or skipping.
+- **ESO after a Vault restart:** Vault's Kubernetes auth no longer stores a pod-bound `token_reviewer_jwt`; it reads and reloads its own ServiceAccount token, so deleting or rescheduling `vault-0` no longer makes every ExternalSecret fail with a 403 until the auth config is rewritten. Applies to `_vault_set_eso_reader`, `_vault_configure_secret_reader_role` and `_hub_data_repoint_vault`.
+- **Hub checkout and promote guard:** the hub checkout follows `deploy/hub` with a backup ref, and the promote guard fails closed when it cannot decide.
+- **Hub PrometheusRules:** applied through ArgoCD from `deploy/hub`, not from the checkout branch.
+- **Repo sync:** pushes to Pushgateway only when `PUSHGATEWAY_URL` is set (no stray m4-air group on the hub); the `hub-sync` summary says `promotable: unknown` when the lookup failed instead of carrying an old SHA.
+- **Hermes and Slack relay:** a refused card click keeps the card and says the decision was NOT recorded; every Slack token seen in a cycle is redacted; regenerate evidence leads with the hint.
+- **Dashboards:** forecast tiles show the open release's Earliest/Latest (forecast table removed); agent cost counts every Fable version, prices Fable 5.2, and shows a neutral reset gauge.
+- **Dispatcher:** `dev_hub_sync` and `hub_snapshot_capture` are reachable through `scripts/k3d-manager`, with a declaration guard.
+- **lib-foundation v0.5.6** (subtree): `_run_command` works under macOS bash 3.2 (guarded empty-array expansions); the ACG login records which page it saw when auto-login fails.
+- **Test hygiene:** the cluster-status test no longer rewrites the real LaunchAgent, and machine-secrets tests no longer touch the real Keychain under the tripwire.
+
+### Security
+
+- **Vault tokens off argv:** `test_vault` and its cleanup pass the root token to `kubectl exec` on stdin under `_no_trace`, never in the `sh -c` string, the EXIT trap text or xtrace (the remaining `test_eso` and `bin/get-ldap-password` sites are tracked as a v1.44.x bug).
+
+### Process
+
+- Release PR gate is a merge gate (open a normal PR, then CI, Copilot, Claude live smoke test and Claude scope check before merge); `LIVE-VERIFIED` is a recognized bug status; dead instructions removed after the 2026-11-15 prompt-debt audit (`docs/process/prompt-debt-audit-2026-11-15.md`).
+- Independent verifier and blind two-reviewer process documented in `docs/process/verification-and-review.md`.
 
 ## [1.43.15] - 2026-11-12
 

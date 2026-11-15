@@ -74,3 +74,29 @@ Spec: [`../bugs/2026-11-12-hub-promote-containment-check-blind-to-squash-merges.
    which suggests a containment rule based on the merged PR's head rather than on tree content.
 
 The lesson for the ladder: an acceptance test must include the real case that motivated the bug, not only a model of it.
+
+## Worked example: ESO 403 after a Vault restart (2026-11-15)
+
+The contrast case: the same ladder, and this time the change shipped, because the real failure was replayed live.
+
+1. **Spec from upstream source.** The fix (store no `token_reviewer_jwt`; Vault reads and reloads its own ServiceAccount
+   token) was proven from vault-plugin-auth-kubernetes v0.22.2, the version in the deployed Vault 1.20.1, before dispatch.
+2. **Blind spec review pair** (Argon + Fable). Both returned CHANGES with the same main finding: five `test_vault` sites
+   still put the root token in `kubectl exec` argv. One Argon claim (a here-string leaks under xtrace) was refuted by a
+   test, not by argument. A related token-in-argv finding outside the spec became its own bug, not scope creep.
+3. **Worker (Flash, 35 minutes).** Claude's checks: 160/160 targeted bats; on the old code exactly the 5 new behaviour
+   tests fail and the positive control passes. Claude fixed one dead code path in the cleanup function before landing.
+4. **Argon diff review** found that test E2 never saw the token handoff to the cleanup trap. Claude confirmed it by
+   removing the handoff: 0 tests went red. A count assertion (exactly 5 stdin deliveries) closed the gap. The worker's
+   tests and the verifier had both missed it.
+5. **Independent verifier (Sonnet, Acceptance only).** All offline items PASS; mutants m1 to m6 killed.
+6. **Land and promote.** Landed `f09edf77`. The first promote was refused because a later push had cancelled that
+   commit's CI; the hub was promoted to the next CI-green commit `0c0e3a44`. Lesson: don't push while waiting on a green
+   run you intend to promote.
+7. **Live check E5: the motivating incident, replayed.** With the operator's go, Claude deleted `vault-0` on the hub
+   (18:30:21Z). After the operator re-unsealed it, a forced ExternalSecret refresh synced at 18:31:25Z, both secret stores
+   stayed Ready and 9/9 ExternalSecrets stayed synced through the watch window. Before the fix, the same restart broke
+   every hub ExternalSecret for 70 minutes.
+
+The difference from the hub-promote case is step 7: acceptance ended with the real event that caused the bug, on the
+real system, not a model of it.

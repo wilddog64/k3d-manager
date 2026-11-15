@@ -17,7 +17,7 @@ moved and are not copied here.
 <a id="pr-creation-gate"></a>
 ### PR merge gate
 
-- **PR merge gate** — open the release PR as a normal PR, never a draft (a draft blocks the Copilot review request), then do NOT merge until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Was a PR *creation* gate until 2026-11-15; it contradicted Copilot, which only reviews an open PR (prompt-debt audit C1).
+- **PR merge gate** — open the release PR as a normal PR, never a draft (a draft blocks the Copilot review request), then do NOT merge until ALL of these pass: CI green, Copilot review comments addressed, Claude live smoke test (read-only kubectl on the hub), Claude scope check. Was a PR *creation* gate until 2026-11-15; it contradicted Copilot, which only reviews an open PR (prompt-debt audit C1). The smoke test said Gemini until 2026-11-15, against the Acceptance rule that live evidence comes from the operator or Claude, never Gemini (audit C2; operator: "go ahead to run the release smoke test").
 
 <a id="prove-external-behaviour"></a>
 ### Prove external behaviour before dispatch
