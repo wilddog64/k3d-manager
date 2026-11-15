@@ -90,6 +90,13 @@ already stores no reviewer JWT; unchanged. The watchdog shard bug is separate
 **Live repair after land** (operator go needed; root token on stdin): one `vault write auth/kubernetes/config` in the
 new form. It is the same write, so it doubles as the first live evidence.
 
+## Files
+
+- `scripts/plugins/vault.sh` (`_vault_set_eso_reader`, `_vault_configure_secret_reader_role`)
+- `scripts/plugins/hub_data.sh` (`_hub_data_repoint_vault`)
+- `scripts/lib/test.sh` (`test_vault`, `_cleanup_vault_test`)
+- `scripts/tests/plugins/vault_k8s_auth_config.bats` (new: E1, E2)
+
 ## Contract readers
 
 Contract: the stored `auth/kubernetes/config` of the in-cluster Vault (grep `token_reviewer_jwt|disable_local_ca_jwt|auth/kubernetes/config`, 2026-11-15).
