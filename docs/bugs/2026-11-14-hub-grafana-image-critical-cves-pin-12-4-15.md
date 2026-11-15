@@ -1,6 +1,8 @@
 # Bug: hub Grafana runs 11.4.0 with 9 critical CVEs; pin 12.4.15 by digest
 
-**Status:** VERIFIED — cf26aabd; live E2 on the M5 2026-11-15 (deploy/hub 234bc2d1): pass, dashboards render (operator's Agent Cost screenshot); captured 2026-11-14 by Claude
+**Status:** LIVE-VERIFIED — cf26aabd; live E2 on the M5 2026-11-15 (deploy/hub 234bc2d1): pass, dashboards render (operator's Agent Cost screenshot); captured 2026-11-14 by Claude
+**Fix commit:** cf26aabd
+**Live evidence:** 2026-11-15 · run claude-kubectl-read · env hub · scenario grafana-12-4-15-pinned-zero-critical · commit cf26aabd · proves E2
 **Priority:** P2
 **Introduced by:** pre-existing (chart default since kube-prometheus-stack 67.9.0)
 **Should have been caught by:** review
