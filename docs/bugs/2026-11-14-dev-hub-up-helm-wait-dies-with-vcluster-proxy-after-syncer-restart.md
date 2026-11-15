@@ -122,3 +122,14 @@ repro (fake helm always failing) now shows refresh, recovery and one retry, then
 28 s); shellcheck clean; fresh Opus verifier PASS with every requested mutant killed. Non-blocking: the refresh-failure
 `_err` (`dev_hub.sh:70`) is not exercised by any test. E5 (live) pending: needs `make hub-promote`, then dev-hub
 down/up with pod `dev-hub-0` deleted during the argocd install.
+
+## Fresh-install throttle sample (Claude, read-only, 2026-11-15 01:19:46Z, M5)
+
+The operator ran `make dev-hub-down && make dev-hub-up`, which finished with argocd and Grafana deployed in about 2 minutes. The syncer pod was not
+deleted (`dev-hub-0` started 01:17:31Z, restarts 0, older than every argocd pod), so E5 is still open. Claude's 3 s
+sampler logged nothing, because the remote shell is zsh and an unquoted `$K` holding the kubectl command is not
+word-split. The pod's cgroup counters cover the whole fresh install (CRDs installed from scratch), read
+once after it: `cpu.max 50000 100000` (the 500m limit), `usage_usec 11292658`, `nr_periods 1223`, `nr_throttled 123`,
+`throttled_usec 19352393`. That is 10% of active periods throttled and 19.4 s throttled over about 135 s, against 3% on
+the CRD-reuse rerun. No apiserver stall or syncer restart happened this time. This supports fix direction 2 (raise or
+drop the CPU limit) but does not prove it caused the original stall.
