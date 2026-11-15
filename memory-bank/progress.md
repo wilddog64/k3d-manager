@@ -761,3 +761,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - [ ] dirused M1b 1a (Luna) + 1b (Hydrogen) dispatched 2026-11-15 — verify, PR, merge 1a then 1b
 - 2026-11-16: dirused PR #4 (1a) merged 245bedd; 1a E5 LIVE-VERIFIED on dirused-dev VM (\\localhost C$/D$ = Get-Volume exactly); offline_tested/live_verified marked. P3 unreachable codes PR #5 green (red ebce3e1 -> green 91d89ae), verify pass. PR #3 rebased onto main locally (33119f9 + 34102df summary-dedup merge fix); force-push awaiting operator.
 - 2026-11-16: dirused PR #3 rebased head 34102df pushed by operator; CI green (windows + portable), CLEAN — ready for merge, as is PR #5.
+- 2026-11-16: idea row added (docs/ideas.md): per-repo dispatch metrics + `$repo` filter — dirused tasks are folded into k3d-manager v1.44.0 dashboard aggregates.
