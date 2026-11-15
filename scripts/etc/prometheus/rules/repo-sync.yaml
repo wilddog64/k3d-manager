@@ -36,7 +36,7 @@ spec:
             cluster: hub
           annotations:
             summary: "CI-green {{ $labels.sha }} is waiting to promote"
-            description: "Run: make hub-promote REF={{ $labels.sha }}"
+            description: "Run: make hub-deploy REF={{ $labels.sha }}"
         - alert: K3dmPromoteLookupFailed
           expr: k3dm_repo_sync_promote_lookup_failed == 1
           for: 30m

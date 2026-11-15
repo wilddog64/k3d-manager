@@ -41,8 +41,8 @@ Alerts (`scripts/etc/prometheus/rules/repo-sync.yaml`, `severity: warning`, `clu
 
 - **`K3dmPromoteWaiting`** — a green commit has waited 15 minutes. It names the SHA and a command to run. A newer green
   commit replaces the series, so the alert always names the newest one. The everyday command is
-  `make hub-deploy REF=<sha>` ([hub promote](hub-promote.md)); the alert text still says `make hub-promote`, which only
-  moves the ref (tracked in `docs/bugs/2026-11-15-promote-waiting-alert-names-hub-promote-not-hub-deploy.md`).
+  `make hub-deploy REF=<sha>` ([hub promote](hub-promote.md)), which the alert names; `make hub-promote` alone only moves
+  the ref.
 - **`K3dmPromoteLookupFailed`** — the check-run lookup has failed for 30 minutes (GitHub outage, token). To promote during an outage, use the
   outage path in [hub promote](hub-promote.md).
 

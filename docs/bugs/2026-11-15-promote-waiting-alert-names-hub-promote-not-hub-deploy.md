@@ -1,11 +1,11 @@
 # Bug: K3dmPromoteWaiting tells the operator to run `make hub-promote` instead of `make hub-deploy`
 
-**Status:** OPEN — captured 2026-11-15
+**Status:** LANDED — description changed to `make hub-deploy` on k3d-manager-v1.44.0, 2026-11-15 (Copilot raised it on PR #161); live once promoted to deploy/hub
 **Priority:** P3 (the named command works but only moves the ref; the follow-up steps then raise `K3dmDeployPending`)
 **Introduced by:** v1.44.0 plan `hub-deploy-one-command` (landed without the string change the behind-alert plan assigned to it); alert added in c763e239
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-15
+**Waiting on:** live check
 **Prior art:** none (exact-slug pass; `make find-similar-docs` unavailable on the M4: vector store needs context `k3d-k3d-cluster`)
 
 ## What happens
