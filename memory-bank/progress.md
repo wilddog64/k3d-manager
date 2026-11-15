@@ -752,3 +752,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - [ ] dirused M1b: specs approved 2026-11-15; phase 0 (Luna) dispatched; 1a Luna ∥ 1b Flash after it merges
 - [x] dirused M1b phase 0 (modular refactor) verified; PR wilddog64/dirused#2 awaiting operator merge (2026-11-15)
 - [ ] dirused M1b 1a remote targets (Luna) + 1b fleet runner (Flash): dispatch after #2 merges
+- [ ] dirused M1b 1a (Luna) + 1b (Hydrogen) dispatched 2026-11-15 — verify, PR, merge 1a then 1b
