@@ -721,3 +721,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-15 01:20Z: proxy-retry E5 attempt: dev-hub down/up clean in ~2 min but dev-hub-0 not deleted -> E5 still open. Fresh-install throttle: 123/1223 periods (10%), 19.4 s throttled in ~135 s at 500m limit. Claude sampler failed (zsh no word-split of $K).
 
 - 2026-11-15: Fable vs Argon reviewer trial pair 1 scored (docs/reviews/reviewer-trial-fable-vs-argon.md, 2eb6d45b). 1 of ~6 pairs.
+- 2026-11-14 ~18:30 PST: grafana-12-4-15-pin LANDED cf26aabd, offline_tested marked, pushed; live E2 waits on promote. Part B correction 8 exited; verification running (test-bin rerun + Opus verifier).
