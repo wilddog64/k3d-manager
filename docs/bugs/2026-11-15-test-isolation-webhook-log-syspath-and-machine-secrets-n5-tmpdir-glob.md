@@ -1,13 +1,12 @@
 # Bug: two tests pass or fail by runner: `test_webhook_log.py` relies on a sibling's sys.path, `machine_secrets.bats` N5 scans every /tmp/k3dm-*
 
-**Status:** LANDED 2026-11-15 — test-only fix by Claude (operator: "go with your recommendation")
+**Status:** VERIFIED 2026-11-15 — live: plan 1 E2 rerun at 1ce3602b, serial and parallel agree per file; test-only fix by Claude (operator: "go with your recommendation")
 **Priority:** P3
 **Classified:** not run (fixed on the operator's E2 decision before triage)
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Prior art:** exact-slug glob, none; `make find-similar-docs` not run
-**Waiting on:** live check
 
 ## Symptom
 

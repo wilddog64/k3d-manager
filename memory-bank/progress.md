@@ -1,4 +1,5 @@
 - 2026-11-13: forecast row (docs/bugs/2026-11-11-bugs-dashboard-target-forecast-tiles-always-no-date.md) re-specced per operator: tiles 29/30 → Earliest/Latest for the open release, table 32 removed; intents approved ('go ahead for forecast'); dispatched to Luna. CI green on 6375f228; operator's run applied deploy/hub e6b62305 (no promote happened — 26 behind); Fable E5 and plan 3 E6 wait on a real promote.
+- 2026-11-15: plan 1 E2 rerun PASS (759 s parallel, per-file identical); Grafana 12.4.15 live on hub (0 critical); P2 alpine/k8s:1.31.4 CVEs captured.
 - 2026-11-15: E2 decision (operator): fixed test_webhook_log sys.path + machine_secrets N5 TMPDIR scan (test-only, Claude); bound 800 s; E2 rerun running.
 - 2026-11-14: plan 1 E2 live FAILED on M4 (parallel 753 s vs 450 s bound; 2 test-isolation per-file diffs; tripwire OK). Operator decision pending.
 - 2026-11-14: triage due (60 queued, 21 since 2026-11-12 grooming). Argon classified 18 (269daf21); 10 of Claude's P3s raised to P2. Operator approved all; Triage lines + roadmap recorded (2 patch, 10 carry, 2 close).

@@ -1,8 +1,8 @@
 # Bug: hub Grafana runs 11.4.0 with 9 critical CVEs; pin 12.4.15 by digest
 
-**Status:** OPEN — captured 2026-11-14 by Claude
+**Status:** LANDED — cf26aabd; live E2 on the M5 2026-11-15 (deploy/hub 234bc2d1): pass except the operator's dashboard view; captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-14
+**Waiting on:** live check — since 2026-11-15
 **Introduced by:** pre-existing (chart default since kube-prometheus-stack 67.9.0)
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); parent `docs/bugs/2026-11-14-trivy-critical-hub-grafana-pgvector-nginx-local-path.md` (disposition 1, tag proof)
@@ -90,3 +90,13 @@ evidence:
     intent: The hub's Grafana is on the patched version and the dashboards still work.
 interface: none
 ```
+
+## Live check (Claude, M5 hub, 2026-11-15, deploy/hub 234bc2d1)
+
+- ArgoCD `kube-prometheus-stack` picked up the promote at about 13:04Z (promote tag 12:57:47Z) and went Synced Healthy at 234bc2d1.
+- Pod image `docker.io/grafana/grafana:12.4.15@sha256:2894082f6cf7081aefdc1389265c04000812309208c190d75e8c65f7a30e4b7e`;
+  grafana and both sidecars ready, 0 restarts; `/api/health` version 12.4.15, database ok.
+- Dashboards: the sidecar delivered 41 dashboard files and provisioning finished with no `level=error` lines in the first 10 minutes.
+  Listing them through the API would need admin credentials in a `kubectl exec` string, so the operator opens one dashboard
+  in the browser to finish E2.
+- Trivy: `replicaset-kube-prometheus-stack-grafana-5bb77b5c89-grafana` 0 critical, 2 high (was 9 critical, 57 high on 11.4.0).
