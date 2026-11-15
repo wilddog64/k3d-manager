@@ -1,8 +1,9 @@
 # Bug: machine-setup's promtool install fails under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
-**Status:** LANDED (lib-foundation v0.5.6, subtree pull 79caba45)
+**Status:** LIVE-VERIFIED — m2-air 2026-11-15 under /bin/bash 3.2.57 (Claude over ssh); was: LANDED (lib-foundation v0.5.6, subtree pull 79caba45)
+**Fix commit:** 79caba45
+**Live evidence:** 2026-11-15 · run claude-ssh-m2-bin-bash-3-2 · env m2 · scenario promtool-absent-machine-setup-console · commit d5e67c1f · proves fix
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-14 (promtool Part B re-land, then machine-setup on a bash 3.2 Mac)
 **Severity:** medium; blocks the promtool Part B land. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2 (a fresh Mac before Homebrew bash is first on `PATH`), the new `install_promtool` step in `bin/k3dm-machine-setup` reports `promtool missing (see installer output)` and sets `failed=1`. Setup still runs to the end. Workaround: rerun once Homebrew bash is on `PATH`.
 **Filed:** 2026-11-14
 **Detected by:** Fable review of the promtool Part B diff (finding M1), 2026-11-14
@@ -49,3 +50,11 @@ Claude, m4-air, 2026-11-14. The promtool land (`f5d1eb5a`, rebased onto `feb4116
 - lib-foundation PR #85 merged by the operator (`d18f4fe`), tagged and released as v0.5.6 (Claude).
 - Subtree pulled into k3d-manager at `79caba45`. Under `/bin/bash` 3.2.57 with `set -euo pipefail`, `source scripts/lib/system.sh; _run_command --quiet -- true` now returns 0 (Claude, m4-air).
 - Next: re-land promtool Part B, whose N4 acceptance test caught this crash.
+
+## Live check (Claude, 2026-11-15, m2-air)
+
+`~/.local/bin/promtool` moved aside, then `/bin/bash bin/k3dm-machine-setup --role console --secrets skip --agents skip`
+at `d5e67c1f` (log first line `bash=3.2.57(1)-release`): `promtool installed`, no `unbound variable` / `probe_args` in
+the log, new binary reports `promtool, version 3.1.0`. Overall rc 1 only from `github-auth missing` (Keychain locked over
+ssh) and `brew:iterm2 missing` (cask needs a GUI session) — unrelated. A first run via `make machine-setup` did not count:
+with `/opt/homebrew/bin` first on PATH, `#!/usr/bin/env bash` resolved to Homebrew bash 5.3.20.
