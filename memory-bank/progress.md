@@ -750,3 +750,5 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-15 19:21Z — PR #161 Copilot review: alert text fixed (9919a452, thread resolved); lib-foundation v0.5.6 table rows -> upstream PR lib-foundation#88 (merge, then subtree pull, then resolve 2 threads).
 - 2026-11-15: Grooming recorded (`docs/grooming/2026-11-15.md`). v1.44.1 +6 bugs (8 P2, 2 P3); v1.45.0 plan 4 = `remote-promote-approval` (DRAFT, review+intent pending), `human-operator-turns` and `argon-bug-classifier` to backlog 1–2; 3 P3s passed over (cap); Trivy umbrella closed; ideas 5 promoted, 27 kept, 10 dropped. dirused PR #1 merged (74412c93); main protected (check `windows`, strict, PR required, admins, no force/delete); Apache-2.0. Next: dirused M1b specs split Flash/Luna (operator 2026-11-15: "be sure to modulus").
 - [ ] dirused M1b: specs approved 2026-11-15; phase 0 (Luna) dispatched; 1a Luna ∥ 1b Flash after it merges
+- [x] dirused M1b phase 0 (modular refactor) verified; PR wilddog64/dirused#2 awaiting operator merge (2026-11-15)
+- [ ] dirused M1b 1a remote targets (Luna) + 1b fleet runner (Flash): dispatch after #2 merges
