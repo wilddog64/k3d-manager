@@ -1,3 +1,9 @@
+## Handoff 2026-11-16 ~01:15Z — dirused PR #5 clear to merge; PR #3 Copilot fixes pushed (e3a5e71), CI running — START HERE
+- **PR #5** (P3 unreachable codes, 91d89ae): CI green, CLEAN, Copilot "Approval recommended, no open issues". Clear to merge; merge it first.
+- **PR #3** (1b): Copilot (on 34102df) raised 3 findings. Fixed 2 in tests-first commits: 794eeba (tests, red at 34102df) + e3a5e71 (ScanRunner adds CANCELLED whenever ct is cancelled unless present; SummaryRenderer.Prepare lists every !Complete result as failed). Portable 20/20 at default and DOTNET_PROCESSOR_COUNT=2. Third (summary delegate ignores token) answered, not changed: one blocking Win32 call; captured as P3 docs/bugs/2026-11-16-dirused-timeout-cannot-bound-hung-volume-probe.md (waiting on operator decision). Reply: PR #3 comment 6903512685. CI on e3a5e71 was running at handoff — check `gh pr view 3 -R wilddog64/dirused`.
+- **Next:** (1) operator merges #5; (2) "Update branch" on #3 (merge commit, no force-push), CI green, operator merges; (3) `mark --state offline_tested --sha <merge>` for dirused-unreachable-codes, dirused-m1b1b-fleet-runner, dirused-parallel-threadpool-cap; bug docs to LANDED; (4) close stale dirused-m1b0 row; (5) k3d-manager PR #161: CI, hub smoke, scope check.
+- **Handoff rule:** the /clear hook injects the FIRST `## ` section — always write the new handoff at the top.
+
 ## Handoff 2026-11-16 ~00:30Z — dirused 1a merged + live-verified; P3 PR #5 green; PR #3 rebased, pushed, green — ready for operator merge — START HERE
 - **Objective:** dirused M1b phases 1a + 1b, scan-only.
 - **1a:** PR #4 MERGED as 245bedd (2026-11-15T23:29Z). Ledger: offline_tested (1a + unc-root slugs) and live_verified (1a) at 245bedd. E5 live 2026-11-16 on dirused-dev VM (BENTO, Win11 arm64): `dirused \\localhost` -> exactly C$ and D$ (no ADMIN$/IPC$), used/free/total equal Get-Volume byte-for-byte, exit 0. Multi-machine UNC still owed to the ACG gate.

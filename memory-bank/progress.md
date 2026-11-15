@@ -763,3 +763,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: dirused PR #3 rebased head 34102df pushed by operator; CI green (windows + portable), CLEAN — ready for merge, as is PR #5.
 - 2026-11-16: idea row added (docs/ideas.md): per-repo dispatch metrics + `$repo` filter — dirused tasks are folded into k3d-manager v1.44.0 dashboard aggregates.
 - 2026-11-16: idea row added: dirused on the PR Checks dashboard (REPOS + guide), blocked on k3dm-hermes-gh-token covering dirused.
+- 2026-11-16: dirused PR #3 Copilot review: 2 findings fixed (794eeba tests red -> e3a5e71 fix, portable 20/20); hung-probe timeout captured as P3 bug doc. PR #5 Copilot approval recommended, clear to merge.
