@@ -1,4 +1,5 @@
 ## Handoff 2026-11-14 ~19:00 PST (2026-11-15 ~03:10Z) — START HERE
+- **2026-11-15:** prompt-debt audit written: docs/process/prompt-debt-audit-2026-11-15.md (3 dead configs, 5 contradictions, 5 cost items); all need operator decision at grooming.
 - **2026-11-15:** Claude's Vault restart left the hub sealed about 12 min (the watchdog Secret's shard was rejected); operator re-unsealed from the Keychain. New bug 2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed (P2 proposed, investigation). argocd-oidc-secret SyncedError from the outage; recheck after 15:49Z.
 - **2026-11-15:** promtool bash-3.2 bug LIVE-VERIFIED on the M2 (/bin/bash 3.2.57, promtool absent → installed). Sol resume 2 running on M2.
 - **2026-11-15:** Sol-coordinated dispatch (M2) of hub-promote containment: ledger start shows coordinator openai/gpt-6.1-sol source env (coordinator E3 half; trailer half pending a commit). Worker stopped on spec defect (m2 unkillable by E6a); spec fixed 81ca369a (E6c), resume prompt at m2:/tmp/sol-resume-e6c.md. Vault watchdog fix applied to hub; timed vault-0 restart running. M2 machine-setup ROLE=console re-run with Homebrew PATH.
