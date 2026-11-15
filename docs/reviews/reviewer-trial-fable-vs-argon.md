@@ -68,3 +68,36 @@ Fable is kept for high-risk land calls. This log measures what that trade costs 
 exit-code blocker and caught MAKEFLAGS. Argon found more contract readers and three concrete unique issues
 (`_ensure_bats` network install, `FAKE_REPO` symlink, retry amplification). Argon had one partly refuted claim; Fable
 had none. Argon's quality is close enough on this pair to keep Argon-first; one pair is not a verdict.
+
+### Pair 2: hub-promote containment diff (Sol run 2, uncommitted), 2026-11-15
+
+High-risk land call (`bin/k3dm-hub-promote` moves the ref the production hub deploys from). Both reviewers got the same
+staged diff and spec, blind to each other and to Claude's gate, pre-fix and verifier results. Argon:
+`gemini-4-argon-medium` via agy, read-only. Fable: background agent, read-only, scratch mirrors only.
+
+**Verdicts:** Argon APPROVE WITH CHANGES; Fable LAND WITH CHANGES, keep the bug OPEN.
+
+Scored by Claude against the code and real history:
+
+- Fable MAJOR-1 (the squash check does not fire on the incident: `git merge-tree --write-tree` of deploy/hub 9f5f0d89
+  into the target conflicts): **confirmed, unique, decisive**. Claude reproduced it in a scratch repo borrowing the
+  main object store: rc 1 with 73 conflicts against 34707659, 24 against the squash aa1196ed, 95 against c4d647bf.
+  deploy/hub was promoted mid-release; PR #160 gained commits before the squash. Every toy-repo test, the independent
+  verifier and Argon missed it because none replayed the real SHAs.
+- Fable MAJOR-2 (`hub-promote.md` overstates the squash case): confirmed, follows from MAJOR-1.
+- Fable minor-3 (`.github/copilot-instructions.md:42,138` still describe BREAK_GLASS as skipping checks): confirmed,
+  unique; a missed contract reader.
+- Fable minor-4 (make expands `$` in `SKIP_CHECK_RUNS_REASON` passed as a make variable): unique; not reproduced by Claude.
+- Fable minor-5 (reason allows control characters; no injection): unique, accepted as low risk.
+- Fable minor-6 / Argon MAJOR-1 (the "before fetching" `!= *"From "*` clause cannot fail): **overlap, confirmed by
+  both**; Argon rated it MAJOR with a concrete mutation, Fable minor (die text and unchanged hub carry the test).
+- Argon minor-2 (E10 make test passes with the `Makefile:478` change reverted, because `:299` falls back to
+  `$SKIP_CHECK_RUNS`): **confirmed, unique** (Claude read `:299`).
+- Argon minor-3 (E9 M5 loop reads only the newest tag and one static reason): unique, plausible, not reproduced.
+- Fable minor-7 (an exported flag skips checks on every promote): by design; noted.
+- Mutants: Fable ran seven (m1 to m7), all red. Argon ran the suites only.
+
+**Pair 2 read:** opposite of pair 1's closeness. Both found the test-strength issues, but only Fable tested the change
+against the incident it claimed to fix, and that finding reverses the land decision. On a high-risk land call that is
+the case for escalating to Fable; Argon-first stays the default for low-risk work. Cost: Fable 128K tokens, 22 tool
+calls, about 10 minutes.

@@ -65,5 +65,12 @@ Spec: [`../bugs/2026-11-12-hub-promote-containment-check-blind-to-squash-merges.
 3. **Pre-fix red.** On the old promoter, exactly the 7 new behaviour tests fail; the 4 refusal controls pass on both.
 4. **Independent verifier (Opus, Acceptance only).** Every offline item PASS, E8 not verifiable offline; all four
    mutants killed, m2 only by E6c. 111K tokens, 32 tool calls, about 12 minutes.
-5. **Blind review pair** (Argon diff review + Fable land call): logged as pair 2 in the trial.
-6. **Live:** E8 is a real promote on the M5 hub, by the operator or Claude.
+5. **Blind review pair** (Argon diff review + Fable land call; pair 2 in the trial). Argon approved with test-strength
+   changes. Fable replayed the incident's real SHAs and found the squash check still refuses: merging deploy/hub into
+   the target conflicts (24 to 95 conflicts) because deploy/hub was promoted mid-release, before the PR gained more
+   commits. Claude reproduced it. Every earlier stage used toy repos, so every earlier stage passed.
+6. **Not landed.** Stages 1 to 6 were green and the change was still wrong for its purpose. The fix goes back to the
+   spec: deploy/hub 9f5f0d89 is an ancestor of PR #160's head (`refs/pull/160/head`, kept by GitHub after the squash),
+   which suggests a containment rule based on the merged PR's head rather than on tree content.
+
+The lesson for the ladder: an acceptance test must include the real case that motivated the bug, not only a model of it.

@@ -6,7 +6,7 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** dispatch — since 2026-11-14 (held: Makefile is open in parallel-offline-tests-b)
+**Waiting on:** operator decision — since 2026-11-15 (Sol run 2 not landed: the squash check does not fire on the real incident; see Review 2026-11-15)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 
 ## Symptom
@@ -283,3 +283,25 @@ Test design (all in `scripts/tests/bin/hub_promote.bats`, existing fixture: scra
 1. **Resolved (operator, 2026-11-14): explicit flag, section 2a.** Was: separating `check_runs` from BREAK_GLASS means BREAK_GLASS no longer works while GitHub is down (`check_runs` dies on lookup failure, `bin/k3dm-hub-promote:84`), though `docs/howto/hub-promote.md:81-83` names that outage as a BREAK_GLASS use. Accept, or add a separate explicit flag later? This spec accepts it, per the decision.
 2. **Resolved (Claude, 2026-11-14): M5 runs git 2.56.0 (`/opt/homebrew/bin/git`).** Was: what git does the M5 hub run? `merge-tree --write-tree` needs 2.38 or newer (probed only on m4-air, 2.56.1). The fallback to the old refusal is safe, but E8 only passes on 2.38+. `ubuntu-24.04` CI git was not probed.
 3. Tag bookkeeping: should the tag record that tree-containment accepted the old commits (for audit)? Not in this spec; the stderr note is the only trace.
+
+## Review 2026-11-15 (Sol run 2 diff, not landed)
+
+Gate rerun on the M4 green; 7 new tests red on pre-fix code; independent verifier (Opus) PASS on every offline item,
+mutants m1 to m4 killed. Blind land call: Argon APPROVE WITH CHANGES, Fable LAND WITH CHANGES (pair 2 in
+`docs/reviews/reviewer-trial-fable-vs-argon.md`).
+
+**Blocking:** on the real history, `git merge-tree --write-tree <target> 9f5f0d89` exits 1 for every candidate target
+(34707659: 73 conflicts; aa1196ed, the squash itself: 24; c4d647bf: 95). deploy/hub was promoted mid-release, and
+PR #160 gained commits before the squash (`git diff --shortstat 9f5f0d89 aa1196ed`: 36 files). So E8 would fail and the
+first promote of a release would still need BREAK_GLASS. The spec's probe used a toy repo; E1 models only "deploy/hub
+equals the squashed tip".
+
+**Candidate redesign (needs spec + review):** 9f5f0d89 is an ancestor of PR #160's head 5a53e35b
+(`refs/pull/160/head`, kept by GitHub after a squash merge). Containment could accept deploy/hub when it is an ancestor
+of the head of a merged PR whose merge commit is an ancestor of the target, via the same GitHub API the check-run gate
+uses, falling back to the current refusal. The parts of run 2 that are sound and independent (SKIP_CHECK_RUNS,
+BREAK_GLASS narrowed to the containment refusal) could land separately.
+
+**Non-blocking follow-ups:** `.github/copilot-instructions.md:42,138` (missed contract reader); E10 make test cannot
+catch a `Makefile:478` revert (`:299` falls back to the environment); the "before fetching" `From ` assertion cannot
+fail; E9 M5 checks only the newest tag; make expands `$` in a reason passed as a make variable.
