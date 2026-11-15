@@ -102,3 +102,4 @@ interface: none
 - Dashboard render: the operator's screenshot of the Agent Cost dashboard's "By model" panel (shared in-session after the 13:05Z swap) shows
   gemini-3.8-flash $34.5, gpt-6-luna $8.77 and gpt-6.1-terra $0.890 for 7d, matching Prometheus `k3dm_dispatch_api_cost_by_model_usd{window="7d"}`
   queried at the same time (34.536, 8.773, 0.890). E2 complete.
+- More render evidence (operator screenshots, 2026-11-15): k3dm PR Checks (stat, table, timeseries, state-timeline panels) and Agent Activity (bar gauge, stat, timeseries, bar chart, gauge panels) both render with data on 12.4.15.
