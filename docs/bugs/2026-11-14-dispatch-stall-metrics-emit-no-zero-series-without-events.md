@@ -3,6 +3,7 @@
 **Status:** OPEN — captured 2026-11-14 by Claude (stall-D live check E5)
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (This is a cosmetic dashboard telemetry polish issue where releases with zero stall events display "no data" on breakdown panels instead of explicit zeros, while the primary stat panels already fall back to zero via `or vector(0)`.)
+**Triage:** carry → v1.45.0 (fold into plan 5 dispatch-stall-recovery) — triage 2026-11-14, operator
 **Waiting on:** operator decision — since 2026-11-14
 **Introduced by:** 09d12e68
 **Should have been caught by:** spec

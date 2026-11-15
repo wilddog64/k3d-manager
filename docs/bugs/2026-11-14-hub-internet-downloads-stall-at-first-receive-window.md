@@ -1,9 +1,9 @@
 # Bug: M5 hub internet downloads stall after about 128 KB; Hermes argocd, values_branch and ci go unknown
 
-**Status:** OPEN — captured 2026-11-14 by Claude
+**Status:** CLOSED — self-cleared, no code fix (triage 2026-11-14, operator); a recurrence reopens
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The M5 internet download stall that blinded Hermes to ArgoCD and CI statuses has self-cleared, and remaining diagnostic or payload-size improvements have workarounds such as resetting the network path or paginating queries.)
-**Waiting on:** operator decision — since 2026-11-14 (cleared by itself about 17:50Z; root cause unknown; decide: close as transient, or keep open and capture on recurrence)
+**Triage:** close (self-cleared, no code fix; a recurrence reopens) — triage 2026-11-14, operator
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store needs the hub context, unreachable from the M4); read `docs/bugs/2026-11-13-hermes-ci-unknown-page-names-no-repo-or-cause.md` (different root cause: it is the evidence gap that hid this one)

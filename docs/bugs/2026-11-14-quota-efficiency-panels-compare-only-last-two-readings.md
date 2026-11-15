@@ -3,6 +3,7 @@
 **Status:** OPEN
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Four Agent Activity dashboard panels are degraded (almost always showing empty or zero because only the last two quota readings are compared), while the underlying observation data in `codex-quota-observations.jsonl` remains intact as a workaround and nothing else depends on the panels.)
+**Triage:** carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
 **Waiting on:** operator decision — since 2026-11-14
 **Severity:** low — four Agent Activity panels (Verified outputs, Observed quota delta, Outputs per percentage point, Quota efficiency coverage) show empty or 0 nearly all the time; nothing else depends on them
 **Approval:** operator, 2026-11-14 ("yes, please", to "capture the quota-efficiency one as a P3 bug")

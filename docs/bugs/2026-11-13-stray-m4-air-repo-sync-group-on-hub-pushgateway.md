@@ -4,6 +4,7 @@
 **Waiting on:** operator decision — since 2026-11-14 (second guard; delete the group after Part B lands)
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Stray metric pushes from worker checkouts over the SSH forward trigger recurring false Prometheus alerts and pollute dashboard panels, though the hub's actual sync remains healthy and the stale Pushgateway group can be manually deleted as a workaround.)
+**Triage:** patch → v1.44.1 — triage 2026-11-14, operator
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** unknown

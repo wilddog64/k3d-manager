@@ -569,7 +569,7 @@ Bug-fix only (operator, 2026-11-09). Cut from `main` after v1.43.15 merges. This
 
 ### Candidate milestone — v1.44.0
 
-**v1.44.1 patch (planned):** dispatch stall detection, `docs/bugs/2026-11-14-dispatch-stall-a-detector.md` (operator, 2026-11-14): a launchd watcher on the M4 pages Slack when a dispatch hangs. Detect and page only; recovery is v1.45.0 plan 5.
+**v1.44.1 patch (planned):** dispatch stall detection, `docs/bugs/2026-11-14-dispatch-stall-a-detector.md` (operator, 2026-11-14): a launchd watcher on the M4 pages Slack when a dispatch hangs. Detect and page only; recovery is v1.45.0 plan 5. Triage 2026-11-14 (operator) adds two P2 bug fixes: `docs/bugs/2026-11-13-stray-m4-air-repo-sync-group-on-hub-pushgateway.md` and `docs/bugs/2026-11-13-hermes-ci-unknown-page-names-no-repo-or-cause.md`; v1.45.0 carries 10 P3s from the same triage (see each doc's `**Triage:**` line).
 
 **v1.44.0 plan 5:** [`hermes-slack-config-sensors`](plans/v1.44.0-hermes-slack-config-sensors.md) (operator, 2026-11-08 sprint pick; design "Manifest + unsigned probe"): a Hermes sensor reads the relay Slack app's manifest and degrades when Interactivity is off or a Request URL is wrong, the two Slack-setting failures that passed every offline test on 2026-11-08; a second sensor checks the relay answers 401 to an unsigned POST. Needs the operator's Slack config token in Keychain and live captures of `apps.manifest.export` before dispatch. Replaces `claude-cost-task-attribution`, unnumbered by Claude on 2026-11-08 (see the ordered backlog under Forward themes).
 

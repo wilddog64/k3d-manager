@@ -3,6 +3,7 @@
 **Status:** OPEN — captured 2026-11-13
 **Priority:** P3 (Claude proposal: error wording only; the operation correctly fails)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (Running `dev-hub-sync` without an active dev hub already fails as intended, making the raw `kubectl` stat message instead of a friendlier prerequisite prompt purely cosmetic.)
+**Triage:** carry → v1.45.0 — triage 2026-11-14, operator
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** pre-existing (dev-hub B, `scripts/plugins/dev_hub.sh` `dev_hub_sync`)
 **Should have been caught by:** spec
