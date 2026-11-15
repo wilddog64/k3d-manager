@@ -5,11 +5,11 @@
 **Introduced by:** wilddog64/dirused 97a47fc (M1b phase 1b, not yet merged)
 **Should have been caught by:** offline test (E4 caught it on a 2-vCPU runner; the 12-core Mac hid it)
 **Introducing change reviewed:** yes (Claude verification; passed on the Mac only)
-**Waiting on:** operator decision — since 2026-11-15 (intent approval, then dispatch)
+**Waiting on:** dispatch — since 2026-11-15
 **Prior art:** none. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
 **Filed:** 2026-11-15
 **Parent spec:** `docs/plans/dirused-m1b-fleet-runner.md` (E4: `/parallel` caps concurrency)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-15
 **Repo / branch:** wilddog64/dirused, `m1b1b-fleet-runner` (worktree `~/.local/share/k3d-manager/worktrees/v1.44.0/dirused-m1b1b-fleet-runner`)
 **Implementer:** Luna (Codex). **Verifier:** Claude, from the Acceptance block only.
 

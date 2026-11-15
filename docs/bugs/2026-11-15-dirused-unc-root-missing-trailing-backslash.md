@@ -5,11 +5,11 @@
 **Introduced by:** pre-existing in `Scanner.Scan` (phase 0); first reachable in wilddog64/dirused ab27363 (M1b phase 1a, not yet merged)
 **Should have been caught by:** offline test (E1 caught it on windows-latest)
 **Introducing change reviewed:** yes (Claude verification; Windows tests cannot run on the Mac)
-**Waiting on:** operator decision — since 2026-11-15 (intent approval, then dispatch)
+**Waiting on:** dispatch — since 2026-11-15
 **Prior art:** none. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
 **Filed:** 2026-11-15
 **Parent spec:** `docs/plans/dirused-m1b-remote-targets.md` (E1)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-15
 **Repo / branch:** wilddog64/dirused, `m1b1a-remote-targets`
 **Implementer:** Luna (Codex). **Verifier:** Claude, from the Acceptance block only.
 
