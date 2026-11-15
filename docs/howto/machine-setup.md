@@ -15,6 +15,10 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 - **console (M2):** browser, dashboards and SSH client tools. It does not install hub services.
 - **control (M2 when travelling):** k3d-manager development, tests, documentation and Codex dispatch. It installs no cluster runtime, hub services or ACG/Playwright tools.
 
+The hub, console and control roles also install the pinned **promtool 3.1.0** into `~/.local/bin` (CI pins the same
+version). The PromQL tests use it and fail with setup instructions when it is missing. `--check` reports `promtool ok`
+or `promtool missing`; any other version counts as missing.
+
 ## Working away from home
 
 On a `control` Mac, run git, tests (`make test`, bats and pytest), shellcheck, documentation work, bug filing, `make find-similar-docs`, Codex dispatch and cloud requests locally. Run cluster and hub work such as `make up`, `make platform-ops`, `make appsets-reapply` and kubectl commands over SSH on the hub. Hub work requires a network path to the hub; `m5-air.local` resolves only on the home LAN, and this setup does not provide a remote path.

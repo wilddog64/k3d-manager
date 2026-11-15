@@ -75,6 +75,16 @@ After a rebuild, generate the new target map and restore with:
 
 ---
 
+## Hub deploy and dev hub
+
+| Target | When to use |
+|---|---|
+| `make hub-deploy REF=<commit-ish>` | Everyday promote: moves `deploy/hub` (`hub-promote`) and runs the follow-up steps. See [hub promote](hub-promote.md) |
+| `make hub-promote REF=<commit-ish>` | Move `deploy/hub` only. The outage and intentional-discard overrides are in [hub promote](hub-promote.md) |
+| `make hub-promote-status` | Show what `deploy/hub` holds and any uncontained commits |
+| `make dev-hub-up` / `dev-hub-down` / `dev-hub-status` | Isolated development vCluster (hub role only). See [dev hub](dev-hub.md) |
+| `make dev-hub-sync BRANCH=<branch>` | Point the dev hub at a branch |
+
 ## ArgoCD
 
 | Target | When to use |
@@ -219,7 +229,7 @@ the store rather than truncating it. See
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make fast-gate [BASE=<rev>]` | `scripts/ci/fast_gate.sh` | Changed-file lint and selected tests in under a minute; the pre-push hook and `codex-dispatch land` run it. See [fast gate](fast-gate.md) |
-| `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard; `PARALLEL=1` runs suites in parallel |
+| `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard; `PARALLEL=1` runs suites in parallel, `JOBS=N` caps the workers |
 | `make bug-tally` | Count bug documents by release, status and priority | Deterministic bug inventory; use `RELEASE=vX.Y.Z` or `JSON=1` |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
@@ -276,7 +286,11 @@ Serial and parallel `test-all` both run all three stages (`test`, `test-bin`,
 `test-python`) even when an earlier stage fails, exiting non-zero if any stage
 failed. A stage only omits its completion marker if it aborted or was killed.
 Pass `PARALLEL=1` to run test files concurrently via `_run_parallel` with
-per-job tripwire isolation and automatic retries for failed items.
+per-job tripwire isolation and automatic retries for failed items. `JOBS=N` sets
+the worker count; without it the runner uses the performance-core count on Apple
+Silicon, else the online CPU count. Each parallel run records per-file durations
+in `${XDG_CACHE_HOME:-~/.cache}/k3d-manager/test-times.txt`, and the next run starts
+files with no recorded time first, then the slowest, so long suites do not finish last.
 
 The raw log path is echoed by `test-all`; the log itself is kept under
 `${TMPDIR:-/tmp}/k3dm-test-all-<pid>-<epoch>.log`.

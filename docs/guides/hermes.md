@@ -329,6 +329,10 @@ To confirm the read-only posture: `argocd account can-i get applications '*/*'` 
 `argocd account can-i sync applications '*/*'` → no; the GitHub PAT succeeds on a read call and is
 403/404 on any write.
 
+`bin/k3dm-slack-config-capture` is the capture tool behind this procedure. With no argument it only checks the
+stored pair; `bin/k3dm-slack-config-capture rotate` performs one rotation and writes the new pair to the Keychain only
+if Slack accepts it. It prints key names, ok/error codes and header names, never token values.
+
 ### Re-minting the ArgoCD token
 
 ```bash
@@ -497,6 +501,7 @@ Keychain. A successful result prints the branch ref and its commit; it never pri
 | `K3DM_HERMES_APP_HEALTH_ENABLED` | (disabled) | Set to `1` to enable aggregate/probe health-delta sampling |
 | `K3DM_HERMES_APP_CONTEXT` | (unset) | Kubernetes context for the app-cluster service proxy |
 | `K3DM_HERMES_APP_KUBECONFIG` | (unset) | Optional kubeconfig path used by app-health kubectl calls |
+| `K3DM_HERMES_SLACK_CONFIG_INTERVAL` | `3600` | Seconds between `slack_app_config` sensor checks (floor 60), so the Slack config API is not called every cycle |
 | `K3DM_PR_CHECKS_PUSHGATEWAY_URL` | `http://localhost:19094` | Pushgateway endpoint for the per-repo PR checks publisher |
 
 An unset `K3DM_HERMES_PROVIDER` falls back to the shared active-provider marker, which a sandbox
