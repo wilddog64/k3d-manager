@@ -1,8 +1,9 @@
 # deploy/hub batch: the hub checkout follows deploy/hub, the promote guard fails closed, and four P3s on the same files
 
-**Status:** VERIFIED — `c7466d65` independently verified 2026-11-13 at e9c375c4 (Acceptance-only Opus verifier, own harness: E1–E8 and E10 pass; N3–N7 red on c7466d65^; M9/M10/M11 red by mutant; 7 existing suites green, 0 ssh/security/kubectl/launchctl calls; Claude checked the saved outputs); E9 live still open; landed `c7466d65` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
+**Status:** LIVE-VERIFIED — E9 live 2026-11-15 on the M5 (Claude, read-only); was: `c7466d65` independently verified 2026-11-13 at e9c375c4 (Acceptance-only Opus verifier, own harness: E1–E8 and E10 pass; N3–N7 red on c7466d65^; M9/M10/M11 red by mutant; 7 existing suites green, 0 ssh/security/kubectl/launchctl calls; Claude checked the saved outputs); E9 live still open; landed `c7466d65` on k3d-manager-v1.44.0, 2026-11-12 (Codex Luna; Flash 3.8 diff review; Claude verified offline)
+**Fix commit:** c7466d65
+**Live evidence:** 2026-11-15 · run claude-m5-read · env hub · scenario checkout-follows-deploy-hub · commit 234bc2d1 · proves E9
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-12 (after `make hub-promote`)
 **Introduced by:** v1.43.15 (checkout auto-sync and deploy/hub promote plans)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — this is a batch spec over six captured docs; each doc carries its own Prior art line
@@ -342,3 +343,10 @@ Before your last message, do all of these and paste the evidence:
   `repo_sync.bats:409-411`.
 - Do not change Hermes' document index ref logic.
 - Do not edit `.github/copilot-instructions.md`; Claude does at land.
+
+## Live check E9 (Claude, read-only, M5, 2026-11-15 ~06:30 PST) — PASS
+
+The hub checkout is `234bc2d1` = `origin/deploy/hub`, while `origin/k3d-manager-v1.44.0` (`a3fbdc4b`) is 10 commits
+ahead. `~/.local/share/k3d-manager/repo-sync/state.json` (06:23) has `deploy_hub_sha` `234bc2d1…`, `deploy_pending`
+`[]`. Prometheus `k3dm_hub_checkout_code_commits_behind{branch="deploy/hub"}` = 0, last check 442 s old (the "Hub code
+behind" tile's freshness window is 900 s). No rollback drill run (not required).

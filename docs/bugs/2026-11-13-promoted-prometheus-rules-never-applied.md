@@ -1,6 +1,8 @@
 # Bug: promoted PrometheusRule changes never reach the hub Prometheus; `K3dmPromoteWaiting` is not loaded
 
-**Status:** VERIFIED — live 2026-11-14 by Claude on deploy/hub `6ba89b3f` (landed `a4460629`). E5 and E6 pass; E7 not run (optional)
+**Status:** LIVE-VERIFIED — E5/E6 live 2026-11-14 (deploy/hub 6ba89b3f) and again 2026-11-15 (234bc2d1), Claude; was: live 2026-11-14 by Claude on deploy/hub `6ba89b3f` (landed `a4460629`). E5 and E6 pass; E7 not run (optional)
+**Fix commit:** a4460629
+**Live evidence:** 2026-11-15 · run claude-m5-read · env hub · scenario rules-synced-and-adopted · commit 234bc2d1 · proves E5,E6
 **Priority:** P2 (new and changed alerts silently absent after a promote; workaround `make prometheus-rules` on the M5)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 **Introduced by:** pre-existing (rules apply only through `make prometheus-rules` / observability deploy); exposed by `c763e239` (v1.44.0 plan 3)
@@ -193,3 +195,9 @@ Read-only over ssh to `m5-air.local` (context `k3d-k3d-cluster`, ArgoCD v3.5.5 i
   `argocd.argoproj.io/tracking-id`. Still Synced at 14:46:16Z, five minutes after the 14:41:06Z sync.
 - Ladder marks `deployed` and `live_verified` recorded. Note: `status.reconciledAt` had not moved past 14:41:06Z at 14:46Z.
 
+
+## Live recheck E5/E6 (Claude, read-only, M5, 2026-11-15 ~06:32 PST) — PASS
+
+`hub-prometheus-rules` Synced Healthy at revision `234bc2d1…`; the rules API group `repo.sync` lists
+`K3dmPromoteWaiting` and `K3dmPromoteLookupFailed`; PrometheusRule `monitoring/repo-sync` still has its 2026-11-11
+creationTimestamp and now carries ArgoCD tracking (adopted, not recreated). E7 not run (optional).

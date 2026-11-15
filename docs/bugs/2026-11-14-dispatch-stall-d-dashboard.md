@@ -1,6 +1,8 @@
 # Bug (child D): stall recovery is invisible on the Agent Dispatch dashboard
 
-**Status:** VERIFIED — live E5 2026-11-14 (landed 09d12e68 on k3d-manager-v1.44.0)
+**Status:** LIVE-VERIFIED — E5 live 2026-11-14 (Claude, read-only, deploy/hub 160f0539); was: live E5 2026-11-14 (landed 09d12e68 on k3d-manager-v1.44.0)
+**Fix commit:** 09d12e68
+**Live evidence:** 2026-11-14 · run claude-m5-read · env hub · scenario stall-recovery-row-renders · commit 160f0539 · proves E5
 **Priority:** P2 (operator, 2026-11-14)
 **Approval:** operator 2026-11-14 asked for a dashboard to track the stall-recovery loop ("maybe we can build a dashboard to track"); spec drafted by Claude, intent not yet approved
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
