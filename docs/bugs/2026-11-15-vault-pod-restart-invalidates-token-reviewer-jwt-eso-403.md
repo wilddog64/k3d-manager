@@ -5,8 +5,8 @@
 **Introduced by:** pre-existing (auth config written with a pod-bound reviewer token by `_hub_data_repoint_vault`, `scripts/plugins/hub_data.sh:847`, and `vault.sh:2106`, `:2305`)
 **Should have been caught by:** deploy step
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-15 (spec written; intent approval, then dispatch to Flash `gemini-3.8-flash-high`)
-**Intent approved:** pending
+**Waiting on:** operator decision — since 2026-11-15 (hub repaired 16:37Z; intent approved; Argon + Fable spec review running, then dispatch to Flash `gemini-3.8-flash-high`)
+**Intent approved:** operator, 2026-11-15 ("approved")
 **Spec review:** risk medium (hub Vault auth) — Argon + Fable blind before dispatch
 **Prior art:** `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md` and `docs/bugs/2026-10-25-deploy-vault-rejected-unseal-cache-triggers-destructive-reinit.md:163` (grep `token_reviewer`) — appended as the third recurrence; the 2026-10-25 doc says "file it separately if it recurs"
 
@@ -124,3 +124,14 @@ mutants:
   on today's code, then green; run `bats scripts/tests/plugins/hub_data.bats scripts/tests/bin/orbstack_upgrade.bats`
   and `make test`. Paste command, rc and proving lines. Leave changes uncommitted; Claude reviews and lands. Never
   touch a live cluster.
+
+## Live repair (Claude, operator go 2026-11-15, M5 hub `k3d-k3d-cluster`, Vault 1.20.1)
+
+16:35:35Z: `vault write auth/kubernetes/config kubernetes_host=https://kubernetes.default.svc:443
+kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` (root token piped from `vault-root` to the
+pod's stdin, never in argv) → `Success!`. `vault read`: `token_reviewer_jwt_set: false`, `disable_local_ca_jwt: false`.
+After a reconcile annotation on both stores and `force-sync` on the ExternalSecrets: `vault-backend` and
+`identity/vault-kv-store` Ready at 16:36:14Z; 8/9 synced, then `cicd/argocd-oidc-secret` (stuck in backoff from the
+"store not ready" error) synced at 16:37:37Z on a second force-sync → 9/9. Every ArgoCD application Healthy. This is
+E4 for the config shape on the live hub; the code fix (four writers) is still to be dispatched, and E5 (survives the
+next vault-0 restart) is still open. Until the code lands, `test_vault` or a DR re-point would write the old form back.
