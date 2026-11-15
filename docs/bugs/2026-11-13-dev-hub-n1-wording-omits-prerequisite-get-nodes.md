@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-13 from the independent Acceptance re-verification of dev-hub B at e9c375c4 (Opus verifier)
 **Priority:** P3 (spec wording; code is correct)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The issue only affects specification wording in a plan document to account for an expected read-only prerequisite check, with no code defect or runtime impact.)
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** `65e4799f` (v1.44.0 dev-hub B spec Acceptance)
 **Should have been caught by:** spec

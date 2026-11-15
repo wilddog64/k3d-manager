@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The M5 internet download stall that blinded Hermes to ArgoCD and CI statuses has self-cleared, and remaining diagnostic or payload-size improvements have workarounds such as resetting the network path or paginating queries.)
 **Waiting on:** operator decision — since 2026-11-14 (cleared by itself about 17:50Z; root cause unknown; decide: close as transient, or keep open and capture on recurrence)
 **Introduced by:** unknown
 **Should have been caught by:** live check

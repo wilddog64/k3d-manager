@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P3
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Dashboard status visibility is degraded by up to 20 minutes of stacked polling latency, with the workaround of checking the pushed doc status in git directly or waiting for the next sync and refresh cycle.)
 **Waiting on:** operator decision — since 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** none

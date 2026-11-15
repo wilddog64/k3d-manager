@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-13
 **Priority:** P3
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The `ci` sensor's broad exception handler masks the failing repository, workflow, and underlying error in both Slack pages and logs, degrading alert diagnostics while leaving manual GitHub Actions inspection as a workaround.)
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** pre-existing
 **Should have been caught by:** review

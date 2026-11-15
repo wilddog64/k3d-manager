@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P3
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The snapshot export succeeded and data is safe on GitHub, so failing on the post-export retention prune and firing the export failure alert is a monitoring/hygiene inaccuracy rather than a functional outage or data loss.)
 **Waiting on:** operator decision — since 2026-11-14
 **Introduced by:** unknown
 **Should have been caught by:** unknown

@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-13 from the operator's M5 promote run (Claude)
 **Priority:** P3 (proposed: cosmetic; the promote resolves the SHA correctly, but the line reads like the cause of an unrelated failure)
-**Classified:** pending second-agent classification
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The false-positive error message is purely cosmetic log noise from an expected non-zero branch probe and does not prevent `hub-promote` from resolving the SHA and executing normally.)
 **Introduced by:** unknown
 **Should have been caught by:** review
 **Prior art:** exact-slug glob, none; `make find-similar-docs` not run

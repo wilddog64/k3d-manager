@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-13 from the round-5 cross-model review of plan 5 (Claude)
 **Priority:** P3 (proposed: no secret leak, no rotation storm, every flag state recovers when the operator writes a new pair; the items are extra API calls, edge-case flag labelling and test coverage)
-**Classified:** pending second-agent classification
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Edge-case flag persistence after a post-rotate manifest auth failure and unthrottled manifest polling during failure states degrade sensor behavior, though writing a new credential pair to the Keychain provides a reliable recovery workaround.)
 **Introduced by:** plan 5 `hermes-slack-config-sensors` (rounds 3–5 corrections)
 **Should have been caught by:** offline test (items 1, 6); review (items 2–5)
 **Prior art:** exact-slug glob, none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing)

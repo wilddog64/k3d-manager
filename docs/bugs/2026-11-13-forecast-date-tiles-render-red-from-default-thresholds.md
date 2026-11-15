@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-13
 **Priority:** P3 (Claude proposal: cosmetic; red reads as "late" but means nothing)
-**Classified:** pending (Argon, from this doc alone)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The release forecast dates are displayed accurately, and the red coloring caused by Grafana's default threshold on epoch milliseconds is a purely cosmetic visual issue.)
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** 2e0fa2d8 (panels 29 and 30 rewritten without a thresholds block)
 **Should have been caught by:** review

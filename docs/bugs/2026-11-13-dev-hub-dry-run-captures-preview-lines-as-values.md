@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 (Claude proposal: only the dev-hub dry run, which fails safe; no real command runs)
-**Classified:** pending (Argon, from this doc alone)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (`DRY_RUN=1 dev_hub_up` fails early when capturing the `[dry-run]` stdout preview as the current kubectl context, breaking dry-run previews for `dev-hub` while leaving normal execution intact and failing safe.)
 **Waiting on:** operator decision — since 2026-11-13
 **Introduced by:** b2067ad3 (dev-hub Part A); the preemption read in 3e0ee4ac adds a second instance
 **Should have been caught by:** offline test (the bats `_run_command` stub ignores `DRY_RUN`, so the dry-run test never exercises the real override)

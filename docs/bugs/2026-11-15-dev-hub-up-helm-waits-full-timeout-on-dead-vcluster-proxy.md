@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-15 by Claude
 **Priority:** P3
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Recovery from a dead vCluster proxy during Helm wait still succeeds via the existing refresh-and-retry path, but degrades recovery time to the full 10-minute Helm timeout.)
 **Waiting on:** operator decision
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
