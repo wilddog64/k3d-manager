@@ -1,7 +1,7 @@
 # M1b-1a: remote targets — UNC paths and `\\node`
 
-**Status:** APPROVED — written 2026-11-15; intents approved by the operator 2026-11-15; dispatch after phase 0 (`dirused-m1b0-modular-refactor.md`) merges
-**Milestone:** M1 (second half), phase 1a. Runs in parallel with phase 1b (`dirused-m1b-fleet-runner.md`, Flash); the two
+**Status:** APPROVED — written 2026-11-15; intents approved by the operator 2026-11-15; phase 0 merged 2026-11-15 (wilddog64/dirused#2, 2dbd10d); dispatched 2026-11-15
+**Milestone:** M1 (second half), phase 1a. Runs in parallel with phase 1b (`dirused-m1b-fleet-runner.md`, Hydrogen); the two
 specs share no file.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness, Multiple drives)
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
