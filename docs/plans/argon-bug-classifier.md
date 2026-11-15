@@ -1,6 +1,6 @@
-# v1.45.0 — Automate Argon bug classification, with a quota guard
+# Automate Argon bug classification, with a quota guard
 
-**Status:** DRAFT — written 2026-11-15; waits on intent approval, the open questions, and a capture-built fixture
+**Status:** DRAFT — written 2026-11-15; ordered backlog position 2 at grooming 2026-11-15 (operator: "Accept"), merged with the 2026-11-12 Argon/Flash token chart idea (build the agy usage reader once); waits on intent approval, the open questions, and a capture-built fixture
 **Approval:** operator, 2026-11-15 (prompt-debt T4: "automate Argon review ... pay attention to his 5-hour/weekly quota"; Fable stays manual)
 **Intent approved:** pending
 **Filed:** 2026-11-15

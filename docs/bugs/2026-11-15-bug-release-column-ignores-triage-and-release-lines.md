@@ -8,6 +8,7 @@
 **Introducing change reviewed:** unknown
 **Prior art:** exact-slug glob, none; read `docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md` (different root cause: status, not release)
 **Waiting on:** operator decision — since 2026-11-15
+**Triage:** carry → v1.45.0 — operator grooming 2026-11-15 ("Accept as shown")
 
 ## Symptom
 

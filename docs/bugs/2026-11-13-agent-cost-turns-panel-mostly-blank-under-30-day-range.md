@@ -4,6 +4,7 @@
 **Priority:** P3 (Claude proposal: display only, numbers are correct)
 **Classified:** pending (Argon, from this doc alone)
 **Waiting on:** dispatch — since 2026-11-13 (batch with the next `grafana-dashboard-agent-cost.yaml` change)
+**Triage:** passed over (1st), unassigned — operator grooming 2026-11-15 (v1.45.0 at the 10-P3 cap: "Pass over today's 3")
 **Introduced by:** pre-existing (panel 112 added without a `timeFrom`)
 **Should have been caught by:** review
 **Prior art:** `docs/bugs/2026-11-12-agent-cost-dashboard-misses-fable-5-2.md` (exact-topic read) — same dashboard, different defect; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing), exact-slug glob found no match

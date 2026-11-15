@@ -3,6 +3,7 @@
 **Status:** OPEN — captured 2026-11-14 by Claude (alert investigation)
 **Priority:** P2 (operator, 2026-11-14)
 **Waiting on:** dispatch — since 2026-11-14
+**Triage:** carry → v1.45.0, batched with install-test-metrics (same files) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (operator approved Claude's recommendation, 2026-11-14)
 **Introduced by:** unknown
 **Should have been caught by:** review

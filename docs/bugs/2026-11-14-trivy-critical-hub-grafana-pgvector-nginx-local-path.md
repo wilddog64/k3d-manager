@@ -1,8 +1,8 @@
 # Bug: four TrivyCriticalVulnerability alerts on hub platform-ops images
 
-**Status:** OPEN — captured 2026-11-14 by Claude
+**Status:** CLOSED — grooming 2026-11-15 (operator): Grafana fixed and LIVE-VERIFIED in `docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md`; pgvector pin is `docs/bugs/2026-11-14-vectordb-pgvector-image-floating-tag.md`; nginx and local-path accepted. OPEN — captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-14 (Grafana 12.4.15 approved; fix in docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md)
+**Triage:** close — Grafana LIVE-VERIFIED (cf26aabd), pgvector has its own doc, nginx and local-path accepted as unreachable; Argon P0 read stale text — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); no bug doc names these images with Trivy

@@ -6,6 +6,7 @@
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
 **Waiting on:** investigation — since 2026-11-15
+**Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
 **Prior art:** `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (exact-slug pass; `find-similar-docs` printed nothing) — read, different root cause (that bug is the boot-time retry; its fix ran correctly here)
 **Severity:** high when it bites — every Vault restart on the hub (OrbStack update, node reboot) leaves Vault sealed, ESO refreshes fail, and nothing unseals it automatically

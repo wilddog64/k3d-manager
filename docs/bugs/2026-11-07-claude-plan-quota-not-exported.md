@@ -141,4 +141,4 @@ status line. The export works; its cadence does not.
 
 **Follow-up (needs operator decision):** publish the quota on a schedule, for example a small M4 LaunchAgent running
 `make dispatch-metrics` (or a quota-only mode) every 10 minutes, so the reading age stays under the 5-hour window it
-measures. It could share the LaunchAgent pattern planned in `docs/plans/v1.45.0-argon-bug-classifier.md`.
+measures. It could share the LaunchAgent pattern planned in `docs/plans/argon-bug-classifier.md`.

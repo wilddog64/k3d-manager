@@ -3,6 +3,7 @@
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14; was P3)
 **Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
+**Triage:** patch → v1.44.1, fixed by the stall-A detector — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** captured by Claude 2026-11-14; operator 2026-11-14 chose the design below: headless Claude diagnosis paid by the API credit, gated by a Slack approval ("if we want to make this safe then we can post an approval request to slack"). Spec not yet written or approved
 **Introduced by:** pre-existing
 **Should have been caught by:** none

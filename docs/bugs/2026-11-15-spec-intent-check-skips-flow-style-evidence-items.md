@@ -1,11 +1,12 @@
 # Bug: spec-intent gate never checks evidence items written in YAML flow style
 
 **Status:** OPEN — captured 2026-11-15
-**Priority:** P3 (proposed: a gate that silently passes; no wrong dispatch known)
+**Priority:** P2 (raised from P3 at grooming 2026-11-15: a gate that silently passes; no wrong dispatch known)
 **Introduced by:** unknown (`scripts/lib/spec_intent.py`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-15
+**Triage:** patch → v1.44.1; Priority raised P3 → P2 (Argon P2 accepted: a safety-gate gap) — operator grooming 2026-11-15 ("Accept as shown")
 **Prior art:** exact-slug pass, no match; `find-similar-docs` not run (needs context k3d-k3d-cluster) — none known
 
 ## What happened (Claude, 2026-11-15)

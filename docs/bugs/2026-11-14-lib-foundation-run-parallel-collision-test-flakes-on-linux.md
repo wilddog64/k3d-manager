@@ -1,8 +1,9 @@
 # lib-foundation `run_parallel.bats` #157 (sanitized-collision test) flakes on Linux CI
 
 **Status:** OPEN — captured, not triaged
-**Priority:** P3
+**Priority:** P2
 **Waiting on:** investigation — since 2026-11-14
+**Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
 **Severity:** low — test-only so far; one red CI attempt on lib-foundation PR #85, green on rerun. If the cause is in

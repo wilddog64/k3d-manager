@@ -4,6 +4,7 @@
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The pre-commit hook falsely blocks committing large new bug documentation files with a valid Priority line due to SIGPIPE under `pipefail`, degrading the commit workflow with a two-step commit workaround.)
 **Waiting on:** dispatch — since 2026-11-14
+**Triage:** passed over (1st), unassigned — operator grooming 2026-11-15 (v1.45.0 at the 10-P3 cap: "Pass over today's 3")
 **Introduced by:** `edfc9a5c` (2026-10-11, the Priority check in `.githooks/pre-commit`)
 **Should have been caught by:** offline test
 **Prior art:** none above threshold — exact-slug glob empty; grep of `docs/bugs/` for pre-commit plus pipefail found only unrelated docs; `make find-similar-docs` not run

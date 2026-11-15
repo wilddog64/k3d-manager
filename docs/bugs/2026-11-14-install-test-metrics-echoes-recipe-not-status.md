@@ -3,6 +3,7 @@
 **Status:** OPEN — captured 2026-11-14 by Claude (operator request)
 **Priority:** P3
 **Waiting on:** dispatch — since 2026-11-14
+**Triage:** passed over (1st), unassigned — operator grooming 2026-11-15 (v1.45.0 at the 10-P3 cap: "Pass over today's 3")
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4)

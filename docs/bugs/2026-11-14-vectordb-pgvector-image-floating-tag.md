@@ -3,6 +3,7 @@
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P3
 **Waiting on:** dispatch — since 2026-11-14 (batch by file)
+**Triage:** patch → v1.44.1 (one-line pin; A08 rule) — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable (vector store needs the hub context, unreachable from the M4); parent `docs/bugs/2026-11-14-trivy-critical-hub-grafana-pgvector-nginx-local-path.md` (disposition 2)
