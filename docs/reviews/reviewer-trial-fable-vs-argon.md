@@ -24,7 +24,7 @@ Fable is kept for high-risk land calls. This log measures what that trade costs 
 | # | Date | Artifact | Reviewer | Verdict | Findings (B/M/m) | Confirmed | Refuted | Unique confirmed | Cost |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 2026-11-14 | Part B M2 stage-runner design (scratchpad draft) | Fable | APPROVE WITH CHANGES | 2 / 3+ / – | 4 spot-checked, 0 refuted | 0 | see below | Claude quota (Fable) |
-| 1 | 2026-11-15 | same, same brief | Argon | pending | | | | | Gemini quota |
+| 1 | 2026-11-15 | same, same brief | Argon | APPROVE WITH CHANGES | 2 / 5 / 2 | 6 | 1 partial | 4 (see below) | Gemini quota, 334 s |
 
 ### Pair 1 baseline: Fable findings on the M2 design (recorded before Argon's run)
 
@@ -40,3 +40,31 @@ Fable is kept for high-risk land calls. This log measures what that trade costs 
   (confirmed), and the land test is caller-supplied.
 - Open questions: bin/ script OK; exit 3 only for pytest; keep the dispatcher as the stage-1 runner; land a fact-based
   pinning test with Part B (adopted as correction 8 item 11).
+
+### Pair 1 Argon findings, scored by Claude (2026-11-15)
+
+- BLOCKER-1 (standalone one-liners break `test_test_tripwire.py:21-47`): **confirmed, overlaps** Fable BLOCKER 2.
+- BLOCKER-2 (parallel completion predicate `rc<126 && rc!=2` would count an exit-3 abort as complete; preflight
+  before `_run_parallel`, because `--retry-failed` at `Makefile:1745` reruns every file of a stage that is missing a
+  tool): **confirmed**. It partly overlaps Fable BLOCKER 1, but Argon calls exit 3 "safe" once a preflight runs, and
+  misses that bats `abort()` mid-run exits 1. Fable's sharper point stands.
+- MAJOR-1/2 (per-runner exit table; keep `test-python` as the composite stage): confirmed, but these restate the
+  design's open questions.
+- MAJOR-3 (`FAKE_REPO` needs `bin/k3dm-test-stage` symlinked): **confirmed, unique**.
+- MAJOR-4 (latent divergences): **partly refuted**. The CLUSTER_ROLE "bug" is wrong because the dispatcher resets an
+  unsupported role to infra (`scripts/k3d-manager:334-344`). The conftest.py skip divergence between standalone
+  `test-python-unit` (`Makefile:1485-1486`) and test-all is real but latent (there is no `scripts/tests/bin/conftest.py`).
+- MAJOR-5 (log-line contract: `bin/k3dm-test-metrics:55-73`, `[make] python3 <f>`): **confirmed, overlaps** Fable
+  MAJOR, with more line detail.
+- MINOR-1 contract readers: overlaps Fable on `test_test_tripwire.py`, `suite_discovery.bats`, `make_targets.py` and
+  `cloud_actions.py`. **Unique, confirmed:** the `K3DM_JUNIT_XML` writer (`scripts/lib/webhook/lifecycle.py:193`) and the
+  tripwire `TMPDIR` coupling with `conftest.py`.
+- Q3 note: the dispatcher's `test` calls `_ensure_bats`, which can run `brew install bats-core`
+  (`system.sh:1662-1663`); the stage script must check `command -v bats` first. **Confirmed, unique.**
+- Missed compared with Fable: MAKEFLAGS exported to every recipe; the plist runs `test-metrics`, not test-all; the land
+  test is caller-supplied; bats `abort()` exits 1.
+
+**Pair 1 read:** both reviewers gave the same verdict and agreed on both blockers in substance. Fable was sharper on the
+exit-code blocker and caught MAKEFLAGS. Argon found more contract readers and three concrete unique issues
+(`_ensure_bats` network install, `FAKE_REPO` symlink, retry amplification). Argon had one partly refuted claim; Fable
+had none. Argon's quality is close enough on this pair to keep Argon-first; one pair is not a verdict.
