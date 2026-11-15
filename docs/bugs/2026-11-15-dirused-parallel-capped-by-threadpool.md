@@ -43,6 +43,11 @@ In `src/Dirused.Common/ScanRunner.cs` only:
   cancelled (including targets never started), and an exception becomes that target's error;
 - never one thread per target (a `/file` can list hundreds).
 
+## Files
+
+- `src/Dirused.Common/ScanRunner.cs`
+- `tests/Dirused.Tests.Portable/FleetRunnerTests.cs` (only if a test needs a compile fix)
+
 ## Acceptance
 
 ```yaml

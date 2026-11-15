@@ -40,6 +40,11 @@ so it never hit this.
 In `src/Dirused.Core/Volumes/VolumeProbe.cs` only: at the top of `Probe`, append `\` to `root` when it does not end with
 `\` or `/`, and use that root for all three calls and for the returned `Volume`. Do not touch `Scanner.cs` (phase 1b changes it).
 
+## Files
+
+- `src/Dirused.Core/Volumes/VolumeProbe.cs`
+- `tests/Dirused.Tests/RemoteTargetTests.cs` (only if a test needs a compile fix)
+
 ## Acceptance
 
 ```yaml
