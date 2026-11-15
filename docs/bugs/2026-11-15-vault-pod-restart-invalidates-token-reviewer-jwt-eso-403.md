@@ -55,12 +55,27 @@ Every writer of `auth/kubernetes/config` on the in-cluster mount stops storing a
 `kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` only (the flag left at its default,
 false). Vault then follows pod restarts and token rotation by itself; no watchdog refresh is needed.
 
-`scripts/lib/test.sh` (`test_vault`, :722-733) also passes the root token inside `kubectl exec` strings
-(`VAULT_TOKEN='$root_token'`), against the A02 rule. Both exec calls move to the stdin pattern used by
-`_hub_data_repoint_vault` (`read -r VAULT_TOKEN; export VAULT_TOKEN; ...` with the token on stdin). The wrong comment
-at :711-720 is removed.
+`scripts/lib/test.sh` also passes the root token inside `kubectl exec` strings (`VAULT_TOKEN='$root_token'`), against
+the A02 rule: `test_vault` at :723, :731, :739, and `_cleanup_vault_test` (run by `test_vault`'s EXIT/TERM trap) at
+:816, :820. The trap string at :705 embeds the token value too. All five exec calls move to the stdin pattern used by
+`_hub_data_repoint_vault` (`read -r VAULT_TOKEN; export VAULT_TOKEN; ...` with the token on stdin), and the trap stops
+embedding the value (for example, it calls a function that reads the token from a variable). The wrong comment at
+:711-720 is removed.
 
-Out of scope: `configure_vault_app_auth` (custom mount for a remote app cluster, `vault_app_auth.bats:175`) — it
+Note for whoever deploys: `_vault_set_eso_reader` returns early when the `eso-reader` policy exists
+(`vault.sh:2089-2092`), so `deploy_vault` on an existing cluster does not rewrite the config; an existing hub is healed
+only by the live repair below (done 2026-11-15) or by a `_vault_configure_secret_reader_role` caller.
+
+Stub needs (from spec review): `_vault_set_eso_reader` and `_vault_configure_secret_reader_role` send their script on
+stdin, so the `_vault_exec_stream` stub must capture stdin (reuse the harness in
+`scripts/tests/plugins/vault_role_policy_merge.bats:21-52`; `_vault_policy_exists` must return 1 for the first).
+`hub_data.sh:847` has the script in argv and the token on stdin. `test_vault` has no harness yet: the `_kubectl` stub
+must return base64 of the fake token for `get secret vault-root` (:702-703) and the secret value for
+`exec vault-read -- cat /tmp/secret` (:771), or the function sleeps 30 s and calls `_err` (:770-783).
+
+Out of scope (captured separately as `2026-11-15-root-token-and-sa-jwt-in-kubectl-exec-argv-test-eso-get-ldap-password.md`):
+`test_eso` root token in argv (`test.sh:583`, :587, :661), the ServiceAccount JWT and derived token at `test.sh:792-796`,
+and `bin/get-ldap-password:132-143`. Also out of scope: `configure_vault_app_auth` (custom mount for a remote app cluster, `vault_app_auth.bats:175`) — it
 already stores no reviewer JWT; unchanged. The watchdog shard bug is separate
 (`2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed.md`).
 
@@ -75,13 +90,18 @@ Contract: the stored `auth/kubernetes/config` of the in-cluster Vault (grep `tok
   - `scripts/plugins/vault.sh:2106-2109` (`_vault_set_eso_reader`)
   - `scripts/plugins/vault.sh:2305` (`_vault_configure_secret_reader_role`)
   - `scripts/plugins/hub_data.sh:847` (`_hub_data_repoint_vault`, DR recovery)
-  - `scripts/lib/test.sh:722-727` (`test_vault`; also the A02 token-in-argv fix at :723 and :730)
+  - `scripts/lib/test.sh:722-727` (`test_vault`; also the A02 token-in-argv fix at :705, :723, :731, :739 and in
+    `_cleanup_vault_test` at :816, :820)
+- TokenReview permission: live 2026-11-15, `kubectl auth can-i create tokenreviews.authentication.k8s.io
+  --as=system:serviceaccount:secrets:vault` → `yes`, via `vault-auth-delegator` (ours, `vault.sh:2112`, `:2308`) and
+  `vault-server-binding` (the Helm chart's own), so the DR path that never creates ours (`hub_data.sh:844-866`) is covered.
 - Readers: Vault's kubernetes auth plugin (behaviour proven above); every ESO store logging in through
   `auth/kubernetes/login` (`ClusterSecretStore vault-backend`, `identity/vault-kv-store`) — unchanged config, only the
   reviewer source changes.
 - Tests that assert on the writers: `scripts/tests/plugins/hub_data.bats:906-918`, `:1172` (stub `_vault_exec_stream`;
   order and payload checks must still pass); `scripts/tests/bin/orbstack_upgrade.bats:317-328` (calls
-  `hub_data_repoint_vault`, unchanged); `scripts/tests/plugins/vault_app_auth.bats:175` (other mount, unchanged).
+  `hub_data_repoint_vault`, unchanged); `scripts/tests/plugins/vault_role_policy_merge.bats:102-105` (drives
+`_vault_configure_secret_reader_role`; its stub discards stdin, so it still passes); `scripts/tests/plugins/vault_app_auth.bats:175` (other mount, unchanged).
 
 ## Acceptance
 
@@ -90,7 +110,7 @@ must:
   - id: M1
     text: "Each of the four writers sends a vault write auth/kubernetes/config that sets kubernetes_host and kubernetes_ca_cert from the pod's ServiceAccount CA, and nothing else that pins a reviewer."
   - id: M2
-    text: "test_vault passes the root token to both vault commands on stdin, never inside the kubectl exec argument list."
+    text: "test_vault and _cleanup_vault_test pass the root token to every vault command on stdin, never inside a kubectl exec argument list or the trap string."
   - id: M3
     text: "Existing hub_data.bats re-point tests (order config, shards, vault-root, root; payload root_token) still pass."
 must_not:
@@ -99,30 +119,33 @@ must_not:
   - id: N2
     text: "No writer sets disable_local_ca_jwt=true."
   - id: N3
-    text: "No kubectl exec or _vault_exec argument in test_vault contains the root token value."
+    text: "No kubectl argument and no trap string set by test_vault (including the _cleanup_vault_test calls it triggers) contains the root token value."
 evidence:
   - {id: E1, proves: [M1, N1, N2], kind: offline, intent: "You will see a bats test drive each of the four writer functions with Vault and kubectl stubbed, capture exactly what each sends to Vault (argv and stdin), and fail if it contains token_reviewer_jwt= or disable_local_ca_jwt=true, or lacks kubernetes_host and kubernetes_ca_cert; it fails on today's code for all four, and a positive control shows the capture really sees a planted token_reviewer_jwt."}
-  - {id: E2, proves: [M2, N3], kind: offline, intent: "You will see a bats test run test_vault with a fake root token string, record every kubectl argument, and fail if the fake token appears in any argument while showing it does arrive on stdin; it fails on today's test.sh."}
-  - {id: E3, proves: [M3], kind: offline, intent: "You will see the existing hub_data.bats and orbstack_upgrade.bats suites pass unchanged."}
-  - {id: E4, proves: [M1, N1], kind: live, intent: "After the operator-approved repair on the M5 hub, Claude shows vault read auth/kubernetes/config with token_reviewer_jwt_set false and disable_local_ca_jwt false, both ESO stores Ready, and Hermes' eso sensor back to 9/9 synced (host, time, Vault version)."}
-  - {id: E5, proves: [M1], kind: live, intent: "At the next vault-0 restart (operator present to unseal), Claude shows ESO stores return Ready within about two minutes of unseal with no config write in between."}
+  - {id: E2, proves: [M2, N3], kind: offline, intent: "You will see a bats test run test_vault with a fake root token string, record every kubectl argument including those from its cleanup trap, and fail if the fake token appears in any argument or in the trap text while showing it does arrive on stdin; it fails on today's test.sh."}
+  - {id: E3, proves: [M3], kind: offline, intent: "You will see the existing hub_data.bats, orbstack_upgrade.bats and vault_role_policy_merge.bats suites pass unchanged."}
+  - {id: E4, proves: [M1, N1], kind: live, intent: "After the operator-approved repair on the M5 hub, Claude shows vault read auth/kubernetes/config with token_reviewer_jwt_set false and disable_local_ca_jwt false, both ESO stores Ready, 9/9 ExternalSecrets synced, and the vault ServiceAccount allowed to create TokenReviews (host, time, Vault version)."}
+  - {id: E5, proves: [M1], kind: live, intent: "At the next vault-0 restart (operator present to unseal), Claude shows ESO stores return Ready after unseal (on their own refresh, or after a reconcile annotation) with no write to auth/kubernetes/config in between."}
 interface:
   - "scripts/plugins/vault.sh: _vault_set_eso_reader, _vault_configure_secret_reader_role"
   - "scripts/plugins/hub_data.sh: _hub_data_repoint_vault"
-  - "scripts/lib/test.sh: test_vault"
+  - "scripts/lib/test.sh: test_vault, _cleanup_vault_test"
   - "Vault path auth/kubernetes/config on the in-cluster mount"
 mutants:
   - "m1: restore token_reviewer_jwt=\"$(cat .../token)\" in _hub_data_repoint_vault only — E1 red"
   - "m2: add disable_local_ca_jwt=true to _vault_configure_secret_reader_role only — E1 red"
   - "m3: put VAULT_TOKEN='$root_token' back in the test_vault role write only — E2 red"
+  - "m4: restore token_reviewer_jwt=\"$(cat .../token)\" in _vault_set_eso_reader only — E1 red"
+  - "m5: restore token_reviewer_jwt and disable_local_ca_jwt=true in the test_vault config write only — E1 red"
+  - "m6: put VAULT_TOKEN='$root_token' back in _cleanup_vault_test's kv delete only — E2 red"
 ```
 
 ## Worker definition of done
 
 - Change only `scripts/plugins/vault.sh`, `scripts/plugins/hub_data.sh`, `scripts/lib/test.sh` and new or existing
-  tests under `scripts/tests/`. Keep the `_no_trace` and stdin patterns; never print or log a token. Show E1 and E2 red
+  tests under `scripts/tests/`. Apply each mutant m1-m6 and paste the red run. Keep the `_no_trace` and stdin patterns; never print or log a token. Show E1 and E2 red
   on today's code, then green; run `bats scripts/tests/plugins/hub_data.bats scripts/tests/bin/orbstack_upgrade.bats`
-  and `make test`. Paste command, rc and proving lines. Leave changes uncommitted; Claude reviews and lands. Never
+  and `bats scripts/tests/plugins/vault_role_policy_merge.bats` and `make test`. Paste command, rc and proving lines. Leave changes uncommitted; Claude reviews and lands. Never
   touch a live cluster.
 
 ## Live repair (Claude, operator go 2026-11-15, M5 hub `k3d-k3d-cluster`, Vault 1.20.1)
