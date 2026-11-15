@@ -7,7 +7,7 @@
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-15 (hub repaired 16:37Z; intent approved; Argon + Fable spec review running, then dispatch to Flash `gemini-3.8-flash-high`)
 **Intent approved:** operator, 2026-11-15 ("approved")
-**Spec review:** risk medium (hub Vault auth) — Argon + Fable blind before dispatch
+**Spec review:** risk medium (hub Vault auth) — Argon + Fable blind, 2026-11-15: both CHANGES, same main finding (test_vault token sites); all confirmed findings applied; Argon's here-string xtrace claim refuted by test (see Fix)
 **Prior art:** `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md` and `docs/bugs/2026-10-25-deploy-vault-rejected-unseal-cache-triggers-destructive-reinit.md:163` (grep `token_reviewer`) — appended as the third recurrence; the 2026-10-25 doc says "file it separately if it recurs"
 
 ## What happened (Claude, 2026-11-15, M5 hub `k3d-k3d-cluster`)
@@ -62,6 +62,13 @@ the A02 rule: `test_vault` at :723, :731, :739, and `_cleanup_vault_test` (run b
 embedding the value (for example, it calls a function that reads the token from a variable). The wrong comment at
 :711-720 is removed.
 
+How the token is passed (proven by Claude, 2026-11-15, bash 5.3.20 and 3.2.57 on the M4, `set -x` with a marker
+value): `_no_trace <cmd> <<<"$root_token"` never shows the value in the trace; `printf %s "$t" | _no_trace <cmd>` and
+`_no_trace <cmd> < <(printf %s "$t")` both trace `printf %s <value>`. Use the here-string form under `_no_trace` only.
+The values interpolated into today's double-quoted `sh -c "..."` strings (`$sa`, `$test_ns`, `$vault_secret_path`,
+`$secret_key`, `$secret_val`) become positional arguments (`sh -c '...' sh "$sa" ...`) so the single-quoted script
+does not splice them (A03).
+
 Note for whoever deploys: `_vault_set_eso_reader` returns early when the `eso-reader` policy exists
 (`vault.sh:2089-2092`), so `deploy_vault` on an existing cluster does not rewrite the config; an existing hub is healed
 only by the live repair below (done 2026-11-15) or by a `_vault_configure_secret_reader_role` caller.
@@ -95,9 +102,16 @@ Contract: the stored `auth/kubernetes/config` of the in-cluster Vault (grep `tok
 - TokenReview permission: live 2026-11-15, `kubectl auth can-i create tokenreviews.authentication.k8s.io
   --as=system:serviceaccount:secrets:vault` → `yes`, via `vault-auth-delegator` (ours, `vault.sh:2112`, `:2308`) and
   `vault-server-binding` (the Helm chart's own), so the DR path that never creates ours (`hub_data.sh:844-866`) is covered.
-- Readers: Vault's kubernetes auth plugin (behaviour proven above); every ESO store logging in through
-  `auth/kubernetes/login` (`ClusterSecretStore vault-backend`, `identity/vault-kv-store`) — unchanged config, only the
-  reviewer source changes.
+- Readers: Vault's kubernetes auth plugin (behaviour proven above), and everything that logs in through
+  `auth/kubernetes/login` — unchanged roles; only the reviewer token source changes, so each benefits:
+  ESO stores (`ClusterSecretStore vault-backend`, `identity/vault-kv-store`); `scripts/plugins/hub_data.sh:191`
+  (`_hub_data_vault_login`, role `hub-data-inventory`); the credential rotators
+  `scripts/etc/argocd/platform-ops/grafana-credential-rotator.yaml:109`, `keycloak-credential-rotator.yaml:75`,
+  `argocd-credential-rotator.yaml:112`; `scripts/etc/jenkins/cert-rotator.sh:278` and `vault-seed-wrapper.yaml:22`
+  (deprecated Jenkins); `scripts/lib/test.sh:760`, `:793` (`test_vault` login checks).
+- Production caller of a writer: `bin/k3dm-orbstack-upgrade:131` runs `hub_data_repoint_vault` when the vault-0 UID
+  changed and a store is invalid (the existing automated mitigation for this bug after an OrbStack upgrade; unchanged,
+  and after the fix it writes the new form).
 - Tests that assert on the writers: `scripts/tests/plugins/hub_data.bats:906-918`, `:1172` (stub `_vault_exec_stream`;
   order and payload checks must still pass); `scripts/tests/bin/orbstack_upgrade.bats:317-328` (calls
   `hub_data_repoint_vault`, unchanged); `scripts/tests/plugins/vault_role_policy_merge.bats:102-105` (drives
@@ -122,7 +136,7 @@ must_not:
     text: "No kubectl argument and no trap string set by test_vault (including the _cleanup_vault_test calls it triggers) contains the root token value."
 evidence:
   - {id: E1, proves: [M1, N1, N2], kind: offline, intent: "You will see a bats test drive each of the four writer functions with Vault and kubectl stubbed, capture exactly what each sends to Vault (argv and stdin), and fail if it contains token_reviewer_jwt= or disable_local_ca_jwt=true, or lacks kubernetes_host and kubernetes_ca_cert; it fails on today's code for all four, and a positive control shows the capture really sees a planted token_reviewer_jwt."}
-  - {id: E2, proves: [M2, N3], kind: offline, intent: "You will see a bats test run test_vault with a fake root token string, record every kubectl argument including those from its cleanup trap, and fail if the fake token appears in any argument or in the trap text while showing it does arrive on stdin; it fails on today's test.sh."}
+  - {id: E2, proves: [M2, N3], kind: offline, intent: "You will see a bats test run test_vault with a fake root token string, record every kubectl argument including those from its cleanup trap, and fail if the fake token appears in any argument, in the trap text, or in the xtrace output of a run under set -x, while showing it does arrive on stdin; it fails on today's test.sh."}
   - {id: E3, proves: [M3], kind: offline, intent: "You will see the existing hub_data.bats, orbstack_upgrade.bats and vault_role_policy_merge.bats suites pass unchanged."}
   - {id: E4, proves: [M1, N1], kind: live, intent: "After the operator-approved repair on the M5 hub, Claude shows vault read auth/kubernetes/config with token_reviewer_jwt_set false and disable_local_ca_jwt false, both ESO stores Ready, 9/9 ExternalSecrets synced, and the vault ServiceAccount allowed to create TokenReviews (host, time, Vault version)."}
   - {id: E5, proves: [M1], kind: live, intent: "At the next vault-0 restart (operator present to unseal), Claude shows ESO stores return Ready after unseal (on their own refresh, or after a reconcile annotation) with no write to auth/kubernetes/config in between."}

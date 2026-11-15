@@ -101,3 +101,28 @@ Scored by Claude against the code and real history:
 against the incident it claimed to fix, and that finding reverses the land decision. On a high-risk land call that is
 the case for escalating to Fable; Argon-first stays the default for low-risk work. Cost: Fable 128K tokens, 22 tool
 calls, about 10 minutes.
+
+## Pair 3 — 2026-11-15, spec review: ESO 403 after vault-0 restart (`token_reviewer_jwt`)
+
+Medium-risk spec review (hub Vault auth config). Both got the spec and the code, blind to each other and to Claude's
+upstream proof. Argon: `gemini-4-argon-medium` via agy, read-only. Fable: background agent, read-only.
+
+**Verdicts:** both CHANGES, no blocker.
+
+- Main finding, **overlap, confirmed by both**: the spec's `test_vault` scope listed two root-token-in-argv sites;
+  there are five (`test.sh:723`, `:731`, `:739`, and `_cleanup_vault_test` `:816`, `:820` via the trap at `:705`), so
+  E2 would have stayed red. Both cited the same lines.
+- Overlap, confirmed: `vault_role_policy_merge.bats:102-110` missing from the test list; `_vault_set_eso_reader`'s early
+  return means `deploy_vault` never heals an existing cluster; remaining argv tokens at `test.sh:661`, `:792-796`.
+- Fable unique, confirmed: no mutant on two of the four writers (added m4-m6); stub needs for `test_vault`
+  (`:702-703`, `:770-783`); suggested the TokenReview `can-i` check (Claude ran it live: `yes`, two bindings); E5's
+  two-minute bound unproven; `bin/get-ldap-password:132-143`.
+- Argon unique, confirmed: non-ESO `auth/kubernetes/login` readers (`hub_data.sh:191`, three credential rotators,
+  Jenkins) and the production caller `bin/k3dm-orbstack-upgrade:131`; A03 positional args for the converted `sh -c`.
+- Argon unique, **refuted**: "`<<<"$root_token"` on a `_no_trace` call traces the token". Claude tested bash 5.3.20 and
+  3.2.57 under `set -x`: the here-string never appears; the pipe and process-substitution forms do. The refutation went
+  into the spec as a requirement.
+
+**Pair 3 read:** like pair 1, same verdict and same main finding; each added different contract readers. Argon's one
+wrong claim was a testable shell-behaviour claim, caught by running it. Cost: Fable 85K tokens, 9 tool calls, about
+2 minutes; Argon one agy call (about 9 minutes wall clock).
