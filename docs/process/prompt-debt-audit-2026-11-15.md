@@ -55,5 +55,8 @@ as a measured trial in v1.44.1 or v1.45.0, using `docs/process-metrics.md`. Arch
   `CLAUDE.md.disabled-2026-11-15`, rename back to restore), C1 (PR creation gate → merge gate), C3 (`LIVE-VERIFIED` added;
   rule now states what the hook really refuses), C4 (P3 filing clause defers to capture-first), C5 (coordinator section
   scoped to coordinator sessions).
-- **Open:** C2 (who runs the release smoke; the gate text still says Gemini), T4 (automate or drop Argon classification).
+- **T4 decided (operator, 2026-11-15):** automate Argon classification, watching its 5-hour and weekly Gemini quota;
+  Fable reviews stay a deliberate manual call, never automated. Design in `docs/ideas.md` (2026-11-15 row); until it
+  lands, classification stays manual.
+- **Open:** C2 (who runs the release smoke; the gate text still says Gemini).
 - **Not started:** T1 (worker memory-bank read + archive), T2 (measured trial), T3 (`plan-cap` out of worker files).
