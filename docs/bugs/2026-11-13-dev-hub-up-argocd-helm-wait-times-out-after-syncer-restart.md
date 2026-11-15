@@ -1,12 +1,12 @@
 # dev-hub: `dev-hub-up` Argo CD `helm --wait` times out when the vCluster syncer restarts during startup
 
-**Status:** VERIFIED — f1eeeb26 live on the M5 2026-11-13 (operator): stuck pending-install argocd uninstalled, argocd and Grafana installed, no down in between
+**Status:** LIVE-VERIFIED — f1eeeb26; live on the M5 2026-11-15 at 234bc2d1 (operator ran, Claude watched): dev-hub-up and a dev-hub-down → dev-hub-up both finished in one run with dev-hub-0 at 0 restarts; 2026-11-13 run cleared the stuck pending-install argocd without a down
 **Priority:** P1 (Claude proposal, raised 2026-11-13: a rerun cannot recover, and the only way back is down/up, which can hit the same timeout; blocks the plan E2 live check)
 **Classified:** pending (Argon, from this doc alone)
 **Introduced by:** b2067ad3 or later Part B commit that added the Argo CD install with `--wait` and no `--timeout` (unknown which)
 **Should have been caught by:** live check (offline tests cannot see startup timing)
 **Fix commit:** `f1eeeb26`
-**Waiting on:** live check — since 2026-11-14 (run 2 on 2026-11-14: leader-elect=false confirmed; run failed on a new cause, see Live run 2; closes when a dev-hub-up finishes in one run with no syncer restart)
+**Live evidence:** 2026-11-15 · run operator-tmux-dev-hub-up · env m5 · scenario dev-hub-down-up-one-run-no-syncer-restart · commit 234bc2d1 · proves E2
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` not run (vector store context missing on m4-air)
 **Approval:** operator, 2026-11-13: "go ahead"
 **Dispatch go:** operator, 2026-11-13: "go ahead"
@@ -185,3 +185,14 @@ recovery path is proven on the real stuck release. The rollback path (pending-up
 ## Live run 3 (operator, 2026-11-14 ~20:39Z-20:42:36Z, m5-air.local, checkout 849ddfcf)
 
 `make dev-hub-up` on the half-built dev-hub left by run 2, no down in between. Output: `release "argocd" uninstalled` (pending-install recovery, second live proof), then argocd `STATUS: deployed` and dev-hub-grafana `STATUS: deployed`; make ended 20:42:36Z. Claude read afterwards: all 8 dev-hub pods Running with 0 restarts; `dev-hub-0` syncer restartCount still 1 (the 20:25:55Z kill from run 2), so no syncer restart during this install. Argo CD's three CRDs were kept from run 2 ("kept due to the resource policy"), so this install was lighter than a fresh one. Step 2 as written (`dev-hub-down` then `dev-hub-up` in one run) is still unproven; run 2 was that shape and failed on the proxy cause.
+
+## Live run 3 (Claude watching, M5, 2026-11-15, deploy/hub and checkout 234bc2d1) — PASS
+
+| Run | argocd | dev-hub-grafana | dev-hub-0 restarts |
+|---|---|---|---|
+| `make dev-hub-up` on the running dev hub (05:51) | rev 2 deployed 05:51:43 | rev 2 deployed 05:52:04 | 0 |
+| `make dev-hub-down`, then `make dev-hub-up` (vcluster created 05:54:02) | rev 1 deployed 05:54:41 | rev 1 deployed 05:55:11 | 0 |
+
+Read with `kubectl --context k3d-k3d-cluster -n dev-hub get pod dev-hub-0` (restartCount sampled every 15 s through
+both runs) and `vcluster connect dev-hub --namespace dev-hub -- helm list -A`. The operator's ssh session dropped at
+about 06:12, after both releases were deployed; the make exit code was not captured.
