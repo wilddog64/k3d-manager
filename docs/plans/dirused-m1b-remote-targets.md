@@ -1,13 +1,13 @@
 # M1b-1a: remote targets — UNC paths and `\\node`
 
-**Status:** DRAFT — written 2026-11-15; waits on `dirused-m1b0-modular-refactor.md` landing, intent approval and a dispatch go
+**Status:** APPROVED — written 2026-11-15; intents approved by the operator 2026-11-15; dispatch after phase 0 (`dirused-m1b0-modular-refactor.md`) merges
 **Milestone:** M1 (second half), phase 1a. Runs in parallel with phase 1b (`dirused-m1b-fleet-runner.md`, Flash); the two
 specs share no file.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness, Multiple drives)
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
 **Open decision (operator):** the plan marks a bare `\\node` scanning every `<letter>$` admin share as "proposed, decide before
 the M1 spec". This spec implements it; approving its intents approves that behaviour.
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-15 ("approved"; includes `\\node` = every `<letter>$` share and Luna for phase 0)
 **Implementer:** Luna (Codex). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1a-remote-targets` from `main` after phase 0 merges.
 

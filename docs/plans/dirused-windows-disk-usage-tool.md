@@ -132,7 +132,7 @@ Every switch accepts `/name` and `--name`. The draft's `—` is read as an autoc
 | `dirused .` | Measure the current directory |
 | `dirused D:\path` | Measure a local path; `D:\` measures the drive |
 | `dirused \\node\d$\path` | Measure a UNC path |
-| `dirused \\node` | Every fixed drive on the node (`C$`, `D$`, …, found by listing its admin disk shares); one volume line per drive. Proposed 2026-11-15, see Multiple drives |
+| `dirused \\node` | Every fixed drive on the node (`C$`, `D$`, …, found by listing its admin disk shares); one volume line per drive. Decided 2026-11-15, see Multiple drives |
 | `dirused /all` | Every fixed local drive |
 | `dirused /file targets.txt` | Measure each target listed, one per line; blank lines and `#` comments are ignored |
 | `/file targets.txt /summary` | Used, free and percent per volume, largest first, with no tree walk; takes seconds across a fleet |
@@ -284,7 +284,7 @@ to be able to scan both or multiple drives if there are".
 - **Test machines carry `D:`.** The Vagrant VM gets a second VirtualBox disk, brought online and formatted NTFS as `D:`
   by the provisioner. Each ACG node gets a second EBS volume as `D:` (inside ACG's 100 GB volume limit). Fixtures, such as
   junctions, hard links and large files, go on both drives, and app-like data on `D:`.
-- **A bare node target scans every fixed drive** (proposed, decide before the M1 spec). `\\node` lists the node's
+- **A bare node target scans every fixed drive** (decided: operator, 2026-11-15, approving `dirused-m1b-remote-targets.md`). `\\node` lists the node's
   administrative disk shares (`NetShareEnum`, special disk shares named `<letter>$`) and measures each. Locally, `/all`
   uses the fixed drives. Results, `/summary` and `/threshold` stay per volume, so a full `C:` is never hidden by an empty
   `D:`. A drive that can't be read is reported, not skipped silently (exit code 3, as for unreadable folders).

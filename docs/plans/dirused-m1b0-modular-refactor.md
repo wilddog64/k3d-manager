@@ -1,12 +1,12 @@
 # M1b-0: split the M1a CLI into modules (no behaviour change)
 
-**Status:** DRAFT — written 2026-11-15; waits on intent approval and a dispatch go
+**Status:** APPROVED — written 2026-11-15; intents approved by the operator 2026-11-15
 **Milestone:** M1 (second half), phase 0 of 3. Phases 1a (`dirused-m1b-remote-targets.md`, Luna) and 1b
 (`dirused-m1b-fleet-runner.md`, Flash) start in parallel once this lands; each edits files the other does not touch.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness, Multiple drives)
 **Approval:** operator, 2026-11-15 ("next step is to start code implemenation. be sure to modulus and we can try to distribute
 tasks between flash and luna")
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-15 ("approved"; includes `\\node` = every `<letter>$` share and Luna for phase 0)
 **Implementer:** Luna (Codex), who wrote M1a. **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b0-modular-refactor` from `main` (74412c9).
 

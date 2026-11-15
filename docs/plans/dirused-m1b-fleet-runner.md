@@ -1,11 +1,11 @@
 # M1b-1b: fleet runner — `/file`, `/summary`, `/timeout`, `/parallel`
 
-**Status:** DRAFT — written 2026-11-15; waits on `dirused-m1b0-modular-refactor.md` landing, intent approval and a dispatch go
+**Status:** APPROVED — written 2026-11-15; intents approved by the operator 2026-11-15; dispatch after phase 0 (`dirused-m1b0-modular-refactor.md`) merges
 **Milestone:** M1 (second half), phase 1b. Runs in parallel with phase 1a (`dirused-m1b-remote-targets.md`, Luna); the two
 specs share no file.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness: multiple targets, slow links)
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-15 ("approved"; includes `\\node` = every `<letter>$` share and Luna for phase 0)
 **Implementer:** Flash (agy `gemini-3.8-flash-medium`). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1b-fleet-runner` from `main` after phase 0 merges.
 
