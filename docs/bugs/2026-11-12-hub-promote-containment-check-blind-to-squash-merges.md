@@ -6,7 +6,7 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** operator decision — since 2026-11-15 (Sol run 2 not landed: the squash check does not fire on the real incident; see Review 2026-11-15)
+**Waiting on:** investigation — since 2026-11-15 (operator chose option (a): respec on PR-head ancestry; Sol run 2 not landed)
 **Intent approved:** operator ("go ahead"), 2026-11-14
 
 ## Symptom
@@ -305,3 +305,5 @@ BREAK_GLASS narrowed to the containment refusal) could land separately.
 **Non-blocking follow-ups:** `.github/copilot-instructions.md:42,138` (missed contract reader); E10 make test cannot
 catch a `Makefile:478` revert (`:299` falls back to the environment); the "before fetching" `From ` assertion cannot
 fail; E9 M5 checks only the newest tag; make expands `$` in a reason passed as a make variable.
+
+**Decision (operator, 2026-11-15): (a)** respec containment on merged-PR head ancestry; do not land run 2 piecemeal. Likely v1.44.1.
