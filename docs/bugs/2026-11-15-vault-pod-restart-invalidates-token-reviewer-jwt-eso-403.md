@@ -1,11 +1,12 @@
 # Bug: any vault-0 pod restart breaks every hub ESO store (stale pod-bound `token_reviewer_jwt`, 403 on login)
 
-**Status:** OPEN — captured 2026-11-15
+**Status:** LANDED — `f09edf77`, 2026-11-15 (Flash gemini-3.8-flash-high; Claude coordinator). Live hub already repaired by hand at 16:37Z; E5 waits on the next vault-0 restart.
+**Fix commit:** `f09edf77`
 **Priority:** P2 (proposed: all hub ExternalSecrets stop refreshing and new pods that need them cannot start; manual workaround exists)
 **Introduced by:** pre-existing (auth config written with a pod-bound reviewer token by `_hub_data_repoint_vault`, `scripts/plugins/hub_data.sh:847`, and `vault.sh:2106`, `:2305`)
 **Should have been caught by:** deploy step
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-15 (hub repaired 16:37Z; intent approved; Argon + Fable spec review running, then dispatch to Flash `gemini-3.8-flash-high`)
+**Waiting on:** live check — since 2026-11-15 (E4: promote f09edf77 or later to deploy/hub; E5: at the next vault-0 restart, ESO stores stay Ready with no repair)
 **Intent approved:** operator, 2026-11-15
 **Intent approval note:** "approved"; revised E2, E4, E5 re-approved "ok" the same day
 **Spec review:** risk medium (hub Vault auth) — Argon + Fable blind, 2026-11-15: both CHANGES, same main finding (test_vault token sites); all confirmed findings applied; Argon's here-string xtrace claim refuted by test (see Fix)
@@ -195,3 +196,12 @@ After a reconcile annotation on both stores and `force-sync` on the ExternalSecr
 "store not ready" error) synced at 16:37:37Z on a second force-sync → 9/9. Every ArgoCD application Healthy. This is
 E4 for the config shape on the live hub; the code fix (four writers) is still to be dispatched, and E5 (survives the
 next vault-0 restart) is still open. Until the code lands, `test_vault` or a DR re-point would write the old form back.
+
+## Verification (Claude, 2026-11-15, M4)
+
+- Worker: Flash `gemini-3.8-flash-high`, 35 min, exit 0, uncommitted diff (3 production files + new `vault_k8s_auth_config.bats`).
+- Gates rerun outside the sandbox: 160/160 targeted bats; `make test` rc 0; `make test-pytest` rc 0; land tests green.
+- Pre-fix red: exactly the 5 new behaviour tests fail on the old code; the positive control passes on both.
+- Mutants m3, m6 killed by E2 (Claude). Independent verifier (Sonnet, Acceptance only, own probes): all offline must/must_not/evidence PASS, E4/E5 not verifiable offline, m1-m6 killed. Its one red (hub_data.bats test 53) also fails on HEAD in its scratch run and is green in `make test`: environmental (broken `cd` in that session).
+- Argon blind diff review: CHANGES. Confirmed: deleting the `_VAULT_TEST_ROOT_TOKEN` handoff left all 6 tests green, so E2 now requires the token on all 5 exec stdins (red with the handoff removed, green on the fix). Claude also fixed a dead `$4` path in `_cleanup_vault_test` (`_no_trace eval` reads `_no_trace`'s own positional args).
+- Landed `f09edf77` with `Coordinator: anthropic/claude-opus-5-5`; pushed to `origin/k3d-manager-v1.44.0`.
