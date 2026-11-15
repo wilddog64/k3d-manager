@@ -6,7 +6,7 @@ specs share no file.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness: multiple targets, slow links)
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
 **Intent approved:** operator, 2026-11-15
-**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0.
+**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0. Scope item 7 added 2026-11-15 on the operator's "yes" to `//server/share` targets.
 **Implementer:** Flash (agy `gemini-3.8-flash-medium`). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1b-fleet-runner` from `main` after phase 0 merges.
 
@@ -48,7 +48,11 @@ None needed beyond phase 0's: this phase uses only .NET (`Task`, `SemaphoreSlim`
    whatever order scans finish in.
 5. **Ctrl+C:** cancel all running scans, print the partial results, mark unfinished targets incomplete, exit 3.
 6. **One failure never stops the rest:** an exception in one target's scan becomes that target's error; the others continue.
-7. **README:** usage lines for the four switches, with a sample `targets.txt`.
+7. **`//` targets (operator, 2026-11-15):** in `ArgParser`, an argument starting with `//` goes to the target parser, not
+   the switch branch, so `//server/share` is a target (phase 1a makes `TargetParser` accept it). `/all` and every switch are
+   unchanged. Test in `tests/Dirused.Tests.Portable/FleetRunnerTests.cs`: `//server/share` no longer gives `Unknown switch`
+   (red on pre-fix code), and `/top 5` still parses as a switch (positive control).
+8. **README:** usage lines for the four switches, with a sample `targets.txt`.
 
 ## Files
 

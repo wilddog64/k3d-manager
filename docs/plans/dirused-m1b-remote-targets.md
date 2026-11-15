@@ -8,7 +8,7 @@ specs share no file.
 **Open decision (operator):** the plan marks a bare `\\node` scanning every `<letter>$` admin share as "proposed, decide before
 the M1 spec". This spec implements it; approving its intents approves that behaviour.
 **Intent approved:** operator, 2026-11-15
-**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0.
+**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0. Scope item 5 and E6 added 2026-11-15 on the operator's "yes" to the extra target forms.
 **Implementer:** Luna (Codex). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1a-remote-targets` from `main` after phase 0 merges.
 
@@ -61,7 +61,14 @@ Not proven here (needs ACG, plan "CLI gate"): a second real machine, a non-admin
    - a node with zero `<letter>$` shares: `NO DRIVES: <node>`, exit 3.
    Same in `/json` (the target's `errors`, `complete: false`) and `/csv` (no rows, error on stderr).
 4. **Credentials:** the current Windows token only. No user, password or credential switch; nothing calls `WNetAddConnection2`.
-5. **README:** add UNC and `\\node` to the usage section, with the admin-rights note.
+5. **Target forms (operator, 2026-11-15: "d:/ can probably be more portable across OS"),** all in `TargetParser`:
+   - `//server/share[/path]` parses as UNC, and `//node` as a node, the same as the backslash forms (phase 1b routes
+     arguments starting with `//` to the target parser instead of the switch branch);
+   - a drive letter alone, `C:` or `c:`, means that drive's root (`C:\`);
+   - drive targets take either separator, any case: `d:/`, `d:\`, `d:/apps`, `D:\apps\logs`, mixed. Root and walk use
+     backslashes; output shows the target as typed;
+   - a relative path (`subdir`, `..\x`, `sub/dir`) resolves against the current directory, as `.` does today.
+6. **README:** add UNC, `\\node` and the target forms above to the usage section, with the admin-rights note.
 
 ## Files
 
@@ -85,16 +92,19 @@ interface:
   - "dirused \\\\server\\share[\\path] [/top N] [/json|/csv]"
   - "dirused \\\\node  -> one target per <letter>$ admin disk share, in letter order"
   - "exit codes: 0 ok, 1 usage, 3 any target incomplete, unreachable, denied or without drives"
+  - "target forms: C:\\x | c:/x | C: | relative | \\\\server\\share | //server/share | \\\\node | //node"
 must:
   - "a UNC scan of a folder reports the same directory and file totals as a local scan of that folder"
   - "\\\\node lists every <letter>$ disk share and prints one volume line per drive"
   - "an unreachable node prints an UNREACHABLE line naming it and exits 3"
   - "a hard link reached through UNC is counted once"
+  - "d:/x, d:\\x and D:\\x scan the same folder with the same totals"
 must_not:
   - "a UNC target exits 1 with 'UNC targets arrive in M1b'"
   - "\\\\node scans ADMIN$, IPC$ or a non-<letter>$ share"
   - "an unreachable or access-denied target is missing from the output or exits 0"
   - "any switch or code path takes a user name, password or credential"
+  - "TargetParser rejects //server/share, C: or a relative path"
 evidence:
   - id: E1
     proves: [ "a UNC scan of a folder reports the same directory and file totals as a local scan of that folder", "a hard link reached through UNC is counted once", "a UNC target exits 1 with 'UNC targets arrive in M1b'" ]
@@ -121,4 +131,9 @@ evidence:
     kind: live
     how: "Claude on the operator's dirused-dev Vagrant VM (C: and D:), when the operator says the VM is free: dirused \\\\localhost shows C: and D: volume lines matching Get-Volume within 1%. Real multi-machine UNC stays owed to the ACG CLI gate"
     intent: "On a Windows box like yours, naming the machine shows both drives with the right numbers."
+  - id: E6
+    proves: [ "d:/x, d:\\x and D:\\x scan the same folder with the same totals", "TargetParser rejects //server/share, C: or a relative path" ]
+    kind: offline
+    how: "Portable xUnit on TargetParser: //server/share -> Unc with Root \\\\server\\share\\, //node -> Node, C: and c: -> LocalDrive C:\\, sub/dir -> LocalPath (each null on pre-fix code); positive control: C:\\x and \\\\server\\share unchanged. Windows xUnit: scan C:/<tree>, c:\\<tree> and C:\\<tree> (temp tree with a 1 MiB file), equal totals and exit 0"
+    intent: "Type a path the Windows way or the Mac/Linux way, d:\\ or d:/, and dirused measures the same folder."
 ```
