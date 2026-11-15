@@ -1,6 +1,8 @@
 # Bug: dev-hub-up fails when the syncer restarts mid-install: the vCluster background proxy dies and Helm loses the cluster
 
-**Status:** VERIFIED — 9676d0af on k3d-manager-v1.44.0, E5 live 2026-11-15 02:17-02:28Z on the M5 (captured 2026-11-14 by Claude)
+**Status:** LIVE-VERIFIED — 9676d0af on k3d-manager-v1.44.0, E5 live 2026-11-15 02:17-02:28Z on the M5 (captured 2026-11-14 by Claude)
+**Fix commit:** 9676d0af
+**Live evidence:** 2026-11-15 · run operator-dev-hub-down-up-claude-pod-delete · env m5 · scenario syncer-deleted-mid-argocd-install · commit 9676d0af · proves E5
 **Priority:** P2
 **Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
