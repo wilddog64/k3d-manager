@@ -147,6 +147,7 @@ Every switch accepts `/name` and `--name`. The draft's `—` is read as an autoc
 | `<target> /threshold 85` | One check: exit 2 if the volume is at or above 85% used |
 | `/file targets.txt /monitor /threshold 85 /interval 15m` | Repeat across all targets; alert on crossing, and on a node that cannot be reached |
 | `/autopurge` | Last milestone only; see "Safety rules" |
+| `/rules r.json`, `/rules-show` | Use a purge-candidate rules file for this run; print the rules in effect and where each came from. See "Purge candidates" |
 
 **Exit codes:** 0 success, 1 failure, 2 threshold exceeded, 3 partial (some targets or directories
 could not be read).
@@ -228,6 +229,45 @@ VHDX images and active logs. So it ships last, and only with all of these requir
   own later decision.
 
 It needs its own operator go after the earlier milestones have seen real use. It may be dropped.
+
+## Purge candidates (operator, 2026-11-15)
+
+Operator: "the default files we are looking for to purge are: *.bak, various compiled object, tomcat dump file. *.log,
+c:\temp, d:\temp, and known backup/temp file pattern. this list should allow update and override".
+
+`/purge` picks from files that match a **candidate rule**, not from every large file. Each rule has an id, a category and
+either a file pattern or a folder. Every Safety rule still applies on top: a rule can never unlock `\Windows`, `\Program Files*`,
+a reparse point or a directory delete.
+
+**Built-in defaults** (operator's list in bold; the rest is Claude's proposal, confirmed or cut at the M2 spec):
+
+| Category | Rules |
+|---|---|
+| Backup | **`*.bak`**; proposed: `*.old`, `*.orig`, `*.bkp`, `*~` |
+| Compiled objects | **compiled objects**; proposed: `*.obj`, `*.o`, `*.pch`, `*.ilk`, `*.ipch`, `*.class`, `*.pyc` |
+| Tomcat / JVM dumps | **Tomcat dump files**; proposed: `*.hprof`, `java_pid*.hprof`, `hs_err_pid*.log`, `javacore*.txt`, `heapdump*.phd`, `core.*.dmp` |
+| Logs | **`*.log`**; proposed: rotated logs `*.log.[0-9]*`, Tomcat `catalina.*.log`, `localhost_access_log.*.txt` |
+| Temp folders | **files under `C:\temp` and `D:\temp`** (files only, folders stay) |
+| Temp patterns | **known temp files**; proposed: `*.tmp`, `*.temp`, `*.dmp` outside `\Windows`, `Thumbs.db` |
+
+**Update and override** (operator: "should allow update and override"):
+
+- Defaults ship inside the exe as a versioned rules document; `/rules-show` prints them.
+- A machine-wide file `%ProgramData%\dirused\purge-rules.json` on the central node, then `/rules <file>` for one run, are
+  applied in that order. Each file either **extends** the rules before it (add rules, disable a rule by id, narrow a rule
+  with `minAgeDays` or `minBytes`) or **replaces** them (`"replace": true`).
+- `/rules-show` lists the rules in effect and where each came from (built-in, machine file, run file).
+- A saved plan records the rules in effect and their hash, and the purge log records the hash, so a delete can be traced to
+  the rules that chose it.
+- Company-specific patterns live in the company's own rules file, never in the dirused repo (see "Open before any company use").
+
+**Risks for the M2 spec to settle:**
+
+- `*.bak` is also SQL Server's backup extension, and may be the only backup there is; `*.log` matches live application and
+  SQL Server transaction logs. Proposed: a default minimum age (for example 7 days) on these two rules, and files that are
+  open or locked are skipped and reported, never forced.
+- Whether `/purge` can still pick files outside the rules (for example with an explicit `/any` switch), or only through
+  `/purge-list`.
 
 ## Milestones
 
