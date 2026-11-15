@@ -824,3 +824,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - **PR #161:** Copilot 3 comments — alert fixed 9919a452 (resolved); 2 lib-foundation table threads wait on lib-foundation#88 merge + subtree pull.
 - **Open:** M1b spec (UNC, \\node via NetShareEnum, /file, /summary, /timeout, /parallel); note tree total < volume used on C: (pagefile, hiberfil, metadata). Grafana: PR Checks REPOS add + Release Tracking idea row offered, not done.
 - 2026-11-15: Grooming recorded (`docs/grooming/2026-11-15.md`). v1.44.1 +6 bugs (8 P2, 2 P3); v1.45.0 plan 4 = `remote-promote-approval` (DRAFT, review+intent pending), `human-operator-turns` and `argon-bug-classifier` to backlog 1–2; 3 P3s passed over (cap); Trivy umbrella closed; ideas 5 promoted, 27 kept, 10 dropped. dirused PR #1 merged (74412c93); main protected (check `windows`, strict, PR required, admins, no force/delete); Apache-2.0. Next: dirused M1b specs split Flash/Luna (operator 2026-11-15: "be sure to modulus").
+
+## 2026-11-15 — dirused M1b specs written (modular, Luna + Flash)
+- windows-latest UNC probe run 43758987933 (throwaway branch deleted): volume APIs equal for C:\ and \\localhost\c$\ (serial 54CBA274), D$ distinct, unreachable = error 53, same file id local vs UNC, shares ADMIN$/C$/D$/IPC$.
+- Specs (DRAFT, `**Intent approved:** pending`): `docs/plans/dirused-m1b0-modular-refactor.md` (phase 0, Luna, serial), `dirused-m1b-remote-targets.md` (1a, Luna: UNC + \\node), `dirused-m1b-fleet-runner.md` (1b, Flash: /file /summary /timeout /parallel). 1a and 1b share no file.
+- Next: operator approves intents (and the plan's open `\\node` = every `<letter>$` decision), then dispatch phase 0; 1a + 1b in parallel after it merges.
