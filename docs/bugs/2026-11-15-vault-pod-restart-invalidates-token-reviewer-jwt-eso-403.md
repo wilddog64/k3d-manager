@@ -6,7 +6,7 @@
 **Introduced by:** pre-existing (auth config written with a pod-bound reviewer token by `_hub_data_repoint_vault`, `scripts/plugins/hub_data.sh:847`, and `vault.sh:2106`, `:2305`)
 **Should have been caught by:** deploy step
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-15 (E4: promote f09edf77 or later to deploy/hub; E5: at the next vault-0 restart, ESO stores stay Ready with no repair)
+**Waiting on:** live check — since 2026-11-15 (E5 only: at the next vault-0 restart, ESO stores stay Ready with no repair; E4 promote done)
 **Intent approved:** operator, 2026-11-15
 **Intent approval note:** "approved"; revised E2, E4, E5 re-approved "ok" the same day
 **Spec review:** risk medium (hub Vault auth) — Argon + Fable blind, 2026-11-15: both CHANGES, same main finding (test_vault token sites); all confirmed findings applied; Argon's here-string xtrace claim refuted by test (see Fix)
@@ -205,3 +205,11 @@ next vault-0 restart) is still open. Until the code lands, `test_vault` or a DR 
 - Mutants m3, m6 killed by E2 (Claude). Independent verifier (Sonnet, Acceptance only, own probes): all offline must/must_not/evidence PASS, E4/E5 not verifiable offline, m1-m6 killed. Its one red (hub_data.bats test 53) also fails on HEAD in its scratch run and is green in `make test`: environmental (broken `cd` in that session).
 - Argon blind diff review: CHANGES. Confirmed: deleting the `_VAULT_TEST_ROOT_TOKEN` handoff left all 6 tests green, so E2 now requires the token on all 5 exec stdins (red with the handoff removed, green on the fix). Claude also fixed a dead `$4` path in `_cleanup_vault_test` (`_no_trace eval` reads `_no_trace`'s own positional args).
 - Landed `f09edf77` with `Coordinator: anthropic/claude-opus-5-5`; pushed to `origin/k3d-manager-v1.44.0`.
+
+## Promote (operator + Claude, 2026-11-15, M5 hub `k3d-k3d-cluster`)
+
+`f09edf77` refused by `make hub-promote` (its CI runs cancelled by the next push); the operator promoted the branch tip
+`0c0e3a44` (contains `f09edf77` plus docs-only commits; `lint` and `alertmanager-behaviour` green), then
+`make appsets-check` and `make platform-ops`. Claude read-only after: `deploy/hub` = `0c0e3a44`; both ESO stores Ready;
+9/9 ExternalSecrets Ready; no ArgoCD app off Synced/Healthy; vault-0 Running, 0 restarts. E5 still needs a vault-0
+restart.
