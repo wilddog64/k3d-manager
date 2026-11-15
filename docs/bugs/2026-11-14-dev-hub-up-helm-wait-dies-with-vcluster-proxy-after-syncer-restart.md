@@ -133,3 +133,18 @@ once after it: `cpu.max 50000 100000` (the 500m limit), `usage_usec 11292658`, `
 `throttled_usec 19352393`. That is 10% of active periods throttled and 19.4 s throttled over about 135 s, against 3% on
 the CRD-reuse rerun. No apiserver stall or syncer restart happened this time. This supports fix direction 2 (raise or
 drop the CPU limit) but does not prove it caused the original stall.
+
+## E5 attempt 2 (Claude, 2026-11-15 02:12-02:15Z, M5) — missed the window, still open
+
+Operator ran `make dev-hub-down && make dev-hub-up` and asked Claude to delete the syncer pod at the right moment. Claude's
+watcher deleted `dev-hub-0` at 02:14:09Z when it first saw argocd pods, but the operator's log shows argocd deployed at
+02:13:16Z and Grafana deployed after 02:13:44Z, so no Helm wait was in flight and no refresh line printed. The run ended
+healthy (new `dev-hub-0` from 02:14:09Z, argocd and Grafana Running), which proves only that a post-install restart is
+harmless. Cause: the trigger (argocd pods exist) appears at the end of a ~34 s install. Next attempt: arm the watcher
+before the run, poll every 1 s, and delete on the first `argocd-redis-secret-init-*` pod (pre-install hook, appears
+about 10 s before the other argocd pods, while Helm still waits).
+
+Throttle sample from a fresh install (3 s sampler, syncer cgroup, limit 500m): at 02:14:08Z, 85 s after pod start,
+`nr_periods 688 / nr_throttled 117 / throttled_usec 20971759`, 17% of periods and 21.0 s throttled. 117 was reached by
+02:13:55Z and stayed flat while argocd ran, so the throttling falls in vCluster boot and CRD install (boot alone: 37 of
+103 periods in the first 25 s). Replacement pod during idle settle: 50 of 258 periods, 10.4 s.
