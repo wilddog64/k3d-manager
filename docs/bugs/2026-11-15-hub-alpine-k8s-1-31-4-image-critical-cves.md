@@ -7,7 +7,8 @@
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
 **Prior art:** `make find-similar-docs` unavailable (vector store context missing on M4); exact-slug glob for `*alpine-k8s*` and `*rotator*`: none
-**Waiting on:** operator decision — since 2026-11-15
+**Waiting on:** dispatch — since 2026-11-15
+**Triage:** patch → v1.44.1 — operator 2026-11-15 ("go with your recommendation")
 
 ## Symptom
 

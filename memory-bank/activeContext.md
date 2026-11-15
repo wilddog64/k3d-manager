@@ -1,4 +1,5 @@
 ## Handoff 2026-11-14 ~19:00 PST (2026-11-15 ~03:10Z) — START HERE
+- **2026-11-15:** Grafana bug VERIFIED (operator's Agent Cost screenshot = dashboards render on 12.4.15). alpine/k8s P2 triaged patch → v1.44.1 (operator). Next: v1.44.0 release PR gates (Gemini smoke, Claude scope check, Copilot).
 - **2026-11-15 plan 1 E2 rerun PASS** at 1ce3602b on M4: serial 1781 s / parallel 759 s (< 800 s), 3376 bats + 2095 pytest + 131 unittest, 0 failures, per-file identical. Plan 1 LANDED; test-isolation bug VERIFIED.
 - **2026-11-15 hub promoted to 234bc2d1** (operator). Grafana E2 live: 12.4.15@sha256:2894082f, 0 critical (was 9); bug LANDED, waiting on the operator opening one dashboard. New P2 captured: alpine/k8s:1.31.4 on 6 hub CronJobs, 27 critical each (operator decision).
 - **Agents (2026-11-15):** agy lists gemini-4-hydrogen-{low..xhigh} (works with -p); Gemini 4 Carbon is Ultra-only. Allowlist/prices need entries before any Hydrogen dispatch.

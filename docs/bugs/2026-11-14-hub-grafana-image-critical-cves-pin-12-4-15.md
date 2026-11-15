@@ -1,8 +1,7 @@
 # Bug: hub Grafana runs 11.4.0 with 9 critical CVEs; pin 12.4.15 by digest
 
-**Status:** LANDED — cf26aabd; live E2 on the M5 2026-11-15 (deploy/hub 234bc2d1): pass except the operator's dashboard view; captured 2026-11-14 by Claude
+**Status:** VERIFIED — cf26aabd; live E2 on the M5 2026-11-15 (deploy/hub 234bc2d1): pass, dashboards render (operator's Agent Cost screenshot); captured 2026-11-14 by Claude
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-15
 **Introduced by:** pre-existing (chart default since kube-prometheus-stack 67.9.0)
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); parent `docs/bugs/2026-11-14-trivy-critical-hub-grafana-pgvector-nginx-local-path.md` (disposition 1, tag proof)
@@ -100,3 +99,6 @@ interface: none
   Listing them through the API would need admin credentials in a `kubectl exec` string, so the operator opens one dashboard
   in the browser to finish E2.
 - Trivy: `replicaset-kube-prometheus-stack-grafana-5bb77b5c89-grafana` 0 critical, 2 high (was 9 critical, 57 high on 11.4.0).
+- Dashboard render: the operator's screenshot of the Agent Cost dashboard's "By model" panel (shared in-session after the 13:05Z swap) shows
+  gemini-3.8-flash $34.5, gpt-6-luna $8.77 and gpt-6.1-terra $0.890 for 7d, matching Prometheus `k3dm_dispatch_api_cost_by_model_usd{window="7d"}`
+  queried at the same time (34.536, 8.773, 0.890). E2 complete.
