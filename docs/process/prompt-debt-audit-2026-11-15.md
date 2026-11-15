@@ -48,3 +48,12 @@ Not rituals in the slide's sense: they check against ground truth and have prece
 
 Take C1–C5 and D1–D3 as one docs-only change (each is a cut or a one-line rewrite) once decided at grooming. Run T2
 as a measured trial in v1.44.1 or v1.45.0, using `docs/process-metrics.md`. Archive memory-bank (T1) as its own small plan.
+
+## Decisions (operator "go ahead", 2026-11-15)
+
+- **Applied:** D1, D2 (cut from `CLAUDE.md` and `rules.md`), D3 (parent `../CLAUDE.md` is not under git: renamed to
+  `CLAUDE.md.disabled-2026-11-15`, rename back to restore), C1 (PR creation gate → merge gate), C3 (`LIVE-VERIFIED` added;
+  rule now states what the hook really refuses), C4 (P3 filing clause defers to capture-first), C5 (coordinator section
+  scoped to coordinator sessions).
+- **Open:** C2 (who runs the release smoke; the gate text still says Gemini), T4 (automate or drop Argon classification).
+- **Not started:** T1 (worker memory-bank read + archive), T2 (measured trial), T3 (`plan-cap` out of worker files).

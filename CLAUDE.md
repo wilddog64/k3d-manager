@@ -13,10 +13,10 @@ identical in `AGENTS.md` and `GEMINI.md`; `bin/k3dm-check-agent-docs` (run by `m
 ## Claude Session Rules
 
 - **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before anything else, unasked.
-- **PR creation gate** — no PR until CI green, Copilot comments addressed, Gemini live smoke test and Claude scope check all pass; a draft PR only as an explicit placeholder.
+- **PR merge gate** — open the release PR as a normal PR (never draft) so Copilot can review it; no merge until CI green, Copilot comments addressed, Gemini live smoke test and Claude scope check all pass.
 - **Prove external behaviour before dispatch** — a fix that depends on how an outside tool behaves carries proof from the deployed version (read-only capture, upstream source at the tag, or live probe; host, date, version) before dispatch. [more](docs/process/rules.md#prove-external-behaviour)
 - **Ideas backlog and release grooming** — a new idea is one row in `docs/ideas.md`; `/release-groom` (Sunday afternoons and each release cut) orders bugs, dispatch queue, open and next release (5 plans each) and the `docs/roadmap.md` backlog; new work enters only by displacing a not-started plan. [more](docs/process/rules.md#ideas-backlog-and-release-grooming)
-- **Dispatch WIP limit and P3 batching** — at most 3 open dispatches (running, or exited and not landed) and one per file; P0/P1 may exceed; a `--role review` child does not count; P3s are filed `**Waiting on:** dispatch` and batched by file. [more](docs/process/rules.md#dispatch-wip-limit)
+- **Dispatch WIP limit and P3 batching** — at most 3 open dispatches (running, or exited and not landed) and one per file; P0/P1 may exceed; a `--role review` child does not count; triaged P3s are batched by file. [more](docs/process/rules.md#dispatch-wip-limit)
 - **Verify before trust** — never trust an agent's commit SHA, BATS result or "done" report without checking via `gh api`, `gh run view` or `git log`.
 <!-- shared:begin plan-cap -->
 - **Versioning and release scope; bugs before features; capture first, triage later** — `X.0.0` breaking; `X.Y.0` at most 5 plans (a 6th goes to the next minor, never a patch); `X.Y.N` bug-fix only, from `docs/bugs/`. P0 fixed at once, P1 blocks the open release PR; any other bug is captured as a short `docs/bugs/` doc (`**Waiting on:** operator decision`), classified by Argon (`gemini-4-argon-medium`) from the doc alone, and triaged at 20 captured, 7 days old, or each post-merge `/release-groom` (Claude says "triage due" at session start). [more](docs/process/rules.md#versioning-and-release-scope)
@@ -25,9 +25,7 @@ identical in `AGENTS.md` and `GEMINI.md`; `bin/k3dm-check-agent-docs` (run by `m
 - **The hub reads `deploy/hub`; promote to reach it** — release-branch config is inert on the hub until `make hub-promote REF=<commit-ish>`, `make appsets-check`, `make platform-ops` (operator's tmux); confirm `make hub-promote-status` before asking for a live check, and ask for a promote if needed. Rollback: `make hub-rollback`. [more](docs/process/rules.md#hub-reads-deploy-hub)
 
 ## Environment Constraints
-- **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).
 - **Context Management:** 200K window, auto-compaction at about 167K. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point. [more](docs/process/rules.md#environment-constraints)
-- **Output Compression:** RTK (Rust Token Killer) is active for all CLI output.
 
 ## Layout
 ```
@@ -59,7 +57,7 @@ Bug priority is urgency, separate from Severity: P0 outage/data loss/security no
 <!-- shared:end bug-priority -->
 
 - **Waiting on line** — an open bug's header carries `**Waiting on:** <word>` (optionally `— since YYYY-MM-DD`), one of `dispatch`, `fix running`, `live check`, `scheduled run`, `investigation`, `operator decision`; update it as the bug moves, omit rather than guess. [more](docs/process/rules.md#waiting-on-line)
-- **Status first word (operator, 2026-11-06)** — `OPEN`, `LANDED`, or `VERIFIED`; enforced by `.githooks/pre-commit` (`scripts/check-bug-status.py`).
+- **Status first word (operator, 2026-11-06)** — `OPEN`, `LANDED`, `VERIFIED` or `LIVE-VERIFIED`; `.githooks/pre-commit` (`scripts/check-bug-status.py`) refuses an `OPEN` Status that says the fix landed.
 - **Acceptance block** — a dispatched spec carries `## Acceptance` YAML (`must`, `must_not`, `evidence` with `proves` and offline/live, `interface`); every `must_not` red on pre-fix code; an independent verifier tests from Acceptance only; live evidence by operator or Claude, never Gemini. [more](docs/process/rules.md#acceptance-block)
 <!-- shared:begin intent-approval -->
 Every evidence item carries an operator-facing `intent`, and the spec carries `**Intent approved:**` before dispatch.

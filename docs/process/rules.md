@@ -15,9 +15,9 @@ moved and are not copied here.
 - **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before doing anything else. Do not wait for the user to ask.
 
 <a id="pr-creation-gate"></a>
-### PR creation gate
+### PR merge gate
 
-- **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
+- **PR merge gate** — open the release PR as a normal PR, never a draft (a draft blocks the Copilot review request), then do NOT merge until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Was a PR *creation* gate until 2026-11-15; it contradicted Copilot, which only reviews an open PR (prompt-debt audit C1).
 
 <a id="prove-external-behaviour"></a>
 ### Prove external behaviour before dispatch
@@ -50,8 +50,8 @@ moved and are not copied here.
   (running, or exited and not yet landed), and at most one open dispatch per file. A spec touching a file
   that an open dispatch edits waits, or is folded into the next dispatch for that file. P0 and P1 may exceed
   the limit. A review child (`start --parent P --role review`, which changes no files) does not count toward
-  the limit (operator, 2026-11-08). A P3 is filed with `**Waiting on:** dispatch` and dispatched in a batch with other P3s on
-  the same files once there is room. Precedent: four concurrent dispatches on `bin/k3dm-dispatch-metrics`
+  the limit (operator, 2026-11-08). A P3 is captured like any bug (`**Waiting on:** operator decision`, see capture-first); once triaged
+  it is dispatched in a batch with other P3s on the same files when there is room. Precedent: four concurrent dispatches on `bin/k3dm-dispatch-metrics`
   on 2026-11-07.
 
 <a id="verify-before-trust"></a>
@@ -97,11 +97,9 @@ Hub promote enforcement (moved from `CLAUDE.md` 2026-11-14; the rule is operator
 ## Environment Constraints
 
 <a id="environment-constraints"></a>
-### Thinking budget, context management, output compression
+### Context management
 
-- **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).
 - **Context Management:** Sessions run in a 200K context window, and auto-compaction runs at about 167K. The 2026-10-22 trial of `autoCompactWindow: 400000` never applied, because the setting cannot exceed the window; it was set back to 200000 on 2026-11-01. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
-- **Output Compression:** RTK (Rust Token Killer) is active for all CLI output.
 
 ## Docs Conventions
 
@@ -143,7 +141,7 @@ whenever the bug moves, and only write what you can support: leave it out rather
 <a id="status-first-word"></a>
 ### Status first word
 
-**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified; anything still open starts `OPEN`. The pre-commit hook refuses other forms when a Status changes.
+**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified, and `LIVE-VERIFIED` once live evidence is recorded; anything still open starts `OPEN`. The pre-commit hook refuses an `OPEN` Status that says the fix landed.
 
 <a id="acceptance-block"></a>
 ### Acceptance block

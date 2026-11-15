@@ -16,8 +16,9 @@ Every evidence item carries an operator-facing `intent`, and the spec carries `*
 A session acting as the primary coordinator exports `K3DM_COORDINATOR=vendor/model` (for
 example, `openai/gpt-6.1-sol` or `openai/gpt-6.1-terra`) before dispatching or resuming work.
 An explicit `--coordinator VENDOR/MODEL` takes precedence over the environment variable.
-End each commit with a `Coordinator: <vendor/model>` trailer. Claude sessions keep their
-existing `Co-Authored-By` trailer as well.
+This section applies to coordinator sessions only; a dispatched worker never commits (see above).
+A coordinator ends each commit it lands with a `Coordinator: <vendor/model>` trailer. Claude
+sessions keep their existing `Co-Authored-By` trailer as well.
 
 ## Test rules
 
