@@ -22,7 +22,9 @@ specs share no file.
 After phase 0, `ArgParser` parses `/file`, `/summary`, `/timeout` and `/parallel` into `Options` and rejects them in one guard,
 `RejectUnavailable`; `ScanRunner.Run(targets, scan, RunOptions, ct)` runs sequentially and takes the scan as a delegate, so tests
 can pass a fake scan. Phase 1a makes UNC and `\\node` targets resolve; this phase does not depend on it (tests use local paths).
-Build and test gate: the `windows-latest` CI job `windows`; there is no local SDK.
+Build and test gate: the `windows-latest` CI job `windows`, plus the `portable` job. ArgParser, ScanRunner and the renderers
+live in the portable `Dirused.Common` project after phase 0, so most of this phase builds and tests on macOS
+(`dotnet test tests/Dirused.Tests.Portable`) before pushing.
 
 ## Proof of external behaviour
 
@@ -49,13 +51,13 @@ None needed beyond phase 0's: this phase uses only .NET (`Task`, `SemaphoreSlim`
 
 ## Files
 
-- `src/Dirused.Cli/ArgParser.cs`, `src/Dirused.Cli/Options.cs`, `src/Dirused.Cli/Program.cs` (Ctrl+C wiring only)
-- `src/Dirused.Core/ScanRunner.cs`, `src/Dirused.Core/Scanner.cs` (cancellation checks only)
-- `src/Dirused.Cli/Renderers/SummaryRenderer.cs` (new), plus the summary branch in the JSON and CSV renderers
-- `tests/Dirused.Tests/FleetRunnerTests.cs`
+- `src/Dirused.Common/ArgParser.cs`, `src/Dirused.Common/Options.cs`, `src/Dirused.Cli/Program.cs` (Ctrl+C wiring only)
+- `src/Dirused.Common/ScanRunner.cs`, `src/Dirused.Core/Scanner.cs` (cancellation checks only)
+- `src/Dirused.Common/Renderers/SummaryRenderer.cs` (new), plus the summary branch in the JSON and CSV renderers
+- `tests/Dirused.Tests.Portable/FleetRunnerTests.cs` (E1 file parsing, E3, E4: fake scans), `tests/Dirused.Tests/SummaryTests.cs` (E2: real volumes and ACLs)
 - `README.md` (usage section; phase 1a edits a different paragraph — rebase if both touch it)
 
-Not touched (phase 1a owns them): `Targets/TargetResolver.cs`, `Targets/NodeShares.cs`, `Native/`.
+Not touched (phase 1a owns them): `Targets/TargetParser.cs`, `Targets/TargetResolver.cs`, `Targets/NodeShares.cs`, `Native/`.
 
 ## Out of scope
 

@@ -22,7 +22,8 @@ the M1 spec". This spec implements it; approving its intents approves that behav
 
 After phase 0, `TargetResolver` classifies UNC and node targets and rejects them; `VolumeProbe` already works on UNC roots;
 `Scanner` already builds `\\?\UNC\` paths. This phase turns the rejection into real targets. Build and test gate: the
-`windows-latest` CI job `windows`; there is no local SDK.
+`windows-latest` CI job `windows` (UNC and `NetShareEnum` run only on Windows); `dotnet build` works on the macOS host as a
+compile check.
 
 ## Proof of external behaviour
 
@@ -63,12 +64,14 @@ Not proven here (needs ACG, plan "CLI gate"): a second real machine, a non-admin
 
 ## Files
 
-- `src/Dirused.Core/Targets/TargetResolver.cs` (UNC branch only), `src/Dirused.Core/Targets/NodeShares.cs`
+- `src/Dirused.Core/Targets/TargetResolver.cs` (UNC branch only), `src/Dirused.Core/Targets/NodeShares.cs`,
+  `src/Dirused.Common/Targets/TargetParser.cs` (only if UNC classification needs it)
 - `src/Dirused.Core/Native/NetApi32.cs`
 - `tests/Dirused.Tests/RemoteTargetTests.cs`
 - `README.md` (usage section)
 
-Not touched (phase 1b owns them): `ArgParser.cs`, `Options.cs`, `ScanRunner.cs`, `Scanner.cs`, `Renderers/`.
+Not touched (phase 1b owns them): `ArgParser.cs`, `Options.cs`, `ScanRunner.cs`, `Scanner.cs`, `Renderers/`. If UNC
+classification in `src/Dirused.Common/Targets/TargetParser.cs` needs a change, it is this phase's file (1b does not touch it).
 
 ## Out of scope
 
