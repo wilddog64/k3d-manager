@@ -7,7 +7,8 @@ specs share no file.
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
 **Open decision (operator):** the plan marks a bare `\\node` scanning every `<letter>$` admin share as "proposed, decide before
 the M1 spec". This spec implements it; approving its intents approves that behaviour.
-**Intent approved:** operator, 2026-11-15 ("approved"; includes `\\node` = every `<letter>$` share and Luna for phase 0)
+**Intent approved:** operator, 2026-11-15
+**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0.
 **Implementer:** Luna (Codex). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1a-remote-targets` from `main` after phase 0 merges.
 

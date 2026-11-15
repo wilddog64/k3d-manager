@@ -5,7 +5,8 @@
 specs share no file.
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness: multiple targets, slow links)
 **Approval:** operator, 2026-11-15 ("be sure to modulus and we can try to distribute tasks between flash and luna")
-**Intent approved:** operator, 2026-11-15 ("approved"; includes `\\node` = every `<letter>$` share and Luna for phase 0)
+**Intent approved:** operator, 2026-11-15
+**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0.
 **Implementer:** Flash (agy `gemini-3.8-flash-medium`). **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b1b-fleet-runner` from `main` after phase 0 merges.
 

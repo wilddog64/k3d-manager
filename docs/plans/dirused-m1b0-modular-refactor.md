@@ -6,7 +6,8 @@
 **Plan:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` (Command line, Scan correctness, Multiple drives)
 **Approval:** operator, 2026-11-15 ("next step is to start code implemenation. be sure to modulus and we can try to distribute
 tasks between flash and luna")
-**Intent approved:** operator, 2026-11-15 ("approved"; includes `\\node` = every `<letter>$` share and Luna for phase 0)
+**Intent approved:** operator, 2026-11-15
+**Approval note:** operator "approved" (2026-11-15) covers the intents below, `\\node` = every `<letter>$` admin share, and Luna for phase 0.
 **Implementer:** Luna (Codex), who wrote M1a. **Verifier:** Claude, from the Acceptance block only.
 **Repo / base:** wilddog64/dirused, branch `m1b0-modular-refactor` from `main` (74412c9).
 
