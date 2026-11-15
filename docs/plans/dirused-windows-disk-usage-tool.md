@@ -44,10 +44,12 @@ software, with an operator who can judge the result by eye.
 | # | You will see | It failed if |
 |---|---|---|
 | M1 | From one node, `/file /summary` shows every target's used and free space, matching each machine's Explorer; a full scan lists the largest files first | A folder or node it could not read leaves a low total or a missing row with no warning |
-| M2 | Each UNC path opened has its own tab; clicking a row previews the file, and the pie matches that tab's volume | A tab shows another UNC's files, or previewing runs the file or downloads a cloud placeholder |
-| M3 | A saved plan lists files per node; confirming it deletes exactly those and logs them | Anything is deleted that the plan did not list |
-| M4 | A target crossing the threshold writes one Event Log alert naming the node | A volume is over the threshold, or a node is unreachable, and no alert appears |
-| M5 | Usage falls back under the threshold, with deletes only inside `/purge-root` | A file outside the root, or newer than `/min-age`, is gone |
+| M2 | A saved plan lists files per node; confirming it from the command line deletes exactly those and logs them | Anything is deleted that the plan did not list |
+| M3 | A target crossing the threshold writes one Event Log alert naming the node | A volume is over the threshold, or a node is unreachable, and no alert appears |
+| CLI gate | Every M1–M3 item that needs real nodes passes on ACG: UNC to other machines, unreachable nodes, fleet purge, `C:` and `D:` | Any of those is reported as working from Vagrant or `\\localhost` evidence alone |
+| M4 | Each UNC path opened has its own tab; clicking a row previews the file, and the pie matches that tab's volume | A tab shows another UNC's files, or previewing runs the file or downloads a cloud placeholder |
+| M5 | Deleting from the GUI produces the same saved plan and audit lines as the command line for the same selection | The GUI deletes anything the equivalent CLI plan would not, or skips the audit log |
+| M6 | Usage falls back under the threshold, with deletes only inside `/purge-root` | A file outside the root, or newer than `/min-age`, is gone |
 
 **The draft as the operator wrote it, frozen on 2026-11-06.** Later interpretation is measured against this. It keeps the original name `diruse` and does not mention tabs; both later decisions are under "Changes from the draft".
 
@@ -80,7 +82,7 @@ command line part:
 | Stage | Where | Proves |
 |---|---|---|
 | Offline gate | `windows-latest` CI runner, private repo | Builds, unit and black-box tests |
-| Daily development | Vagrant + Windows 11 ARM VM, on the M4 | GUI by eye, local paths, `\\localhost\c$` |
+| Daily development | Vagrant + Windows 11 ARM VM, on the M4, with a second disk as `D:` | GUI by eye, local paths on `C:` and `D:`, `\\localhost\c$` and `\\localhost\d$` |
 | Multi-node | Windows Server x64 on an ACG AWS sandbox: one central node, two or more targets | UNC, admin shares, unreachable nodes, fleet purge, real x64 |
 
 - **Vagrant on the M4 (operator, 2026-11-06: "go ahead to use M4").** The M4 has 24 GiB and 161 GB free disk, and it is where agents run; v1.57.0 dedicates the M2 to its own run. The M5 is the hub, so nothing runs there, and the operator is uninstalling its copies. The VM stays halted when not in use.
@@ -130,6 +132,8 @@ Every switch accepts `/name` and `--name`. The draft's `—` is read as an autoc
 | `dirused .` | Measure the current directory |
 | `dirused D:\path` | Measure a local path; `D:\` measures the drive |
 | `dirused \\node\d$\path` | Measure a UNC path |
+| `dirused \\node` | Every fixed drive on the node (`C$`, `D$`, …, found by listing its admin disk shares); one volume line per drive. Proposed 2026-11-15, see Multiple drives |
+| `dirused /all` | Every fixed local drive |
 | `dirused /file targets.txt` | Measure each target listed, one per line; blank lines and `#` comments are ignored |
 | `/file targets.txt /summary` | Used, free and percent per volume, largest first, with no tree walk; takes seconds across a fleet |
 | `/top N` | Rows to show; default 50 |
@@ -227,15 +231,23 @@ It needs its own operator go after the earlier milestones have seen real use. It
 
 ## Milestones
 
-Reads ship before deletes, and manual deletes before automatic ones. Versions belong to the new repo.
+Reads ship before deletes, and manual deletes before automatic ones. **The command line is finished and verified before
+any GUI work starts** (operator, 2026-11-15: "complete cli first. after we verify everything work then we move into gui
+development. mixing them together is not a good idea"). The GUI then calls the same scan and purge engine; it adds no
+logic of its own. Versions belong to the new repo.
 
 | # | Scope | Deletes? |
 |---|---|---|
-| M1 | ACG Windows probe, VirtualBox box check, private repo, `windows-latest` CI gate, Vagrant VM, ACG fleet script; scanner and read-only CLI: paths, UNC, `/file`, `/summary`, `/top`, `/timeout`, `/parallel`, `/json`, `/csv`, exit codes | No |
-| M2 | Read-only GUI: node list, one tab per UNC path, table, pie chart, preview pane | No |
-| M3 | Manual deletes: saved plans, `/purge`, `/purge-plan`, `/purge-list`, GUI delete and editor actions, audit log, safety rules | Yes, confirmed |
-| M4 | `/threshold`, `/monitor` across targets, alerts to the console and the central node's Windows Event Log | No |
-| M5 | `/autopurge`, after a separate go | Yes, unattended |
+| M1 | Private repo, `windows-latest` CI gate, VirtualBox box check, Vagrant VM with `D:`; scanner and read-only CLI: paths, UNC, `\\node` and `/all`, `/file`, `/summary`, `/top`, `/timeout`, `/parallel`, `/json`, `/csv`, exit codes | No |
+| M2 | CLI manual deletes: saved plans, `/purge`, `/purge-plan`, `/purge-list`, audit log, safety rules | Yes, confirmed |
+| M3 | `/threshold`, `/monitor` across targets, alerts to the console and the central node's Windows Event Log | No |
+| CLI gate | ACG Windows probe and fleet script (after the k3d-manager credentials-only ACG entry point, `docs/ideas.md` 2026-11-15); every real-node item of M1–M3 run on ACG. No GUI work before it passes | Yes, on throwaway nodes |
+| M4 | Read-only GUI: node list, one tab per UNC path, table, pie chart, preview pane | No |
+| M5 | GUI delete and editor actions, through the M2 engine and its saved plans | Yes, confirmed |
+| M6 | `/autopurge`, after a separate go | Yes, unattended |
+
+Before the CLI gate, M1–M3 are verified on the CI runner and the Vagrant VM; their real-node acceptance items are
+tagged ACG and stay open until the gate.
 
 ## Changes from the draft
 
@@ -263,6 +275,24 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 - Remote agents or WinRM. All remote access is plain SMB, so nothing is installed on targets.
   Reconsider only if M1 shows full scans are too slow, since `/summary` and `/monitor` need no tree walk.
 - Public release, winget and public packaging (operator, 2026-11-06).
+
+## Multiple drives (operator, 2026-11-15)
+
+Operator: "ideally if we can create a d: drive that's better as most companies will put apps on d: instead of c: but need
+to be able to scan both or multiple drives if there are".
+
+- **Test machines carry `D:`.** The Vagrant VM gets a second VirtualBox disk, brought online and formatted NTFS as `D:`
+  by the provisioner. Each ACG node gets a second EBS volume as `D:` (inside ACG's 100 GB volume limit). Fixtures, such as
+  junctions, hard links and large files, go on both drives, and app-like data on `D:`.
+- **A bare node target scans every fixed drive** (proposed, decide before the M1 spec). `\\node` lists the node's
+  administrative disk shares (`NetShareEnum`, special disk shares named `<letter>$`) and measures each. Locally, `/all`
+  uses the fixed drives. Results, `/summary` and `/threshold` stay per volume, so a full `C:` is never hidden by an empty
+  `D:`. A drive that can't be read is reported, not skipped silently (exit code 3, as for unreadable folders).
+- **Not included:** removable, network-mapped and CD drives, and volumes mounted into a folder with no letter (listed as
+  a known gap until someone needs them).
+- **Hard links stay per volume** (already the rule), which matters once two drives are scanned in one run.
+- **Purge across drives** on one node is still one node, so the existing safety rules apply unchanged; the saved plan
+  lists each file's full path including the drive.
 
 ## Decided (operator, 2026-11-06)
 
