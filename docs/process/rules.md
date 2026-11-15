@@ -117,6 +117,19 @@ new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directl
 `**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**`
 one of `spec`, `offline test`, `review`, `deploy step`, `live check` or `none`: the first safety net that
 should have stopped it. Write `unknown` rather than guess. Each retro counts them by release and by net.
+**Review escape trial (operator, 2026-11-15).** Every bug filed from 2026-11-15 also carries
+`**Introducing change reviewed:** yes (Argon|Fable|both) | no | unknown`: whether the change that introduced
+the bug had an agent review before it landed (check `docs/process-metrics.md` and
+`docs/reviews/reviewer-trial-fable-vs-argon.md` before writing `unknown`). Each release-cut retro compares the
+escape rate of reviewed and unreviewed changes; the verdict on whether agent review improves release quality is
+taken at the v1.46.0 cut, after two releases of data.
+
+**Review tiering (operator, 2026-11-15).** Spec review of a medium- or high-risk change (Makefile, hub,
+dispatch tooling, a shared contract) goes to Argon and Fable in parallel, each blind to the other; Claude
+verifies every finding against the code, drops refuted ones and sends one merged list. A low-risk spec (docs,
+a value pin, a single-file fix) goes to Argon only. Diff review after the verifier passes goes to Argon; Fable
+only for a high-risk land call. On a spec Claude wrote, Claude rejects a reviewer finding only when the code
+shows it is wrong. Each dual review is logged as a trial pair in `docs/reviews/reviewer-trial-fable-vs-argon.md`.
 
 <a id="waiting-on-line"></a>
 ### Waiting on line

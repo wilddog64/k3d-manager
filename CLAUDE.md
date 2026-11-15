@@ -55,7 +55,7 @@ New plugins go in `scripts/plugins/`: public `mytool_do_something`, private `_my
 ## Docs Conventions
 
 <!-- shared:begin bug-priority -->
-Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every new `docs/bugs/` file carries, directly under Status, `**Priority:**`, `**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**` (`spec`, `offline test`, `review`, `deploy step`, `live check` or `none`; `unknown` rather than a guess). [more](docs/process/rules.md#bug-priority-and-escape-origin)
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every new `docs/bugs/` file carries, directly under Status, `**Priority:**`, `**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**` (`spec`, `offline test`, `review`, `deploy step`, `live check` or `none`; `unknown` rather than a guess), plus `**Introducing change reviewed:**` (`yes (Argon|Fable|both)`, `no`, `unknown`). [more](docs/process/rules.md#bug-priority-and-escape-origin)
 <!-- shared:end bug-priority -->
 
 - **Waiting on line** — an open bug's header carries `**Waiting on:** <word>` (optionally `— since YYYY-MM-DD`), one of `dispatch`, `fix running`, `live check`, `scheduled run`, `investigation`, `operator decision`; update it as the bug moves, omit rather than guess. [more](docs/process/rules.md#waiting-on-line)

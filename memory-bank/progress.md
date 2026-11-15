@@ -722,3 +722,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 
 - 2026-11-15: Fable vs Argon reviewer trial pair 1 scored (docs/reviews/reviewer-trial-fable-vs-argon.md, 2eb6d45b). 1 of ~6 pairs.
 - 2026-11-14 ~18:30 PST: grafana-12-4-15-pin LANDED cf26aabd, offline_tested marked, pushed; live E2 waits on promote. Part B correction 8 exited; verification running (test-bin rerun + Opus verifier).
+- 2026-11-15: Part B parallel test-all LANDED b0bde34e (offline_tested); dev-hub proxy-retry VERIFIED live (E5 attempt 3); P3 Helm full-timeout wait filed; review tiering + review escape trial (field `Introducing change reviewed`, verdict v1.46.0) added to rules.

@@ -53,7 +53,7 @@ Use the existing Bash and Python styles. Route privileged and external commands 
 <!-- shared:end plan-cap -->
 
 <!-- shared:begin bug-priority -->
-Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every new `docs/bugs/` file carries, directly under Status, `**Priority:**`, `**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**` (`spec`, `offline test`, `review`, `deploy step`, `live check` or `none`; `unknown` rather than a guess). [more](docs/process/rules.md#bug-priority-and-escape-origin)
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every new `docs/bugs/` file carries, directly under Status, `**Priority:**`, `**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**` (`spec`, `offline test`, `review`, `deploy step`, `live check` or `none`; `unknown` rather than a guess), plus `**Introducing change reviewed:**` (`yes (Argon|Fable|both)`, `no`, `unknown`). [more](docs/process/rules.md#bug-priority-and-escape-origin)
 <!-- shared:end bug-priority -->
 
 <!-- shared:begin security -->
