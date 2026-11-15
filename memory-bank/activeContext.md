@@ -1,3 +1,17 @@
+## Handoff 2026-11-14 ~16:40 PST (real clock) — START HERE
+- appsets-check after promote 160f0539 (tag hub-promote/20261115T002512Z) failed on M5 with "Could not read Applications"; operator shell kubectl fine; Claude reran over SSH 16:3x PST: rc 0, 22 refs on deploy/hub. Transient (stderr is suppressed at argocd.sh:2061, cause unknown). Operator: rerun `make appsets-check && make platform-ops`, then stall-D/proxy-retry E5.
+- Part B run 7 froze 22 min: test-bin under the setpgrp bound sat in state T (SIGTTIN, background pgroup on ttys005; stopped perl cannot fire alarm). Claude killed pgid 18115 (operator go, 2026-11-14, this run only: troubleshoot + land without asking). Correction 8 prompt = scratchpad part-b-correction-8.md (setsid + </dev/null, tty test, red proof, rerun test-bin) — resume when agy exits.
+- Watcher: copy DB+WAL to scratchpad and count steps (mode=ro fails; immutable=1 ignores the WAL and reads stale); also exit on any T-state process.
+- P2 dev test-all overwrites nightly metrics: operator asked what to decide; options given (recommend publish only when K3DM_PUSHGATEWAY_URL explicitly set; v1.44.1). Waiting.
+- Handoff ordering bug: previous handoff was appended at the bottom so the /clear hook injected a stale one; moved below.
+
+## Handoff 2026-11-14 ~17:30 PST (before /clear)
+- CI green on 160f0539 → operator to run `make hub-promote REF=160f0539 && make appsets-check && make platform-ops`; then E5 live checks for stall-D (docs/bugs/2026-11-14-dispatch-stall-d-dashboard.md) and proxy-retry.
+- Grafana 12.4.15 pin dispatched to Luna: slug grafana-12-4-15-pin (spec docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md). Watch exit, verify E1/E2, land with lint-python in the land test.
+- Part B correction 7 (resume 8) running (Flash): verify R1 red proof verbatim + R2 test-bin, then Opus verifier + Fable review, land; then Part A to Flash. After land, operator deletes the m4-air repo-sync group on M5 (stray doc Recurrence).
+- Alerts: operator to run `make install-test-metrics` on M5 (PyYAML); new P2 dev test-all overwrites nightly metrics, awaiting operator decision.
+- M4 disk 72%: ~94 GB is 232 leftover /private/tmp/bats-run-* dirs (interrupted bats runs; machine_setup_acceptance copies the repo per test, ~2.6 GB/run). Cleanup offered to operator (older than 1 day only); capture a P3 for the leak.
+
 ## Handoff — 2026-11-14 15:50Z (real clock; earlier labels today ran 1-3 h fast): stall work split and specced; Part B correction 4 running — START HERE
 
 - **2026-11-14 ~19:45Z plan 5 hub-deploy LIVE-VERIFIED:** operator ran `make hub-deploy REF=849ddfcf`; deploy/hub 6ba89b3 → 849ddfcf, reapply skipped, appsets-check/platform-ops ok, exporter rolled out; ladder fully done (`31a03e26`). v1.44.0 now: plans 2-5 live-verified, plan 1 Part B correction 6 running. Hub's local release-branch checkout is 25 behind origin (harmless: promote reads origin).
@@ -753,10 +767,3 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-14 ~21:00Z: `dev-hub-proxy-retry` (Luna) dispatched for docs/bugs/2026-11-14-dev-hub-up-helm-wait-dies-with-vcluster-proxy-after-syncer-restart.md; WIP 3/3 (Part B, D, proxy-retry). Queue unchanged: next free slot → A (Flash, after Part B frees Makefile) / Trivy investigation (Luna).
 
 - 2026-11-14 22:15Z: dispatch-stall-d-dashboard LANDED 09d12e68; live E5 (Stall recovery row on hub Grafana) after `make hub-promote`. Grafana Trivy target awaiting operator (12.4.15 recommended). Part B running after hung probe killed.
-
-## Handoff 2026-11-14 ~17:30 PST (before /clear)
-- CI green on 160f0539 → operator to run `make hub-promote REF=160f0539 && make appsets-check && make platform-ops`; then E5 live checks for stall-D (docs/bugs/2026-11-14-dispatch-stall-d-dashboard.md) and proxy-retry.
-- Grafana 12.4.15 pin dispatched to Luna: slug grafana-12-4-15-pin (spec docs/bugs/2026-11-14-hub-grafana-image-critical-cves-pin-12-4-15.md). Watch exit, verify E1/E2, land with lint-python in the land test.
-- Part B correction 7 (resume 8) running (Flash): verify R1 red proof verbatim + R2 test-bin, then Opus verifier + Fable review, land; then Part A to Flash. After land, operator deletes the m4-air repo-sync group on M5 (stray doc Recurrence).
-- Alerts: operator to run `make install-test-metrics` on M5 (PyYAML); new P2 dev test-all overwrites nightly metrics, awaiting operator decision.
-- M4 disk 72%: ~94 GB is 232 leftover /private/tmp/bats-run-* dirs (interrupted bats runs; machine_setup_acceptance copies the repo per test, ~2.6 GB/run). Cleanup offered to operator (older than 1 day only); capture a P3 for the leak.
