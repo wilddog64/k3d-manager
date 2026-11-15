@@ -1,4 +1,5 @@
 ## Handoff 2026-11-14 ~19:00 PST (2026-11-15 ~03:10Z) — START HERE
+- **2026-11-15:** hub-promote containment (Sol run 2): diff copied to M4 scratch worktree (files byte-identical to M2); targeted suites 86/86 post-fix, 7 new tests red pre-fix (E1,E2,E4,E9x2,E10x2). Full make test + pytest running; Acceptance-only verifier (Opus) running. Then Argon review, Fable land call (high-risk: Makefile + hub). Worker could not commit (read-only .git) -> coordinator trailer goes on the landing commit (audit C5).
 - **2026-11-15:** prompt-debt audit written: docs/process/prompt-debt-audit-2026-11-15.md (3 dead configs, 5 contradictions, 5 cost items); all need operator decision at grooming.
 - **2026-11-15:** Claude's Vault restart left the hub sealed about 12 min (the watchdog Secret's shard was rejected); operator re-unsealed from the Keychain. New bug 2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed (P2 proposed, investigation). argocd-oidc-secret SyncedError from the outage; recheck after 15:49Z.
 - **2026-11-15:** promtool bash-3.2 bug LIVE-VERIFIED on the M2 (/bin/bash 3.2.57, promtool absent → installed). Sol resume 2 running on M2.
