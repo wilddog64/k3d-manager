@@ -1,11 +1,11 @@
 # dirused `/parallel N` is capped by the .NET thread pool, not by N
 
-**Status:** VERIFIED — fix on PR branch, CI green; 4c1d83f (PR #3), red/green at DOTNET_PROCESSOR_COUNT=2, CI green 2026-11-16; awaiting merge
+**Status:** VERIFIED — 4c1d83f, rebased onto main 245bedd as 33119f9 (+34102df merge fix), local only; portable 18/18 at DOTNET_PROCESSOR_COUNT=2; PR #3 still at 4c1d83f
 **Priority:** P1 — blocks the open dirused PR #3 (M1b phase 1b); no workaround inside dirused
 **Introduced by:** wilddog64/dirused 97a47fc (M1b phase 1b, not yet merged)
 **Should have been caught by:** offline test (E4 caught it on a 2-vCPU runner; the 12-core Mac hid it)
 **Introducing change reviewed:** yes (Claude verification; passed on the Mac only)
-**Waiting on:** operator decision — since 2026-11-16 (merge)
+**Waiting on:** operator decision — since 2026-11-16 (force-push of rebased PR #3 blocked by auto-mode; operator push, then merge)
 **Prior art:** none. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
 **Filed:** 2026-11-15
 **Parent spec:** `docs/plans/dirused-m1b-fleet-runner.md` (E4: `/parallel` caps concurrency)

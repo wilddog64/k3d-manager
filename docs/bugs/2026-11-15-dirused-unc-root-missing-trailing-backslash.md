@@ -1,11 +1,12 @@
 # dirused UNC scans fail: volume root passed to `GetVolumeInformation` without a trailing backslash
 
-**Status:** VERIFIED — fix on PR branch, CI green; a9b4d78 (PR #4), CI green 2026-11-16; awaiting merge
+**Status:** LIVE-VERIFIED — a9b4d78 merged in 245bedd (PR #4, 2026-11-15); live 2026-11-16 on dirused-dev VM: `dirused \\localhost` C$ and D$ volume totals equal Get-Volume exactly
 **Priority:** P1 — every UNC and `\\node` scan fails; blocks the open dirused PR #4 (M1b phase 1a)
 **Introduced by:** pre-existing in `Scanner.Scan` (phase 0); first reachable in wilddog64/dirused ab27363 (M1b phase 1a, not yet merged)
 **Should have been caught by:** offline test (E1 caught it on windows-latest)
 **Introducing change reviewed:** yes (Claude verification; Windows tests cannot run on the Mac)
-**Waiting on:** operator decision — since 2026-11-16 (merge)
+**Fix commit:** a9b4d78 (wilddog64/dirused; merged in 245bedd)
+**Live evidence:** 2026-11-16 · run claude-vagrant-winrm-dirused-localhost · env dirused-dev-vm · scenario unc-admin-shares-match-get-volume · commit 245bedd · proves E1
 **Prior art:** none. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
 **Filed:** 2026-11-15
 **Parent spec:** `docs/plans/dirused-m1b-remote-targets.md` (E1)

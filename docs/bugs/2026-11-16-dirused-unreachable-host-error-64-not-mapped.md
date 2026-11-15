@@ -1,11 +1,11 @@
 # dirused: an unreachable host can fail with error 64, shown as ERROR instead of UNREACHABLE
 
-**Status:** OPEN — seen once on wilddog64/dirused#4 CI (run 43773975699, `windows`, 2026-11-16); the same commit passed in run 43773969722
+**Status:** VERIFIED — fix 91d89ae on wilddog64/dirused#5, CI green 2026-11-16; red at tests-only ebce3e1 (run 43775009024, codes 51 and 64 only); awaiting merge
 **Priority:** P3 — wrong label only; the target is still incomplete and the run exits 3
 **Introduced by:** pre-existing (test from phase 0 d86655b; mapping from M1b phase 1a ab27363)
 **Should have been caught by:** none (depends on how the runner's name resolution fails)
 **Introducing change reviewed:** yes (Claude)
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** operator decision — since 2026-11-16 (merge PR #5)
 **Prior art:** none. Exact slug: no match; `make find-similar-docs` not run (vector store context missing earlier this session).
 **Filed:** 2026-11-16
 **Triage:** operator approved 2026-11-16 ("approve P3 and you can dispatch to Luna")
