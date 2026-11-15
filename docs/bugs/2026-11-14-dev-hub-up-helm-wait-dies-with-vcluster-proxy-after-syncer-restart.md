@@ -1,8 +1,7 @@
 # Bug: dev-hub-up fails when the syncer restarts mid-install: the vCluster background proxy dies and Helm loses the cluster
 
-**Status:** LANDED — 9676d0af on k3d-manager-v1.44.0, 2026-11-14 (captured 2026-11-14 by Claude)
+**Status:** VERIFIED — 9676d0af on k3d-manager-v1.44.0, E5 live 2026-11-15 02:17-02:28Z on the M5 (captured 2026-11-14 by Claude)
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-14 (E5 after hub-promote)
 **Intent approved:** operator, 2026-11-14
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
@@ -148,3 +147,19 @@ Throttle sample from a fresh install (3 s sampler, syncer cgroup, limit 500m): a
 `nr_periods 688 / nr_throttled 117 / throttled_usec 20971759`, 17% of periods and 21.0 s throttled. 117 was reached by
 02:13:55Z and stayed flat while argocd ran, so the throttling falls in vCluster boot and CRD install (boot alone: 37 of
 103 periods in the first 25 s). Replacement pod during idle settle: 50 of 258 periods, 10.4 s.
+
+## E5 attempt 3 (2026-11-15, M5) — PASS
+
+Operator ran `make dev-hub-down && make dev-hub-up`; Claude, with the operator's go, deleted `dev-hub-0` at 02:17:17Z the
+second the argocd pre-install hook pod (`argocd-redis-secret-init-8chsz`) was created, so the argocd Helm install was in
+flight. Operator's log: `context deadline exceeded: kubernetes cluster unreachable: ... 127.0.0.1:11444: connect:
+connection refused`, `helm command failed (1)`, then `dev-hub: refreshing vCluster connection after Helm lost cluster
+for release argocd`, `release "argocd" uninstalled` (CRDs kept by policy), reinstall, argocd `STATUS: deployed` at
+02:27:21Z, dev-hub-grafana deployed 02:27:49Z. New syncer started 02:17:18Z, restarts 0. M1 and N1 hold.
+
+Gap found (not an E5 failure): Helm sat out its whole `--timeout 10m` against the dead proxy before failing, so the
+recovery costs about 10 minutes. Captured as a separate P3.
+
+Throttle, replacement syncer from 02:17:18Z to 02:30:10Z (whole reinstall plus settle): `nr_periods 7548`,
+`nr_throttled 190`, 2.5% of periods. The throttling stays concentrated in vCluster boot (attempt 3 boot: 47 of 162
+periods in the first 22 s).
