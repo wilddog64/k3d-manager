@@ -1,8 +1,7 @@
 # Bug (child D): stall recovery is invisible on the Agent Dispatch dashboard
 
-**Status:** LANDED — 09d12e68 on k3d-manager-v1.44.0, 2026-11-14
+**Status:** VERIFIED — live E5 2026-11-14 (landed 09d12e68 on k3d-manager-v1.44.0)
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** live check — since 2026-11-14 (E5 after hub-promote)
 **Approval:** operator 2026-11-14 asked for a dashboard to track the stall-recovery loop ("maybe we can build a dashboard to track"); spec drafted by Claude, intent not yet approved
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
 **Intent approved:** operator, 2026-11-14
@@ -174,3 +173,12 @@ gauges 127/129/131, adds a promtool rule-unit test, and closes the median-format
 dedupe after label sanitising. Claude re-ran: pytest 220 passed, dashboard bats 52/52, abandon bats 10/10; independent
 mutant (fallback restored in panel 127) gave not ok 3. Land test via `--allow-out-of-scope` (abandon bats and guide md).
 E5 (live dashboard) pending a hub-promote.
+
+## Live check E5 (Claude, read-only, 2026-11-14 ~18:15 PST)
+
+PASS. On the M5 hub, `hub-platform-ops` was Synced at deploy/hub 160f0539 (it contains 09d12e68). The live
+`grafana-dashboard-agent-dispatch` ConfigMap has the retitled "Repeated failed attempts" panel and the "Stall recovery" row
+with its 9 panels. Prometheus holds all 15486 `k3dm_dispatch_*` series the publisher's `--dry-run` produces, and the stat
+panels read 0. `deployed` and `live_verified` are recorded in the ledger. Gap: with no stall events in the ledger, no
+per-version stall series exist, so the zeros come from `or vector(0)` and the by-label panels show no data. Filed as P3
+`docs/bugs/2026-11-14-dispatch-stall-metrics-emit-no-zero-series-without-events.md`.

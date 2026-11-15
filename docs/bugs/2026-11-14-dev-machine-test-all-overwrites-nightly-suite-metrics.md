@@ -1,8 +1,9 @@
 # Bug: `make test-all` on a dev machine overwrites the nightly offline-suite metrics
 
 **Status:** OPEN — captured 2026-11-14 by Claude (alert investigation)
-**Priority:** P2 (proposed)
-**Waiting on:** operator decision — since 2026-11-14
+**Priority:** P2 (operator, 2026-11-14)
+**Waiting on:** dispatch — since 2026-11-14
+**Release:** v1.44.1 (operator approved Claude's recommendation, 2026-11-14)
 **Introduced by:** unknown
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; related `docs/bugs/2026-11-02-hostinger-offline-suite-alerts.md`, `docs/bugs/2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md` (read, different root cause); `make find-similar-docs` not run (vector store unreachable from the M4)
@@ -27,3 +28,12 @@ not from the nightly suite. `make test-all` always publishes to `K3DM_PUSHGATEWA
 Publish only when the URL is set explicitly (the nightly LaunchAgent sets it), or put the host in the Pushgateway group
 so a dev run cannot replace the nightly group. Needs a spec with Contract readers (the nightly plist template, the
 `k3dm_test_*` rules and dashboards).
+
+## Decision (operator, 2026-11-14: "approve")
+
+P2 confirmed. Option (a): `make test-all` and `bin/k3dm-test-metrics` publish only when `K3DM_PUSHGATEWAY_URL` is set
+explicitly. The nightly LaunchAgent sets it; a dev run prints "metrics not published (K3DM_PUSHGATEWAY_URL unset)" and
+writes only the local log. Rejected (b), a per-host Pushgateway grouping key, because it changes every `k3dm_test_*` series
+and the rules and dashboards that read them. Target v1.44.1. Needs a spec with Acceptance and Contract readers (plist
+template, `Makefile:1646`, `bin/k3dm-test-metrics:17`, the rules-acg file, the dashboard). Dispatch after Part B frees the
+Makefile.
