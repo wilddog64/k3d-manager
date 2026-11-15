@@ -2104,7 +2104,6 @@ vault secrets enable -path=secret kv-v2 || true
 vault auth enable kubernetes || true
 
 vault write auth/kubernetes/config \
-  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
   kubernetes_host="https://kubernetes.default.svc:443" \
   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
@@ -2302,7 +2301,9 @@ function _vault_configure_secret_reader_role() {
 
   cat <<'SH' | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- sh -
 set -e
-vault write auth/kubernetes/config   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"   kubernetes_host="https://kubernetes.default.svc:443"   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+vault write auth/kubernetes/config \
+  kubernetes_host="https://kubernetes.default.svc:443" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
 
   _kubectl create clusterrolebinding vault-auth-delegator     --clusterrole=system:auth-delegator     --serviceaccount="${ns}:${release}"     --dry-run=client -o yaml | _kubectl apply -f -

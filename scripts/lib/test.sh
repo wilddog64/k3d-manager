@@ -1,4 +1,4 @@
-# shellcheck disable=SC1090,SC1091,SC2034,SC2064,SC2086,SC2155
+# shellcheck disable=SC1090,SC1091,SC2016,SC2034,SC2064,SC2086,SC2155
 
 # Ensure SCRIPT_DIR is set when this library is sourced directly.
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
@@ -700,43 +700,33 @@ function test_vault() {
   fi
 
   local root_token
-  root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
+  _no_trace eval 'root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath="{.data.root_token}" | base64 -d)'
+  _no_trace eval '_VAULT_TEST_ROOT_TOKEN="$root_token"'
 
-  trap "_cleanup_vault_test '$vault_ns' '$vault_release' '$vault_secret_path' '$root_token' '$test_ns' '$sa'" EXIT TERM
+  trap "_cleanup_vault_test '$vault_ns' '$vault_release' '$vault_secret_path' '' '$test_ns' '$sa'" EXIT TERM
 
   _info "Preparing test namespace '$test_ns' and service account '$sa'..."
   _kubectl create namespace "$test_ns" >/dev/null 2>&1 || true
   _kubectl create sa "$sa" -n "$test_ns" >/dev/null 2>&1 || true
 
-  # Refresh the k8s auth backend config with the current vault pod SA token
-  # and force TokenReview mode (disable_local_ca_jwt=true).
-  #
-  # Background: the default disable_local_ca_jwt=false uses OIDC discovery to
-  # validate JWTs locally. On OrbStack/k3s the OIDC discovery or JWKS endpoint
-  # may not be reachable from the vault pod, causing 403 on auth/kubernetes/login.
-  # Forcing TokenReview mode (disable_local_ca_jwt=true) uses the vault pod's
-  # own SA token (token_reviewer_jwt) to call the k8s TokenReview API, which is
-  # always available inside the cluster.  Projected SA tokens rotate every ~24h
-  # so we also refresh token_reviewer_jwt with the pod's current token.
-  _info "Refreshing Vault Kubernetes auth backend (TokenReview mode)..."
-  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/config \
-      token_reviewer_jwt=\"\$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" \
-      disable_local_ca_jwt=true \
-      kubernetes_host=\"https://kubernetes.default.svc:443\" \
-      kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+  _info "Refreshing Vault Kubernetes auth backend..."
+  _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config \
+      kubernetes_host="https://kubernetes.default.svc:443" \
+      kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$root_token"
 
   _info "Creating temporary Vault role for service account..."
-  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/role/$sa \\
-      bound_service_account_names=\"$sa\" \\
-      bound_service_account_namespaces=\"$test_ns\" \\
-      policies=eso-reader \\
-      ttl=1h"
+  _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write "auth/kubernetes/role/$1" \
+      bound_service_account_names="$1" \
+      bound_service_account_namespaces="$2" \
+      policies=eso-reader \
+      ttl=1h' sh "$sa" "$test_ns" <<<"$root_token"
 
   _info "Seeding test secret at secret/${vault_secret_path}..."
-  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN='$root_token' vault kv put secret/${vault_secret_path} ${secret_key}=${secret_val}"
+  _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put "secret/$1" "$2=$3"' \
+    sh "$vault_secret_path" "$secret_key" "$secret_val" <<<"$root_token"
 
   # Launch pod to read secret
   cat <<POD | _kubectl apply -f -
@@ -805,20 +795,24 @@ function _cleanup_vault_test() {
   local vault_ns="$1"
   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
   local vault_secret_path="$3"
-  local root_token="$4"
+  local root_token="${4:-}"
+  [[ -n "$root_token" ]] || _no_trace eval 'root_token="${_VAULT_TEST_ROOT_TOKEN:-}"'
   local test_ns="${5:-vault-test}"
   local sa="$6"
   local vault_pod="${vault_release}-0"
   echo "Cleaning up Vault test resources..."
   _kubectl delete namespace "$test_ns" --ignore-not-found >/dev/null 2>&1
   if [[ -n "$vault_secret_path" ]]; then
-    _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-      sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/${vault_secret_path}" >/dev/null 2>&1 || true
+    _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+      sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv delete "secret/$1"' \
+      sh "$vault_secret_path" <<<"$root_token" >/dev/null 2>&1 || true
   fi
   if [[ -n "$sa" ]]; then
-    _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-      sh -c "VAULT_TOKEN='$root_token' vault delete auth/kubernetes/role/$sa" >/dev/null 2>&1 || true
+    _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+      sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault delete "auth/kubernetes/role/$1"' \
+      sh "$sa" <<<"$root_token" >/dev/null 2>&1 || true
   fi
+  unset _VAULT_TEST_ROOT_TOKEN
 }
 function test_cert_rotation() {
   echo "==================================================================="
