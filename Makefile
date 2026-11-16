@@ -36,7 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
-.PHONY: promote hub-promote hub-deploy hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync
+.PHONY: promote hub-promote hub-deploy hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync install-dispatch-stall-watch uninstall-dispatch-stall-watch
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -85,6 +85,26 @@ uninstall-repo-sync:
 	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.repo-sync" 2>/dev/null || true
 	@rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.repo-sync.plist"
 	@echo "uninstall-repo-sync: OK, com.k3d-manager.repo-sync unloaded and plist removed"
+
+install-dispatch-stall-watch:
+	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.local/share/k3d-manager/logs"
+	@sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.dispatch-stall-watch.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-stall-watch.plist" || { echo "install-dispatch-stall-watch: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-stall-watch.plist" >&2; exit 1; }
+	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
+	  echo "install-dispatch-stall-watch: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
+	else \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.dispatch-stall-watch" 2>/dev/null || true; \
+	  if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-stall-watch.plist"; then \
+	    echo "install-dispatch-stall-watch: OK, com.k3d-manager.dispatch-stall-watch loaded; log: $(HOME)/.local/share/k3d-manager/logs/dispatch-stall-watch.log"; \
+	  else \
+	    echo "install-dispatch-stall-watch: FAILED, launchctl bootstrap of com.k3d-manager.dispatch-stall-watch did not load the agent" >&2; exit 1; \
+	  fi; \
+	fi
+
+uninstall-dispatch-stall-watch:
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.dispatch-stall-watch" 2>/dev/null || true
+	@rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-stall-watch.plist"
+	@echo "uninstall-dispatch-stall-watch: OK, com.k3d-manager.dispatch-stall-watch unloaded and plist removed"
+
 
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:

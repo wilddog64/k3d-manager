@@ -1708,6 +1708,7 @@ main() {
   (($#)) || { _dispatch_usage; exit 2; }
   case "$1" in
     _worker) shift; _dispatch_worker "$@" ;;
+    _stall-sample) shift; (($# == 1)) || _dispatch_error "_stall-sample requires a run"; _dispatch_stall_db_sample "$1" "$(_dispatch_stall_processes)" ;;
     start) shift; _dispatch_start "$@" ;;
     open) shift; _dispatch_open "$@" ;;
     stalled) shift; (($# <= 1)) || _dispatch_error "stalled accepts at most one option"; _dispatch_stalled "${1:-}" ;;

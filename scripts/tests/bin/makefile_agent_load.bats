@@ -63,7 +63,7 @@ teardown() {
 }
 
 @test "E1: with K3DM_AGENT_LOAD=0 each in-scope install target writes plist and calls no launchctl (N1, M2)" {
-  local targets=(repo-sync cleanup node-health-watch sandbox-reaper cloud-bridge test-metrics)
+  local targets=(dispatch-stall-watch repo-sync cleanup node-health-watch sandbox-reaper cloud-bridge test-metrics)
   local target
 
   for target in "${targets[@]}"; do
@@ -77,7 +77,7 @@ teardown() {
 }
 
 @test "E2: with K3DM_AGENT_LOAD unset each in-scope install target boots out then bootstraps (M1)" {
-  local targets=(repo-sync cleanup node-health-watch sandbox-reaper cloud-bridge test-metrics)
+  local targets=(dispatch-stall-watch repo-sync cleanup node-health-watch sandbox-reaper cloud-bridge test-metrics)
   local target
 
   for target in "${targets[@]}"; do

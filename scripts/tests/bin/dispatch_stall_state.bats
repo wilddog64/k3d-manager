@@ -307,3 +307,18 @@ PYMUTATE
   run perl -e 'print((stat shift)[9])' "$TEST_RUN/start"
   [ "$status" -eq 0 ]; [[ "$output" =~ ^[0-9]+$ ]]
 }
+
+@test "A2: watcher refresh uses the dispatcher database sample" {
+  local watch="$BATS_TEST_DIRNAME/../../../bin/k3dm-dispatch-stall-watch" before
+  export K3DM_STALL_NOTIFY_BIN="$HOME/bin/missing-notifier"
+  run "$watch"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TEST_RUN/stall-watch.state")" == "db=$TEST_DB steps=1 since="* ]]
+  printf 'db=%s steps=1 since=2\n' "$TEST_DB" > "$TEST_RUN/stall-watch.state"
+  sqlite3 "$TEST_DB" 'insert into steps values(2);'
+  before="$(find "$HOME/.gemini" -type f -exec shasum -a 256 {} \; | sort)"
+  run "$watch"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TEST_RUN/stall-watch.state")" == "db=$TEST_DB steps=2 since="* ]]
+  [ "$(find "$HOME/.gemini" -type f -exec shasum -a 256 {} \; | sort)" = "$before" ]
+}
