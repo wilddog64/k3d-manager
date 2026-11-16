@@ -772,3 +772,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: dirused P3 intents approved; dispatched dirused-unreachable-1707 (Flash) and dirused-timeout-hung-probe (Luna); WIP 3.
 - 2026-11-16: dirused P3s exited; Claude verified; PR #7 (1707, 562de4a) and PR #8 (hung probe, 588f0c2) open; awaiting CI/Copilot/red-check run.
 - 2026-11-15: operator scheduled v1.44.0 live testing for 18:57 PST; Claude reminder set for 18:50.
+- 2026-11-15: operator decision — dirused tracked separately from k3d-manager releases (not k8s); memory saved; separation plan proposed.

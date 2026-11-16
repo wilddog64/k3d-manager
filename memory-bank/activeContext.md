@@ -1,4 +1,5 @@
 ## Handoff 2026-11-16 ~02:45Z — dirused P3s: both exited, verified, PRs #7/#8 open
+- **DECISION (operator, 2026-11-15): dirused is tracked separately from k3d-manager** — not a k8s app; never assigned to a k3d-manager release or gate. Consequence: the dirused `/parallel` P1 should not block v1.44.0 / PR #161. Cause: bug-tally assigns a release from the k3d-manager branch that added the doc, so any doc under `docs/bugs/` lands in a release. Separation plan awaiting operator go.
 - **SCHEDULED: v1.44.0 k3d-manager live testing at 18:57 PST 2026-11-15 (02:57Z 11-16)** — operator 2026-11-15. Session reminder at 18:50 (cron e68f182d, dies on exit). Keep the dirused VM idle from ~18:40; dirused `make vm-live` for #7/#8 only before then or after. Owed checks: PR #161 hub smoke, Hermes card, read-only batch, vault-unseal, machine-setup N3; confirm `make hub-promote-status` first.
 
 - **PR #7 (1707, Flash):** 47d0572 test + 562de4a fix; offline verified: CI windows red on 47d0572 (run 43787406779, exactly the 3 new tests), fix green (run 43787367644); temp branch deleted. Next: Copilot, then make vm-live L2.
