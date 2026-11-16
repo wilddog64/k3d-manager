@@ -5,7 +5,7 @@
 **Introduced by:** wilddog64/dirused d302f65 (M1b phase 1b fleet runner: `/file`, `/summary`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-16
+**Waiting on:** fix running — since 2026-11-16
 **Prior art:** `docs/dirused/bugs/` exact-slug glob, no match; `make find-similar-docs` not run (vector store context `k3d-k3d-cluster` missing) — none above threshold
 **Filed:** 2026-11-16 (operator report, screenshot)
 

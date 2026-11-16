@@ -5,7 +5,7 @@
 **Introduced by:** wilddog64/dirused d86655b (M1b phase 0; `/all` = all fixed local drives in `TargetResolver`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** fix running — since 2026-11-16
 **Prior art:** `docs/dirused/bugs/` exact-slug glob, no match; `make find-similar-docs` not run (vector store context `k3d-k3d-cluster` missing) — none above threshold
 **Filed:** 2026-11-16 (operator report)
 
