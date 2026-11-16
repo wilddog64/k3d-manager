@@ -6,7 +6,7 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** fix running — since 2026-11-16 (Luna, codex)
 **Triage:** patch → v1.44.1 (P2, flagged: every first promote of a release needs BREAK_GLASS) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
 **Intent approved:** operator, 2026-11-16
