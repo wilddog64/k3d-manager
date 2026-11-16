@@ -769,3 +769,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: dirused PR #6 make vm-live (L1-L10); first run 9/10, L2 found 1707 not mapped -> P3 bug doc.
 - 2026-11-16 dirused PR #6 (make vm-live + release zips) merged b475154; Release run 43785276977 produced win-x64/arm64 artifacts (x64 checksum + contents verified).
 - 2026-11-16: dirused P3 specs written with Acceptance (1707 -> Flash, hung-probe timeout -> Luna); awaiting operator intent approval before dispatch.
+- 2026-11-16: dirused P3 intents approved; dispatched dirused-unreachable-1707 (Flash) and dirused-timeout-hung-probe (Luna); WIP 3.
