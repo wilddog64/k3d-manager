@@ -10,6 +10,9 @@ setup() {
 
   mkdir -p "$SCRATCH/bin" "$SCRATCH/home/.config/k3d-manager" "$SCRATCH/state" "$SCRATCH/stubs"
   printf 'hub\n' > "$SCRATCH/home/.config/k3d-manager/machine-role"
+  K3DM_HUB_HOST="$(hostname | cut -d. -f1)"
+  export K3DM_HUB_HOST
+  unset K3DM_REPO_SYNC_HOSTNAME
 
   export HOME="$SCRATCH/home"
   export XDG_CONFIG_HOME="$SCRATCH/home/.config"
