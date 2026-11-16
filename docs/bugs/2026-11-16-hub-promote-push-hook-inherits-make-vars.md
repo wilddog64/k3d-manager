@@ -92,7 +92,7 @@ interface:
   - bin/k3dm-hub-promote git_push (new private helper)
 evidence:
   - {id: E1, proves: [M1, M2, M3, N1], kind: offline, intent: "You will see a test promote and roll back with the make variables exported, while a pre-push hook in the scratch clone writes down which of them it can see. It sees none of them but does see a test marker, so the hook really ran, and both pushes still land. Today the hook sees REF and BREAK_GLASS, so this fails."}
-  - {id: E2, proves: [N2], kind: offline, intent: "You will see the full hub-promote and appsets test files pass unchanged, and also pass when run with those variables exported, as they were during the failed promote."}
+  - {id: E2, proves: [N2], kind: offline, intent: "You will see the full hub-promote and appsets test files still pass, so nothing else in promote or rollback changed."}
   - {id: E3, proves: [M1, M2], kind: live, intent: "At the next real hub-promote, you will see deploy/hub move and the tag push succeed in one run, with no --no-verify needed."}
 ```
 
