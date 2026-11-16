@@ -420,6 +420,8 @@ Contract: `uncontained_commits` behaviour (stdout list, exit codes, stderr note)
 
 ## Acceptance
 
+Revised 2026-11-16 (Claude) after the Luna worker stopped: only N1 is red on pre-fix code, so the former N2 to N8 moved to `must` as regression guards M6 to M12.
+
 ```yaml
 must:
   M1: with deploy/hub holding commits that git cherry flags but that sit in a merged PR whose head contains deploy/hub and whose merge commit is in the target (PR gained commits before squash, so a tree merge conflicts), promote with green checks and no BREAK_GLASS moves deploy/hub, records a tag without "mode: break-glass", and prints a note naming the PR
@@ -427,24 +429,24 @@ must:
   M3: BREAK_GLASS=1 still bypasses the uncontained-commits refusal for a real promoter commit (green checks, typed confirmation) and records "mode: break-glass"
   M4: is-contained exits 0 for the squash case, 1 for an uncontained case, 2 on bad input
   M5: SKIP_CHECK_RUNS=1 with a one-line SKIP_CHECK_RUNS_REASON promotes when the check-run lookup fails, after the typed confirmation, and this run's tag records "mode: skip-check-runs" and "reason: <text>"
+  M6: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that a promoter commit added on top of a squash-merged deploy/hub tip is treated as contained
+  M7: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that a merged PR whose merge commit is not in the target, whose origin refs/pull/<n>/head differs from the API head, whose head does not contain old, or that is not merged, is treated as contained
+  M8: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that a gh lookup failure is treated as contained or aborts the refusal listing; promote must refuse with the usual list
+  M9: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that a git cherry error stops failing closed
+  M10: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that BREAK_GLASS=1 or SKIP_CHECK_RUNS=1 stops requiring the typed confirmation or origin reachability
+  M11: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that SKIP_CHECK_RUNS=1 with a reason unset, empty, whitespace-only or multi-line promotes
+  M12: (regression guard, passes on pre-fix code; proven by mutant plus positive control, not by a pre-fix red) it is not the case that SKIP_CHECK_RUNS=1 bypasses the uncontained-commits refusal
 must_not:
   N1: BREAK_GLASS=1 skips the check-run gate (red on pre-fix code: today it promotes with checks missing)
-  N2: a promoter commit added on top of a squash-merged deploy/hub tip is treated as contained (pre-fix code also refuses, so this is proven by mutant m2 and the positive control M1, not by a pre-fix red)
-  N3: a merged PR whose merge commit is not in the target, whose origin refs/pull/<n>/head differs from the API head, whose head does not contain old, or that is not merged, is treated as contained (same proof: mutants m3 to m6 plus M1)
-  N4: a gh lookup failure is treated as contained or aborts the refusal listing; promote must refuse with the usual list
-  N5: a git cherry error stops failing closed
-  N6: BREAK_GLASS=1 or SKIP_CHECK_RUNS=1 stops requiring the typed confirmation or origin reachability
-  N7: SKIP_CHECK_RUNS=1 with a reason unset, empty, whitespace-only or multi-line promotes (red on pre-fix code only in the sense the flag does not exist: refused anyway; proven by mutant m7 and M5)
-  N8: SKIP_CHECK_RUNS=1 bypasses the uncontained-commits refusal
 evidence:
   - {id: E1, proves: [M1], kind: offline, intent: "You will see a test where deploy/hub holds two commits that were squash-merged as part of a larger PR (so merging them conflicts); a normal make hub-promote with green checks moves deploy/hub, names PR 160 in a note, and the tag has no break-glass line. Today it refuses and lists the commits."}
   - {id: E2, proves: [M2], kind: offline, intent: "You will see make hub-promote-status print nothing about uncontained commits for that squash-merged case. Today it lists them."}
-  - {id: E3, proves: [N2, N3, N4], kind: offline, intent: "You will see six variations of the squash case each end in the usual refusal and an unmoved hub: a real promoter commit on top, a merge commit not in the new release, a PR ref that does not match GitHub's answer, a PR head that lacks the hub commit, an unmerged PR, and GitHub being unreachable. The unbroken case beside them promotes."}
-  - {id: E4, proves: [M3, N6], kind: offline, intent: "You will see a real promoter commit on deploy/hub refused without BREAK_GLASS and accepted with it (green checks, typed confirmation, tag says break-glass); with no terminal it still refuses."}
+  - {id: E3, proves: [M6, M7, M8], kind: offline, intent: "You will see six variations of the squash case each end in the usual refusal and an unmoved hub: a real promoter commit on top, a merge commit not in the new release, a PR ref that does not match GitHub's answer, a PR head that lacks the hub commit, an unmerged PR, and GitHub being unreachable. The unbroken case beside them promotes."}
+  - {id: E4, proves: [M3, M10], kind: offline, intent: "You will see a real promoter commit on deploy/hub refused without BREAK_GLASS and accepted with it (green checks, typed confirmation, tag says break-glass); with no terminal it still refuses."}
   - {id: E5, proves: [N1], kind: offline, intent: "You will see BREAK_GLASS=1 refuse to promote when the check runs are missing, pending, failed or unreadable, hub and tags untouched. Today it promotes anyway."}
-  - {id: E6, proves: [N5], kind: offline, intent: "You will see the existing git-cherry-failure test still fail closed and succeed once restored."}
+  - {id: E6, proves: [M9], kind: offline, intent: "You will see the existing git-cherry-failure test still fail closed and succeed once restored."}
   - {id: E7, proves: [M4], kind: offline, intent: "You will see the new is-contained command say yes for the squash case, no for a promoter commit, and exit 2 for a missing or unknown SHA."}
-  - {id: E8, proves: [M5, N7, N8], kind: offline, intent: "You will see GitHub's check-run lookup fail: SKIP_CHECK_RUNS=1 with a one-line reason promotes after the typed confirmation and the new tag shows the mode and reason; a missing, blank or two-line reason, or a real promoter commit without BREAK_GLASS, refuses and nothing moves. make -n hub-promote shows both flags passed to the command, so reverting the Makefile line turns it red."}
+  - {id: E8, proves: [M5, M11, M12], kind: offline, intent: "You will see GitHub's check-run lookup fail: SKIP_CHECK_RUNS=1 with a one-line reason promotes after the typed confirmation and the new tag shows the mode and reason; a missing, blank or two-line reason, or a real promoter commit without BREAK_GLASS, refuses and nothing moves. make -n hub-promote shows both flags passed to the command, so reverting the Makefile line turns it red."}
   - {id: E9, proves: [M1], kind: live, intent: "You will see the real 9f5f0d89 case, read-only on the M5 or M4, answered by the shipped code: is-contained b5b931df 50a42198 exits 0 naming PR 161, is-contained b5b931df 9f5f0d89 exits 0 naming PR 160, is-contained b5b931df ebf0a1c9 exits 1, is-contained aa1196ed 50a42198 exits 1. Claude or the operator runs it, never Gemini; the operator's next first promote of a release then needs no BREAK_GLASS."}
 interface:
   - "bin/k3dm-hub-promote promote REF [BREAK_GLASS] [SKIP_CHECK_RUNS]"
@@ -457,11 +459,14 @@ interface:
 
 ## Worker definition of done
 
-- Change only the six files in Files. Scratch HOME, no network, `gh` is the stub (no real GitHub call; a test that reaches real `gh` is a defect), no push to the real `origin`. Show E1, E2 and E5 red on today's code, then green; N2 to N4 are regression guards, so paste their passing lines and the mutant results instead.
+- Change only the six files in Files. Scratch HOME, no network, `gh` is the stub (no real GitHub call; a test that reaches real `gh` is a defect), no push to the real `origin`. Show E1, E2 and E5 red on today's code, then green; M6 to M8 are regression guards, so paste their passing lines and the mutant results instead.
 - Run `bats scripts/tests/bin/hub_promote.bats scripts/tests/bin/hub_deploy.bats scripts/tests/bin/repo_sync_promote_backlog.bats` from the repo root and `shellcheck bin/k3dm-hub-promote`; paste command, rc and proving lines. Run mutants m1 to m7 with rc each.
 - `git status`: only the six files changed. Leave uncommitted; Claude lands them. Do not run `make hub-promote` or any target that pushes or deploys.
 
-## Open questions
+## Open questions (resolved, operator 2026-11-16: accepted Claude defaults)
+
+Resolutions: Q1 accept tip-only for v1.44.1; Q2 accept (rollback in an outage needs BREAK_GLASS); Q3 keep SKIP_CHECK_RUNS in this patch; Q4 out of scope.
+
 
 1. Tip-only test: a promoter commit on top of a squashed tip makes the whole old range look uncontained, so the refusal lists hundreds of commits, not just the promoter. Accept for v1.44.1 (safe, noisy), or add a second pass that lists only commits outside every associated PR head?
 2. Rollback (`rollback`, `:246`) now also calls the API. In a GitHub outage a rollback with a squash-merged old tip refuses and needs BREAK_GLASS. Accept?
