@@ -20,7 +20,20 @@ Failing tests, all "must refuse" assertions:
 
 The same commit was green on all 7 CI check-runs.
 
-## Likely cause (not yet proven)
+## Cause (proven offline, 2026-11-16, m4-air.local, Claude)
+
+Two channels, both from `make hub-promote REF=... BREAK_GLASS=1`:
+- **`MAKEFLAGS`** carries the command-line variables into any nested `make`. `makefile_appsets.bats` "#8 promote without
+  REF refuses" runs `make`, so it sees `REF` again: red with `MAKEFLAGS=' REF=b5b931df BREAK_GLASS=1'` in the
+  environment, green without. Plain `REF=x BREAK_GLASS=1` in the environment alone stays green.
+- **Environment** `REF`/`BREAK_GLASS` reach `bin/k3dm-hub-promote` directly: `hub_promote.bats` N2 "rollback refuses
+  promoter commits not in stack top; BREAK_GLASS=1 permits (E3)" is red with them set, green without (6 other N2 cases
+  green either way).
+
+Any fix must clear `MAKEFLAGS`, `MFLAGS` and `MAKELEVEL` as well as the variables themselves. Option 1 below without
+the make variables would leave the first channel open.
+
+## Original hypothesis
 
 Make exports command-line variables to every recipe child, so `git push` -> `.githooks/pre-push` -> BATS inherit
 `REF=b5b931df` and `BREAK_GLASS=1`. The tests that expect a refusal without REF / without break-glass then see them set.
