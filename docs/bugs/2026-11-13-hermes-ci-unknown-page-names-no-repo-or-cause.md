@@ -1,10 +1,10 @@
 # Bug: Hermes "ci check unknown 30+ min" page names no repo, workflow or cause
 
-**Status:** OPEN — captured 2026-11-13
+**Status:** LANDED — c3642f8f (2026-11-16); captured 2026-11-13
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The `ci` sensor's broad exception handler masks the failing repository, workflow, and underlying error in both Slack pages and logs, degrading alert diagnostics while leaving manual GitHub Actions inspection as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator
-**Waiting on:** fix running — since 2026-11-16 (Flash)
+**Waiting on:** live check — since 2026-11-16 (E3: next real CI unknown page names repo and cause)
 **Branch:** k3d-manager-v1.44.1
 **Introduced by:** pre-existing
 **Should have been caught by:** review
@@ -130,3 +130,11 @@ a test that never reaches the error path cannot pass. The fetch stub is built fr
 - New tests for M1 (HTTP 502, timeout, no runs), M2 (two repos, one fails, one degraded), M3, N1 (token in exception message);
   N3 shown red on the pre-fix code (stash the sensors.py change).
 - `pytest scripts/tests/hermes` green; commit and push verified with `git log origin/<branch>`; no cluster or Slack call.
+
+## Landed 2026-11-16 (Claude)
+
+`c3642f8f` (Gemini Flash). Verified by Claude in a scratch worktree at the pre-fix HEAD with the new tests copied in:
+`test_ci_unknown_evidence_names_repo_and_cause_and_logs_to_stderr` and `test_ci_multi_repo_partial_failure_and_degraded_precedence`
+fail on the old code, and `pytest scripts/tests/hermes` passes 390/390 on the fix. The existing ci tests were not edited (N2).
+The token-leak test feeds in an exception that contains the token and asserts the token is absent from evidence, stdout and stderr (N1).
+E3 is live and still owed.
