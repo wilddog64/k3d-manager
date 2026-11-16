@@ -788,3 +788,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: ideas row — dirused privileged mode (/elevate UAC relaunch + SeBackupPrivilege vs /user remote admin credentials); groom 2026-11-22.
 - 2026-11-16: dirused elevated-mode idea moved from docs/ideas.md to new docs/dirused/ideas.md (operator: dirused ideas stay out of ideas.md).
 - 2026-11-16: dirused v0.0.1 tagged at 1926d2e; Release run 43794113905 green; prerelease with win-x64/win-arm64 self-contained zips + sha256 (x64 checksum and contents verified). Operator tests at office 2026-11-16.
+- 2026-11-16: v1.44.0 hub promoted to 50a42198; PR #161 hub smoke PASS (make status HEALTHY, all apps Synced/Healthy, promoted repo-sync rule live).
