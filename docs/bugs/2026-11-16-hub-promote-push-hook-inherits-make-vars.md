@@ -1,11 +1,11 @@
 # hub-promote pushes run the pre-push hook with REF and BREAK_GLASS exported, so refusal tests fail
 
-**Status:** OPEN
+**Status:** LANDED — 4476316a (Flash; Claude verified: E1 red pre-fix, hub_promote 59/59, appsets green)
 **Priority:** P2 — the promote half-completes (deploy/hub moves, tag push refused); workaround: push the tag with --no-verify
 **Introduced by:** unknown
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-16 (Flash)
+**Waiting on:** live check — since 2026-11-16 (E3 at the next real hub-promote)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 — operator 2026-11-16 ("fix in v1.44.1")
 **Prior art:** docs/bugs/2026-11-08-hub-promote-no-op-promote-tags-and-breaks-rollback.md (name match) — read, different root cause; `make find-similar-docs` printed nothing (not run successfully)

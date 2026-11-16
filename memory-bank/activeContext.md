@@ -3,14 +3,12 @@
 - LANDED: hermes CI unknown page c3642f8f (Flash; 2 red pre-fix, 390/390). Stray host guard 3b0def6b + coordinator fixture 5b308552
   (Flash; 2 red pre-fix, 28/28). The land gate caught repo_sync_promote_backlog.bats, a reader the spec missed; it was added to Files
   and landed with --allow-out-of-scope (the scope check uses the dispatch-time spec snapshot). Land does not push: push after land.
-- DISPATCHED: hub-promote push-hook fix to Flash (worktree .../v1.44.1/2026-11-16-hub-promote-push-hook-inherits-make-vars).
-  Open: stall-A1 (Luna, resume 4) + push-hook (Flash) = 2/3.
 - New rule (operator, 2026-11-16): when triage picks a patch or carry, the bug doc gets Triage + Branch lines naming the target
   release (rules.md 92671d8e, /release-groom Step 0, memory).
 - ~21:40Z: stall-A1 LANDED f3828ad9 (Luna; 16 red pre-fix, 34/34; pytest 2115 outside sandbox; live read-only probe clean).
   Agy step-count stalls need A2's watcher (sole writer of stall-watch.state). A2 dispatched (Luna, slug 2026-11-14-dispatch-stall-a2-watcher;
   land needs --superseding? no: different spec stage, same spec → land may need --superseding 2026-11-14-dispatch-stall-a-detector).
-  Silent-running bug closes with A2 (M8-M11). Open: push-hook (Flash) + A2 (Luna) = 2/3.
+  Silent-running bug closes with A2 (M8-M11). push-hook LANDED 4476316a (live E3 at next promote). A2 exited; verifier LAND WITH FIXES → correction resume. Open 1/3.
 - Next: verify push-hook, A2 → land; local CI shards; operator live checks one at a time; /create-pr.
 
 ## 2026-11-16 ~13:30Z — v1.44.1: fix the 10 groomed bugs before the release PR (operator)
