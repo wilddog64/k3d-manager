@@ -1,13 +1,13 @@
 # Bug: the bug tables put every triaged bug in the release it was filed on, ignoring `**Triage:**` and `**Release:**`
 
-**Status:** OPEN — captured 2026-11-15 by Claude
+**Status:** LANDED — 8cff0301 on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 8 tests red pre-fix, 140 green; corpus diff 179 docs, ~25 move to their groomed release, rest same release from an explicit line)
 **Priority:** P2
 **Classified:** not run (queued for the next triage)
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
 **Prior art:** exact-slug glob, none; read `docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md` (different root cause: status, not release)
-**Waiting on:** fix running — since 2026-11-16 (Luna)
+**Waiting on:** live check — since 2026-11-16 (E3: Bugs dashboard after the next metrics run; operator)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 — operator 2026-11-16 ("yes", pulled in from carry → v1.45.0 because the dashboard cannot show v1.44.1 progress without it)
 
