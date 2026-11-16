@@ -5,7 +5,7 @@ import importlib.util
 import json
 import re
 import sys
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -1518,6 +1518,114 @@ def test_ci_prefers_rerunnable_conclusion_after_failure():
                         {"name": "failed", "conclusion": "failure", "status": "completed"}]),
                 {"debounce": {"ci": 1}}, token="x", now=now)
     assert record["data"]["conclusion"] == "cancelled"
+
+
+def test_ci_unknown_evidence_names_repo_and_cause_and_logs_to_stderr(capsys):
+    now = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    secret_token = "ghp_SECRET_TOKEN_12345"
+
+    def fail_with(exc):
+        def fetch(url, headers):
+            assert headers.get("Authorization") == f"token {secret_token}"
+            raise exc
+        return fetch
+
+    # HTTP 502
+    err_502 = HTTPError("https://api.github.com", 502, "Bad Gateway", {}, None)
+    rec = ci(fail_with(err_502), {}, repos=["wilddog64/k3d-manager"], token=secret_token, now=now)
+    assert rec["status"] == "unknown"
+    assert rec["evidence"] == "wilddog64/k3d-manager: GitHub API HTTP 502"
+    out, err = capsys.readouterr()
+    assert err == "Hermes ci unknown: wilddog64/k3d-manager HTTPError 502\n"
+
+    # TimeoutError
+    rec = ci(fail_with(TimeoutError("request timed out")), {}, repos=["wilddog64/k3d-manager"], token=secret_token, now=now)
+    assert rec["status"] == "unknown"
+    assert rec["evidence"] == "wilddog64/k3d-manager: timeout"
+    out, err = capsys.readouterr()
+    assert err == "Hermes ci unknown: wilddog64/k3d-manager TimeoutError -\n"
+
+    # URLError
+    rec = ci(fail_with(URLError("connection refused")), {}, repos=["wilddog64/k3d-manager"], token=secret_token, now=now)
+    assert rec["status"] == "unknown"
+    assert rec["evidence"] == "wilddog64/k3d-manager: network error"
+    out, err = capsys.readouterr()
+    assert err == "Hermes ci unknown: wilddog64/k3d-manager URLError -\n"
+
+    # ValueError("missing workflow run")
+    def fetch_no_runs(url, headers):
+        return {"workflow_runs": []}
+    rec = ci(fetch_no_runs, {}, repos=["wilddog64/k3d-manager"], token=secret_token, now=now)
+    assert rec["status"] == "unknown"
+    assert rec["evidence"] == "wilddog64/k3d-manager: no workflow runs"
+    out, err = capsys.readouterr()
+    assert err == "Hermes ci unknown: wilddog64/k3d-manager ValueError -\n"
+
+    # Any other ValueError -> invalid response
+    def fetch_invalid_checks(url, headers):
+        if "actions/runs" in url:
+            return {"workflow_runs": [{"head_sha": "abc", "id": 123}]}
+        return "not a dict"
+    rec = ci(fetch_invalid_checks, {}, repos=["wilddog64/k3d-manager"], token=secret_token, now=now)
+    assert rec["status"] == "unknown"
+    assert rec["evidence"] == "wilddog64/k3d-manager: invalid response"
+    out, err = capsys.readouterr()
+    assert err == "Hermes ci unknown: wilddog64/k3d-manager ValueError -\n"
+
+    # N1: Token leakage test: exception message contains secret token
+    leaky_err = RuntimeError(f"error referencing {secret_token} and Bearer secret")
+    rec = ci(fail_with(leaky_err), {}, repos=["wilddog64/k3d-manager"], token=secret_token, now=now)
+    assert rec["status"] == "unknown"
+    assert secret_token not in rec["evidence"]
+    assert rec["evidence"] == "wilddog64/k3d-manager: RuntimeError"
+    out, err = capsys.readouterr()
+    assert secret_token not in err
+    assert secret_token not in out
+    assert err == "Hermes ci unknown: wilddog64/k3d-manager RuntimeError -\n"
+    # N3: must not report bare "CI status source unavailable"
+    assert rec["evidence"] != "CI status source unavailable"
+
+
+def test_ci_multi_repo_partial_failure_and_degraded_precedence(capsys):
+    now = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    token = "ghp_dummy"
+
+    def fetch_multi(url, headers):
+        if "repo1" in url:
+            raise HTTPError("https://api.github.com", 502, "Bad Gateway", {}, None)
+        if "repo2" in url:
+            if "actions/runs" in url:
+                return {"workflow_runs": [{"head_sha": "def", "id": 456, "name": "PR Checks",
+                                            "head_branch": "feat-branch", "html_url": "https://github.com/org/repo2/actions/runs/456"}]}
+            return {"check_runs": [{"name": "lint", "conclusion": "failure", "status": "completed",
+                                     "started_at": "2026-09-05T00:00:00Z"}]}
+        if "repo3" in url:
+            if "actions/runs" in url:
+                return {"workflow_runs": [{"head_sha": "789", "id": 789, "name": "CI",
+                                            "head_branch": "main", "html_url": "https://github.com/org/repo3/actions/runs/789"}]}
+            return {"check_runs": [{"name": "test", "conclusion": "success", "status": "completed",
+                                     "started_at": "2026-09-05T00:00:00Z"}]}
+        raise ValueError(f"unknown url {url}")
+
+    # M2 & M3: repo1 fails, repo2 degraded. Degraded takes precedence, evidence has workflow and branch
+    state = {"debounce": {"ci": 1}}
+    rec = ci(fetch_multi, state, repos=["repo1", "repo2"], token=token, now=now)
+    assert rec["status"] == "degraded"
+    assert rec["evidence"] == "repo2 PR Checks@feat-branch lint failure"
+    assert rec["data"]["repo"] == "repo2"
+    assert rec["data"]["run_id"] == 456
+    out, err = capsys.readouterr()
+    assert "Hermes ci unknown: repo1 HTTPError 502\n" in err
+
+    # Positive control: repo1 fails, repo3 is healthy. No bad checks -> reports unknown for repo1,
+    # does NOT touch debounce counter.
+    state_ctrl = {}
+    rec_ctrl = ci(fetch_multi, state_ctrl, repos=["repo1", "repo3"], token=token, now=now)
+    assert rec_ctrl["status"] == "unknown"
+    assert rec_ctrl["evidence"] == "repo1: GitHub API HTTP 502"
+    assert "debounce" not in state_ctrl or "ci" not in state_ctrl.get("debounce", {})
+    out, err = capsys.readouterr()
+    assert "Hermes ci unknown: repo1 HTTPError 502\n" in err
 
 
 def sensor(name, status):
