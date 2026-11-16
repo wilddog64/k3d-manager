@@ -1,3 +1,9 @@
+## Handoff 2026-11-16 ~02:00Z — dirused P3 specs written; awaiting intent approval, then dispatch
+
+- **Specs written (Acceptance in the bug docs, per the error-64 precedent):** Bug 1 `docs/bugs/2026-11-16-dirused-unreachable-node-error-1707-not-mapped.md` (Flash, branch `p3-unreachable-1707`, E1/E2 Windows xUnit in RemoteTargetTests: TargetResolver is in Dirused.Core = Windows-only, so not portable; red proof = test-only commit on CI windows job; E3 live vm-live L2). Bug 2 `docs/bugs/2026-11-16-dirused-timeout-cannot-bound-hung-volume-probe.md` (Luna, branch `p3-timeout-hung-probe`; design: per-target background thread, wait Timeout + min(Timeout,2s) grace, abandon -> TIMED OUT, cap Parallel abandoned, beyond -> SKIPPED; E1/E2 portable, E3 existing tests unchanged, E4 live vm-live regression).
+- **Both carry `**Intent approved:** pending — operator`**, so the spec_intent gate blocks dispatch until the operator approves the intents shown to them.
+- **Next:** on approval, set the header, then `bin/k3dm-codex-dispatch start --spec <doc> --slug dirused-unreachable-1707 --agent agy --model gemini-3.8-flash-medium --repo ../dirused --branch p3-unreachable-1707` and `--slug dirused-timeout-hung-probe --agent codex --model gpt-6-luna --branch p3-timeout-hung-probe`. WIP then 3 (limit).
+
 ## Handoff 2026-11-16 ~01:30Z — dirused P3s approved; write specs and dispatch after /clear
 
 - **Operator 2026-11-16:** "approve two P3 bugs and can dispatch to Flash and Luna after /clear", then clarified: "one for each". **Bug 1 (1707) → Flash** (`gemini-3.8-flash-medium` via agy); **Bug 2 (hung probe) → Luna** (`gpt-6-luna` via `make codex-dispatch`). Smaller fix to Flash, harder one to Luna. Routine P3 specs: no separate spec review needed. Claude verifies each (new tests red at b475154, `gh api`/CI, never trust the report), then runs `make vm-live` for live evidence (Gemini never does live checks).
