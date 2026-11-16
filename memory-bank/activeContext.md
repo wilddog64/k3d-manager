@@ -3,7 +3,8 @@
 - **Ledger:** offline_tested at eac2aa2 for dirused-unreachable-codes; at febe79d for dirused-m1b1b-fleet-runner and dirused-parallel-threadpool-cap (evidence scratchpad offline-p3-merge.md / offline-1b-merge.md).
 - **Bug docs:** threadpool + unreachable-codes now LANDED, Waiting on: live check. Hung-probe timeout P3 OPEN, waiting on operator decision.
 - **Open item:** `open` still lists dirused-m1b0-modular-refactor (phase 0, merged 2dbd10d, offline_tested recorded) because it never got a `land` event; the only closer is `abandon`, which would miscount merged work. Left for operator decision.
-- **Next:** (1) live checks on dirused-dev VM: `dirused \\nosuchhost-xyz` UNREACHABLE (P3), 1b `/file` + `/summary` + `/parallel` smoke; multi-machine UNC still owed to ACG gate; (2) k3d-manager PR #161: CI, hub smoke, scope check; (3) PR Checks dirused waits on Hermes PAT scope.
+- **Live tooling:** `make vm-live` (dirused PR #6, branch vm-live-check): vm-build + tools/vm-live.ps1 L1-L10, evidence .vagrant/live-evidence.md. First run 2026-11-16 at febe79d: 9 pass; L2 FAIL = new P3 docs/bugs/2026-11-16-dirused-unreachable-node-error-1707-not-mapped.md (NetShareEnum 1707 -> ERROR not UNREACHABLE). L1 passing = live proof for the unreachable-codes P3; L5/L7 = 1b live.
+- **Next:** (1) operator runs `make vm-live` after PR #6 merges, then Claude marks live_verified (unreachable-codes from L1; m1b1b-fleet-runner from L5-L7; threadpool needs ACG fleet); multi-machine UNC still owed to ACG gate; (2) k3d-manager PR #161: CI, hub smoke, scope check; (3) PR Checks dirused waits on Hermes PAT scope.
 - **Handoff rule:** the /clear hook injects the FIRST `## ` section — always write the new handoff at the top.
 
 ## Handoff 2026-11-16 ~01:15Z — dirused PR #5 clear to merge; PR #3 Copilot fixes pushed (e3a5e71), CI running — START HERE
