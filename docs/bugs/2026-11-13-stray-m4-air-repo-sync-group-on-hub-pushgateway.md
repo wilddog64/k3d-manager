@@ -310,10 +310,12 @@ The comparison is case-insensitive. An empty `K3DM_HUB_HOST` counts as unset (de
 
 - `bin/k3dm-repo-sync`
 - `scripts/tests/bin/repo_sync.bats`
+- `scripts/tests/bin/repo_sync_promote_backlog.bats` (added by Claude at land, 2026-11-16: hub-role fixture that reads the pushed body; sets `K3DM_HUB_HOST` to this host)
 
 ### Contract readers
 
 - `bin/k3dm-repo-sync:506` — writer; the `instance` label value is unchanged on the hub (`m5-air`).
+- `scripts/tests/bin/repo_sync_promote_backlog.bats:12` — reader (missed at spec time, found by the land gate 2026-11-16): runs as hub and greps `curl.body`, so it must name this host as the hub.
 - `Makefile:68` — reader of `K3DM_HUB_HOST` (default `m5-air.local`); unchanged, same default.
 - Repo-sync alert rules and the Release Tracking "deploy/hub behind" stat read `job="k3dm_repo_sync"` series; the hub
   keeps pushing, so they are unaffected. Worker should grep `k3dm_repo_sync_` under `scripts/etc` and list hits.
