@@ -1,8 +1,8 @@
 # Bug: dispatch stall, child A: a `stalled` state and a watcher that captures, stops and tells the operator
 
-**Status:** OPEN
+**Status:** OPEN — stage A1 in f3828ad9 (status probe, stalled listing, OrbStack guard); stage A2 (watcher) running
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** fix running — since 2026-11-16 (Luna)
+**Waiting on:** fix running — since 2026-11-16 (Luna, stage A2)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (already planned there, operator 2026-11-14) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
@@ -211,6 +211,12 @@ and the launchd label `com.k3d-manager.dispatch-stall-watch`.
 Two Luna runs stopped short on the full scope (run 1 wrote nothing; run 2 wrote the OrbStack guard and red tests only). Split:
 - **A1** (v1.44.1, resume 3): status probe, `stalled` / `stalled --live`, OrbStack guard. M1-M6, M14; N1, N4, N6, N7, N10-N12; E1, E2, E6.
 - **A2** (dispatch after A1 lands): watcher, plist, install targets, howto. M7-M13, M15; N2, N3, N5, N8, N9; E3-E5, E7, E8.
+
+**A1 landed 2026-11-16 as f3828ad9** (Claude verified: 16 tests red pre-fix, 34/34 green, pytest 2115 passed outside the sandbox;
+live read-only probe on a running Flash dispatch: `status` running in 0.46 s, `stalled --live` listed it, `stalled` empty, run dir
+byte-identical). **Current stage: A2.** A worker on this spec implements A2 only, on top of the landed A1 code in
+`bin/k3dm-codex-dispatch` (`_dispatch_stall_probe`, `_dispatch_stalled`, which read `<run>/stall-watch.state`; the watcher
+tick is its only writer, M5). Do not rewrite A1; changing an A1 function is a correction only if an A2 must or must_not needs it.
 
 ## Acceptance
 
