@@ -787,3 +787,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: make vm-live (operator) 10/10 on main 1926d2e build 02:36:18Z — dirused 1707 (L2) and timeout (E4) LIVE-VERIFIED; ledger live_verified both slugs. Remaining dirused live: /parallel P1 (ACG gate).
 - 2026-11-16: ideas row — dirused privileged mode (/elevate UAC relaunch + SeBackupPrivilege vs /user remote admin credentials); groom 2026-11-22.
 - 2026-11-16: dirused elevated-mode idea moved from docs/ideas.md to new docs/dirused/ideas.md (operator: dirused ideas stay out of ideas.md).
+- 2026-11-16: dirused v0.0.1 tagged at 1926d2e; Release run 43794113905 green; prerelease with win-x64/win-arm64 self-contained zips + sha256 (x64 checksum and contents verified). Operator tests at office 2026-11-16.
