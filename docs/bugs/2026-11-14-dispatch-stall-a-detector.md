@@ -208,7 +208,7 @@ parent bug doc): `K3DM_DISPATCH_STALL_SECONDS`, `K3DM_DISPATCH_STALL_MAX_PROCS`,
 `K3DM_STALL_DRAIN_CMD` (child B), the files `$run/stall-handled-<id>` and `$run/stall-<ts>/` (children B and C read the dir),
 and the launchd label `com.k3d-manager.dispatch-stall-watch`.
 
-Contract C (found at land, 2026-11-16, spec defect): every `install-*` Makefile target and `scripts/etc/launchd/*.plist.tmpl`. Readers: `scripts/tests/bin/machine_setup_acceptance.bats:336` (M4) and `scripts/tests/bin/machine_setup.bats:265` require each to be in a role `agents.*.list` or in `scripts/etc/machine/not-installed.list`; role lists must stay byte-identical (N4). Changes: `install-dispatch-stall-watch` added to not-installed.list as operator-run.
+Contract C (found at land, 2026-11-16, spec defect): every `install-*` Makefile target and `scripts/etc/launchd/*.plist.tmpl`. Readers: `scripts/tests/bin/machine_setup_acceptance.bats:336` (M4) and `scripts/tests/bin/machine_setup.bats:265` require each target to be in a role `agents.*.list` or in `scripts/etc/machine/not-installed.list`; role lists must stay byte-identical (N4). `scripts/tests/bin/agent_classification.bats:8` requires each template label in exactly one of hub-local, hub-singletons or not-installed. Changes: `install-dispatch-stall-watch` and the label `dispatch-stall-watch` added to not-installed.list as operator-run.
 
 ## Staging (coordinator, 2026-11-16)
 
