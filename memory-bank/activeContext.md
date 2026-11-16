@@ -5,8 +5,23 @@
   6.2/7.0/5.1/4.5, all 7 check-runs green. Pending: pull_request run on the v1.44.1 release PR (E4 second half).
 - Changed: .github/workflows/ci.yml, Makefile (test-shard, test-shard-list), scripts/ci/test_shard.sh,
   scripts/tests/bin/test_test_shard.py, grafana-dashboard-pr-checks.yaml (panel 8 description).
-- Next (operator, morning): hub promote at f20d1b2b or later green head — `make hub-promote REF=<sha>`, appsets-check,
-  platform-ops. Open questions still owed: stale standing docs, Dependabot #16, stale review rows, xhigh P3, dirused CRLF P3.
+- Next (operator, morning) — hub promote of b5b931df (CI 7/7 green, checked 2026-11-16). deploy/hub is 50a42198 and
+  holds one uncontained docs-only commit f5c6cc79 (v1.43.15 plan Status lines); b5b931df already carries a newer text of
+  both lines, so it is superseded, but `git cherry` flags it and a plain promote exits 1. Hence BREAK_GLASS=1, which
+  also skips the CI-green gate, so step 1 re-checks green by hand:
+    1. bin/k3dm-hub-promote is-green b5b931df   (exit 0 = green)
+    2. make hub-promote-status                   (expect deploy/hub 50a42198, uncontained f5c6cc79 only)
+    3. make hub-promote REF=b5b931df BREAK_GLASS=1   (typed confirmation)
+    4. make appsets-check
+    5. make platform-ops
+    6. make hub-promote-status                   (expect deploy/hub b5b931df + new hub-promote/ tag)
+  Then Claude: read-only live check (CI-shard change is CI-only; hub-side change = Grafana PR-checks panel 8
+  description). Rollback: make hub-rollback. If the branch head moved, promote the newest head whose check-runs are all green.
+- After promote: open the v1.44.1 release PR (normal, not draft) → E4 pull_request-run half; Argon review (Copilot quota out).
+- Open questions still owed to operator: stale standing docs (copilot-instructions k3s-oci, functions.md v1.44.0,
+  projectbrief), Dependabot low #16, stale review rows (deploy-hub-batch-review, test-hygiene-batch-review), xhigh P3
+  (bin/k3dm-dispatch-metrics:752), dirused .sha256 CRLF P3. Owed live checks: Hermes card, vault-unseal, machine-setup N3,
+  dirused /parallel fleet run.
 
 ## Current focus 2026-11-16 ~04:00Z — v1.44.0 MERGED, v1.44.1 open
 - **v1.44.0 merged** (PR #161, `46ec5b36`, 2026-11-16 03:54Z by operator via admin override). Tag and GitHub release v1.44.0 created on `46ec5b36` (Latest). enforce_admins on main restored (enabled true; required reviews 1).
