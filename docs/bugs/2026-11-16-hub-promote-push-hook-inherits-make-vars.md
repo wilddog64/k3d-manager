@@ -96,4 +96,4 @@ evidence:
   - {id: E3, proves: [M1, M2], kind: live, intent: "At the next real hub-promote, you will see deploy/hub move and the tag push succeed in one run, with no --no-verify needed."}
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-16
