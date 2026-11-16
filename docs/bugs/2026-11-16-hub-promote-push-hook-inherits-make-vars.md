@@ -5,7 +5,9 @@
 **Introduced by:** unknown
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-16
+**Waiting on:** dispatch — since 2026-11-16 (operator: "fix in v1.44.1"; spec next)
+**Branch:** k3d-manager-v1.44.1
+**Triage:** patch → v1.44.1 — operator 2026-11-16 ("fix in v1.44.1")
 **Prior art:** docs/bugs/2026-11-08-hub-promote-no-op-promote-tags-and-breaks-rollback.md (name match) — read, different root cause; `make find-similar-docs` printed nothing (not run successfully)
 
 ## Symptom (2026-11-16, m4-air.local, operator's pane, promote of b5b931df)

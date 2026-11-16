@@ -6,6 +6,7 @@
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Waiting on:** live check — since 2026-11-16 (E5: test_eso + test_vault against hub Vault 1.20.1, Claude or operator)
+**Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1; Claude's P2 kept over Argon P3 (breaks the CLAUDE.md secrets rule) — operator grooming 2026-11-15 ("Accept as shown")
 **Prior art:** exact-slug pass, no match; `find-similar-docs` not run (needs context k3d-k3d-cluster from the M4) — found by the Fable spec review of `2026-11-15-vault-pod-restart-invalidates-token-reviewer-jwt-eso-403.md`, which fixes the `test_vault` root-token sites only
 

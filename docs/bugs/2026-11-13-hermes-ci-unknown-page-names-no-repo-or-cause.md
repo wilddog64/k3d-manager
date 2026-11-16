@@ -5,6 +5,7 @@
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The `ci` sensor's broad exception handler masks the failing repository, workflow, and underlying error in both Slack pages and logs, degrading alert diagnostics while leaving manual GitHub Actions inspection as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator
 **Waiting on:** fix running — since 2026-11-16 (Flash)
+**Branch:** k3d-manager-v1.44.1
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; `make find-similar-docs` returned nothing — none above threshold

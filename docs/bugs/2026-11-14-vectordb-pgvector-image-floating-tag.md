@@ -3,6 +3,7 @@
 **Status:** LANDED — 74c8c7f3 on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: new test red on pre-fix manifest, digest matches Docker Hub and the live pod)
 **Priority:** P3
 **Waiting on:** live check — since 2026-11-16 (E2 after hub-promote + platform-ops)
+**Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (one-line pin; A08 rule) — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** pre-existing
 **Should have been caught by:** review

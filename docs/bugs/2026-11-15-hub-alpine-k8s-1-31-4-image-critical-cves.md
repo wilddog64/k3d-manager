@@ -8,6 +8,7 @@
 **Introducing change reviewed:** unknown
 **Prior art:** `make find-similar-docs` unavailable (vector store context missing on M4); exact-slug glob for `*alpine-k8s*` and `*rotator*`: none
 **Waiting on:** live check — since 2026-11-16 (E2 after hub-promote + platform-ops: 6 CronJobs on 1.33.13 digest, 5 accepted critical)
+**Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 — operator 2026-11-15 ("go with your recommendation")
 
 ## Symptom

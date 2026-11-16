@@ -3,6 +3,7 @@
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14; was P3)
 **Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
+**Branch:** k3d-manager-v1.44.1
 **Intent approved:** operator, 2026-11-16
 **Approval note:** ("Approve all 9")
 **Triage:** patch → v1.44.1, fixed by the stall-A detector — operator grooming 2026-11-15 ("Accept as shown")
