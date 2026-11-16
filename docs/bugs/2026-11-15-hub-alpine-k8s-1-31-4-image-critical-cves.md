@@ -1,13 +1,13 @@
 # Bug: six hub CronJobs run `alpine/k8s:1.31.4` with 27 critical and 218 high CVEs
 
-**Status:** OPEN — captured 2026-11-15 by Claude
+**Status:** LANDED — pending land-commit on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: 3 tests red on pre-fix code, green on fix; no live 1.31.4 reference left outside history)
 **Priority:** P2
 **Classified:** not run (queued for the next triage)
 **Introduced by:** pre-existing (pin added in v1.23.0 `7253ece4` and v1.24.0 `fd281c85`)
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
 **Prior art:** `make find-similar-docs` unavailable (vector store context missing on M4); exact-slug glob for `*alpine-k8s*` and `*rotator*`: none
-**Waiting on:** fix running — since 2026-11-16 (Flash, gemini-3.8-flash-medium)
+**Waiting on:** live check — since 2026-11-16 (E2 after hub-promote + platform-ops: 6 CronJobs on 1.33.13 digest, 5 accepted critical)
 **Triage:** patch → v1.44.1 — operator 2026-11-15 ("go with your recommendation")
 
 ## Symptom
