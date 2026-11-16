@@ -11,7 +11,8 @@
 **Severity:** misleading, no breakage. A "lint" result takes 20.8 min and a red `lint` usually means a failing test,
 not a lint finding. Lint feedback that could arrive in about a minute waits behind the suite.
 **Approval:** operator, 2026-11-10: "so then we should really make the name correctly reflect what it does"
-**Intent approved:** operator, 2026-11-10 ("approve P3 intents")
+**Intent approved:** operator, 2026-11-16
+**Intent approval note:** 2026-11-16 "apporve your intents" (widened fix, Acceptance below); 2026-11-10 "approve P3 intents" (original split)
 **Filed:** 2026-11-10
 **Detected by:** operator, reading the PR-checks dashboard (lint 20.8 min)
 **Branch:** `k3d-manager-v1.43.15`
@@ -26,7 +27,7 @@ Steps of job `lint` (`.github/workflows/ci.yml:35`), timed from `gh run view --j
 | Run pytest suites (hermes + bin), `make test-pytest` (`:130-134`) | 144 s |
 | shellcheck, pyflakes, yamllint, kubeconform, setup | about 35 s |
 
-## Fix
+## Original fix (superseded 2026-11-16 by "Approved fix" below)
 
 Split job `lint` in `.github/workflows/ci.yml` into two jobs on the same triggers:
 
@@ -36,7 +37,7 @@ Split job `lint` in `.github/workflows/ci.yml` into two jobs on the same trigger
 Both jobs keep `permissions: contents: read` and pinned action tags. No test is added, removed or skipped; the step
 commands stay byte-identical, only their job moves. Parallel sharding is out of scope (an idea row, not this fix).
 
-## Contract readers
+### Original contract readers (still valid for the `lint` check name)
 
 - Job name `lint` as a GitHub check name: readers found by grep and the API, 2026-11-10:
   - Branch protection: ruleset `main` (id 12967352) has only `deletion` and `non_fast_forward` rules, no required
@@ -49,7 +50,7 @@ commands stay byte-identical, only their job moves. Parallel sharding is out of 
     use `"lint"` as sample fixture data only. Unchanged.
 - Writer: `.github/workflows/ci.yml` is the only writer of the check name.
 
-## Acceptance
+### Original acceptance (superseded)
 
 ```yaml
 must:
@@ -70,7 +71,7 @@ interface:
   - "GitHub check names on a push to the release branch"
 ```
 
-## Worker definition of done
+### Original worker definition of done (superseded)
 
 - Change only `.github/workflows/ci.yml`, a new or existing static test under `scripts/tests/`, and the PR-checks
   dashboard panel description. Show E1 red on today's `ci.yml`, then green. Paste command, rc and proving lines.
@@ -190,4 +191,24 @@ interface:
   - make test-shard-list SHARD=i/N
 ```
 
-**Intent approved:** operator, 2026-11-16 ("apporve your intents")
+Intent approval: see header.
+
+## Files
+
+- `.github/workflows/ci.yml`
+- `Makefile`
+- `scripts/ci/test_shard.sh` (new, optional: the shard selection helper if the Makefile recipe would be too long)
+- `scripts/ci/test-shard-weights.txt` (new, optional: checked-in weights for the long-pole files)
+- `scripts/tests/bin/test_shard.bats` or `scripts/tests/bin/test_test_shard.py` (new: E1, E2, E3)
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` (panel description only: `lint` is about 1 min from 2026-11-16; tests show as `test (1)`…`test (4)` and `test-python`)
+
+## Worker definition of done
+
+- Change only the files above. Do not edit, skip or delete any existing test.
+- Show E1, E2 and E3 red on today's tree (no `test-shard` target, today's `ci.yml`), then green, with each mutation
+  named in Acceptance red. Paste command, rc and proving lines.
+- Run `make test-shard SHARD=i/4` for i = 1..4 locally and paste per-shard rc and duration; the four together must
+  run every file once (paste the `test-shard-list` union count against the serial count).
+- `yamllint .github/workflows/*.yml` and `shellcheck -S error` on any new script pass.
+- Leave changes uncommitted; Claude reviews, commits and lands. E4 is live, Claude's.
+
