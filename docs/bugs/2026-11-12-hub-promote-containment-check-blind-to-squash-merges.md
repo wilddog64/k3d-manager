@@ -397,7 +397,7 @@ uncontained_commits() {
 - The "before fetching `From `" assertion lived only in unlanded run 2 and cannot fail; it is dropped, not rewritten (nothing in this design claims a fetch ordering).
 - Mutants the worker records (rc each, restore with snapshot and `cmp`): (m1) `:305` back to the BREAK_GLASS conditional: H4 red. (m2) `merged_pr_contains` always `return 0`: R1 to R6 red. (m3) drop the `ls-remote` head comparison: R3 red. (m4) drop `merge-base --is-ancestor "$merge" "$target"`: R2 red. (m5) drop the `merge-base --is-ancestor "$old" "$head"`: R6 red. (m6) drop `select(.merged_at != null)`: R4 red. (m7) drop the reason check: E9 refusals red.
 
-### Files
+## Files
 
 | File | Change |
 |---|---|
@@ -408,7 +408,7 @@ uncontained_commits() {
 | `docs/howto/hub-promote.md` | `:67-72`, `:81-83` |
 | `.github/copilot-instructions.md` | `:42`, `:138` |
 
-### Contract readers
+## Contract readers
 
 Contract: `uncontained_commits` behaviour (stdout list, exit codes, stderr note), `BREAK_GLASS` meaning, the `promote` argument list, the tag message fields. Greps run 2026-11-16 (`grep -rn "BREAK_GLASS\|k3dm-hub-promote\|uncontained"` over the repo minus `docs/bugs`, `docs/reviews`, `memory-bank`).
 
