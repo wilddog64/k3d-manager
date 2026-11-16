@@ -1,3 +1,13 @@
+## Handoff 2026-11-16 ~05:15Z — v1.44.1 CI shard LANDED (f20d1b2b), CI 22 → 7.0 min
+
+- Objective: CI speed P2 (docs/bugs/2026-11-10-ci-job-named-lint-runs-the-full-test-suite.md). Status LANDED.
+- Evidence: Claude reran tests + 2 real mutations red; union 264=264; push CI run 43806426493 wall 7.0 min, shards
+  6.2/7.0/5.1/4.5, all 7 check-runs green. Pending: pull_request run on the v1.44.1 release PR (E4 second half).
+- Changed: .github/workflows/ci.yml, Makefile (test-shard, test-shard-list), scripts/ci/test_shard.sh,
+  scripts/tests/bin/test_test_shard.py, grafana-dashboard-pr-checks.yaml (panel 8 description).
+- Next (operator, morning): hub promote at f20d1b2b or later green head — `make hub-promote REF=<sha>`, appsets-check,
+  platform-ops. Open questions still owed: stale standing docs, Dependabot #16, stale review rows, xhigh P3, dirused CRLF P3.
+
 ## Current focus 2026-11-16 ~04:00Z — v1.44.0 MERGED, v1.44.1 open
 - **v1.44.0 merged** (PR #161, `46ec5b36`, 2026-11-16 03:54Z by operator via admin override). Tag and GitHub release v1.44.0 created on `46ec5b36` (Latest). enforce_admins on main restored (enabled true; required reviews 1).
 - **2026-11-16 ~04:30Z — v1.44.1 open.** v1.44.0 merged (#161, 46ec5b36), tagged, released; enforce_admins restored. **Tomorrow morning (operator): hub promote** of the merged release (operator deferred it on 2026-11-16 when leaving). CI speed P2 (`docs/bugs/2026-11-10-ci-job-named-lint-runs-the-full-test-suite.md`, option B lint split + 4 matrix shards, intents approved) DISPATCHED to Codex (task/v1.44.1/2026-11-10-ci-job-named-lint-runs-the-full-test-suite); Claude verifies + E4 live. Open for operator: standing-docs staleness (copilot-instructions lists k3s-oci; functions.md lacks v1.44.0 entries), Dependabot low #16, stale review rows deploy-hub-batch-review / test-hygiene-batch-review.

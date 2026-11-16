@@ -1,10 +1,10 @@
 # Bug: the CI job named `lint` runs the full offline test suite
 
-**Status:** OPEN
+**Status:** LANDED — f20d1b2b on k3d-manager-v1.44.1 (2026-11-16); E4 push-run green, pull_request run pending the release PR
 **Priority:** P2 — raised by the operator 2026-11-16 ("we really need to fix this slow ci. this a big hurdle"); was P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (CI job hygiene/test-only issue where offline test suites are bundled into the `lint` job, delaying lint feedback without breaking functionality); Claude proposed P3. Agreed.
 **Triage:** passed over, 1st — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** live check — since 2026-11-16 (E4 pull_request half, on the v1.44.1 release PR)
 **Introduced by:** unknown (the test steps accreted into `lint` over several releases)
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10). Related, not a duplicate: `docs/plans/v1.44.0-parallel-offline-tests.md` (local runner speed; leaves CI unchanged, line 62)
@@ -212,3 +212,13 @@ Intent approval: see header.
 - `yamllint .github/workflows/*.yml` and `shellcheck -S error` on any new script pass.
 - Leave changes uncommitted; Claude reviews, commits and lands. E4 is live, Claude's.
 
+
+## Verification (Claude, 2026-11-16)
+
+- Offline, rerun by Claude in the task worktree: `test_test_shard.py` 3/3 green. Mutation "ignore per-file rc" → 1 failed;
+  mutation "drop scripts/tests/etc from find" → 1 failed; restored → 3 passed. Union of `test-shard-list` 1/4..4/4 =
+  264 files, 264 unique, identical to the serial find list. Land fast gate PASS (243 s).
+- Live E4, CI run 43806426493 (push, head f20d1b2b): wall time first job start to last job end **7.0 min** (was ~22).
+  lint 0.8, alertmanager-behaviour 1.9, test-python 3.4, test (1) 6.2, test (2) 7.0, test (3) 5.1, test (4) 4.5 min.
+  Shard mean 5.7 min, max 7.0 = 1.23x (limit 1.5x). All 7 check-runs on the head SHA green.
+- Pending: the pull_request run of the same shape on the v1.44.1 release PR.
