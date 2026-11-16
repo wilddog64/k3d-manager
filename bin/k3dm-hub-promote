@@ -17,6 +17,7 @@ GH_REPO="${GH_REPO:-wilddog64/k3d-manager}"
 
 die() { printf '[hub-promote] ERROR: %s\n' "$*" >&2; exit 1; }
 git_cmd() { _run_command --soft -- git -C "$REPO_ROOT" "$@"; }
+git_push() { _run_command --soft -- env -u REF -u BREAK_GLASS -u SKIP_CHECK_RUNS -u SKIP_CHECK_RUNS_REASON -u MAKEFLAGS -u MFLAGS -u MAKELEVEL git -C "$REPO_ROOT" push "$@"; }
 
 merged_pr_contains() {
   local target="$1" old="$2" rows number head merge remote_head
@@ -156,7 +157,7 @@ record_move() {
   local lease="refs/heads/$BRANCH:$old"
   [[ ! "$old" =~ ^0+$ ]] || lease="refs/heads/$BRANCH:"
   push_log="$(mktemp)"
-  if ! git_cmd push "$REMOTE" "--force-with-lease=$lease" "$new:refs/heads/$BRANCH" 2>&1 | tee "$push_log" >&2; then
+  if ! git_push "$REMOTE" "--force-with-lease=$lease" "$new:refs/heads/$BRANCH" 2>&1 | tee "$push_log" >&2; then
     push_output="$(<"$push_log")"
     rm -f "$push_log"
     if [[ "$push_output" == *"stale info"* ]]; then
@@ -166,7 +167,7 @@ record_move() {
   fi
   rm -f "$push_log"
   git_cmd tag -a "$tag" "$new" -m "$message" || die "could not create annotated tag $tag"
-  git_cmd push "$REMOTE" "refs/tags/$tag" || die "deploy/hub moved, but tag push failed ($tag)"
+  git_push "$REMOTE" "refs/tags/$tag" || die "deploy/hub moved, but tag push failed ($tag)"
   printf '[hub-promote] moved deploy/hub to %s and recorded %s\n' "$new" "$tag"
 }
 

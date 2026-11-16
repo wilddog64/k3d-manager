@@ -478,6 +478,65 @@ REF: $promoted"
   [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
 }
 
+@test "E1: promote and rollback push hooks do not inherit promote make or env vars (M1, M2, M3, N1)" {
+  _prepare_promotion_history
+  initial_sha="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
+
+  hook_log="$BATS_TEST_TMPDIR/pre-push-seen.log"
+  : > "$hook_log"
+  mkdir -p "$WORK/.git/hooks"
+  cat > "$WORK/.git/hooks/pre-push" <<EOF
+#!/bin/sh
+echo "HOOK_CALL" >> "$hook_log"
+[ -n "\${HOOK_SENTINEL+x}" ] && echo "SEEN_HOOK_SENTINEL=\$HOOK_SENTINEL" >> "$hook_log"
+[ -n "\${REF+x}" ] && echo "SEEN_REF=\$REF" >> "$hook_log"
+[ -n "\${BREAK_GLASS+x}" ] && echo "SEEN_BREAK_GLASS=\$BREAK_GLASS" >> "$hook_log"
+[ -n "\${SKIP_CHECK_RUNS+x}" ] && echo "SEEN_SKIP_CHECK_RUNS=\$SKIP_CHECK_RUNS" >> "$hook_log"
+[ -n "\${SKIP_CHECK_RUNS_REASON+x}" ] && echo "SEEN_SKIP_CHECK_RUNS_REASON=\$SKIP_CHECK_RUNS_REASON" >> "$hook_log"
+[ -n "\${MAKEFLAGS+x}" ] && echo "SEEN_MAKEFLAGS=\$MAKEFLAGS" >> "$hook_log"
+[ -n "\${MFLAGS+x}" ] && echo "SEEN_MFLAGS=\$MFLAGS" >> "$hook_log"
+[ -n "\${MAKELEVEL+x}" ] && echo "SEEN_MAKELEVEL=\$MAKELEVEL" >> "$hook_log"
+exit 0
+EOF
+  chmod +x "$WORK/.git/hooks/pre-push"
+
+  export REF="b5b931df"
+  export BREAK_GLASS="1"
+  export SKIP_CHECK_RUNS="1"
+  export SKIP_CHECK_RUNS_REASON="testing hook isolation"
+  export MAKEFLAGS=' REF=x BREAK_GLASS=1'
+  export MFLAGS='-j4'
+  export MAKELEVEL="2"
+  export HOOK_SENTINEL="sentinel_present"
+
+  # Promote with the variables exported
+  _run_promoter_tty promote success promote "$A_SHA" 1
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$A_SHA" ]
+  tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}' | sort -r | head -1)"
+  [ -n "$tag_ref" ]
+
+  # 2 pushes: deploy/hub branch and promotion tag
+  [ "$(grep -c 'HOOK_CALL' "$hook_log")" -eq 2 ]
+
+  # Rollback with the variables exported
+  _run_promoter_tty promote empty rollback
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$initial_sha" ]
+
+  # 4 pushes total: 2 from promote, 2 from rollback
+  [ "$(grep -c 'HOOK_CALL' "$hook_log")" -eq 4 ]
+
+  # Positive control: HOOK_SENTINEL was seen by every hook invocation
+  [ "$(grep -c 'SEEN_HOOK_SENTINEL=sentinel_present' "$hook_log")" -eq 4 ]
+
+  # None of the 7 promote/make variables were seen by any hook invocation
+  for var in REF BREAK_GLASS SKIP_CHECK_RUNS SKIP_CHECK_RUNS_REASON MAKEFLAGS MFLAGS MAKELEVEL; do
+    run grep "SEEN_${var}=" "$hook_log"
+    [ "$status" -ne 0 ]
+  done
+}
+
 @test "M4: divergent local and origin branch is rejected with both SHAs" {
   _prepare_promotion_history
   git -C "$WORK" checkout -q k3d-manager-v1.43.15
