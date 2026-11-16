@@ -55,10 +55,25 @@ constant, values reach it as positional parameters, and every call is wrapped in
    `unset _VAULT_TEST_ROOT_TOKEN` as the last line of `_cleanup_eso_test`.
 5. `:660-661`: replace `sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/$vault_secret_path" >/dev/null 2>&1 || true` with
    `_no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv delete "secret/$1"' sh "$vault_secret_path" <<<"$root_token" >/dev/null 2>&1 || true`.
-6. `:779-783` (the JWT login): replace the `sa_jwt=...` assignment with
-   `_no_trace eval 'sa_jwt=$(_kubectl create token "$sa" -n "$test_ns")'` and the login with
-   `vault_token=$(_no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- sh -c 'read -r JWT; printf %s "$JWT" | vault write -field=token auth/kubernetes/login role="$1" jwt=-' sh "$sa" <<<"$sa_jwt")`.
-7. `:785-786`: replace `sh -c "VAULT_TOKEN=$vault_token vault kv get -field=${secret_key} secret/${vault_secret_path}"` with
+6. `:779-783` (the JWT login). **Corrected 2026-11-16 (Claude) after the Luna worker stopped:** the original text
+   (`vault_token=$(_no_trace ...)`) leaks the token under xtrace, because bash traces the assignment `vault_token=<value>`
+   after the substitution returns, outside `_no_trace`. Instead add a private helper directly above `test_vault`:
+
+   ```bash
+   function _test_vault_k8s_login() {
+     local vault_ns="$1" vault_pod="$2" sa="$3" test_ns="$4"
+     local sa_jwt
+     sa_jwt=$(_kubectl create token "$sa" -n "$test_ns")
+     vault_token=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+       sh -c 'read -r JWT; printf %s "$JWT" | vault write -field=token auth/kubernetes/login role="$1" jwt=-' sh "$sa" <<<"$sa_jwt")
+   }
+   ```
+
+   and in `test_vault` replace the `local sa_jwt` / `sa_jwt=...` / `vault_token=...` lines with
+   `local vault_token` followed by `_no_trace _test_vault_k8s_login "$vault_ns" "$vault_pod" "$sa" "$test_ns"`.
+   The helper assigns the caller's `local vault_token` through bash dynamic scoping; `_no_trace` keeps xtrace off for
+   the whole helper, so neither the JWT nor the token is traced. No `eval`.
+7. `:785-786`: replace (wrap the whole assignment the same way if E2's xtrace check flags `value=`; `value` is the test secret, not a token, so `$(_no_trace ...)` is acceptable here) `sh -c "VAULT_TOKEN=$vault_token vault kv get -field=${secret_key} secret/${vault_secret_path}"` with
    `value=$(_no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -field="$1" "secret/$2"' sh "$secret_key" "$vault_secret_path" <<<"$vault_token")`.
 8. `bin/get-ldap-password:131-132`, `:137-138`, `:142-143`: each `kubectl exec -n "$VAULT_NS" vault-0 -- sh -c "VAULT_TOKEN='$VAULT_TOKEN' vault kv get ... $VAULT_PATH"`
    becomes `kubectl exec -i -n "$VAULT_NS" vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -format=json "$1"' sh "$VAULT_PATH" <<<"$VAULT_TOKEN"`
