@@ -793,3 +793,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: Copilot quota out → rule: gated PRs get blind Argon review of the post-Copilot delta. PR #161: Copilot reviewed 34112fe3; Argon reviewed 6-file delta, 1 finding verified → P3 docs/bugs/2026-11-16-dispatch-metrics-xhigh-tier-runs-unpriced.md (Waiting on operator decision; not a release blocker).
 - 2026-11-16: API credit re-verified (monthly $100, no rollover, not Claude Code); ideas row: Claude-API PR reviewer (groom 2026-11-22).
 - 2026-11-16 03:54Z: v1.44.0 MERGED (PR #161, 46ec5b36); tag/release v1.44.0 created on 46ec5b36 (release marked Latest); enforce_admins restored; next branch k3d-manager-v1.44.1 (CI speed fix P2, option B approved)
+- 2026-11-16 ~04:30Z: v1.44.0 releases rows added (docs/releases.md, README); CI shard spec committed d1a2e0d4 and dispatched (Codex, coordinator anthropic/claude-opus-5-5). Hub promote deferred to 2026-11-17 morning (operator).
