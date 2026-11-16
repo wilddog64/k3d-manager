@@ -1486,7 +1486,7 @@ EOF
   grep -q -- '--connect-timeout 5 --max-time 15' <<<"${_resolved}"
   run grep -qF "${GH_TOKEN}" "${CURL_LOG}"
   [ "$status" -eq 1 ]
-  grep -q 'image: docker.io/alpine/k8s:1.31.4' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'image: docker.io/alpine/k8s:1.33.13@sha256:e521cee1f1cb8699bc6e906b4ce6fe50e84addae97f52d5dcf05d3974002ac26' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'name: install-trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'mountPath: /tools' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'cp /usr/local/bin/trivy /tools/trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
@@ -1592,4 +1592,39 @@ PY
   [ "${status}" -eq 0 ]
   [ "${output}" = "200" ]
   grep -q '^Docker-Content-Digest: sha256:deadbeef' "${_headers_file}"
+}
+
+@test "credential rotators and CVE scanner pin alpine/k8s image by tag and sha256 digest" {
+  local files=(
+    "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+    "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/argocd-credential-rotator.yaml"
+    "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-credential-rotator.yaml"
+    "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/keycloak-credential-rotator.yaml"
+    "${BATS_TEST_DIRNAME}/../../etc/ldap/vars.sh"
+  )
+
+  for file in "${files[@]}"; do
+    [ -f "${file}" ]
+
+    # must_not N1: no alpine/k8s reference is 1.31.4
+    run ! grep -q 'alpine/k8s:1\.31\.4' "${file}"
+
+    # must_not N1: no tag without a digest
+    run ! grep -E 'alpine/k8s:[^@[:space:]"\x27]+($|[[:space:]"\x27])' "${file}"
+
+    # must M2: every alpine/k8s reference matches tag plus sha256 digest
+    run grep -E 'alpine/k8s:' "${file}"
+    [ "$status" -eq 0 ]
+    while IFS= read -r line; do
+      [[ "${line}" =~ alpine/k8s:[0-9]+\.[0-9]+\.[0-9]+@sha256:[0-9a-f]{64} ]]
+    done < <(grep 'alpine/k8s:' "${file}")
+  done
+
+  # must M1: all six manifest and default references use the exact pinned image
+  local pinned="docker.io/alpine/k8s:1.33.13@sha256:e521cee1f1cb8699bc6e906b4ce6fe50e84addae97f52d5dcf05d3974002ac26"
+  [ "$(grep -c "${pinned}" "${files[0]}")" -eq 2 ]
+  [ "$(grep -c "${pinned}" "${files[1]}")" -eq 1 ]
+  [ "$(grep -c "${pinned}" "${files[2]}")" -eq 1 ]
+  [ "$(grep -c "${pinned}" "${files[3]}")" -eq 1 ]
+  [ "$(grep -c "${pinned}" "${files[4]}")" -eq 1 ]
 }

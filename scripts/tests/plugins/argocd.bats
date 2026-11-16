@@ -64,7 +64,7 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F -- 'resourceNames: ["argocd-admin-secret"]' "${manifest}"
   [ "$status" -eq 0 ]
-  run grep -F -- 'image: docker.io/alpine/k8s:1.31.4' "${manifest}"
+  run grep -F -- 'image: docker.io/alpine/k8s:1.33.13@sha256:e521cee1f1cb8699bc6e906b4ce6fe50e84addae97f52d5dcf05d3974002ac26' "${manifest}"
   [ "$status" -eq 0 ]
   run grep -F -- 'schedule: "0 0 1 * *"' "${manifest}"
   [ "$status" -eq 0 ]
