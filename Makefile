@@ -1470,6 +1470,15 @@ test-bin:
 	   echo "[make] bats not found — install with: brew install bats-core" >&2; exit 2; }; \
 	 scripts/tests/tripwire.sh bats scripts/tests/bin
 
+## List or run a deterministic share of the offline BATS files
+.PHONY: test-shard test-shard-list
+export SHARD
+test-shard-list:
+	@scripts/ci/test_shard.sh list "$${SHARD:-}"
+
+test-shard:
+	@scripts/ci/test_shard.sh run "$${SHARD:-}"
+
 ## Run the real-host BATS suites under scripts/tests/host (macOS only, no tripwire)
 test-host:
 	@set -euo pipefail; \
