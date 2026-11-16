@@ -4,7 +4,8 @@
 **Parent:** `docs/plans/dirused-m1c-summary-top-and-fast-scan.md` (A1, A2 only; A3 `/summary /top N` and Part B are later rounds)
 **Bugs:** `docs/dirused/bugs/2026-11-16-dirused-summary-drops-hosts-sharing-volume-serial.md`, `docs/dirused/bugs/2026-11-16-dirused-all-scans-local-host-with-remote-targets.md`
 **Tracked:** separately from k3d-manager releases; this file sits in k3d-manager only so `codex-dispatch start` can read it
-**Intent approved:** operator, 2026-11-16 ("at the moment can you dispatch dirused bugs fix to flash")
+**Intent approved:** operator, 2026-11-16
+**Approval words:** "at the moment can you dispatch dirused bugs fix to flash"
 **Repo / branch:** wilddog64/dirused, `m1c-summary-all-bugs` from `main` at 1926d2e
 **Implementer:** Flash (agy `gemini-3.8-flash-medium`). **Verifier:** Claude, from the Acceptance block only; live evidence by Claude (`make vm-live`).
 
