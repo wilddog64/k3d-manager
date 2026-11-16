@@ -1,5 +1,5 @@
 ## Handoff 2026-11-16 ~00:45Z — dirused M1b 1a + 1b + P3 all MERGED; ledger offline_tested recorded — START HERE
-- **Merged:** PR #5 (P3 unreachable codes) as eac2aa2 (00:21Z); PR #3 (1b fleet runner) as febe79d (00:34Z) after Update branch (486f219, CI green). Both merge trees identical to the CI-tested heads. Main CI at febe79d: run 43781208836 (check result). Copilot on #3 at e3a5e71: approval recommended, 3 threads resolved.
+- **Merged:** PR #5 (P3 unreachable codes) as eac2aa2 (00:21Z); PR #3 (1b fleet runner) as febe79d (00:34Z) after Update branch (486f219, CI green). Both merge trees identical to the CI-tested heads. Main CI at febe79d: run 43781208836 green. Copilot on #3 at e3a5e71: approval recommended, 3 threads resolved.
 - **Ledger:** offline_tested at eac2aa2 for dirused-unreachable-codes; at febe79d for dirused-m1b1b-fleet-runner and dirused-parallel-threadpool-cap (evidence scratchpad offline-p3-merge.md / offline-1b-merge.md).
 - **Bug docs:** threadpool + unreachable-codes now LANDED, Waiting on: live check. Hung-probe timeout P3 OPEN, waiting on operator decision.
 - **Open item:** `open` still lists dirused-m1b0-modular-refactor (phase 0, merged 2dbd10d, offline_tested recorded) because it never got a `land` event; the only closer is `abandon`, which would miscount merged work. Left for operator decision.
