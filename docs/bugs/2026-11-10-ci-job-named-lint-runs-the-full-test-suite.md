@@ -1,10 +1,10 @@
 # Bug: the CI job named `lint` runs the full offline test suite
 
 **Status:** OPEN
-**Priority:** P3
+**Priority:** P2 — raised by the operator 2026-11-16 ("we really need to fix this slow ci. this a big hurdle"); was P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (CI job hygiene/test-only issue where offline test suites are bundled into the `lint` job, delaying lint feedback without breaking functionality); Claude proposed P3. Agreed.
 **Triage:** passed over, 1st — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Waiting on:** operator decision — since 2026-11-16 (approve the widened fix below; target v1.44.1)
 **Introduced by:** unknown (the test steps accreted into `lint` over several releases)
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none. `make find-similar-docs` unavailable (vector store: context `k3d-k3d-cluster` does not exist on the M4, 2026-11-10). Related, not a duplicate: `docs/plans/v1.44.0-parallel-offline-tests.md` (local runner speed; leaves CI unchanged, line 62)
@@ -75,3 +75,32 @@ interface:
 - Change only `.github/workflows/ci.yml`, a new or existing static test under `scripts/tests/`, and the PR-checks
   dashboard panel description. Show E1 red on today's `ci.yml`, then green. Paste command, rc and proving lines.
   Leave changes uncommitted; Claude reviews and lands.
+
+## Escalation (operator, 2026-11-16): split alone is not enough
+
+PR #161 at `12bd21b7` (runs `43798158706` pull_request, `43798151066` push): job `lint` took 21.9 min, of which
+`Run the full offline suite` 1127 s (866 s on 2026-11-10: +30 % in six days) and `make test-pytest` 135 s.
+
+Per-test durations from the job log (`ok N` timestamps): 3381 tests, 18.0 min in total. The slowest 31 tests (over
+5 s each) are 4.6 min; the rest is breadth, about 0.3 s a test. Making single tests faster cannot fix this; running
+them side by side can.
+
+Each push to a PR branch also runs CI twice (`push` on `k3d-manager-v*` and `pull_request`, `.github/workflows/ci.yml:4-11`),
+with the concurrency group keyed on `github.ref`, which differs between the two events, so neither cancels the other. On
+2026-11-16 Claude watched only one of the pair and reported green early. The `push` trigger exists for the hub-promote
+gate (`docs/bugs/2026-11-07-hub-promote-refuses-release-branch-commits-ci-runs-only-on-prs.md`), so it stays.
+
+### Widened fix (proposed, needs operator approval and new Acceptance)
+
+1. The split above (`lint` about 1 min, its own job).
+2. Shard the test job with a `strategy.matrix` (e.g. 4 shards of the BATS files, one for `test-bin` + Python units,
+   one for `test-pytest`). The repo is public, so each shard gets its own free 4-vCPU runner. Target wall time
+   under 7 min including setup, from about 22. Each shard runs the same commands on a subset; the union of shards
+   must equal today's file list (a test that checks this belongs in Acceptance), and a red in any shard fails the run.
+3. Not in this fix: `PARALLEL=1` inside one runner (`docs/plans/v1.44.0-parallel-offline-tests.md` keeps CI serial
+   until the local runner has a clean month, and `docs/bugs/2026-11-14-lib-foundation-run-parallel-collision-test-flakes-on-linux.md`
+   is an open Linux parallel flake). Matrix shards are separate machines, so they avoid that shared-`TMPDIR` class.
+4. Optional: drop the double run cost by giving both events one concurrency key (`github.head_ref || github.ref_name`).
+   Needs checking first: the cancelled run would leave a cancelled check-run on the head SHA, and the hub-promote gate's
+   reading of check-runs must still pass. Prove that before including it.
+
