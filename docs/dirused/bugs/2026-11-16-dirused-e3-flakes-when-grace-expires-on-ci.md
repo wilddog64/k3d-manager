@@ -28,3 +28,11 @@ Low. Real `/timeout` values are seconds or more, giving a 2 s grace. A cooperati
 
 1. Test-only: give E3 a timeout whose grace absorbs runner jitter (e.g. `Timeout: 1s`, grace 1 s), keeping the hung-scan tests E1/E2 on short timeouts.
 2. Product: a grace floor (e.g. `max(min(timeout, 2s), 500ms)`) so a cooperative scan always gets a reasonable window.
+
+## Review of the fix (PR #9, 2026-11-16)
+
+Argon blind review, verified by Claude:
+- E3 at 1 s *narrows* the race (grace 200 ms → 1 s); it doesn't remove it. Accepted: E3 checks behaviour at a wall-clock deadline, so some timing dependence comes with the test.
+- E3 still fails if partial-result handling breaks (`FleetRunnerTests.cs:70`), so its guard survives the change.
+- Watch item, not fixed: E1 (`quick` must finish within its 600 ms abandon window) and E2's second sub-test (`manyCalls == 4` needs each scan thread to start within 400 ms) carry the same kind of exposure. It's smaller there, since the margin covers thread start-up rather than a timer callback plus a wake-up. Neither has failed in CI. If one does, give it the same treatment.
+- Rejected: an `ObjectDisposedException` on `ct.WaitHandle` can only happen after abandonment, which already fails the test, and the scan thread's catch absorbs it. E4's `max8 > 2` predates PR #8.
