@@ -6,10 +6,10 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** investigation — since 2026-11-15 (operator chose option (a): respec on PR-head ancestry; Sol run 2 not landed)
+**Waiting on:** operator decision — since 2026-11-16 (intent approval)
 **Triage:** patch → v1.44.1 (P2, flagged: every first promote of a release needs BREAK_GLASS) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
-**Intent approved:** operator ("go ahead"), 2026-11-14
+**Intent approved:** pending (respec 2026-11-16)
 
 ## Symptom
 
@@ -52,7 +52,7 @@ v1.43.15 history (9f5f0d89), whose squashed-away commits (fcc4fa4a, bb71f0cb, �
 
 Operator, 2026-11-14: "go with your recommendations" — accept `old` as contained when `git merge-tree --write-tree new old` merges without conflict and the result's tree equals `new`'s tree (no GitHub API). `check_runs` stays independent of `BREAK_GLASS`.
 
-## Spec (2026-11-14; drafted by Sonnet, reviewed by Claude)
+## Spec (2026-11-14; drafted by Sonnet, reviewed by Claude) (superseded by the 2026-11-16 respec; sections 2 and 2a are carried over there)
 
 ## Symptom
 
@@ -101,11 +101,11 @@ Findings that shape the fix:
 - Any non-zero rc (1 conflict, 128 unrelated histories or bad object, 129 usage) is treated as NOT contained, falling back to the existing refusal. This is also the behaviour on git older than 2.38, where `--write-tree` is an unknown option (usage error): the guard then behaves exactly as today. Not probed on git < 2.38 (none on this machine): unproven, stated as such.
 - `git merge-tree --write-tree` needs git >= 2.38. Machine-local only: this machine has 2.56.1. NOT discoverable in the repo: `grep -rn "merge-tree\|2\.38"` over `docs/howto`, `.github`, `bin`, `scripts/ci` returned nothing; no repo doc names a git minimum. CI runs on `ubuntu-24.04` / `ubuntu-latest` (`.github/workflows/ci.yml:22,39`, `deploy-worker.yml:21`), whose git version was not probed (no network from this session). The M5 hub's git version was not probed. Open question for the operator below; the fail-closed fallback makes an old git harmless (a refusal, as today).
 
-## Fix
+## Fix (superseded)
 
 All changes in `bin/k3dm-hub-promote`.
 
-## 1. Tree-containment helper and use in `uncontained_commits`
+## 1. Tree-containment helper and use in `uncontained_commits` (superseded)
 
 Old block (`bin/k3dm-hub-promote:21-27`, verbatim):
 
@@ -152,7 +152,7 @@ Design notes for the worker (do not deviate):
 - `uncontained_commits` is also called by `status` (`:179`, against the release's origin SHA) and `rollback` (`:246`, against `live_sha`). Both get the same tree-equality acceptance; this is intended (a squash-merged release is not "uncontained" in `status` either). The note goes to stderr so the captured `$(...)` list (stdout) stays clean.
 - `git_cmd` is `_run_command --soft -- git -C "$REPO_ROOT"` (`:19`); do not call `git` directly.
 
-## 2. Separate the green-checks gate from BREAK_GLASS
+## 2. Separate the green-checks gate from BREAK_GLASS (carried into the 2026-11-16 respec)
 
 Old line (`bin/k3dm-hub-promote:305`, verbatim):
 
@@ -170,7 +170,7 @@ New line:
 
 Instead of the bare line above, the worker writes the block in section 2a, which keeps `check_runs "$new"` as the default path.
 
-## 2a. Explicit outage flag `SKIP_CHECK_RUNS` (operator, 2026-11-14: "so make an explicit flag for this")
+## 2a. Explicit outage flag `SKIP_CHECK_RUNS` (operator, 2026-11-14: "so make an explicit flag for this") (carried into the 2026-11-16 respec)
 
 The GitHub-outage case gets its own flag, separate from BREAK_GLASS, so each bypass is named for the one gate it skips.
 
@@ -190,11 +190,11 @@ The GitHub-outage case gets its own flag, separate from BREAK_GLASS, so each byp
 - It does not bypass the containment refusal (that stays BREAK_GLASS), the typed confirmation, origin reachability or the lease. A combined outage-plus-uncontained promote needs both flags, and the tag carries both mode lines.
 - `Makefile` `hub-promote` (`:477-478`) becomes `@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}" "$${SKIP_CHECK_RUNS:-0}"`. `bin/k3dm-hub-deploy` needs no change: it calls `promote "$ref"`, and the defaults read the environment, so `make hub-deploy REF=... SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...` passes through. E10 proves that.
 
-## 3. Docs
+## 3. Docs (superseded)
 
 `docs/howto/hub-promote.md:81-83`, replace "`BREAK_GLASS=1` skips the check-run gate and the containment refusal" so it says: `BREAK_GLASS=1` skips only the uncontained-commits refusal; the green check-run gate, `origin` reachability, the typed confirmation and the promotion record still apply. Add one sentence: a deploy/hub whose commits were squash-merged into the target is recognised by content (`git merge-tree --write-tree`, git 2.38 or newer) and needs no BREAK_GLASS; on older git the old refusal applies. Document `SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON="..."` as the GitHub-outage path (skips only the check-run gate; recorded in the tag), and say an outage with an uncontained commit needs both flags.
 
-## Contract readers
+## Contract readers (superseded)
 
 Contract: the behaviour of `uncontained_commits` / the promote guard (stdout list, exit codes, message text) and the meaning of `BREAK_GLASS`. Greps run 2026-11-14.
 
@@ -212,7 +212,7 @@ Contract: the behaviour of `uncontained_commits` / the promote guard (stdout lis
 - Docs reading the semantics: `docs/howto/hub-promote.md:81-83` (changed here). `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` and `docs/bugs/2026-11-12-...squash-merges.md` describe it historically; no edit.
 - Message contract: the refusal text `deploy/hub contains N commit(s) not in <ref>` (`:300`) and `check_runs` die texts (`:84-86`) are unchanged.
 
-## Acceptance
+## Acceptance (superseded)
 
 ```yaml
 must:
@@ -264,7 +264,7 @@ Test design (all in `scripts/tests/bin/hub_promote.bats`, existing fixture: scra
 - E10: `_create_promoter_commit_on_hub` + `SKIP_CHECK_RUNS=1` with a reason and `BREAK_GLASS=0`: refused naming the commit; same with `BREAK_GLASS=1`: promotes, tag has `mode: break-glass` and `mode: skip-check-runs`; without a TTY: `confirmation requires a TTY`. Makefile pass-through like `:773-780` for `hub-promote`, and a `hub_deploy.bats` case asserting the promote stub receives `SKIP_CHECK_RUNS=1` in its environment.
 - Mutants the worker must run (record rc): (m1) revert `:305` to the BREAK_GLASS conditional: E4 red. (m2) make `tree_contained` ignore rc and compare only the first line: E6c red (E6a stays green under m2; Sol worker probe 2026-11-15: conflict tree `0f906e96` != target `6ca45b19`). (m3) make `tree_contained` always `return 0`: E5 red. (m4) drop the reason check: E9 refusals red. Restore after each (snapshot + `cmp`).
 
-## Files
+## Files (superseded)
 
 | File | Change |
 |---|---|
@@ -274,13 +274,13 @@ Test design (all in `scripts/tests/bin/hub_promote.bats`, existing fixture: scra
 | `scripts/tests/bin/hub_promote.bats` | helper `_make_squash_release`; stub `MERGE_TREE_FAIL`; E1, E2, E4 (replaces H4), E5, E6; `:773-780` stub mode |
 | `docs/howto/hub-promote.md` | `:81-83` BREAK_GLASS semantics, squash-merge sentence |
 
-## Worker definition of done
+## Worker definition of done (superseded)
 
 - Change only the files above. Scratch HOME, no network, no live cluster or hub, no push to the real `origin` (the tests use the bare scratch origin; `git` stub refuses non-fixture targets). Show E1, E2 and E4(a) red on today's code, then green; paste N2, N3 and N4 passing on both (they are regression guards).
 - Run `bats scripts/tests/bin/hub_promote.bats scripts/tests/bin/hub_deploy.bats scripts/tests/bin/repo_sync_promote_backlog.bats` from the repo root, plus `shellcheck bin/k3dm-hub-promote`, and paste command, rc and the proving lines for each. Mutants m1 to m3 with their rc.
 - Run `git status` and confirm only the five files in the table changed. Leave changes uncommitted. Claude lands them.
 
-## Open questions
+## Open questions (2026-11-14 spec, resolved or superseded)
 
 1. **Resolved (operator, 2026-11-14): explicit flag, section 2a.** Was: separating `check_runs` from BREAK_GLASS means BREAK_GLASS no longer works while GitHub is down (`check_runs` dies on lookup failure, `bin/k3dm-hub-promote:84`), though `docs/howto/hub-promote.md:81-83` names that outage as a BREAK_GLASS use. Accept, or add a separate explicit flag later? This spec accepts it, per the decision.
 2. **Resolved (Claude, 2026-11-14): M5 runs git 2.56.0 (`/opt/homebrew/bin/git`).** Was: what git does the M5 hub run? `merge-tree --write-tree` needs 2.38 or newer (probed only on m4-air, 2.56.1). The fallback to the old refusal is safe, but E8 only passes on 2.38+. `ubuntu-24.04` CI git was not probed.
@@ -309,3 +309,159 @@ catch a `Makefile:478` revert (`:299` falls back to the environment); the "befor
 fail; E9 M5 checks only the newest tag; make expands `$` in a reason passed as a make variable.
 
 **Decision (operator, 2026-11-15): (a)** respec containment on merged-PR head ancestry; do not land run 2 piecemeal. Likely v1.44.1.
+
+## Spec (2026-11-16 respec, option a)
+
+Drafted by Sonnet, for Claude's review, then operator intent approval. Replaces the 2026-11-14 tree-merge spec (its `## Fix` section 1, its tree-based acceptance items and its Files table are superseded; sections 2 and 2a are carried over below). Nothing from Sol run 2 lands piecemeal; the worker implements this whole section.
+
+### Containment rule
+
+`deploy/hub` commit `old` is contained in `target` when `git cherry` flags it, and some merged GitHub PR is associated with `old` (`gh api repos/$GH_REPO/commits/<old>/pulls`) such that (1) `refs/pull/<n>/head` on `origin` equals the API's `head.sha` (the API is not trusted alone), (2) `old` is an ancestor of that head, and (3) the PR's `merge_commit_sha` is an ancestor of `target`. Any failure (API error, no merged PR, head mismatch, missing object, ancestry false) falls back to today's refusal. Only the `old` tip is tested, in one API call; a promoter commit added on top of a squashed tip therefore still refuses (the tip then is in no PR), which is the CVE-pin case the guard exists for.
+
+### Evidence (Claude, 2026-11-16, host m4-air.local, git 2.56.1, gh 2.104.0, read-only against the real repo; prototype `scratchpad/proto.sh` of the rule above, nothing pushed)
+
+```
+$ gh api --paginate repos/wilddog64/k3d-manager/commits/9f5f0d89/pulls --jq '.[] | select(.merged_at != null) | [.number,.head.sha,.merge_commit_sha] | @tsv'
+160  5a53e35bfd8be5a4c6d4bbcdbe993b55c0bec0f7  aa1196ed4c23e218cf27fcc31143301a17aadd4a
+161  12bd21b7718f9da62743878dacee47b2367a9ad8  46ec5b36f72990f276575d5c486167cffe02fa2c
+$ git ls-remote origin refs/pull/160/head   -> 5a53e35bfd8b...  (equals the API head; refs/pull/161/head -> 12bd21b7... also equal)
+$ git merge-base --is-ancestor 9f5f0d89 5a53e35b  -> yes;  aa1196ed is an ancestor of 34707659, c4d647bf, b5b931df, origin/main
+rule applied (target old -> result):
+  34707659 9f5f0d89 -> CONTAINED via PR#160      aa1196ed 9f5f0d89 -> CONTAINED via PR#160
+  b5b931df 50a42198 -> CONTAINED via PR#161 (head 12bd21b7, merge 46ec5b36)   [the 2026-11-16 promote: git cherry listed 390 '+' commits, first f5c6cc79 docs(plans), the promote needed BREAK_GLASS=1]
+  b5b931df f5c6cc79 -> CONTAINED via PR#161      b5b931df 9f5f0d89 -> CONTAINED via PR#160
+  b5b931df ebf0a1c9 (release-branch tip, no merged PR) -> NOT contained (API returns [])
+  aa1196ed 50a42198 -> NOT contained ("PR#161: merge not in target": 46ec5b36 is not an ancestor of aa1196ed)
+$ gh api repos/.../commits/0000...0001/pulls -> HTTP 422 "No commit found for SHA" (gh exits 1: fail closed)
+```
+
+Why the tree approach could not work: `git merge-tree --write-tree <target> 9f5f0d89` exits 1 on every real target (Sol run 2: 73 conflicts on 34707659), because the PR gained commits before the squash. Ancestry on the PR head does not care about those. f5c6cc79 itself is a docs-only commit on the v1.43.15 line that `git cherry` marks `+` (its patch is inside the squash, not as a separate commit).
+
+Not probed: GitHub behaviour for fork PRs, PRs closed without merge (filtered by `merged_at != null`; stub fixture covers the filter), rebase-merged PRs (`merge_commit_sha` is then the rebased tip: the ancestor test (3) still holds), and `gh` pagination beyond one page (a commit in more than 30 PRs; `--paginate` is passed).
+
+### Fix
+
+All edits in `bin/k3dm-hub-promote` unless stated; line numbers are the current file (unchanged since `ebf0a1c9`).
+
+1. Replace `:21-27` (`uncontained_commits`) with a helper plus the new function:
+
+```bash
+merged_pr_contains() {
+  local target="$1" old="$2" rows number head merge remote_head
+  rows="$(_run_command --soft -- gh api --paginate "repos/$GH_REPO/commits/$old/pulls" --jq '.[] | select(.merged_at != null) | [.number,.head.sha,.merge_commit_sha] | @tsv')" || return 1
+  while IFS=$'\t' read -r number head merge; do
+    [[ "$number" =~ ^[0-9]+$ && "$head" =~ ^[0-9a-f]{40,64}$ && "$merge" =~ ^[0-9a-f]{40,64}$ ]] || continue
+    remote_head="$(git_cmd ls-remote "$REMOTE" "refs/pull/$number/head")" || continue
+    [[ "${remote_head%%$'\t'*}" == "$head" ]] || continue
+    git_cmd cat-file -e "$head^{commit}" 2>/dev/null || git_cmd fetch --no-tags "$REMOTE" "refs/pull/$number/head" >/dev/null 2>&1 || continue
+    git_cmd cat-file -e "$merge^{commit}" 2>/dev/null || continue
+    git_cmd merge-base --is-ancestor "$old" "$head" || continue
+    git_cmd merge-base --is-ancestor "$merge" "$target" || continue
+    printf '%s\n' "$number"
+    return 0
+  done <<< "$rows"
+  return 1
+}
+
+uncontained_commits() {
+  local target="$1" old="$2" list pr
+  if [[ "$old" =~ ^0+$ || -z "$target" || -z "$old" ]]; then
+    return 0
+  fi
+  list="$(git_cmd cherry "$target" "$old" | awk '$1 == "+" {print $2}')" || return 1
+  if [[ -n "$list" ]] && pr="$(merged_pr_contains "$target" "$old")"; then
+    printf '[hub-promote] note: deploy/hub %s is contained in merged PR #%s whose merge commit is in %s (squash merge); not treating its commits as uncontained\n' "$old" "$pr" "$target" >&2
+    return 0
+  fi
+  [[ -z "$list" ]] || printf '%s\n' "$list"
+}
+```
+
+   `cherry` still runs first and its failure still returns 1 (the fail-closed path at `:296`, `:246`, test `hub_promote.bats:302-315`). The API is called only when cherry found `+` rows. A `gh` failure returns 1 from `merged_pr_contains`, so the refusal list prints as today; it never dies. `status` (`:179`) and `rollback` (`:246`) call the same function and get the same acceptance (intended).
+2. New subcommand in `main` after `is-green` (`:263-271`): `is-contained <target> <old>` resolves both with `git_cmd rev-parse --verify "<x>^{commit}"`, exits 0 when `uncontained_commits` prints nothing, 1 when it prints a list, 2 on a usage or resolve error. Usage string `:261` gains `| is-contained TARGET OLD`. It exists so the live check (E8) is read-only and exact.
+3. Carried over unchanged from the 2026-11-14 spec: section 2 (`:305` check-runs not skipped by BREAK_GLASS) and section 2a (`SKIP_CHECK_RUNS` plus `SKIP_CHECK_RUNS_REASON`: usage strings `:261`, `:280`, parse near `:281-282`, replacement for `:305`, `record_move` sixth parameter and tag lines, `Makefile:478`). Reason: they fit (each bypass names the gate it skips, the operator asked for the explicit flag) and the operator said not to land run 2 piecemeal. Two additions from the review: a reason passed as a make variable has `$` expanded by make, so the docs say to pass it in the environment (`SKIP_CHECK_RUNS_REASON='...' make hub-promote ...`) or avoid `$`; and `Makefile:2315` help text gains `SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...`.
+4. Docs, `docs/howto/hub-promote.md`: `:67-72` (containment paragraph) gains one sentence on the PR-ancestry rule and that `GH_REPO`/`gh` access is needed for it; `:81-83` says `BREAK_GLASS=1` skips only the uncontained-commits refusal (check-run gate, `origin` reachability, typed confirmation and the record still apply) and documents `SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...` as the outage path (needs both flags with an uncontained commit); `:87` example unchanged.
+5. `.github/copilot-instructions.md`: `:42` replace "`BREAK_GLASS=1` skips the check-run gate and is recorded in the tag" with the two-flag semantics (BREAK_GLASS skips only the containment refusal; `SKIP_CHECK_RUNS=1` with a reason skips the check-run gate; both recorded in the tag) and add that containment recognises squash-merged releases by merged-PR head ancestry. `:138` replace "a promote that skips the check-run gate without `BREAK_GLASS=1` being recorded" with "without `SKIP_CHECK_RUNS=1` and its reason being recorded, or a promote that treats uncontained commits as contained without a merged-PR ancestry match or `BREAK_GLASS=1`".
+
+### Test design (all in `scripts/tests/bin/hub_promote.bats` unless stated)
+
+- `gh` stub (setup, `:~78`): add a branch for `api --paginate repos/wilddog64/k3d-manager/commits/*/pulls --jq <filter>`: it runs `jq -r "<filter>" "$PULLS_JSON"` (default: `[]`), exits 1 when `PULLS_FAIL=1`. Comment above it: "Read-only capture: m4-air.local, 2026-11-16, gh 2.104.0: `gh api repos/wilddog64/k3d-manager/commits/9f5f0d89/pulls` returned PR objects with number, state, merged_at, merge_commit_sha, head.sha; this stub keeps those fields". The fixture JSON is built by `jq` with exactly those fields. Existing check-runs branch unchanged; the first `exit 97` guard now allows either endpoint (a mode unknown to both still exits 97).
+- Helper `_make_squash_release`: from `initial`, branch `rel-old` with commits c1 (`f1.txt`=1) and c2; push to `origin deploy/hub` (the old tip); add c3 (edits `f1.txt` to 2) so the PR head is c3; `git update-ref refs/pull/160/head <c3>` in the bare `$ORIGIN`; on `k3d-manager-v1.43.15` from `initial` run `git merge --squash <c3>`, commit (the squash), add `candidate.txt` commit, push. Writes `$PULLS_JSON` with one merged PR (160, head c3, merge = squash). The helper first asserts its target: `git cherry <new> <old>` lists `+` rows; `merge-base --is-ancestor <old> <new>` is false; `merge-base --is-ancestor <old> refs/pull/160/head` is true; `merge-base --is-ancestor <squash> <new>` is true; and `git merge-tree --write-tree <new> <old>` exits 1 (conflict on `f1.txt`, modelling the real 73 conflicts, so a tree-merge design would fail here).
+- E1: `_make_squash_release; _run_promoter_tty promote success promote k3d-manager-v1.43.15 0`: status 0, hub equals new, tag exists, tag data lacks `mode: break-glass`, output contains `merged PR #160`.
+- E2: after `_make_squash_release`, `status` (`RELEASE_BRANCH=k3d-manager-v1.43.15`) output lacks `uncontained commits on deploy/hub`.
+- Refusals, each after `_make_squash_release` with one thing broken, each asserting refusal text `not in`, hub unchanged, no new tag, and paired with E1 as the positive control: (R1) a promoter commit pushed on top of `deploy/hub` (`_create_promoter_commit_on_hub`; the fixture asserts its file is absent from the target and that the stub returns no PR for the new tip) names the promoter commit; (R2) PR row `merge_commit_sha` set to a commit not in the target (a side branch commit; fixture asserts non-ancestor); (R3) `refs/pull/160/head` in `$ORIGIN` pointing elsewhere than the API head; (R4) the PR row has `merged_at: null`; (R5) `PULLS_FAIL=1`; (R6) `old` not an ancestor of the PR head (head set to c2's parent, fixture asserts non-ancestry).
+- E5 `is-contained`: exit 0 on the squash case, 1 on R1, 2 with a bad argument count and with an unresolvable SHA.
+- Carried tests: H4 replacement (BREAK_GLASS refuses with checks missing, pending, failed, lookup-fail; still promotes with `success`, records `mode: break-glass`); E9 and E10 of the 2026-11-14 spec with two fixes from the review: E9 asserts on the tag created by this run (tag list before and after, new tag's data holds `mode: skip-check-runs` and `reason:`), not the newest tag; E10's Makefile check is `make -n hub-promote REF=x BREAK_GLASS=1 SKIP_CHECK_RUNS=1` asserting the printed command contains `promote "x" "1" "1"`, which fails when `Makefile:478` is reverted (the recipe has no `$(MAKE)`; the worker confirms with `make -n` output before relying on it). `:773-780` stub mode `empty` to `success`.
+- The "before fetching `From `" assertion lived only in unlanded run 2 and cannot fail; it is dropped, not rewritten (nothing in this design claims a fetch ordering).
+- Mutants the worker records (rc each, restore with snapshot and `cmp`): (m1) `:305` back to the BREAK_GLASS conditional: H4 red. (m2) `merged_pr_contains` always `return 0`: R1 to R6 red. (m3) drop the `ls-remote` head comparison: R3 red. (m4) drop `merge-base --is-ancestor "$merge" "$target"`: R2 red. (m5) drop the `merge-base --is-ancestor "$old" "$head"`: R6 red. (m6) drop `select(.merged_at != null)`: R4 red. (m7) drop the reason check: E9 refusals red.
+
+### Files
+
+| File | Change |
+|---|---|
+| `bin/k3dm-hub-promote` | `merged_pr_contains`, `uncontained_commits` (`:21-27`), `is-contained` subcommand, usage strings, plus carried-over sections 2 and 2a (`:261`, `:280-282`, `:305`, `record_move`) |
+| `Makefile` | `:478` passes `SKIP_CHECK_RUNS`; `:2315` help text |
+| `scripts/tests/bin/hub_promote.bats` | gh stub pulls branch; `_make_squash_release`; E1, E2, R1-R6, E5, H4 replacement, E9, E10, `:773-780` stub mode |
+| `scripts/tests/bin/hub_deploy.bats` | SKIP_CHECK_RUNS pass-through case (carried E10) |
+| `docs/howto/hub-promote.md` | `:67-72`, `:81-83` |
+| `.github/copilot-instructions.md` | `:42`, `:138` |
+
+### Contract readers
+
+Contract: `uncontained_commits` behaviour (stdout list, exit codes, stderr note), `BREAK_GLASS` meaning, the `promote` argument list, the tag message fields. Greps run 2026-11-16 (`grep -rn "BREAK_GLASS\|k3dm-hub-promote\|uncontained"` over the repo minus `docs/bugs`, `docs/reviews`, `memory-bank`).
+
+- Writers: `bin/k3dm-hub-promote` only (`:21-27`, `:128`, `:261`, `:280-282`, `:305`).
+- Command callers: `Makefile:478` (changes, carried), `:487` rollback and `:491` status (use `uncontained_commits`, now with API lookup; output format unchanged), `:496` `promote` target (no flags, unchanged); `bin/k3dm-hub-deploy:32` (`promote "$ref"`, unchanged; flags pass by environment); `bin/k3dm-repo-sync:91` (`is-green`, unchanged; `status`-style readers of the list: none).
+- Tests: `hub_promote.bats` `:302-315` (cherry fail closed, unchanged), `:486-494` H4 (replaced), `:773-780` (stub mode), `:874-901`, `:937-968`, `:970-983` (unchanged; their gh calls now also hit the pulls stub branch and get `[]`); `hub_deploy.bats:31,141-143`, `repo_sync_promote_backlog.bats:67,192,262` (do not read guard text, unchanged).
+- Docs/readers of BREAK_GLASS semantics: `docs/howto/hub-promote.md:67-72,81-83` (changed), `.github/copilot-instructions.md:42,138` (changed; missed by the 2026-11-14 spec), `Makefile:2315` (help, changed). Historical, no edit: `CHANGELOG.md:53`, `memory-bank/projectbrief.md:105`, `docs/plans/v1.43.15-hub-deploy-ref-and-live-write-guard.md:73`. Forward-looking, flagged not edited: `docs/plans/v1.45.0-remote-promote-approval.md:22,40,85,101` read BREAK_GLASS as "skips checks"; its author should re-read after this lands.
+- New external reader: GitHub API `commits/<sha>/pulls` and `refs/pull/<n>/head` on `origin` (needs `gh` auth and network, as `check_runs` already does).
+
+## Acceptance
+
+```yaml
+must:
+  M1: with deploy/hub holding commits that git cherry flags but that sit in a merged PR whose head contains deploy/hub and whose merge commit is in the target (PR gained commits before squash, so a tree merge conflicts), promote with green checks and no BREAK_GLASS moves deploy/hub, records a tag without "mode: break-glass", and prints a note naming the PR
+  M2: status reports no uncontained commits for that same situation
+  M3: BREAK_GLASS=1 still bypasses the uncontained-commits refusal for a real promoter commit (green checks, typed confirmation) and records "mode: break-glass"
+  M4: is-contained exits 0 for the squash case, 1 for an uncontained case, 2 on bad input
+  M5: SKIP_CHECK_RUNS=1 with a one-line SKIP_CHECK_RUNS_REASON promotes when the check-run lookup fails, after the typed confirmation, and this run's tag records "mode: skip-check-runs" and "reason: <text>"
+must_not:
+  N1: BREAK_GLASS=1 skips the check-run gate (red on pre-fix code: today it promotes with checks missing)
+  N2: a promoter commit added on top of a squash-merged deploy/hub tip is treated as contained (pre-fix code also refuses, so this is proven by mutant m2 and the positive control M1, not by a pre-fix red)
+  N3: a merged PR whose merge commit is not in the target, whose origin refs/pull/<n>/head differs from the API head, whose head does not contain old, or that is not merged, is treated as contained (same proof: mutants m3 to m6 plus M1)
+  N4: a gh lookup failure is treated as contained or aborts the refusal listing; promote must refuse with the usual list
+  N5: a git cherry error stops failing closed
+  N6: BREAK_GLASS=1 or SKIP_CHECK_RUNS=1 stops requiring the typed confirmation or origin reachability
+  N7: SKIP_CHECK_RUNS=1 with a reason unset, empty, whitespace-only or multi-line promotes (red on pre-fix code only in the sense the flag does not exist: refused anyway; proven by mutant m7 and M5)
+  N8: SKIP_CHECK_RUNS=1 bypasses the uncontained-commits refusal
+evidence:
+  - {id: E1, proves: [M1], kind: offline, intent: "You will see a test where deploy/hub holds two commits that were squash-merged as part of a larger PR (so merging them conflicts); a normal make hub-promote with green checks moves deploy/hub, names PR 160 in a note, and the tag has no break-glass line. Today it refuses and lists the commits."}
+  - {id: E2, proves: [M2], kind: offline, intent: "You will see make hub-promote-status print nothing about uncontained commits for that squash-merged case. Today it lists them."}
+  - {id: E3, proves: [N2, N3, N4], kind: offline, intent: "You will see six variations of the squash case each end in the usual refusal and an unmoved hub: a real promoter commit on top, a merge commit not in the new release, a PR ref that does not match GitHub's answer, a PR head that lacks the hub commit, an unmerged PR, and GitHub being unreachable. The unbroken case beside them promotes."}
+  - {id: E4, proves: [M3, N6], kind: offline, intent: "You will see a real promoter commit on deploy/hub refused without BREAK_GLASS and accepted with it (green checks, typed confirmation, tag says break-glass); with no terminal it still refuses."}
+  - {id: E5, proves: [N1], kind: offline, intent: "You will see BREAK_GLASS=1 refuse to promote when the check runs are missing, pending, failed or unreadable, hub and tags untouched. Today it promotes anyway."}
+  - {id: E6, proves: [N5], kind: offline, intent: "You will see the existing git-cherry-failure test still fail closed and succeed once restored."}
+  - {id: E7, proves: [M4], kind: offline, intent: "You will see the new is-contained command say yes for the squash case, no for a promoter commit, and exit 2 for a missing or unknown SHA."}
+  - {id: E8, proves: [M5, N7, N8], kind: offline, intent: "You will see GitHub's check-run lookup fail: SKIP_CHECK_RUNS=1 with a one-line reason promotes after the typed confirmation and the new tag shows the mode and reason; a missing, blank or two-line reason, or a real promoter commit without BREAK_GLASS, refuses and nothing moves. make -n hub-promote shows both flags passed to the command, so reverting the Makefile line turns it red."}
+  - {id: E9, proves: [M1], kind: live, intent: "You will see the real 9f5f0d89 case, read-only on the M5 or M4, answered by the shipped code: is-contained b5b931df 50a42198 exits 0 naming PR 161, is-contained b5b931df 9f5f0d89 exits 0 naming PR 160, is-contained b5b931df ebf0a1c9 exits 1, is-contained aa1196ed 50a42198 exits 1. Claude or the operator runs it, never Gemini; the operator's next first promote of a release then needs no BREAK_GLASS."}
+interface:
+  - "bin/k3dm-hub-promote promote REF [BREAK_GLASS] [SKIP_CHECK_RUNS]"
+  - "bin/k3dm-hub-promote is-contained TARGET OLD"
+  - "bin/k3dm-hub-promote status"
+  - "make hub-promote REF=... [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...]"
+  - "make hub-deploy REF=... [SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=...]"
+  - "make hub-promote-status"
+```
+
+## Worker definition of done
+
+- Change only the six files in Files. Scratch HOME, no network, `gh` is the stub (no real GitHub call; a test that reaches real `gh` is a defect), no push to the real `origin`. Show E1, E2 and E5 red on today's code, then green; N2 to N4 are regression guards, so paste their passing lines and the mutant results instead.
+- Run `bats scripts/tests/bin/hub_promote.bats scripts/tests/bin/hub_deploy.bats scripts/tests/bin/repo_sync_promote_backlog.bats` from the repo root and `shellcheck bin/k3dm-hub-promote`; paste command, rc and proving lines. Run mutants m1 to m7 with rc each.
+- `git status`: only the six files changed. Leave uncommitted; Claude lands them. Do not run `make hub-promote` or any target that pushes or deploys.
+
+## Open questions
+
+1. Tip-only test: a promoter commit on top of a squashed tip makes the whole old range look uncontained, so the refusal lists hundreds of commits, not just the promoter. Accept for v1.44.1 (safe, noisy), or add a second pass that lists only commits outside every associated PR head?
+2. Rollback (`rollback`, `:246`) now also calls the API. In a GitHub outage a rollback with a squash-merged old tip refuses and needs BREAK_GLASS. Accept?
+3. Scope: carrying SKIP_CHECK_RUNS (a new flag) into a bug-fix patch. Kept because run 2 is not landed piecemeal; say if it should move to a minor release and BREAK_GLASS narrowing alone ships.
+4. A merge commit later reverted in `target` still counts as containing the PR (ancestry only). Out of scope; the check-run gate and review cover it.

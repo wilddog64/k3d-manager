@@ -8,7 +8,7 @@
   Luna: stall-A (+silent-running), hub-promote containment respec, root-token argv, vault-unseal watchdog.
 - RUNNING: Flash task/v1.44.1/2026-11-14-vectordb-pgvector-image-floating-tag. Sonnet spec drafts in progress (uncommitted
   edits in the bug docs) for the other 8; then Claude review → one intent-approval batch to the operator.
-- Owed operator: stray m4-air second guard choice (hub-host-only push vs worktrees on release head).
+- 2026-11-16 ~14:30Z: all 9 specs drafted and committed; awaiting ONE intent-approval batch + decisions: alpine tag (1.33.13 in-skew, 5 crit vs 1.35.10 0 crit, +3 skew), unseal E0 fingerprint on M5, stall-A open Qs 4-6, containment open Qs, spec-intent map-style fails closed.
 
 ## 2026-11-16 ~12:30Z — v1.44.1 PROMOTED to hub: deploy/hub b5b931df, tag hub-promote/20261116T121447Z
 
