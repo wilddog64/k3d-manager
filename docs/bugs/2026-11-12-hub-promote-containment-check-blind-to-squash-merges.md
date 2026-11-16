@@ -420,7 +420,7 @@ Contract: `uncontained_commits` behaviour (stdout list, exit codes, stderr note)
 
 ## Acceptance
 
-Revised 2026-11-16 (Claude) after the Luna worker stopped: only N1 is red on pre-fix code, so the former N2 to N8 moved to `must` as regression guards M6 to M12.
+Revised 2026-11-16 (Claude) after the Luna worker stopped twice. (2) E8's Makefile check used `make -n`, which prints the recipe unexpanded (and executes `$(MAKE)` lines); it now runs real make in a scratch root with a recording stub, as `hub_deploy.bats` does. (1) only N1 is red on pre-fix code, so the former N2 to N8 moved to `must` as regression guards M6 to M12.
 
 ```yaml
 must:
@@ -446,7 +446,7 @@ evidence:
   - {id: E5, proves: [N1], kind: offline, intent: "You will see BREAK_GLASS=1 refuse to promote when the check runs are missing, pending, failed or unreadable, hub and tags untouched. Today it promotes anyway."}
   - {id: E6, proves: [M9], kind: offline, intent: "You will see the existing git-cherry-failure test still fail closed and succeed once restored."}
   - {id: E7, proves: [M4], kind: offline, intent: "You will see the new is-contained command say yes for the squash case, no for a promoter commit, and exit 2 for a missing or unknown SHA."}
-  - {id: E8, proves: [M5, M11, M12], kind: offline, intent: "You will see GitHub's check-run lookup fail: SKIP_CHECK_RUNS=1 with a one-line reason promotes after the typed confirmation and the new tag shows the mode and reason; a missing, blank or two-line reason, or a real promoter commit without BREAK_GLASS, refuses and nothing moves. make -n hub-promote shows both flags passed to the command, so reverting the Makefile line turns it red."}
+  - {id: E8, proves: [M5, M11, M12], kind: offline, intent: "You will see GitHub's check-run lookup fail: SKIP_CHECK_RUNS=1 with a one-line reason promotes after the typed confirmation and the new tag shows the mode and reason; a missing, blank or two-line reason, or a real promoter commit without BREAK_GLASS, refuses and nothing moves. make hub-promote, run in a scratch copy of the repo with a recording stub in place of bin/k3dm-hub-promote, passes both flags, so reverting the Makefile line turns it red."}
   - {id: E9, proves: [M1], kind: live, intent: "You will see the real 9f5f0d89 case, read-only on the M5 or M4, answered by the shipped code: is-contained b5b931df 50a42198 exits 0 naming PR 161, is-contained b5b931df 9f5f0d89 exits 0 naming PR 160, is-contained b5b931df ebf0a1c9 exits 1, is-contained aa1196ed 50a42198 exits 1. Claude or the operator runs it, never Gemini; the operator's next first promote of a release then needs no BREAK_GLASS."}
 interface:
   - "bin/k3dm-hub-promote promote REF [BREAK_GLASS] [SKIP_CHECK_RUNS]"
