@@ -1,4 +1,5 @@
 ## Handoff 2026-11-16 ~02:45Z — dirused P3s: both exited, verified, PRs #7/#8 open
+- **SCHEDULED: v1.44.0 k3d-manager live testing at 18:57 PST 2026-11-15 (02:57Z 11-16)** — operator 2026-11-15. Session reminder at 18:50 (cron e68f182d, dies on exit). Keep the dirused VM idle from ~18:40; dirused `make vm-live` for #7/#8 only before then or after. Owed checks: PR #161 hub smoke, Hermes card, read-only batch, vault-unseal, machine-setup N3; confirm `make hub-promote-status` first.
 
 - **PR #7 (1707, Flash):** 47d0572 test + 562de4a fix; offline verified: CI windows red on 47d0572 (run 43787406779, exactly the 3 new tests), fix green (run 43787367644); temp branch deleted. Next: Copilot, then make vm-live L2.
 - **PR #8 (hung probe, Luna):** CI green run 43787368953. c9c59d6 tests + 588f0c2 fix on p3-timeout-hung-probe. Claude verified: E1/E2 red at b475154 (30 s / 2 min), 22/22 green, 5/5 reruns; MRES.Set-after-Dispose probe: no throw. Evidence scratchpad verify-hung-probe.md. Then make vm-live regression (E4).
