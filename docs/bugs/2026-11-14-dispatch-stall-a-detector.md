@@ -1,8 +1,8 @@
 # Bug: dispatch stall, child A: a `stalled` state and a watcher that captures, stops and tells the operator
 
-**Status:** OPEN — stage A1 in f3828ad9 (status probe, stalled listing, OrbStack guard); stage A2 (watcher) running
+**Status:** LANDED — A1 f3828ad9 (probe, stalled listing, OrbStack guard); A2 c91b4409 + 25d349c3, 16e6014f (watcher, launchd agent, install targets; machine manifests). Claude + independent Opus verifier; N2/N9 mutants red
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** fix running — since 2026-11-16 (Luna, stage A2)
+**Waiting on:** live check — since 2026-11-16 (E8: operator runs make install-dispatch-stall-watch, then a real stall is captured and announced)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (already planned there, operator 2026-11-14) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14

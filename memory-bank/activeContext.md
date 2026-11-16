@@ -8,7 +8,7 @@
 - ~21:40Z: stall-A1 LANDED f3828ad9 (Luna; 16 red pre-fix, 34/34; pytest 2115 outside sandbox; live read-only probe clean).
   Agy step-count stalls need A2's watcher (sole writer of stall-watch.state). A2 dispatched (Luna, slug 2026-11-14-dispatch-stall-a2-watcher;
   land needs --superseding? no: different spec stage, same spec → land may need --superseding 2026-11-14-dispatch-stall-a-detector).
-  Silent-running bug closes with A2 (M8-M11). push-hook LANDED 4476316a (live E3 at next promote). A2 exited; verifier LAND WITH FIXES → correction resume. Open 1/3.
+  Silent-running bug closes with A2 (M8-M11). push-hook LANDED 4476316a (live E3 at next promote). stall-A2 LANDED c91b4409 (+machine-manifest fixes 25d349c3, 16e6014f). Open 0/3. All v1.44.1 bugs landed.
 - Next: verify push-hook, A2 → land; local CI shards; operator live checks one at a time; /create-pr.
 
 ## 2026-11-16 ~13:30Z — v1.44.1: fix the 10 groomed bugs before the release PR (operator)

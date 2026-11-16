@@ -1,8 +1,8 @@
 # Bug: a dispatch that stays `running` with a silent log raises no alert
 
-**Status:** OPEN
+**Status:** LANDED — fixed by the stall-A detector (A2 c91b4409, M8-M11: stall_detected ledger event and one Slack notice per incident)
 **Priority:** P2 (operator, 2026-11-14; was P3)
-**Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
+**Waiting on:** live check — since 2026-11-16 (stall-A E8)
 **Branch:** k3d-manager-v1.44.1
 **Intent approved:** operator, 2026-11-16
 **Approval note:** ("Approve all 9")
