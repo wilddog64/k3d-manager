@@ -1,3 +1,15 @@
+## 2026-11-16 ~13:30Z — v1.44.1: fix the 10 groomed bugs before the release PR (operator)
+
+- Correction: v1.44.1 holds 10 groomed bugs + the CI shard, not just the CI shard (docs/grooming/2026-11-15.md:54).
+  Dashboard can't show them: Triage/Release lines ignored (P2 docs/bugs/2026-11-15-bug-release-column-ignores-triage-and-release-lines.md, v1.45.0).
+- Operator plan: split dispatches evenly Flash (agy gemini-3.8-flash-medium) / Luna (codex); Claude verifies each; operator
+  live-verifies one at a time; then the release PR. CHANGELOG [1.44.1] promotion was drafted and reverted (not committed).
+- Proposed split. Flash: pgvector pin, alpine/k8s CVEs, hermes-ci unknown page, spec-intent flow-style, stray m4-air guard.
+  Luna: stall-A (+silent-running), hub-promote containment respec, root-token argv, vault-unseal watchdog.
+- RUNNING: Flash task/v1.44.1/2026-11-14-vectordb-pgvector-image-floating-tag. Sonnet spec drafts in progress (uncommitted
+  edits in the bug docs) for the other 8; then Claude review → one intent-approval batch to the operator.
+- Owed operator: stray m4-air second guard choice (hub-host-only push vs worktrees on release head).
+
 ## 2026-11-16 ~12:30Z — v1.44.1 PROMOTED to hub: deploy/hub b5b931df, tag hub-promote/20261116T121447Z
 
 - Operator ran hub-promote REF=b5b931df BREAK_GLASS=1 on m4-air.local; appsets-check, platform-ops, hub-promote-status OK.

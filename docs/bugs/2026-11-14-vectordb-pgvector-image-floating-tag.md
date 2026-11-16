@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-14 (batch by file)
+**Waiting on:** fix running — since 2026-11-16 (Flash, gemini-3.8-flash-medium)
 **Triage:** patch → v1.44.1 (one-line pin; A08 rule) — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** pre-existing
 **Should have been caught by:** review
