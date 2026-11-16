@@ -7,7 +7,7 @@
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
 **Prior art:** `make find-similar-docs` unavailable (vector store context missing on M4); exact-slug glob for `*alpine-k8s*` and `*rotator*`: none
-**Waiting on:** operator decision — since 2026-11-16 (intent approval)
+**Waiting on:** dispatch — since 2026-11-16
 **Triage:** patch → v1.44.1 — operator 2026-11-15 ("go with your recommendation")
 
 ## Symptom
@@ -48,14 +48,19 @@ current `alpine/k8s` tag pinned by digest, after checking the kubectl version sk
 - Trivy 0.76.2 local scan (`trivy image --scanners vuln`, fresh DB, 2026-11-16): `1.31.4` 27 critical / 763 high;
   `1.35.10` 0 critical / 130 high; `1.34.13` 0 critical / 130 high. Base of both new tags is Alpine
   `3.25.0_alpha20260805` (an alpha base, upstream's choice; note it, do not fight it).
-- Not proven: the hub's k3s server version. Repo records show clusters at v1.32.0 (k3d), v1.35.5 and v1.36.4 (Hostinger);
-  the M5 hub version is not recorded. kubectl is supported within one minor of the server, so `1.35.10` is valid for a
-  hub on 1.34, 1.35 or 1.36 and `1.34.13` for 1.33 to 1.35. E3 below must read it before the pin ships.
+- **Hub version read (Claude, 2026-11-16, `ssh m5-air.local kubectl version`, read-only): server `v1.32.0+k3s1`.**
+  kubectl is supported within one minor of the server, so `1.35.10` and `1.34.13` are out of skew. Newest in-skew tag:
+  `1.33.13` (pushed 2026-06-14), digest `sha256:e521cee1f1cb8699bc6e906b4ce6fe50e84addae97f52d5dcf05d3974002ac26` (imagetools, 2026-11-16).
+  Trivy 0.76.2: 5 critical / 468 high (vs 27 / 763 on `1.31.4`; `1.32.13` is 9 / 591).
+- **Operator decision (2026-11-16): pin `1.33.13`.** Remaining criticals, accepted until the hub's k3s is upgraded:
+  CVE-2026-111497 (brotli-libs 1.2.0-r1), CVE-2026-31789 (libcrypto3/libssl3 3.5.5-r0), CVE-2026-33186 (grpc in
+  `eksctl`, unused), CVE-2025-68121 (Go stdlib in `kustomize`, unused). The jobs only run `kubectl` against the
+  in-cluster API; none of the four is on that path except OpenSSL, whose fix is not in any 1.33 tag.
 
 ## Fix
 
 Replace `docker.io/alpine/k8s:1.31.4` with
-`docker.io/alpine/k8s:1.35.10@sha256:6b9b607247ab8f0d0bd2d6173a0b842b4d173c652475c9a715eec0c7ef27eac5` in:
+`docker.io/alpine/k8s:1.33.13@sha256:e521cee1f1cb8699bc6e906b4ce6fe50e84addae97f52d5dcf05d3974002ac26` in:
 
 1. `scripts/etc/argocd/platform-ops/app-cve-scan-cronjob.yaml:72` and `:212`.
 2. `scripts/etc/argocd/platform-ops/argocd-credential-rotator.yaml:104`.
@@ -98,7 +103,7 @@ Grep: `grep -rn "alpine/k8s" scripts bin Makefile deploy .github` (2026-11-16).
 ```yaml
 must:
   - id: M1
-    text: all six manifest and default references use docker.io/alpine/k8s:1.35.10 pinned by the digest above
+    text: all six manifest and default references use docker.io/alpine/k8s:1.33.13 pinned by the digest above
   - id: M2
     text: every alpine/k8s reference in the manifests and vars.sh is a tag plus sha256 digest
 must_not:
@@ -115,17 +120,18 @@ evidence:
   - id: E2
     proves: [M1]
     kind: live
-    command: trivy image docker.io/alpine/k8s:1.35.10@sha256:6b9b6072... --severity CRITICAL (Claude or operator)
-    intent: The new image really has no critical vulnerabilities, as the hub scanner will see it.
+    command: trivy image docker.io/alpine/k8s:1.33.13@sha256:e521cee1... --severity CRITICAL (Claude or operator)
+    intent: The new image's critical findings drop from 27 to the 5 accepted above, as the hub scanner will see it.
   - id: E3
     proves: [M1]
     kind: live
-    command: kubectl version on the M5 hub (read-only), then a one-off job run from each CronJob after hub-promote and sync (operator)
+    command: a one-off job run from each CronJob after hub-promote and sync (operator)
     intent: The rotators and the scanner still work with the new kubectl against the hub's Kubernetes version.
 interface: none
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-16
+**Approval note:** ("Approve all 9"; tag 1.33.13)
 
 ## Worker definition of done
 

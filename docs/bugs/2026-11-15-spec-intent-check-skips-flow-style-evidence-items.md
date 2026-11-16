@@ -5,7 +5,7 @@
 **Introduced by:** unknown (`scripts/lib/spec_intent.py`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-16 (intent approval)
+**Waiting on:** dispatch — since 2026-11-16
 **Triage:** patch → v1.44.1; Priority raised P3 → P2 (Argon P2 accepted: a safety-gate gap) — operator grooming 2026-11-15 ("Accept as shown")
 **Prior art:** exact-slug pass, no match; `find-similar-docs` not run (needs context k3d-k3d-cluster) — none known
 
@@ -184,4 +184,6 @@ interface:
   - bin/k3dm-codex-dispatch start --spec <spec>
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-16
+**Approval note:** ("Approve all 9")
+**Operator decision (2026-11-16, accepted Claude default):** map-style evidence fails closed.

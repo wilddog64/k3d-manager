@@ -4,7 +4,7 @@
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The `ci` sensor's broad exception handler masks the failing repository, workflow, and underlying error in both Slack pages and logs, degrading alert diagnostics while leaving manual GitHub Actions inspection as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-16 (intent approval)
+**Waiting on:** dispatch — since 2026-11-16
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Prior art:** exact-slug glob: none; `make find-similar-docs` returned nothing — none above threshold
@@ -120,7 +120,8 @@ Positive control for N1 and M2: in the same test, a healthy second repo and a de
 a test that never reaches the error path cannot pass. The fetch stub is built from the real shape in `test_hermes.py:1458-1467`
 (GitHub `workflow_runs` and `check_runs` payloads); error classes are the real `urllib.error` types raised by `_http_json`.
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-16
+**Approval note:** ("Approve all 9")
 
 ## Worker definition of done
 
