@@ -776,3 +776,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-15: dirused bug docs moved to docs/dirused/bugs/; v1.44.0 no longer blocked by the dirused /parallel P1.
 - 2026-11-15: ideas.md row added — multi-repo records (dispatch --repo, ledger repo field, multi-repo bug-tally); groom Sunday 2026-11-22.
 - 2026-11-15: Copilot never attached to dirused PRs #7/#8 — every API request route no-ops (no review_requested timeline event); operator to request from the web UI.
+- 2026-11-15: Copilot budget rule (operator): Copilot only on k3d-manager/lib-foundation release PRs + shopping-cart-payment, once per PR; others get a blind Argon review. Monthly cap hit 2026-11-15 (26 reviews/22 PRs). rules.md + CLAUDE.md updated.
