@@ -49,7 +49,7 @@ if [[ "$check_rc" != 3 ]]; then
 fi
 dispatch_bin="${ORBSTACK_DISPATCH_BIN:-$ROOT/bin/k3dm-codex-dispatch}"
 dispatch_status="$("$dispatch_bin" status 2>/dev/null || true)"
-grep -Eq '^state: (running|starting)$' <<< "$dispatch_status" && refuse 'a Codex dispatch task is running'
+grep -Eq '^state: (running|starting|stalled)' <<< "$dispatch_status" && refuse 'a Codex dispatch task is running'
 # shellcheck disable=SC2009
 if ps -axo command= 2>/dev/null | grep -E '[b]in/cluster-up|[m]ake (up|refresh|platform-ops)( |$)' >/dev/null; then
   refuse 'a cluster lifecycle or platform-ops command is running'
