@@ -1,11 +1,12 @@
 # dirused `\\node` for a host that does not resolve prints `ERROR (1707)` instead of `UNREACHABLE`
 
-**Status:** OPEN — found by `make vm-live` check L2 on the dirused-dev VM, 2026-11-16, at main febe79d; approved, not yet dispatched; spec with Acceptance written and intents approved 2026-11-16; dispatched 2026-11-16
+**Status:** OPEN — Flash fix exited 2026-11-16; Claude verified the diff; commits 47d0572 (test) + 562de4a (fix) in PR wilddog64/dirused#7, not merged
 **Priority:** P3 — wrong label only: the run still exits 3 and other targets still scan; the operator sees a raw code instead of "UNREACHABLE"
 **Introduced by:** wilddog64/dirused ab27363 (M1b phase 1a `\\node` expansion; merged in 245bedd)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Claude verification)
-**Waiting on:** fix running — since 2026-11-16
+**Waiting on:** live check — since 2026-11-16 (CI windows red on test-only 47d0572 via branch redcheck-1707-test-only, then make vm-live L2)
+**Fix commit:** 562de4a (wilddog64/dirused PR #7, not merged)
 **Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Flash (`gemini-3.8-flash-medium`, agy) implements; spec with Acceptance next
 **Prior art:** `docs/bugs/2026-11-16-dirused-unreachable-host-error-64-not-mapped.md` (exact-slug neighbour; `make find-similar-docs` unavailable, vector store context `k3d-k3d-cluster` missing) — read, different code path: that fix mapped share-path codes 51/64 from the volume probe; this code comes from `NetShareEnum` while expanding a bare node.
 **Filed:** 2026-11-16
