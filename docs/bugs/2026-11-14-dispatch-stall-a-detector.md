@@ -47,7 +47,7 @@ store records every step. Proof, M4, 2026-11-14 ~15:30Z, agy conversation
 step timestamps read from the `steps.metadata` blobs: one 803-minute gap from 2026-11-14 01:38:44Z, four minutes after
 correction 3 started (the 13-hour hang); the next longest gaps 21 and 13 minutes; at the same moment `agy-5.log` was
 1630 s old while the newest step was about 7 minutes old. Rule for agy: stalled when `select count(*) from steps`
-(read-only, `mode=ro`) has not grown for `K3DM_DISPATCH_STALL_SECONDS` (default 2700), tracked across ticks in
+(counted in a temp copy of the db and its `-wal`, never the live file; decision below) has not grown for `K3DM_DISPATCH_STALL_SECONDS` (default 2700), tracked across ticks in
 `<run>/stall-watch.state`; no blob decoding. Settled 2026-11-16 (read-only evidence; host M4 arm64, macOS, sqlite3 3.51.0, 438 run dirs under
 `~/.local/share/k3d-manager/worktrees/*/*.run`, 35 completed agy runs with a `session` file, 570 completed codex runs):
 
@@ -60,8 +60,10 @@ correction 3 started (the 13-hour hang); the next longest gaps 21 and 13 minutes
   zero or two candidates and no lsof hit: no steps signal, use the process-count rule alone for that tick.
   Gotcha measured: `sqlite3 'file:<db>?mode=ro'` on an idle WAL db (no `-shm`) fails with "unable to open database file"
   (rc 14), also in a writable scratch copy; with a live holder (`-wal`/`-shm` present) it opens and counts (35 rows).
-  `?immutable=1` opens an idle db but ignores the WAL, so it is wrong for a live one. Rule: always `mode=ro`; an open
-  failure is "no information", never "stalled". Healthy steps counts of the 35 runs: 28 to 673 (the 13-hour hang db: 3214
+  `?immutable=1` opens an idle db but ignores the WAL, so it is wrong for a live one. **Decision (coordinator, 2026-11-16, supersedes "always `mode=ro`"):** any open of the live db, `mode=ro` included,
+  writes its `-shm`, which breaks the read-only contract (M5, N6). So copy the db and `-wal` (never `-shm`) into a `mktemp -d`,
+  count `steps` in the copy, remove the temp dir. A failed copy or count is "no information", never "stalled". Landed in A1
+  (`_dispatch_stall_count`, f3828ad9). Healthy steps counts of the 35 runs: 28 to 673 (the 13-hour hang db: 3214
   now after resumes).
 - **(b) codex.** Rollout file = the single `rollout-*-<session id>.jsonl` under `${CODEX_HOME:-~/.codex}/sessions`, with
   the id from the `session id:` line of the newest `codex*.log`; its mtime equals its last line's timestamp (30 newest
@@ -229,7 +231,7 @@ must:
   M1: a live agy worker whose conversation-db `steps` count is unchanged for more than K3DM_DISPATCH_STALL_SECONDS (state file older than the threshold) makes `status` print `state: stalled (silent Ns, P procs)` with N above the threshold, even when agy.log is fresh or absent
   M2: a live codex worker whose session rollout mtime is older than the threshold makes `status` print the same stalled line, even when codex.log is fresh
   M3: more than K3DM_DISPATCH_STALL_MAX_PROCS processes whose command line contains the worktree path (followed by `/`, space or end of line) make `status` print the stalled line whatever the other signal says; a value of 0 disables the test, a non-numeric value falls back to the default
-  M4: the agy db is the one held open by a descendant of the worker pid (first run and `--conversation` resume alike); with no holder, the one db born within 10 s of agy.log; with zero or two candidates there is no steps signal and only M3 applies; a db that cannot be opened read-only counts as no information
+  M4: the agy db is the one held open by a descendant of the worker pid (first run and `--conversation` resume alike); with no holder, the one db born within 10 s of agy.log; with zero or two candidates there is no steps signal and only M3 applies; a db whose temp copy cannot be made or counted counts as no information
   M5: `status`, `dispatch open`, `stalled` and `stalled --live` write, touch or remove nothing under the run dir, the worktree, the ledger or the conversation store; `stall-watch.state` is written only by the watcher tick
   M6: `bin/k3dm-codex-dispatch stalled` prints one TSV line per stalled run (slug version run worktree silent procs), covers only the newest v* directory, is cwd-independent and exits 0 always; `stalled --live` prints slug version run worktree for every live run; both are in the usage text
   M7: one watcher tick on a stalled run writes stall-<UTC ts>/ in the run dir with ps.txt, log-tail.txt, status.txt, diff.patch and summary.txt (a failed step goes to errors.txt and the tick goes on) and leaves every process alive
@@ -247,7 +249,7 @@ must_not:
   N3: the watcher reads, runs or mentions K3DM_STALL_DRAIN_CMD, K3DM_STALL_DIAGNOSE_CMD or their timeouts, and the plist sets any of K3DM_STALL_DRAIN_CMD, K3DM_STALL_DIAGNOSE_CMD or K3DM_HERMES_APPROVAL_DRAIN_URL (red-capable: with the two CMD variables pointing at recorder scripts, a scratch watcher that runs them leaves a record and fails the check)
   N4: a `dispatch open` row of a stalled run differs from the row of the same run when running (control: `status` of that fixture says stalled)
   N5: one incident is captured, ledgered or announced twice (control: a resumed run IS handled once more)
-  N6: the agy db is opened read-write or its directory gains or loses a file (a -shm, -wal or journal) because of a probe (red-capable: the same snapshot comparison turns red when the fixture opens the db without mode=ro)
+  N6: the agy db is opened read-write or its directory gains or loses a file (a -shm, -wal or journal) because of a probe (red-capable: the same snapshot comparison turns red when the probe is pointed at the live db instead of a copy)
   N7: silence is derived from agy.log or codex.log mtime for a run that has a steps or rollout signal (the frozen-steps run with a fresh log IS stalled; the growing-steps run with a 3000 s old log is NOT)
   N8: a missing or failing notifier, a failing ledger write, a failing git call or an unopenable db stops the tick before the other steps (control: the other steps' outputs exist in the same fixture)
   N9: the ledger event, the Slack notice or summary.txt contains any command-line text, prompt text or credential (the fixture worker argv carries a marker string that must appear in ps.txt only)
@@ -275,7 +277,7 @@ Regression-guard note: M1 to M15 fail on today's tree (no stalled state, subcomm
 The must_not items about absent behaviour (N1, N2, N3, N4, N5, N12) are true on today's tree because the feature does
 not exist, so each is made red-capable by a control in the same fixture or by a mutation: the aged or frozen run IS
 stalled (N1, N7), a scratch watcher copy with `kill -TERM`, with a hook call, or with a row suffix fails the check
-(N2, N3, N4), a resumed run IS a new incident (N5), opening the db without `mode=ro` or running the watcher turns the
+(N2, N3, N4), a resumed run IS a new incident (N5), pointing the probe at the live db or running the watcher turns the
 snapshot comparison red (N6, E2). N10 and N11 are red against a naive implementation through the GNU-first stubs and
 the stubbed launchctl. N8 is red against an implementation that exits on the first failed step.
 
@@ -301,8 +303,7 @@ Test fixtures (all stubbed, from a real read-only capture where one exists):
   `status` says `running` before the signal is aged.
 - agy db: a small WAL sqlite file with a `steps` table in the fake store, a `lsof` stub on PATH printing the db for the worker's
   descendant (header comment: shape from `lsof -Fn -p` on the M4, 2026-11-16, agy 84968), the db held open by a real
-  `sqlite3` child so `-shm` exists. A second case leaves it idle: `mode=ro` must fail and mean no information (captured
-  2026-11-16, M4, sqlite3 3.51.0: rc 14).
+  `sqlite3` child so `-shm` exists. A second case makes the copy fail: that must mean no information (A1 test M4 "failed db copy").
 - codex rollout: a JSONL file named `rollout-<ts>-<session id>.jsonl` whose mtime is set with `perl -e 'utime($t,$t,$f)'`; the
   `codex.log` first line `session id: <id>`.
 - Fake process table: a `ps` stub first on PATH (real `/bin/ps` for `-p`; fixture lines for `-axo pid=,ppid=,command=`;
