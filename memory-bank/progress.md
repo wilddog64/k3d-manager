@@ -795,3 +795,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16 03:54Z: v1.44.0 MERGED (PR #161, 46ec5b36); tag/release v1.44.0 created on 46ec5b36 (release marked Latest); enforce_admins restored; next branch k3d-manager-v1.44.1 (CI speed fix P2, option B approved)
 - 2026-11-16 ~04:30Z: v1.44.0 releases rows added (docs/releases.md, README); CI shard spec committed d1a2e0d4 and dispatched (Codex, coordinator anthropic/claude-opus-5-5). Hub promote deferred to 2026-11-17 morning (operator).
 - 2026-11-16 ~05:15Z v1.44.1 CI shard LANDED f20d1b2b; live push run 7.0 min wall (was ~22), all green; PR-run half pending
+- 2026-11-16 ~12:30Z v1.44.1 promoted: deploy/hub b5b931df, tag hub-promote/20261116T121447Z; panel-8 live check PASS; P2 bug hub-promote hook env leak captured

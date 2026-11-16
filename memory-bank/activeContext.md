@@ -1,3 +1,13 @@
+## 2026-11-16 ~12:30Z — v1.44.1 PROMOTED to hub: deploy/hub b5b931df, tag hub-promote/20261116T121447Z
+
+- Operator ran hub-promote REF=b5b931df BREAK_GLASS=1 on m4-air.local; appsets-check, platform-ops, hub-promote-status OK.
+- Live check (Claude, read-only, 2026-11-16): monitoring/grafana-dashboard-pr-checks contains the new panel-8 text.
+- Hiccups: (a) m4 local k3d-manager-v1.44.1 pointed at old hub tip 50a42198 (ahead 392) → fixed with
+  `git switch -C k3d-manager-v1.44.1 origin/k3d-manager-v1.44.1`; (b) tag push refused by pre-push hook tests that
+  inherit REF/BREAK_GLASS from make → pushed with --no-verify. Captured: docs/bugs/2026-11-16-hub-promote-push-hook-inherits-make-vars.md (P2).
+- Next: open v1.44.1 release PR (normal) → E4 pull_request-run half; Argon review. Ideas row candidate: hub-promote
+  refuses when the checkout is not on origin's release tip.
+
 ## Handoff 2026-11-16 ~05:15Z — v1.44.1 CI shard LANDED (f20d1b2b), CI 22 → 7.0 min
 
 - Objective: CI speed P2 (docs/bugs/2026-11-10-ci-job-named-lint-runs-the-full-test-suite.md). Status LANDED.
