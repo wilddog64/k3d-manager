@@ -5,7 +5,7 @@
 **Introduced by:** unknown (`scripts/lib/spec_intent.py`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** fix running — since 2026-11-16 (Flash, gemini-3.8-flash-medium)
 **Triage:** patch → v1.44.1; Priority raised P3 → P2 (Argon P2 accepted: a safety-gate gap) — operator grooming 2026-11-15 ("Accept as shown")
 **Prior art:** exact-slug pass, no match; `find-similar-docs` not run (needs context k3d-k3d-cluster) — none known
 
