@@ -208,6 +208,8 @@ parent bug doc): `K3DM_DISPATCH_STALL_SECONDS`, `K3DM_DISPATCH_STALL_MAX_PROCS`,
 `K3DM_STALL_DRAIN_CMD` (child B), the files `$run/stall-handled-<id>` and `$run/stall-<ts>/` (children B and C read the dir),
 and the launchd label `com.k3d-manager.dispatch-stall-watch`.
 
+Contract C (found at land, 2026-11-16, spec defect): every `install-*` Makefile target and `scripts/etc/launchd/*.plist.tmpl`. Readers: `scripts/tests/bin/machine_setup_acceptance.bats:336` (M4) and `scripts/tests/bin/machine_setup.bats:265` require each to be in a role `agents.*.list` or in `scripts/etc/machine/not-installed.list`; role lists must stay byte-identical (N4). Changes: `install-dispatch-stall-watch` added to not-installed.list as operator-run.
+
 ## Staging (coordinator, 2026-11-16)
 
 Two Luna runs stopped short on the full scope (run 1 wrote nothing; run 2 wrote the OrbStack guard and red tests only). Split:
@@ -294,6 +296,7 @@ the stubbed launchctl. N8 is red against an implementation that exits on the fir
 | `scripts/tests/bin/dispatch_stall_watch.bats` | new: E3, E4, the watcher half of E7 |
 | `scripts/tests/bin/dispatch_stall_watch_install.bats` | new: E5 plist and install (model: `repo_sync_launchd_env.bats`) |
 | `scripts/tests/bin/makefile_agent_load.bats` | add `dispatch-stall-watch` to both target lists (E5) |
+| `scripts/etc/machine/not-installed.list` | add `install-dispatch-stall-watch` as operator-run with a reason (machine-setup M4 reader; added by coordinator at land, 2026-11-16) |
 | `scripts/tests/bin/orbstack_upgrade.bats` | one added case (E6) |
 | `docs/howto/codex-dispatch.md` | Fix 9 (E7) |
 
