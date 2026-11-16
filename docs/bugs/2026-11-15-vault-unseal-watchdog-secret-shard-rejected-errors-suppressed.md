@@ -1,11 +1,11 @@
 # Bug: hub unseal watchdog replays a shard Vault rejects, and hides the error
 
-**Status:** OPEN — captured 2026-11-15
+**Status:** LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
 **Priority:** P2 (proposed: a hub Vault restart stays sealed until the operator runs `deploy_vault --re-unseal` from the Keychain; workaround exists)
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-16 (Luna, stage 1)
+**Waiting on:** live check — since 2026-11-16 (E0 Keychain fingerprint vs f1bffbb8cc7e, E5 watchdog log on the hub; operator)
 **Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
 **Prior art:** `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (exact-slug pass; `find-similar-docs` printed nothing) — read, different root cause (that bug is the boot-time retry; its fix ran correctly here)

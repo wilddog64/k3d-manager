@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** fix running — since 2026-11-16 (Luna)
 **Triage:** patch → v1.44.1 (already planned there, operator 2026-11-14) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
 **Release:** v1.44.1 patch (operator, 2026-11-14: "go with your recommendation"): detect and page only; the kill and the B/C hooks move to the v1.45.0 plan `dispatch-stall-recovery`

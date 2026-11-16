@@ -1,11 +1,11 @@
 # Bug: spec-intent gate never checks evidence items written in YAML flow style
 
-**Status:** OPEN — captured 2026-11-15
+**Status:** LANDED — d09d98f2 on k3d-manager-v1.44.1, 2026-11-16 (Flash, one correction for the `- E1: {…}` shape found by a whole-corpus run; Claude verified: 11 tests red pre-fix, 29/29 green; corpus diff shows only the two map-style plans newly refused, the accepted fail-closed case)
 **Priority:** P2 (raised from P3 at grooming 2026-11-15: a gate that silently passes; no wrong dispatch known)
 **Introduced by:** unknown (`scripts/lib/spec_intent.py`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-16 (Flash, gemini-3.8-flash-medium)
+**Waiting on:** scheduled run — since 2026-11-16 (next codex-dispatch start of a flow-style spec)
 **Triage:** patch → v1.44.1; Priority raised P3 → P2 (Argon P2 accepted: a safety-gate gap) — operator grooming 2026-11-15 ("Accept as shown")
 **Prior art:** exact-slug pass, no match; `find-similar-docs` not run (needs context k3d-k3d-cluster) — none known
 

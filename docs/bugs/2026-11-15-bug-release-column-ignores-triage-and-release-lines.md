@@ -7,7 +7,7 @@
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
 **Prior art:** exact-slug glob, none; read `docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md` (different root cause: status, not release)
-**Waiting on:** operator decision — since 2026-11-15
+**Waiting on:** fix running — since 2026-11-16 (Luna)
 **Triage:** patch → v1.44.1 — operator 2026-11-16 ("yes", pulled in from carry → v1.45.0 because the dashboard cannot show v1.44.1 progress without it)
 
 ## Symptom
