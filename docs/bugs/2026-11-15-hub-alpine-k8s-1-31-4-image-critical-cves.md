@@ -1,6 +1,6 @@
 # Bug: six hub CronJobs run `alpine/k8s:1.31.4` with 27 critical and 218 high CVEs
 
-**Status:** LANDED — pending land-commit on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: 3 tests red on pre-fix code, green on fix; no live 1.31.4 reference left outside history)
+**Status:** LANDED — 9a0d0afe on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: 3 tests red on pre-fix code, green on fix; no live 1.31.4 reference left outside history)
 **Priority:** P2
 **Classified:** not run (queued for the next triage)
 **Introduced by:** pre-existing (pin added in v1.23.0 `7253ece4` and v1.24.0 `fd281c85`)

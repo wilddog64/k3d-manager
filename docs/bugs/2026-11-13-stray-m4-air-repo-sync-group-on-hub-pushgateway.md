@@ -1,7 +1,7 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
 **Status:** OPEN — recurred 2026-11-14 from a pre-fix dispatch worktree (was VERIFIED live 2026-11-14, landed 22ca679c)
-**Waiting on:** dispatch — since 2026-11-16
+**Waiting on:** fix running — since 2026-11-16 (Flash, code guard)
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Stray metric pushes from worker checkouts over the SSH forward trigger recurring false Prometheus alerts and pollute dashboard panels, though the hub's actual sync remains healthy and the stale Pushgateway group can be manually deleted as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator
