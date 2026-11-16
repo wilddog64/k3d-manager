@@ -1,12 +1,12 @@
 # dirused `\\node` for a host that does not resolve prints `ERROR (1707)` instead of `UNREACHABLE`
 
-**Status:** OPEN — Flash fix exited 2026-11-16; Claude verified the diff; commits 47d0572 (test) + 562de4a (fix) in PR wilddog64/dirused#7, not merged
+**Status:** LANDED — merged in wilddog64/dirused#7 as 1926d2e (operator, 2026-11-16); test 47d0572 red on CI before the fix, fix 562de4a green; live-check fix-up 82442a0 (L1/L2 accept 1707) after Argon review; CI green at b270d5e
 **Priority:** P3 — wrong label only: the run still exits 3 and other targets still scan; the operator sees a raw code instead of "UNREACHABLE"
 **Introduced by:** wilddog64/dirused ab27363 (M1b phase 1a `\\node` expansion; merged in 245bedd)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Claude verification)
-**Waiting on:** live check — since 2026-11-16 (offline done: CI windows run 43787406779 red on test-only 47d0572, exactly the 3 new 1707 tests; fix 562de4a green run 43787367644. Next: Copilot on PR #7, then make vm-live L2)
-**Fix commit:** 562de4a (wilddog64/dirused PR #7, not merged)
+**Waiting on:** live check — since 2026-11-16 (make vm-live L2)
+**Fix commit:** 562de4a + 82442a0 (merged as 1926d2e, wilddog64/dirused PR #7)
 **Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Flash (`gemini-3.8-flash-medium`, agy) implements; spec with Acceptance next
 **Prior art:** `docs/bugs/2026-11-16-dirused-unreachable-host-error-64-not-mapped.md` (exact-slug neighbour; `make find-similar-docs` unavailable, vector store context `k3d-k3d-cluster` missing) — read, different code path: that fix mapped share-path codes 51/64 from the volume probe; this code comes from `NetShareEnum` while expanding a bare node.
 **Filed:** 2026-11-16

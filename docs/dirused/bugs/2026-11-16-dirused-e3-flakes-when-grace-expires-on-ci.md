@@ -1,11 +1,11 @@
 # dirused E3 flakes on Windows CI: the 200 ms grace expires before the cooperative scan returns
 
-**Status:** OPEN — option 1 approved by operator 2026-11-16; fix 58b7073 in PR wilddog64/dirused#9 (Claude, test-only), not merged
+**Status:** LANDED — merged in wilddog64/dirused#9 as 609d183 (operator, 2026-11-16); CI windows + portable green at 58b7073, then #7 (with the fix merged in) green at b270d5e
 **Priority:** P3 — test-only, but `windows` is a required check on dirused `main`, so each flake blocks a merge until a rerun passes
 **Introduced by:** wilddog64/dirused 588f0c2 (PR #8, merged as 25671fb) — added the hard-abandon wait at timeout + `min(timeout, 2s)`
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon)
-**Waiting on:** fix running — since 2026-11-16 (PR #9 CI + Argon review)
+**Waiting on:** scheduled run — since 2026-11-16 (watch the next few windows CI runs for E1/E2/E3 timing failures)
 **Approved:** operator 2026-11-16 ("approved 1")
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` not run (vector store context missing earlier today).
 **Filed:** 2026-11-16
