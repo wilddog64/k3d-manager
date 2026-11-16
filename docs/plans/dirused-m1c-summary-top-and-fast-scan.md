@@ -5,7 +5,8 @@
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); this file sits in k3d-manager only so `codex-dispatch start` can read it
 **Bugs fixed:** `docs/dirused/bugs/2026-11-16-dirused-summary-drops-hosts-sharing-volume-serial.md`, `docs/dirused/bugs/2026-11-16-dirused-all-scans-local-host-with-remote-targets.md`
 **Operator decisions (2026-11-16):** `/all` with targets = every drive on each target, never the local machine; `/all` alone = local fixed drives. `/summary /top N` = N largest **top-level** folders per drive ("go with your suggestion"). Speed-up items #1–#3 in this release; on-host/MFT scanning goes to `docs/dirused/ideas.md`.
-**Intent approved:** —
+**Intent approved:** operator, 2026-11-16
+**Approval words:** "approve dirused" (Part A, including A3 `/summary /top N`; Part B still waits on proof P1, P2)
 **Implementer:** Part A Flash or Luna (one agent); Part B the other, after proof. **Verifier:** Claude, from Acceptance only; live evidence by Claude (`make vm-live`).
 
 ## Why
