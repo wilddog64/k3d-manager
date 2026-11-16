@@ -1,3 +1,12 @@
+## Handoff 2026-11-16 ~01:30Z — dirused P3s approved; write specs and dispatch after /clear
+
+- **Operator 2026-11-16:** "approve two P3 bugs and can dispatch to Flash and Luna after /clear". Read per model tiering: Flash (`gemini-3.8-flash-medium`, agy) reviews each spec read-only; Luna (`gpt-6-luna`) implements via `make codex-dispatch`. Claude verifies (tests red at pre-fix, `gh api`, CI), then `make vm-live` on the VM for live evidence.
+- **Bug 1 (small):** `docs/bugs/2026-11-16-dirused-unreachable-node-error-1707-not-mapped.md` — add 1707 to the unreachable set in `TargetResolver.ErrorMessage` (`src/Dirused.Core/Targets/TargetResolver.cs:33`) + portable test. 1722 only if a capture proves it. Live red check: vm-live L2 (red at b475154).
+- **Bug 2 (harder):** `docs/bugs/2026-11-16-dirused-timeout-cannot-bound-hung-volume-probe.md` — `/timeout` cannot bound a blocking summary volume probe; fix direction: ScanRunner abandons the worker at the deadline and reports TIMED OUT. Portable test with a blocking fake probe; must_not red at b475154.
+- **Steps:** (1) write each as a spec with `## Acceptance` (must/must_not/evidence with intent, interface) + `**Intent approved:**` — show the intents to the operator; the bug-level approval above is not intent approval of evidence items they have not seen; (2) Flash review; (3) dispatch — separate files (TargetResolver.cs vs ScanRunner.cs), so one per file holds.
+- **WIP:** open rows = dirused-m1b0-modular-refactor (merged work, row still open, operator decision) + two `*-batch-review` rows (review children, do not count). Two new dispatches → 3, at the limit.
+- **dirused state:** main b475154 (PR #6 merged). Release run 43785276977 artifacts (win-x64/arm64) for the operator's office test; expire 2026-12-16.
+
 ## Handoff 2026-11-16 ~00:45Z — dirused M1b 1a + 1b + P3 all MERGED; ledger offline_tested recorded — START HERE
 - **Merged:** PR #5 (P3 unreachable codes) as eac2aa2 (00:21Z); PR #3 (1b fleet runner) as febe79d (00:34Z) after Update branch (486f219, CI green). Both merge trees identical to the CI-tested heads. Main CI at febe79d: run 43781208836 green. Copilot on #3 at e3a5e71: approval recommended, 3 threads resolved.
 - **Ledger:** offline_tested at eac2aa2 for dirused-unreachable-codes; at febe79d for dirused-m1b1b-fleet-runner and dirused-parallel-threadpool-cap (evidence scratchpad offline-p3-merge.md / offline-1b-merge.md).

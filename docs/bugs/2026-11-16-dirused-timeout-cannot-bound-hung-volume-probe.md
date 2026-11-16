@@ -1,11 +1,12 @@
 # dirused `/timeout` cannot bound a volume probe that never returns
 
-**Status:** OPEN — captured from the Copilot review of wilddog64/dirused PR #3 (Program.cs:28); not dispatched
+**Status:** OPEN — captured from the Copilot review of wilddog64/dirused PR #3 (Program.cs:28); approved, not yet dispatched
 **Priority:** P3 — a dead SMB server can stall one worker past `/timeout`; other targets still finish (workaround: Ctrl+C after the rest report, or a smaller `/file`)
 **Introduced by:** wilddog64/dirused 97a47fc (M1b phase 1b, not yet merged)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Claude verification)
-**Waiting on:** operator decision — since 2026-11-16
+**Waiting on:** dispatch — since 2026-11-16
+**Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); spec with Acceptance next, Flash review, Luna implements
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
 **Filed:** 2026-11-16
 **Repo / branch:** wilddog64/dirused, `m1b1b-fleet-runner`
