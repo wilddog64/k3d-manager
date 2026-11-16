@@ -1,7 +1,7 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** OPEN — recurred 2026-11-14 from a pre-fix dispatch worktree (was VERIFIED live 2026-11-14, landed 22ca679c)
-**Waiting on:** fix running — since 2026-11-16 (Flash, code guard)
+**Status:** LANDED — host guard 3b0def6b + fixture 5b308552 (2026-11-16); recurred 2026-11-14 from a pre-fix dispatch worktree (first fix 22ca679c, VERIFIED live 2026-11-14)
+**Waiting on:** live check — since 2026-11-16 (E4 after promote; operator deletes m4-air group, retire two stale review worktrees)
 **Branch:** k3d-manager-v1.44.1
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Stray metric pushes from worker checkouts over the SSH forward trigger recurring false Prometheus alerts and pollute dashboard panels, though the hub's actual sync remains healthy and the stale Pushgateway group can be manually deleted as a workaround.)
@@ -363,3 +363,14 @@ the stub path and scratch config before running (test controls rule).
 
 - Close the two stale review rows and remove their worktrees (Claude, with operator go).
 - On the M5: `curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air`.
+
+### Landed 2026-11-16 (Claude)
+
+`3b0def6b` is the guard (Gemini Flash). `5b308552` is a coordinator fixture fix. Verified in a scratch worktree at the pre-fix HEAD
+with the new tests copied in: "hub role on non-hub host skips…" and "hub role on hub host pushes…" fail on the old code,
+which is the E3 revert check. All 28 tests in `repo_sync.bats` pass on the fix.
+The land gate found a reader the spec missed: `repo_sync_promote_backlog.bats` runs as hub and reads the pushed body,
+so E11 and E12 went red. Its fixture now sets `K3DM_HUB_HOST` to this host. That file is added to Files and Contract readers,
+and the land used `--allow-out-of-scope` because the scope check reads the spec snapshot taken at dispatch.
+Repo-sync suites on land: repo_sync, repo_sync_promote_backlog (21), repo_sync_launchd_env and hub_sync (16) all pass.
+Spec escape: **Should have been caught by:** spec (contract-reader grep covered `scripts/etc`, not `scripts/tests`).
