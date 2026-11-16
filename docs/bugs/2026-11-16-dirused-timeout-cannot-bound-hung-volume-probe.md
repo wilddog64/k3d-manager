@@ -6,7 +6,7 @@
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Claude verification)
 **Waiting on:** dispatch — since 2026-11-16
-**Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); spec with Acceptance next, Flash review, Luna implements
+**Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Luna (`gpt-6-luna`, Codex) implements; spec with Acceptance next
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
 **Filed:** 2026-11-16
 **Repo / branch:** wilddog64/dirused, `m1b1b-fleet-runner`
