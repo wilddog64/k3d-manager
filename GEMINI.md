@@ -49,62 +49,20 @@ Use the existing Bash and Python styles. Route privileged and external commands 
 ## Shared rules
 
 <!-- shared:begin plan-cap -->
-- **Versioning and release scope (operator, 2026-11-07; supersedes the 2026-10-10 split-early-into-a-patch rule)** — `X.0.0` is a breaking change. `X.Y.0` is a feature release, a sprint story of at most 5 plan docs in `docs/plans/`. A 6th plan, or a release growing too big or too fast, splits into the next minor `X.(Y+1).0`, never into a patch. `X.Y.N` (N ≥ 1) is **bug-fix only**: specs from `docs/bugs/`, no `docs/plans/`, branch `k3d-manager-vX.Y.N` cut from `main` after the previous release merges. **Bugs before features (operator, 2026-11-07).** A P0 is fixed at once, whatever the release: a hotfix `X.Y.N` from `main` if the open release is not about to merge. A P1 blocks the open release's PR. **Capture first, triage later (operator, 2026-11-11; supersedes the 2026-11-08 P2 rules, effective now incl. v1.43.15).** A bug found live or anywhere else is captured as a short `docs/bugs/` doc (symptom, evidence, Priority, `**Introduced by:**`, `**Waiting on:** operator decision`): no fix spec, Acceptance block or dispatch yet. **Second-agent classification (operator, 2026-11-11):** Claude's Priority is a proposal; Gemini 4.0 Argon (`gemini-4-argon-medium`, cross-vendor) reads only the bug doc, not Claude's reasoning, and gives a Priority with one line of reason, recorded as `**Classified:** <P> by <agent>, YYYY-MM-DD`. When they differ the higher Priority stands until the operator decides; Fable breaks a P1/P2 tie when asked. Only P0 and P1 are fixed without triage. P2 and P3 wait for triage and never block a release PR by themselves. **Triage trigger (operator, 2026-11-11; from v1.44.0, after v1.43.15's post-merge grooming clears the backlog):** triage runs when 20 bugs have been captured since the last triage, or when the oldest of them is 7 days old, whichever comes first, and at each post-merge `/release-groom`. Claude checks at session start and says "triage due"; it brings a one-line recommendation per bug. Related bugs from one live session are captured as one doc. The rules here are expected to be tuned as data comes in. If Claude judges a P2 costly to leave (e.g. it bypasses a safety gate), Claude says why and the operator decides. The full spec rigor (Acceptance, Contract readers, independent verifier, cross-vendor review) applies once a bug is chosen for a fix. Measured in docs/process-metrics.md. Patches are optional: after `/post-merge`, `/release-groom` triages every open bug as `patch` (cut `X.Y.N+1`), `carry` (into `X.(Y+1).0`) or `close`, and the operator decides. A P2 goes to the patch if its workaround costs something now, otherwise it carries; a carried P2 lands in that release and is not carried twice without the operator saying so. P3s are batched into a release or a patch, at most 10 per release; a P3 passed over at two groomings is closed as won't-fix unless the operator gives a reason to keep it, the doc stays, and a recurrence reopens it. When bug work crowds a release, the lowest-priority plan not yet started moves to the next minor: plans move out, bugs stay. Bug specs never count toward the 5-plan cap. Claude decides splits, records them in `docs/roadmap.md`, and tells the operator. The queue after v1.43.15 was renumbered to this scheme on 2026-11-07 (old → new table in `docs/roadmap.md`).
+- **Versioning and release scope; bugs before features; capture first, triage later** — `X.0.0` breaking; `X.Y.0` at most 5 plans (a 6th goes to the next minor, never a patch); `X.Y.N` bug-fix only, from `docs/bugs/`. P0 fixed at once, P1 blocks the open release PR; any other bug is captured as a short `docs/bugs/` doc (`**Waiting on:** operator decision`), classified by Argon (`gemini-4-argon-medium`) from the doc alone, and triaged at 20 captured, 7 days old, or each post-merge `/release-groom` (Claude says "triage due" at session start). [more](docs/process/rules.md#versioning-and-release-scope)
 <!-- shared:end plan-cap -->
 
 <!-- shared:begin bug-priority -->
-Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
-without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
-new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
-**Escape origin (operator, 2026-11-07).** Every bug filed from 2026-11-07 also carries
-`**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**`
-one of `spec`, `offline test`, `review`, `deploy step`, `live check` or `none`: the first safety net that
-should have stopped it. Write `unknown` rather than guess. Each retro counts them by release and by net.
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every new `docs/bugs/` file carries, directly under Status, `**Priority:**`, `**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**` (`spec`, `offline test`, `review`, `deploy step`, `live check` or `none`; `unknown` rather than a guess), plus `**Introducing change reviewed:**` (`yes (Argon|Fable|both)`, `no`, `unknown`). [more](docs/process/rules.md#bug-priority-and-escape-origin)
 <!-- shared:end bug-priority -->
 
 <!-- shared:begin security -->
-## Security Rules (treat violations as bugs — catch before commit)
-
-**Shell Injection (OWASP A03)**
-- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments.
-- Never pass external or user-supplied input to `eval`.
-- Use `--` to separate options from arguments in CLI calls where arguments may contain hyphens.
-- Variables expanded via `envsubst` in `*.yaml.tmpl` must not contain shell metacharacters — validate before substitution.
-
-**Least Privilege (OWASP A01)**
-- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
-- New Kubernetes ServiceAccounts must not use `cluster-admin`. Use namespace-scoped Role + RoleBinding.
-- New ClusterRoles must be justified — prefer namespace-scoped resources.
-- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is explicitly required.
-
-**Cryptographic Failures (OWASP A02)**
-- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only. Never introduce in production config paths.
-- Vault PKI leaf cert TTL must stay short (≤720h). Do not increase `VAULT_PKI_ROLE_TTL` without justification.
-- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
-
-**Secret Hygiene (OWASP A02)**
-- Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
-- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in lib-foundation's `scripts/lib/system.sh` (change it upstream, then subtree-pull; `scripts/lib/system.sh` here only loads it).
-- Test credentials (`alice/password`, etc.) are dev-only — never reference in production config paths.
-- No secrets in `kubectl exec` command strings that appear in logs.
-
-**Security Misconfiguration (OWASP A05)**
-- Every new deployed service must use its own namespace — never `default`.
-- New Helm chart installations must pin chart versions explicitly — no floating `latest`.
-
-**Supply Chain Integrity (OWASP A08)**
-- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
-- New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
-- **Pins get reviewed, not only set (operator, 2026-11-07).** A pinned chart or image never moves by itself: the
-  observability stack sat at kube-prometheus-stack `67.9.0` (Grafana 11.4.0) for nearly two years. Severity sets the
-  response. A critical or high CVE in a pinned image calls for a patch release. An upstream bug that hurts us and has a
-  cheap workaround gets the workaround, with `**Fixed upstream in:** <component> <version>` in its bug doc. An upstream
-  bug with no workaround, or several fixed-upstream bugs piling up, calls for an upgrade release. Absent any of those,
-  review the pinned stack versions once a quarter and plan an upgrade when one is more than about two minor versions
-  behind.
-
-**Existing protections — do not remove or weaken:**
-- `_run_command` handles sudo probing and escalation safely.
-- `_args_have_sensitive_flag` disables trace for commands with `--password`, `--token`, `--username`.
-- ESO syncs credentials from Vault without exposing them in git.
+## Security Rules (violations are bugs — catch before commit)
+- **Injection (A03):** double-quote every expansion (`"$var"`); never `eval` external input; `--` before arguments that may start with a hyphen; validate `envsubst` values in `*.yaml.tmpl` for shell metacharacters.
+- **Least privilege (A01):** Vault policies grant minimum paths (`read` unless `write` is needed); no `cluster-admin` ServiceAccounts (namespace Role + RoleBinding); justify any ClusterRole; workflows use `permissions: contents: read` unless more is needed.
+- **Crypto (A02):** `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES`, `insecureSkipVerify: true` and `--insecure`/`-k` are dev-only, never on production paths; Vault PKI leaf TTL stays ≤720h (`VAULT_PKI_ROLE_TTL`).
+- **Secrets (A02):** no Vault tokens in arguments, shell history, CI logs or `kubectl exec` strings (use env or stdin); register new sensitive flags in `_args_have_sensitive_flag` upstream in lib-foundation, then subtree-pull; test credentials (`alice/password`) are dev-only.
+- **Misconfiguration (A05):** every new service gets its own namespace, never `default`; Helm chart versions pinned.
+- **Supply chain (A08):** Actions pinned to a tag (`@v4`), images in `*.yaml.tmpl` pinned, never `@main`, `@latest` or `latest`. Pins get reviewed: critical/high CVE → patch release; upstream bug with a cheap workaround → workaround plus `**Fixed upstream in:**`; no workaround or several piling up → upgrade release; otherwise review quarterly, upgrade when about two minors behind. [more](docs/process/rules.md#security-rules)
+- **Never weaken:** `_run_command` sudo handling; `_args_have_sensitive_flag` trace suppression (`--password`, `--token`, `--username`); ESO syncing credentials from Vault.
 <!-- shared:end security -->

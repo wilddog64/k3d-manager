@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 
 import pytest
+# agent-audit: allow assert-removed newest-release assertions retargeted to deploy/hub one for one (deploy/hub batch, N6)
 
 ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_loader(
@@ -35,6 +36,7 @@ def origin_and_clone(tmp_path, monkeypatch):
     git(seed, "branch", "-M", "k3d-manager-v1.43.14")
     git(seed, "remote", "add", "origin", str(origin))
     git(seed, "push", "-u", "origin", "HEAD")
+    git(seed, "push", "origin", "HEAD:refs/heads/deploy/hub")
     subprocess.run(["git", f"--git-dir={origin}", "symbolic-ref", "HEAD",
                     "refs/heads/k3d-manager-v1.43.14"], check=True)
     git(seed, "clone", str(origin), str(clone))
@@ -73,7 +75,7 @@ def refresh_with_capture(monkeypatch, clone, fail_older_fetch=False):
         if command[0] == "git" and len(command) > 1 and command[1] == "fetch":
             fetches.append((command, kwargs))
             if (fail_older_fetch and
-                    command[-1] == "+refs/heads/k3d-manager-v1.43.14:refs/remotes/origin/k3d-manager-v1.43.14"):
+                    command[-1] == "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub"):
                 return type("R", (), {"returncode": 1, "stdout": "", "stderr": "fetch failed"})()
             return real_run(command, **kwargs)
         if command[0] == "git":
@@ -101,16 +103,20 @@ def refresh_with_capture(monkeypatch, clone, fail_older_fetch=False):
 
 def test_refresh_lag_count_uses_fetched_older_upstream_when_newer_release_exists(
         older_branch_behind, monkeypatch):
-    _origin, _seed, clone = older_branch_behind
-    _state, _result, fetches, lag_payloads, index_metrics = refresh_with_capture(monkeypatch, clone)
+    _origin, seed, clone = older_branch_behind
+    state, _result, fetches, lag_payloads, index_metrics = refresh_with_capture(monkeypatch, clone)
     assert len(lag_payloads) == 1
-    assert 'code_commits_behind{branch="k3d-manager-v1.43.14"} 2' in lag_payloads[0]
+    assert 'code_commits_behind{branch="deploy/hub"} 0' in lag_payloads[0]
     assert len(fetches) == 2
     assert fetches[0][0][-1] == "+refs/heads/k3d-manager-v1.43.100:refs/remotes/origin/k3d-manager-v1.43.100"
-    assert fetches[1][0][-1] == "+refs/heads/k3d-manager-v1.43.14:refs/remotes/origin/k3d-manager-v1.43.14"
+    assert fetches[1][0][-1] == "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub"
     assert fetches[0][1]["timeout"] == fetches[1][1]["timeout"] == 60
     assert fetches[0][1]["env"] is fetches[1][1]["env"]
     assert index_metrics[0]["result"] == "success"
+    git(seed, "push", "origin", "HEAD:refs/heads/deploy/hub")
+    next_state, _result, _fetches, next_payloads, _metrics = refresh_with_capture(monkeypatch, clone)
+    assert 'code_commits_behind{branch="deploy/hub"} 2' in next_payloads[0]
+    assert next_state["index_ref"] == state["index_ref"] == "origin/k3d-manager-v1.43.100"
 
 
 def test_failed_older_upstream_fetch_skips_lag_without_changing_index_result(
@@ -129,9 +135,10 @@ def test_refresh_on_newest_branch_fetches_once(older_branch_behind, monkeypatch)
         "+refs/heads/k3d-manager-v1.43.100:refs/remotes/origin/k3d-manager-v1.43.100")
     git(clone, "switch", "--track", "-c", "k3d-manager-v1.43.100", "origin/k3d-manager-v1.43.100")
     _state, _result, fetches, lag_payloads, index_metrics = refresh_with_capture(monkeypatch, clone)
-    assert len(fetches) == 1
+    assert len(fetches) == 2
     assert fetches[0][0][-1] == "+refs/heads/k3d-manager-v1.43.100:refs/remotes/origin/k3d-manager-v1.43.100"
-    assert 'code_commits_behind{branch="k3d-manager-v1.43.100"} 0' in lag_payloads[0]
+    assert fetches[1][0][-1] == "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub"
+    assert 'code_commits_behind{branch="deploy/hub"} 0' in lag_payloads[0]
     assert index_metrics[0]["result"] == "success"
 
 
@@ -141,8 +148,8 @@ def test_lag_publishes_code_count_excluding_docs(origin_and_clone, monkeypatch):
     git(seed, "add", "docs/new.md"); git(seed, "commit", "-m", "doc")
     (seed / "code.txt").write_text("code\n")
     git(seed, "add", "code.txt"); git(seed, "commit", "-m", "code")
-    git(seed, "push", "origin", "HEAD")
-    git(clone, "fetch", "origin", "+refs/heads/k3d-manager-v1.43.14:refs/remotes/origin/k3d-manager-v1.43.14")
+    git(seed, "push", "origin", "HEAD:refs/heads/deploy/hub")
+    git(clone, "fetch", "origin", "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub")
     captured = []
 
     class Response:
@@ -155,10 +162,10 @@ def test_lag_publishes_code_count_excluding_docs(origin_and_clone, monkeypatch):
         return Response()
 
     monkeypatch.setattr(hermes.urllib.request, "urlopen", capture)
-    hermes._push_checkout_lag("origin/k3d-manager-v1.43.14", "k3d-manager-v1.43.14", "k3d-manager-v1.43.14")
-    assert 'code_commits_behind{branch="k3d-manager-v1.43.14"} 1' in captured[0]
+    hermes._push_checkout_lag("origin/deploy/hub")
+    assert 'code_commits_behind{branch="deploy/hub"} 1' in captured[0]
     assert "k3dm_hub_checkout_last_check_timestamp_seconds" in captured[0]
-    assert "k3dm_hub_checkout_on_newest_release{newest_branch=\"k3d-manager-v1.43.14\"} 1" in captured[0]
+    assert "k3dm_hub_checkout_on_newest_release" not in captured[0]
 
 
 def test_newest_release_uses_numeric_version_and_never_downgrades(origin_and_clone, monkeypatch):
@@ -182,8 +189,8 @@ def test_unsafe_branch_and_git_or_gateway_failures_publish_nothing(origin_and_cl
     published = []
     monkeypatch.setattr(hermes.subprocess, "run", lambda *_a, **_k: type("R", (), {"returncode": 1, "stdout": ""})())
     monkeypatch.setattr(hermes.urllib.request, "urlopen", lambda *_a, **_k: published.append(1))
-    hermes._push_checkout_lag("origin/x", 'x"bad', "x")
-    hermes._push_checkout_lag("origin/x", "x", "x")
+    hermes._push_checkout_lag('x"bad')
+    hermes._push_checkout_lag("origin/x")
     assert published == []
 
 
@@ -192,8 +199,7 @@ def test_unreachable_gateway_does_not_escape(origin_and_clone, monkeypatch):
     monkeypatch.setattr(hermes.subprocess, "run", lambda *_a, **_k:
                         type("R", (), {"returncode": 0, "stdout": "0\n"})())
     monkeypatch.setattr(hermes.urllib.request, "urlopen", lambda *_a, **_k: (_ for _ in ()).throw(OSError("offline")))
-    assert hermes._push_checkout_lag("origin/k3d-manager-v1.43.14", "k3d-manager-v1.43.14",
-                                     "k3d-manager-v1.43.14") is None
+    assert hermes._push_checkout_lag("origin/deploy/hub") is None
 
 
 def test_paused_refresh_still_publishes_checkout_lag(origin_and_clone, monkeypatch):
@@ -209,7 +215,7 @@ def test_paused_refresh_still_publishes_checkout_lag(origin_and_clone, monkeypat
     state = {"index_paused_until": 200}
     assert hermes._refresh_index(state, now=100) is None
     assert state["index_ref"] == "origin/k3d-manager-v1.43.14"
-    assert lag == [("origin/k3d-manager-v1.43.14", "k3d-manager-v1.43.14", "k3d-manager-v1.43.14")]
+    assert lag == [("origin/deploy/hub",)]
 
 
 def test_refresh_fetches_newest_release_docs_without_moving_head(origin_and_clone, monkeypatch):
@@ -263,5 +269,9 @@ def test_explicit_index_ref_wins_without_remote_release_lookup(origin_and_clone,
     hermes._refresh_index(state, now=1000)
     assert state["index_ref"] == "origin/k3d-manager-v1.43.14"
     fetch_calls = [command for command in calls if command[:2] == ["git", "fetch"]]
-    assert fetch_calls == [["git", "fetch", "--quiet", "origin", "k3d-manager-v1.43.14"]]
+    assert fetch_calls == [
+        ["git", "fetch", "--quiet", "origin", "k3d-manager-v1.43.14"],
+        ["git", "fetch", "--quiet", "origin",
+         "+refs/heads/deploy/hub:refs/remotes/origin/deploy/hub"],
+    ]
     assert not any(command[:3] == ["git", "ls-remote", "--heads"] for command in calls)

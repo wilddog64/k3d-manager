@@ -32,6 +32,8 @@ spec:
               env:
                 - name: VAULT_ADDR
                   value: "${VAULT_ENDPOINT}"
+                - name: VAULT_CLIENT_TIMEOUT
+                  value: "5s"
               command:
                 - /bin/sh
                 - -c
@@ -42,16 +44,27 @@ spec:
                     echo "[unseal-watchdog] vault-unseal secret not mounted — nothing to do"
                     exit 0
                   fi
-                  vault status >/dev/null 2>&1
-                  rc=$?
-                  if [ "$rc" -eq 0 ]; then
-                    echo "[unseal-watchdog] vault already unsealed"
-                    exit 0
-                  fi
-                  if [ "$rc" -eq 1 ]; then
-                    echo "[unseal-watchdog] vault unreachable at $VAULT_ADDR — skipping"
-                    exit 0
-                  fi
+                  attempt=1
+                  while [ "$attempt" -le 12 ]; do
+                    vault status >/dev/null 2>&1
+                    rc=$?
+                    if [ "$rc" -eq 0 ]; then
+                      echo "[unseal-watchdog] vault already unsealed"
+                      exit 0
+                    fi
+                    if [ "$rc" -eq 2 ]; then
+                      break
+                    fi
+                    if [ "$rc" -eq 1 ]; then
+                      if [ "$attempt" -eq 12 ]; then
+                        echo "[unseal-watchdog] vault unreachable at $VAULT_ADDR — skipping"
+                        exit 0
+                      fi
+                      echo "[unseal-watchdog] vault unreachable at $VAULT_ADDR — retry $attempt/12"
+                      sleep 5
+                    fi
+                    attempt=$((attempt + 1))
+                  done
                   echo "[unseal-watchdog] vault sealed — replaying shard"
                   vault operator unseal "$(cat "$SHARD_FILE")" >/dev/null 2>&1 || true
                   if vault status >/dev/null 2>&1; then

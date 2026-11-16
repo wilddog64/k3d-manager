@@ -1,12 +1,17 @@
 # Bug: the Vault unseal watchdog gives up while Vault is still booting
 
 **Filed:** 2026-10-12
-**Branch:** `k3d-manager-v1.46.0`
-**Status:** OPEN
+**Branch:** `k3d-manager-v1.44.0`
+**Status:** LANDED — 55ad3a11, 2026-11-14
 **Priority:** P2 — Vault, and every secret read through it, stays sealed up to 5 minutes longer than needed after a restart; it recovers on its own
-**Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Post-restart unsealing is delayed by one 5-minute CronJob interval when Vault is still booting, after which the next scheduled run automatically unseals it); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
+**Waiting on:** live check — since 2026-11-14 (fixed template applied to the hub 2026-11-15; unseal half blocked by docs/bugs/2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed.md)
+**Release:** v1.44.0 (carried by grooming 2026-11-12; was v1.46.0 per backlog triage, Claude, 2026-10-22)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** medium
+**Intent approved:** operator, 2026-11-13
+**Intent approval words:** "apporve three intents and you can dispatch them" (vault-unseal, hermes-card amended E1, coordinator-unattributed)
 
 ## Symptom
 
@@ -86,6 +91,40 @@ Gates: `bats scripts/tests/etc/vault_unseal_watchdog.bats`, `make test` (read th
 The next hub restart (an OrbStack update or a rebuild): the first watchdog run after Vault's pod
 starts logs `retry <n>/12` lines followed by `unseal succeeded`, in the same run.
 
+## Acceptance
+
+```yaml
+interface:
+  - "scripts/etc/vault/unseal-watchdog.yaml.tmpl rendered with envsubst; the CronJob's inline script extracted and run with sh, a stub vault on PATH, a stub sleep, and the shard path pointed at a temp file"
+must:
+  - id: M1
+    text: "vault status returns 1, 1, then 2: in the same run the stub sees exactly one 'operator unseal' call, output contains 'retry 1/12' and 'retry 2/12', and the run exits 0."
+  - id: M2
+    text: "vault status returns 1 every time: exactly 12 status calls and 11 'sleep 5' calls, then a line ending in '— skipping', rc 0, no 'operator unseal' call."
+  - id: M3
+    text: "vault status returns 0 first: 'vault already unsealed', one status call, no sleep. Returns 2 first: the unseal path runs with no 'retry' line and no sleep."
+  - id: M4
+    text: "The extracted script passes 'sh -n'; the rendered CronJob keeps schedule '*/5 * * * *', activeDeadlineSeconds 150, backoffLimit and image unchanged from the pre-fix template; the shard file's content never appears in stdout or stderr in any M1-M3 scenario."
+must_not:
+  - id: N1
+    text: "When vault status returns 1 then 0, the watchdog does not print '— skipping' and does not exit before the second status call. (Pre-fix: skips after one call.)"
+  - id: N2
+    text: "When vault status returns 1, 1, then 2, the watchdog does not exit without calling 'operator unseal'. (Pre-fix: exits 0 with no unseal.)"
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, M4, N1, N2]
+    kind: offline
+    intent: "You will see tests where a stub Vault answers 'unreachable' a few times and then 'sealed': the watchdog retries, unseals in the same run, and never prints the shard. Today it gives up on the first 'unreachable'."
+  - id: E2
+    proves: [N1, N2]
+    kind: offline
+    intent: "You will see the same retry tests run against today's template and fail, so they can catch the bug."
+  - id: E3
+    proves: [M1]
+    kind: live
+    intent: "After the next hub restart (OrbStack update or rebuild), you will see one watchdog run log 'retry n/12' lines followed by 'unseal succeeded', with no 5-minute sealed gap."
+```
+
 ## What NOT to Do
 
 - Do NOT change the schedule, `activeDeadlineSeconds`, `backoffLimit` or the image.
@@ -93,3 +132,38 @@ starts logs `retry <n>/12` lines followed by `unseal succeeded`, in the same run
 - Do NOT apply the template to the live hub; the operator does that.
 - Do NOT commit, push or create a PR. Claude verifies and commits.
 - Do NOT modify files outside the Files list.
+
+## Verification — 2026-11-14 (Claude)
+
+Landed as `55ad3a11` (Flash, gemini-3.8-flash-medium). Claude made three changes before landing:
+
+- **Shard path kept fixed.** The worker made the production `SHARD_FILE` overridable by env (`${SHARD_FILE:-…}`) only
+  for testing. The test already rewrites the path with `sed`, so the change was reverted.
+- **`VAULT_CLIENT_TIMEOUT: "5s"` added to the container env** (Fable review M-1). Fable timed the real Vault 1.18.3 CLI:
+  connection refused 0 s, NXDOMAIN 1 s, blackholed SYN 30 s, TCP accepted but never answered 60 s. Without a client
+  timeout, 12 slow attempts exceed `activeDeadlineSeconds: 150`, and the Job fails with no `— skipping` line. With the
+  timeout, the worst case is about 125 s. Schedule, deadline, `backoffLimit` and image are unchanged.
+- **Tests tightened** (Fable L-2, L-3): exact `sleep 5` match; `set -u` and the timeout env asserted; a positive control
+  on the unseal path in M4.
+
+Evidence:
+- **E1:** `bats scripts/tests/etc/vault_unseal_watchdog.bats` passed 12/12.
+- **E2:** the pre-fix template failed tests 6, 7, 10, 11 and 12 (M1, M2, M4, N1, N2).
+- **Mutants:** each turned a test red: retry 12→1, the rc 2 `break` dropped, `sleep` removed, the timeout env removed,
+  `sleep 50`, `set -u` removed.
+- **Not fixed (low):** a `vault status` rc other than 0/1/2 (for example 127) runs 12 quick attempts and then the
+  unseal path. That matches pre-fix behaviour.
+- **E3 (live): pending.** On the next hub restart, one watchdog run should log `retry n/12` lines followed by
+  `unseal succeeded`.
+- **Independent verifier (Opus, Acceptance block only, own harness, real production `envsubst` allow-list):** 8/8 PASS
+  on `55ad3a11`. M1, M2, N1 and N2 were red on `55ad3a11~1`; M3a, M3b and M4 were green on both, as expected. The
+  shard marker never appeared in output (positive control: it was found in the stub's unseal call log). The only
+  rendered change outside the script is the `VAULT_CLIENT_TIMEOUT` env var. bats 12/12; the repo tree was clean after
+  the verifier moved its stray stub files out.
+
+## Live attempt (Claude, 2026-11-15) — template applied; unseal blocked by a separate bug
+
+The fixed template had never been applied to the hub (the live CronJob had no retry lines). Claude applied it at
+`234bc2d1` and deleted `vault-0` at 15:24:45Z. Jobs ran every 5 minutes and reached `replaying shard`, but the Secret's
+shard was rejected, so E3's `unseal succeeded` could not happen. See
+`docs/bugs/2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed.md`. The operator unsealed by hand at about 15:37Z.

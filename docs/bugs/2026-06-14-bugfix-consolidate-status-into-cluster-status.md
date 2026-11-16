@@ -2,6 +2,7 @@
 
 **Branch:** `k3d-manager-v1.7.1`
 **Files:** `bin/cluster-status`, `Makefile`, `bin/k3dm-webhook`, **delete** `bin/hostinger-status`
+**Status:** LANDED — `bin/cluster-status` exists and `bin/hostinger-status` is gone (checked 2026-11-12); fix commit not recorded
 **Priority:** P3 — `bin/hostinger-status` no longer exists (checked 2026-10-10); no remaining urgency
 
 ---

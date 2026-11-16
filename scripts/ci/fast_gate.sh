@@ -29,6 +29,7 @@ run_limited() {
   ' "${FAST_GATE_SUITE_TIMEOUT:-900}" "$@"
 }
 worker() {
+  unset BASE
   local work=$1 index=$2 kind=$3 file=$4 label="" begin=$SECONDS rc=0 no_tests=0
   local -a command=() pytest_cmd=() docs=()
   case "$kind" in
@@ -137,7 +138,7 @@ done <<< "$fixture_commits"
 git diff --name-only --diff-filter=ACMR "$base" HEAD > "$work/changed"
 : > "$work/tests"
 add_test() {
-  case "$1" in scripts/tests/*.bats|scripts/tests/test_*.py|scripts/tests/*/test_*.py) [[ -f "$1" ]] && printf '%s\n' "$1" >> "$work/tests" ;; esac
+  case "$1" in scripts/tests/host/*) return 0 ;; scripts/tests/*.bats|scripts/tests/test_*.py|scripts/tests/*/test_*.py) [[ -f "$1" ]] && printf '%s\n' "$1" >> "$work/tests" ;; esac
   return 0
 }
 while IFS= read -r file || [[ -n "$file" ]]; do
@@ -157,7 +158,7 @@ while IFS= read -r file; do
 done < "$work/changed"
 : > "$work/matched"
 if [[ -s "$work/patterns" ]]; then
-  find scripts/tests -type f \( -name '*.bats' -o -name 'test_*.py' \) -print0 |
+  find scripts/tests -type f -not -path 'scripts/tests/host/*' \( -name '*.bats' -o -name 'test_*.py' \) -print0 |
     xargs -0 grep -lF -f "$work/patterns" > "$work/matched" || true
 fi
 sort -u "$work/tests" -o "$work/tests"

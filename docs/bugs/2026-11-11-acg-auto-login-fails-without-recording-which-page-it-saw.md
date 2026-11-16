@@ -1,13 +1,16 @@
 # Bug: ACG unattended login fails with `ACG_LOGIN_FIELDS_MISSING` and records nothing about the page it saw
 
-**Status:** OPEN
+**Status:** LANDED — lib-foundation `c7384ff` on `release/v0.5.6`, 2026-11-14; reaches k3d-manager after the lib-foundation v0.5.6 release and subtree pull
 **Priority:** P2 — `/cluster-up aws` from Slack fails at step 1 whenever the Pluralsight session lapses; workaround: sign in by hand on the M5's CDP Chrome (:9222) and rerun
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unattended ACG auto-login fails without diagnostic logging when the session expires, but operators can work around it by signing in manually on the host's CDP Chrome); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (own dispatch) — grooming 2026-11-12, operator.
+**Waiting on:** live check — since 2026-11-14 (next lapsed Pluralsight session, after the subtree pull)
 **Introduced by:** unknown
 **Should have been caught by:** live check
 **Severity:** medium — unattended cluster-up depends on a human at the M5's screen every few days; each recurrence of this flow is diagnosed by guessing
 **Approval:** operator 2026-11-11: "can you investigate this and file bug if necessary"
-**Intent approved:** operator, 2026-11-11 ("approve ACG auto-login P2")
+**Intent approved:** operator, 2026-11-11
+**Intent approval words:** "approve ACG auto-login P2"
 **Prior art:** `scripts/lib/foundation/docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md`, `2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md`, `2026-09-12-acg-session-check-false-green-on-signed-out-page.md`, `2026-07-07-acg-session-check-render-race-false-negative.md` — read, same flow, different root causes, all FIXED; this is the fifth failure of the flow and the first filed for missing diagnostics (`make find-similar-docs` not run: vector store unreachable from the M4)
 **Filed:** 2026-11-11
 **Detected by:** Claude, reviewing operator Slack job `eebeb490` on the M5
@@ -52,7 +55,9 @@ The fix below is therefore diagnostics first. The next recurrence names its caus
    - A screenshot failure prints `screenshot=failed` and never changes the return value.
 3. **Reason on the final message.** In `acg_session_check.js`, the `ACG_SESSION_EXPIRED:` line gains ` reason=<reason>`. The reason is the `loginWithPage` result reason (`login_form_unavailable`, `mfa_required`, `login_failed`, `no_creds`), or `no_attempt` when no credentials exist. `_autoLogin` returns the result object, not only `ok`. The thrown `Error('ACG_SESSION_EXPIRED')` message is unchanged.
 
-## Files (lib-foundation)
+## Files
+
+All paths are in lib-foundation (`release/v0.5.6`).
 
 - `scripts/lib/acg/playwright/lib/pluralsight_login.js`
 - `scripts/lib/acg/acg_session_check.js`
@@ -116,3 +121,43 @@ interface:
 2. For each `must_not`: break the guard, show its test red, restore it, show it green. List any that stayed green.
 3. "No read-only real-data run possible": a real run needs a signed-out Pluralsight session.
 4. List every choice the spec did not decide.
+
+## Verification — 2026-11-14 (Claude)
+
+Landed in lib-foundation as `c7384ff` (Luna, gpt-6-luna; one correction round), pushed to `release/v0.5.6`.
+
+Fable's review of run 1 found, and correction round 1 fixed:
+- **HIGH (pre-existing):** when a sign-in field was visible but disabled or read-only, Playwright's `fill()` timeout error
+  carried its call log, `- fill("<password>")`, and `acg_session_check.js` printed it (`INFO: auto-login error: …`), which
+  reaches the Slack cluster-up output. Fable reproduced it with real Playwright 1.60.0. `fillIfVisible` now throws
+  `fill_failed: <field>` with none of the original text.
+- **MEDIUM:** one new test never pointed `XDG_STATE_HOME` at a scratch dir, so each jest run wrote fake screenshots into
+  the operator's real `~/.local/state/k3d-manager/acg-diag` and ran retention there. Claude removed the 5 `fake-png`
+  files. The tests now set a scratch dir in `beforeEach`, and a guard test asserts it.
+- The title is now stripped of control characters, has the username replaced by `[redacted]`, and is printed quoted.
+  `ACG_SESSION_EXPIRED` reports `login_error` for a throw and `post_login_probe_failed` when login succeeded but the
+  follow-up check did not. The screenshot path is kept when retention fails; a symlinked `acg-diag` is refused; a relative
+  `XDG_STATE_HOME` is ignored.
+
+Evidence:
+- **E1:** `npx jest` in `scripts/lib/acg`, outside the sandbox with a scratch `HOME`: 8 suites, 66/66. `npm run check` and
+  `git diff --check` rc 0.
+- **Pre-fix:** run 1's new tests on `23a5753` failed 7 of 8. N4 passed there as expected, because pre-fix never prints a
+  DIAG line.
+- **Mutants:** each turned a test red. Claude: fill error rethrown raw; scratch `XDG_STATE_HOME` removed (the screenshots
+  then landed in the scratch `HOME`); username redaction off. Luna: retention sorted ascending; directory mode 0755; the
+  Cloudflare iframe check dropped; title truncation dropped; control-character strip dropped; screenshot allowed after
+  the email field was filled.
+- The real `~/.local/state/k3d-manager/acg-diag` did not exist before or after any run.
+- **Land:** the lib-foundation mirror doc shares this spec's path, which land always treats as out of scope, so it landed
+  with `--allow-out-of-scope`. It was the only out-of-scope file.
+- **Independent verifier (Opus, Fix and Acceptance sections only, own node harness, no jest tests read):** 8/8 PASS on
+  `c7384ff`. N1–N4 cannot fail on pre-fix `23a5753`, because pre-fix has no DIAG or screenshot code. Instead each has a
+  positive control, a mutant the check caught: a screenshot on `login_failed` (N1), a raw URL plus an unredacted title
+  (N2). N3's control is the throwing screenshot call, which was seen to run. M3: pre-fix prints no `reason=`. M4: after 8
+  runs exactly the newest 5 screenshots by mtime remain, and an unrelated file is kept. With a symlinked `acg-diag` the
+  line says `screenshot=failed` and nothing is written through the link. Real `acg-diag` absent before and after; both
+  repo trees clean.
+- **E2 (live): pending.** It needs the lib-foundation v0.5.6 release, the subtree pull here, and the next lapsed
+  Pluralsight session on the M5.
+

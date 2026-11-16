@@ -108,18 +108,27 @@ test('interactivity rejects bad signatures without side effects', async () => {
   assert.equal(response.status, 401); assert.equal(kv.puts.length, 0); assert.equal(worker.fetches.length, 0)
 })
 
-test('non-allowlisted user cannot approve', async () => {
-  const kv = fakeKv(); const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1,UAPPROVER2', APPROVAL_DRAIN_TOKEN: token })
-  assert.equal((await worker.dispatch(signed('/slack/interactivity', interactivityBody('UOTHER', 'hermes_approve', value)))).status, 200)
-  assert.equal(await kv.get('approval:r2-0123abcd'), null)
-  assert.match(worker.fetches.find(item => item.url.includes('hooks.slack.test')).init.body, /not authorized/)
-})
-
-test('allowlisted user must re-authenticate', async () => {
-  const kv = fakeKv(); const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1,UAPPROVER2', APPROVAL_DRAIN_TOKEN: token })
-  await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', value)))
-  assert.equal(await kv.get('approval:r2-0123abcd'), null)
-  assert.match(worker.fetches[0].init.body, /hermes-auth/)
+test('interactivity refusal replies preserve the card and say the decision was not recorded', async () => {
+  const cases = [
+    ['approvals-not-configured', () => loadWorker({ APPROVALS_KV: undefined, APPROVER_ALLOWLIST: 'UAPPROVER1' }), 'UAPPROVER1', 'not configured'],
+    ['not-allowlisted', () => loadWorker({ APPROVALS_KV: fakeKv(), APPROVER_ALLOWLIST: 'UAPPROVER1' }), 'UOTHER', 'not authorized'],
+    ['reauth-required', () => loadWorker({ APPROVALS_KV: fakeKv(), APPROVER_ALLOWLIST: 'UAPPROVER1' }), 'UAPPROVER1', 'hermes-auth'],
+  ]
+  for (const [name, createWorker, userId, reason] of cases) {
+    for (const [actionId, decision] of [['hermes_approve', 'Approve'], ['hermes_deny', 'Deny']]) {
+      const worker = createWorker()
+      assert.equal((await worker.dispatch(signed('/slack/interactivity', interactivityBody(userId, actionId, value)))).status, 200, name)
+      const calls = worker.fetches.filter(item => item.url === 'https://hooks.slack.test/resp')
+      assert.equal(calls.length, 1, name)
+      const call = calls[0]
+      const reply = JSON.parse(call.init.body)
+      assert.equal(reply.response_type, 'ephemeral', name)
+      assert.equal(reply.replace_original, false, name)
+      assert.match(reply.text, new RegExp(`Your ${decision} of r2-0123abcd was NOT recorded`), name)
+      assert.match(reply.text, new RegExp(reason, 'i'), name)
+      if (worker.kv) assert.equal(worker.kv.puts.length, 0, name)
+    }
+  }
 })
 
 test('happy approve stores an expiring approval and replaces the message', async () => {
@@ -136,7 +145,10 @@ test('deny dismisses without recording an approval', async () => {
   const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1')
   const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1,UAPPROVER2', APPROVAL_DRAIN_TOKEN: token })
   await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_deny', value)))
-  assert.equal(await kv.get('approval:r2-0123abcd'), null); assert.match(worker.fetches[0].init.body, /denied/)
+  assert.equal(await kv.get('approval:r2-0123abcd'), null)
+  const reply = JSON.parse(worker.fetches[0].init.body)
+  assert.equal(reply.replace_original, true)
+  assert.match(reply.text, /r2-0123abcd denied by <@UAPPROVER1>/)
 })
 
 test('DELETE rejects encoded path separators', async () => {

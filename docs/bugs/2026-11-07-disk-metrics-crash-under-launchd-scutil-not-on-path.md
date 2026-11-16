@@ -2,10 +2,9 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED 2026-11-07 — `d70047d5`; live M1 met 2026-11-08 (push age 42.6 s, flat across many Hermes cycles since ~15:30 on 2026-11-07; operator screenshot, below); `HostDiskMetricsStale` resolution not yet seen; independent verifier pending
+**Status:** VERIFIED 2026-11-13 — E1 independent verifier (Opus, Acceptance only) PASS M1/M2/N1/N2 at 16ecb35e, M1 control + N1 red on d70047d5^; E2 live PASS 2026-11-13 (HostDiskMetricsStale inactive/ok, push age 474 s, 8 pushes in 1 h); landed `d70047d5` 2026-11-07
 **Fix commit:** d70047d5
 **Priority:** P2 — every host's disk gauges are frozen, so the critical disk-space alert cannot fire; running the script by hand is a workaround
-**Waiting on:** dispatch — since 2026-11-08 (independent verifier)
 **Approval:** explicit 2026-11-07 "can you investigate this issue, file bug if necessary and dispatch to Luna" (operator)
 **Severity:** high
 **Related:** `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md` (its 2026-11-06 recurrence note; this doc is that recurrence's root cause)
@@ -82,3 +81,13 @@ evidence:
 - Probe status: hostinger, m2, m4, m5 all `up`. Used %: hostinger 19.8, m2 69.7, m4 69.1, m5 14.9. Free: 155, 281, 142, 789 GiB (m5 matches the M5 disk, 822 GiB free on 2026-10-31; m4 is no longer the M5's disk).
 - Last push age 42.6 s, and the push-age sparkline stays flat from about 15:30 on 2026-11-07, so the launchd-scheduled Hermes runs push every cycle again. Used % over time has no data from about 07:00 to 15:30 on 2026-11-07, the window before the M5 checkout had `d70047d5`.
 - Not shown: `HostDiskMetricsStale` resolved. The hub was not reachable from Claude's M4 session, so the Prometheus query was not run by Claude.
+
+## Verification — 2026-11-13 (Claude)
+
+- **E1 offline (independent verifier, Opus subagent, Acceptance block only; not the Fix section, diff or existing tests).** HEAD 16ecb35e vs pre-fix d70047d5^, scratch HOME, `env -i`, Pushgateway URL `http://127.0.0.1:9`.
+  - M1 PASS: `PATH=<stub ssh>:/usr/bin:/bin bin/k3dm-disk-metrics --dry-run` rc 0, `k3dm_disk_probe_success{host="m4",path="/System/Volumes/Data"} 1`. Control on pre-fix: rc 1, `FileNotFoundError: [Errno 2] No such file or directory: 'scutil'`. Claude reran both: same rc and lines.
+  - M2 PASS: stub exit 1 → exactly one line `disk metrics publish failed: rc=1: <last non-blank line>`; exit 0 → no output. Pre-fix printed nothing on exit 1.
+  - N1 PASS: AST check finds bare `["scutil", ...]` at pre-fix line 30, none post-fix; a fake `scutil` first on PATH is called by pre-fix, not post-fix.
+  - N2 PASS: no exception for exit 0, exit 1 with a 403-character line (detail capped at 300), a hang past the timeout, or a missing script.
+  - Errors seen: the expected pre-fix FileNotFoundError; verifier setup errors from a refused `cd`, which wrote 13 stray files into the repo root. The verifier deleted them, Claude confirmed `git status` clean of them, and every result above came from an absolute-path re-run.
+- **E2 live (Claude, hub Prometheus on m5-air via ssh, 2026-11-13 ~21:05Z).** `HostDiskMetricsStale` rule loaded (`inactive`, health `ok`), no active alert; `time()-push_time_seconds{job="k3dm-disk"}` = 474 s; `changes(push_time_seconds{job="k3dm-disk"}[1h])` = 8.

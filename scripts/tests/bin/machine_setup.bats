@@ -77,6 +77,8 @@ PY
   run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
   [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
   [ "$(cat "$CALL_LOG.installer")" = '1|1' ]
+  grep -Fq 'promtool install' "$CALL_LOG"
+  [[ "$output" == *'promtool                         installed'* ]]
   [ ! -e "$CALL_LOG.sudo" ]
   grep -Fq 'https://raw.githubusercontent.com/Homebrew/install/7986efac25016e41eed7e471666140c06f9d97cf/install.sh' "$CALL_LOG.curl"
   [ -d "$FIXHOME/src/gitrepo/personal/k3d-manager/.git" ]
@@ -305,7 +307,10 @@ printf 'secrets %s\n' "$*" >> "$CALL_LOG"
 exit "${SECRETS_STUB_RC:-0}"
 SH
   chmod +x "$FIXROOT/bin/k3dm-machine-secrets"
-  printf '%s\n' '_run_command() { [[ "${LINUX_SETUP_FIXTURE:-0}" == 1 ]] || return 1; while [[ "$#" -gt 0 ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }' > "$FIXROOT/scripts/lib/system.sh"
+  cat > "$FIXROOT/scripts/lib/system.sh" <<'SH'
+_run_command() { [[ "${LINUX_SETUP_FIXTURE:-0}" == 1 ]] || return 1; while [[ "$#" -gt 0 ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }
+_install_promtool() { printf 'promtool install\n' >> "$CALL_LOG"; [[ "${PROMTOOL_INSTALL_RC:-0}" -eq 0 ]]; }
+SH
   : > "$FIXROOT/scripts/lib/core.sh"
   for role in hub worker console; do
     : > "$FIXROOT/scripts/etc/machine/brew.$role.list"
@@ -395,6 +400,12 @@ SH
   local default_venv="$FIXHOME/.local/share/k3d-manager/venv"
   mkdir -p "$default_venv/bin"
   touch "$default_venv/bin/yaml-installed"
+  mkdir -p "$FIXHOME/.local/bin"
+  cat > "$FIXHOME/.local/bin/promtool" <<'PROMTOOL'
+#!/bin/sh
+echo 'promtool, version 3.1.0 (branch: HEAD, revision: fixture)'
+PROMTOOL
+  chmod +x "$FIXHOME/.local/bin/promtool"
   for tool in ruff pytest; do printf '#!/bin/sh\nexit 0\n' > "$default_venv/bin/$tool"; chmod +x "$default_venv/bin/$tool"; done
   cat > "$default_venv/bin/python" <<'VENV'
 #!/bin/sh
@@ -434,6 +445,93 @@ SH
   mkdir -p "$FIXHOME/.ssh" "$FIXHOME/.config/k3d-manager"
   printf 'E2E_M2_PUBLISH_BACK_HOST=fixture-user@fixture-hub.local\n' > "$FIXHOME/.config/k3d-manager/e2e-remote.env"
   printf 'from="192.168.39.0/24",command="%s/scripts/k3d-manager e2e_result_publish",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAA e2e-m2-publisher@m2-air-20260824\n' "$FIXROOT" > "$FIXHOME/.ssh/authorized_keys"
+}
+
+@test "machine setup installs promtool for control, console, and hub but not worker" {
+  for tested_role in console hub worker; do
+    setup_machine_fixture
+    "$REAL_PYTHON3" - "$FIXROOT/bin/k3dm-machine-setup" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "preflight\nensure_ec2_ssh_key\nif (( brew_available )); then install_tools; else report brew-phase 'skipped (Homebrew unavailable)'; fi\ninstall_promtool\ncheck_ai_clis\nensure_python_tools\ninstall_repos\nswitch_ssh_remotes\ncheck_completion_dirs\ninstall_state_chain\ncheck_secrets\ncopy_files\ninstall_e2e_publish_back\nrun_agents\nexit \"$failed\""
+assert old in text
+path.write_text(text.replace(old, "install_promtool\nexit \"$failed\""))
+PY
+    run_machine --role "$tested_role"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+    if [[ "$tested_role" == worker ]]; then
+      if grep -Fq 'promtool install' "$CALL_LOG"; then return 1; fi
+      [[ "$output" != *'promtool '* ]]
+    else
+      grep -Fq 'promtool install' "$CALL_LOG"
+      [[ "$output" == *'promtool                         installed'* ]]
+    fi
+  done
+}
+
+@test "machine setup records macOS promtool install failure" {
+  setup_machine_fixture
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="$FIXHOME/.local/share" REAL_PYTHON3="$REAL_PYTHON3" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" PROMTOOL_INSTALL_RC=1 "$FIXROOT/bin/k3dm-machine-setup" --role console </dev/null
+  [ "$status" -eq 1 ]
+  grep -Eq '^promtool[[:space:]]+missing \(see installer output\)$' <<< "$output"
+}
+
+@test "machine setup check reports installed promtool and never installs it" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.local/bin"
+  cat > "$FIXHOME/.local/bin/promtool" <<'SH'
+#!/bin/sh
+echo 'promtool, version 3.1.0 (branch: HEAD, revision: fixture)'
+SH
+  chmod +x "$FIXHOME/.local/bin/promtool"
+  run_machine --role hub --check
+  grep -Eq '^promtool[[:space:]]+ok$' <<< "$output"
+  if grep -Fq 'promtool install' "$CALL_LOG"; then return 1; fi
+}
+
+@test "machine setup check reports missing promtool and never installs it" {
+  setup_machine_fixture
+  rm -f "$FIXHOME/.local/bin/promtool"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  grep -Eq '^promtool[[:space:]]+missing$' <<< "$output"
+  if grep -Fq 'promtool install' "$CALL_LOG"; then return 1; fi
+}
+
+@test "Linux control records promtool installer failure" {
+  setup_linux_brew_fixture
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PROMTOOL_INSTALL_RC=1 PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control
+  [ "$status" -ne 0 ]
+  grep -Eq '^promtool[[:space:]]+missing \(installer failed\)$' <<< "$output" || { printf '%s\n' "$output"; return 1; }
+}
+
+@test "Linux control check reports missing promtool without installing" {
+  setup_linux_brew_fixture
+  mkdir -p "$FIX_PREFIX/bin"
+  cp "$STUBS/fake-brew" "$FIX_PREFIX/bin/brew"
+  chmod +x "$FIX_PREFIX/bin/brew"
+  : > "$FIXROOT/scripts/etc/machine/brew.control.list"
+  mkdir -p "$FIXHOME/src/gitrepo/personal/k3d-manager/.git" "$FIXHOME/src/gitrepo/personal/lib-foundation/.git"
+  rm -f "$FIXHOME/.local/bin/promtool"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control --check
+  [ "$status" -eq 1 ]
+  grep -Eq '^promtool[[:space:]]+missing$' <<< "$output" || { printf '%s\n' "$output"; return 1; }
+  if grep -Fq 'promtool install' "$CALL_LOG"; then return 1; fi
+}
+
+@test "Linux control check reports installed promtool without installing" {
+  setup_linux_brew_fixture
+  mkdir -p "$FIX_PREFIX/bin"
+  cp "$STUBS/fake-brew" "$FIX_PREFIX/bin/brew"
+  chmod +x "$FIX_PREFIX/bin/brew"
+  : > "$FIXROOT/scripts/etc/machine/brew.control.list"
+  mkdir -p "$FIXHOME/src/gitrepo/personal/k3d-manager/.git" "$FIXHOME/src/gitrepo/personal/lib-foundation/.git"
+  run env HOME="$FIXHOME" LINUX_SETUP_FIXTURE=1 CALL_LOG="$CALL_LOG" FIX_PREFIX="$FIX_PREFIX" FAKE_BREW="$STUBS/fake-brew" FAKE_INSTALLER="$STUBS/fake-installer" INSTALL_LOG="$CALL_LOG.installer" PATH="$STUBS:/usr/bin:/bin" "$FIXROOT/bin/k3dm-machine-setup" --role control --check
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  grep -Eq '^promtool[[:space:]]+ok$' <<< "$output" || { printf '%s\n' "$output"; return 1; }
+  if grep -Fq 'promtool install' "$CALL_LOG"; then return 1; fi
 }
 
 run_machine() {

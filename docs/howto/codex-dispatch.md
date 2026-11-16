@@ -4,6 +4,12 @@ For component relationships, trust boundaries, task lifecycle, and Mermaid diagr
 
 `bin/k3dm-codex-dispatch` gives each spec a separate worktree and task branch. Run it from a clean, pushed release branch:
 
+For a session acting as the primary coordinator, export `K3DM_COORDINATOR=vendor/model` before
+starting or resuming (for example, `openai/gpt-6.1-sol`). An explicit
+`--coordinator VENDOR/MODEL` overrides the environment variable. If neither is set, dispatch continues with an
+unreported coordinator and prints a warning. End each commit with `Coordinator: <vendor/model>`;
+Claude sessions keep their existing `Co-Authored-By` trailer too.
+
 ```bash
 make codex-dispatch SPEC=docs/plans/v1.43.0-example.md
 make codex-status

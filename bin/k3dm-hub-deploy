@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+source "$REPO_ROOT/scripts/lib/foundation/scripts/lib/system.sh"
+
+die() { printf '[hub-deploy] ERROR: %s\n' "$*" >&2; exit 2; }
+stop() {
+  local step="$1" code="$2"
+  printf 'hub-deploy: stopped at %s: rerun make hub-deploy REF=%s after fixing it\n' "$step" "$ref" >&2
+  exit "$code"
+}
+[[ $# == 1 && -n "$1" ]] || die 'usage: k3dm-hub-deploy <commit-ish>'
+ref="$1"
+
+if _run_command --soft -- "$REPO_ROOT/bin/k3dm-require-role" hub; then :; else
+  code=$?; stop require-role "$code"
+fi
+
+remote_sha() {
+  local rows sha
+  rows="$(_run_command --soft -- git -C "$REPO_ROOT" ls-remote origin refs/heads/deploy/hub)" || return $?
+  sha="${rows%%$'\t'*}"
+  [[ "$sha" =~ ^[0-9a-f]{40,64}$ ]] || { printf '[hub-deploy] ERROR: origin/deploy/hub is missing or invalid\n' >&2; return 1; }
+  printf '%s' "$sha"
+}
+
+if old="$(remote_sha)"; then :; else
+  code=$?; stop read-deploy-hub "$code"
+fi
+if _run_command --soft -- "$REPO_ROOT/bin/k3dm-hub-promote" promote "$ref"; then
+  :
+else
+  code=$?
+  stop promote "$code"
+fi
+
+if new="$(remote_sha)"; then :; else
+  code=$?; stop read-promoted-ref "$code"
+fi
+if _run_command --soft -- git -C "$REPO_ROOT" diff --quiet "$old" "$new" -- scripts/etc/argocd/applicationsets/; then
+  reapply=skipped
+  printf 'appsets unchanged between %s and %s; skipping reapply\n' "$old" "$new"
+else
+  diff_status=$?
+  if [[ "$diff_status" != 1 ]]; then
+    stop diff "$diff_status"
+  fi
+  reapply=ran
+  if _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" appsets-reapply; then :; else
+    code=$?; stop appsets-reapply "$code"
+  fi
+fi
+
+for step in appsets-check platform-ops; do
+  if _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" "$step"; then :; else
+    code=$?; stop "$step" "$code"
+  fi
+done
+
+if _run_command --soft -- kubectl --context "${INFRA_CONTEXT:-k3d-k3d-cluster}" -n platform-ops rollout status deploy/vulnerability-inventory-exporter --timeout=180s; then :; else
+  code=$?; stop rollout "$code"
+fi
+
+printf 'hub-deploy: deploy/hub %s..%s; reapply %s; appsets-check ok; platform-ops ok; exporter rolled out\n' "${old:0:7}" "${new:0:7}" "$reapply"

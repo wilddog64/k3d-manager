@@ -9,12 +9,14 @@ import shlex
 import json
 import socket
 import math
+import statistics
 import os
 import re
 import tempfile
 import time
 import urllib.request
 from collections import defaultdict
+from decimal import Decimal
 from pathlib import Path
 import subprocess
 import sys
@@ -38,8 +40,9 @@ BUG_SPEC_RE = re.compile(r"^docs/bugs/(\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*)\.md
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
 MODEL_IDENTITY_ALLOWLIST = {
     "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
-    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-fable-5-2",
     "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+    "gemini-4-hydrogen-low", "gemini-4-hydrogen-medium", "gemini-4-hydrogen-high", "gemini-4-hydrogen-xhigh",
     "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high",
 }
 RUNGS = ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed")
@@ -52,7 +55,10 @@ NEW_S1_EVENTS = {
     "gate_coverage_start", "combine", "attempt_assessed", "stall_gate",
     "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared",
     "state_mark", "link",
+    "stall_detected", "stall_diagnosis", "stall_proposal", "stall_decision", "stall_resume",
 }
+STALL_EVENTS = {"stall_detected", "stall_diagnosis", "stall_proposal", "stall_decision", "stall_resume"}
+STALL_COST_CUTOFF = 1794614400
 
 
 def _repo_root():
@@ -884,6 +890,166 @@ def _task_states(events):
     return states
 
 
+def _prepare_stall_events(events):
+    """Drop malformed stall records and return how many were rejected."""
+    kept = []
+    bad = 0
+    for event in events:
+        if event.get("event") not in STALL_EVENTS:
+            kept.append(event)
+            continue
+        ts = event.get("ts")
+        version = event.get("version")
+        slug, stall = event.get("slug"), event.get("stall")
+        valid = (isinstance(ts, (int, float)) and not isinstance(ts, bool) and math.isfinite(ts)
+                 and isinstance(version, str) and bool(version)
+                 and isinstance(slug, str) and bool(slug) and isinstance(stall, str) and bool(stall))
+        if event.get("event") == "stall_detected":
+            value = event.get("silent_s")
+            valid = valid and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+        elif event.get("event") == "stall_diagnosis":
+            value = event.get("cost_usd")
+            valid = valid and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+        if valid:
+            kept.append(event)
+        else:
+            bad += 1
+    return kept, bad
+
+
+def _stall_all_versions_cost(events):
+    total = sum((Decimal(str(event["cost_usd"])) for event in events
+                 if event.get("event") == "stall_diagnosis" and event["ts"] >= STALL_COST_CUTOFF), Decimal(0))
+    return f"k3dm_dispatch_stall_diagnosis_cost_usd_all_versions {total}"
+
+
+def _stall_scope_metrics(events, all_events, window):
+    """Render one scope's stall metrics, preserving ledger order for joins."""
+    scoped = [(index, event) for index, event in enumerate(all_events)
+              if event in events and event.get("event") in STALL_EVENTS]
+    by_version = defaultdict(list)
+    for index, event in scoped:
+        by_version[event["version"]].append((index, event))
+
+    all_by_incident = defaultdict(list)
+    slug_events = defaultdict(list)
+    for index, event in enumerate(all_events):
+        if event.get("event") not in STALL_EVENTS and event.get("event") != "resume" and event.get("event") not in {"land", "abandon"}:
+            continue
+        version, slug = event.get("version"), event.get("slug")
+        if isinstance(version, str) and isinstance(slug, str):
+            slug_events[(version, slug)].append((index, event))
+        if event.get("event") in STALL_EVENTS:
+            key = (str(slug), str(event.get("stall", "")), version)
+            all_by_incident[key].append((index, event))
+
+    out = []
+    for version, rows in sorted(by_version.items()):
+        version_label = _label_value(version)
+        detected = [(i, e) for i, e in rows if e.get("event") == "stall_detected"]
+        diagnoses = [(i, e) for i, e in rows if e.get("event") == "stall_diagnosis"]
+        decisions = [(i, e) for i, e in rows if e.get("event") == "stall_decision"]
+        resumes = [(i, e) for i, e in rows if e.get("event") == "stall_resume" and e.get("rc") == 0]
+
+        reason_counts = defaultdict(int)
+        for _, event in detected:
+            reason_counts[str(event.get("reason", "unknown"))] += 1
+        for reason in sorted(set(reason_counts) | {"silent", "procs"}):
+            out.append(f'k3dm_dispatch_stall_incidents{{window="{_label_value(window)}",version="{version_label}",reason="{_label_value(reason)}"}} {reason_counts[reason]}')
+        silences = sorted(e["silent_s"] for _, e in detected)
+        median_silence = statistics.median(silences) if silences else 0
+        out.append(f'k3dm_dispatch_stall_silent_seconds_median{{window="{_label_value(window)}",version="{version_label}"}} {float(median_silence)}')
+
+        statuses = sorted({str(e.get("status", "unknown")) for _, e in diagnoses})
+        for status in statuses:
+            count = sum(str(e.get("status", "unknown")) == status for _, e in diagnoses)
+            out.append(f'k3dm_dispatch_stall_diagnoses{{window="{_label_value(window)}",version="{version_label}",status="{_label_value(status)}"}} {count}')
+        diagnosis_cost = sum((Decimal(str(e["cost_usd"])) for _, e in diagnoses), Decimal(0))
+        out.append(f'k3dm_dispatch_stall_diagnosis_cost_usd{{window="{_label_value(window)}",version="{version_label}"}} {diagnosis_cost}')
+
+        decision_counts = defaultdict(int)
+        for _, event in decisions:
+            decision_counts[str(event.get("decision", "unknown"))] += 1
+        for decision in sorted(set(decision_counts) | {"approved", "denied", "expired", "precondition_failed"}):
+            out.append(f'k3dm_dispatch_stall_decisions{{window="{_label_value(window)}",version="{version_label}",decision="{_label_value(decision)}"}} {decision_counts[decision]}')
+        decision_minutes = []
+        for decision_index, decision in decisions:
+            key = (str(decision.get("slug", "")), str(decision.get("stall", "")), version)
+            previous = [i for i, e in all_by_incident[key] if i < decision_index and e.get("event") == "stall_proposal"]
+            if previous:
+                proposal = all_events[previous[-1]]
+                decision_minutes.append((float(decision["ts"]) - float(proposal["ts"])) / 60)
+        median_decision = statistics.median(decision_minutes) if decision_minutes else 0
+        out.append(f'k3dm_dispatch_stall_decision_minutes_median{{window="{_label_value(window)}",version="{version_label}"}} {float(median_decision)}')
+
+        incident_keys = {(str(e.get("slug", "")), str(e.get("stall", "")), version) for _, e in detected}
+        successful_resume_keys = {(str(e.get("slug", "")), str(e.get("stall", "")), version) for _, e in resumes}
+        outcome_counts = defaultdict(int)
+        outcome_by_incident = {}
+        resume_by_incident = {}
+        land_by_incident = {}
+        for key in successful_resume_keys:
+            incident_rows = all_by_incident[key]
+            successful_resumes = [(i, e) for i, e in incident_rows if e.get("event") == "stall_resume" and e.get("rc") == 0]
+            if not successful_resumes:
+                continue
+            resume_index, resume = successful_resumes[0]
+            later = [(i, e) for i, e in slug_events[(version, key[0])]
+                     if i > resume_index and e.get("event") in {"land", "stall_detected", "abandon"}]
+            next_index, next_event = later[0] if later else (None, None)
+            outcome = {"land": "landed", "stall_detected": "stalled_again", "abandon": "abandoned"}.get(
+                next_event.get("event"), "pending") if next_event else "pending"
+            outcome_counts[outcome] += 1
+            outcome_by_incident[key] = outcome
+            resume_by_incident[key] = (resume_index, resume)
+            if next_event and next_event.get("event") == "land":
+                land_by_incident[key] = (next_index, next_event)
+
+        latest_by_incident = {}
+        for key, incident_rows in all_by_incident.items():
+            latest_by_incident[key] = {
+                "stall_diagnosis": next((e for _, e in reversed(incident_rows) if e.get("event") == "stall_diagnosis"), None),
+                "stall_decision": next((e for _, e in reversed(incident_rows) if e.get("event") == "stall_decision"), None),
+            }
+        clean = 0
+        for key in incident_keys:
+            if outcome_by_incident.get(key) != "landed" or key not in resume_by_incident or key not in land_by_incident:
+                continue
+            last_decision = latest_by_incident.get(key, {}).get("stall_decision")
+            if not last_decision or last_decision.get("decision") != "approved":
+                continue
+            resume_index, _ = resume_by_incident[key]
+            land_index, _ = land_by_incident[key]
+            corrected = any(i > resume_index and i < land_index and e.get("event") == "resume"
+                            and e.get("reason") == "correction" for i, e in slug_events[(version, key[0])])
+            if not corrected:
+                clean += 1
+
+        for outcome in ("landed", "stalled_again", "abandoned", "pending"):
+            out.append(f'k3dm_dispatch_stall_outcomes{{window="{_label_value(window)}",version="{version_label}",outcome="{outcome}"}} {outcome_counts[outcome]}')
+        out.append(f'k3dm_dispatch_stall_clean_approvals{{window="{_label_value(window)}",version="{version_label}"}} {clean}')
+
+        emitted_incident_labels = set()
+        for key in sorted(incident_keys):
+            slug, stall, _ = key
+            detection = next((e for _, e in reversed(all_by_incident[key]) if e.get("event") == "stall_detected"), None)
+            if not detection:
+                continue
+            latest = latest_by_incident.get(key, {})
+            diagnosis = latest.get("stall_diagnosis")
+            decision = latest.get("stall_decision")
+            labels = (f'window="{_label_value(window)}",version="{version_label}",slug="{_label_value(slug)}",'
+                      f'stall="{_label_value(stall)}",reason="{_label_value(detection.get("reason", "unknown"))}",'
+                      f'diagnosis="{_label_value(diagnosis.get("status", "unknown") if diagnosis else "unknown")}",'
+                      f'decision="{_label_value(decision.get("decision", "unknown") if decision else "unknown")}",'
+                      f'outcome="{outcome_by_incident.get(key, "none")}"')
+            if labels in emitted_incident_labels:
+                continue
+            emitted_incident_labels.add(labels)
+            out.append(f'k3dm_dispatch_task_stall_incident{{{labels}}} {detection["silent_s"]}')
+    return out
+
+
 def _task_state(task_events):
     names = {event.get("event") for event in task_events}
     if names & {"land", "abandon"}:
@@ -981,7 +1147,7 @@ def _task_metrics(task_events, land_event, prices=None):
     declared_coordinators = [event.get("coordinator_identity") for _, event in ordered
                              if event.get("event") in {"start", "resume"}
                              and isinstance(event.get("coordinator_identity"), dict)
-                             and event["coordinator_identity"].get("source") == "declared"
+                             and event["coordinator_identity"].get("source") in {"declared", "env"}
                              and event["coordinator_identity"].get("status") == "declared"]
     coordinator_identity = declared_coordinators[-1] if declared_coordinators else (
         latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {})
@@ -1581,6 +1747,16 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     else:
         scoped = [event for event in source_events if _normalize_version(event.get("version")) == window]
         _render_release_duration(lines, window, scoped)
+    lines.extend(_stall_scope_metrics(scoped, source_events, window))
+    coordinator_starts = [event for event in scoped if event.get("event") == "start"]
+    coordinator_unreported = sum(
+        1 for event in coordinator_starts
+        if not isinstance(event.get("coordinator_identity"), dict)
+        or event["coordinator_identity"].get("source") == "unreported"
+    )
+    if coordinator_starts:
+        lines.append(f'k3dm_dispatch_coordinator_unreported_share{{window="{window}"}} '
+                     f'{coordinator_unreported / len(coordinator_starts)}')
     complexity = {}
     complexity_events = source_events if time_scope else scoped
     for task_events in _task_states(complexity_events).values():
@@ -1678,7 +1854,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         emitted_identity_labels = set()
         def identity_labels(identity, role):
             raw_source = identity.get("source")
-            source = raw_source if isinstance(raw_source, str) and raw_source in {"explicit", "default", "inherited", "runtime", "runtime-reported", "unreported", "declared", "unknown"} else "unreported"
+            source = raw_source if isinstance(raw_source, str) and raw_source in {"explicit", "default", "inherited", "runtime", "runtime-reported", "unreported", "declared", "env", "unknown"} else "unreported"
             if source == "runtime-reported":
                 source = "runtime"
             raw_vendor = identity.get("vendor")
@@ -2650,11 +2826,13 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
            codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None,
            claude_usage_cache=None):
     now = time.time() if now is None else now
+    events, bad_stall = _prepare_stall_events(events)
+    bad_lines += bad_stall
     doc_root = Path(repo_root) if repo_root is not None else _repo_root()
     prices = prices or {}
     repo_by_worktree = _dispatch_worktree_repos(events)
     coverage = list(_session_files(codex_home, now, repo_by_worktree)) if codex_home else None
-    lines = [f"k3dm_dispatch_ledger_bad_lines {bad_lines}"]
+    lines = [f"k3dm_dispatch_ledger_bad_lines {bad_lines}", _stall_all_versions_cost(events)]
     for window, seconds in WINDOWS.items():
         _render_scope(lines, window, _window_metrics(events, now, seconds, prices, doc_root), events,
                       prices, coverage, True, now, claude_records, claude_prices, now-seconds)

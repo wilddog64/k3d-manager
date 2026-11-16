@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic dashboard label ambiguity ("not recorded" instead of "no handoff") when the adjacent Handoffs column already shows `0`); Claude proposed P3. Agreed.
+**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** `32393e17` (v1.43.9, Acting coordinator column)
 **Should have been caught by:** spec
 **Severity:** low — display only; reads as missing data when nothing is missing

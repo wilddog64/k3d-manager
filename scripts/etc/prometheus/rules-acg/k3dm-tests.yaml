@@ -44,7 +44,7 @@ spec:
             severity: warning
           annotations:
             summary: "offline test run incomplete for target {{ $labels.target }}"
-            description: "A stage failed before the later suites ran. Check the [test-all] metrics log: path printed by the run."
+            description: "a stage aborted. Check the [test-all] metrics log: path printed by the run."
         - alert: OfflineSuiteStale
           expr: time() - k3dm_test_last_success_timestamp_seconds > 604800
           for: 1h

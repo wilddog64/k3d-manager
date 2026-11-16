@@ -2,10 +2,12 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`; dispatch after the decision)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic wording fix renaming a dashboard panel title, description, and related documentation without changing underlying queries or behavior); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** pre-existing (the panel title and description since the reason bars; see CHANGELOG "Agent Dispatch Human continuation prompts")
 **Should have been caught by:** review
-**Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `docs/plans/v1.45.0-human-operator-turns.md` covers the same panel (read: this doc takes only its rename step; the plan keeps the real turn counting)
+**Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `docs/plans/human-operator-turns.md` covers the same panel (read: this doc takes only its rename step; the plan keeps the real turn counting)
 **Severity:** cosmetic, misleading. The operator read the bars (correction, clarification, continue) as their own effort; they are Claude's coordinator → sub-agent resume prompts recorded in the ledger.
 **Approval:** operator, 2026-11-10: "also can you schedule the label fix?"
 **Intent approved:** operator, 2026-11-10
@@ -29,7 +31,7 @@ recorded operator events by reason". The ledger `intervention` events behind it 
    dispatched agents, by recorded reason. Not operator turns: those are counted by the v1.45.0 human-operator-turns
    plan. The tracked tasks bar is the coverage denominator." Query, layout and id unchanged.
 2. The guide and the how-to say the same.
-3. `docs/plans/v1.45.0-human-operator-turns.md` drops its rename step and refers here.
+3. `docs/plans/human-operator-turns.md` drops its rename step and refers here.
 
 ## Files
 
@@ -47,7 +49,7 @@ recorded operator events by reason". The ledger `intervention` events behind it 
 | `scripts/tests/plugins/agent_dispatch_dashboard.bats:187,1036` (panel lookup by title) | Yes |
 | `docs/guides/grafana-dashboards/k3dm-agent-cost.md:69`, `docs/howto/codex-dispatch.md:162` | Yes |
 | `CHANGELOG.md:338`, `docs/retro/2026-11-07-v1.43.14-retrospective.md:24` | No: history |
-| `docs/plans/v1.45.0-human-operator-turns.md` | Yes: rename step removed (Claude, at filing) |
+| `docs/plans/human-operator-turns.md` | Yes: rename step removed (Claude, at filing) |
 
 Writers: `bin/k3dm-codex-dispatch resume` writes the `intervention` events; unchanged. Found by
 `git grep -n "Human continuation prompts"`, 2026-11-10.

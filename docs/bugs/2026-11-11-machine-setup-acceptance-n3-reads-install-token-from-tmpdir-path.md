@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-11 (post-merge `/release-groom` triage: patch `v1.43.16` or carry into `v1.44.0`)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only defect in `machine_setup_acceptance.bats` (`grep` matching `install-*` in `TMPDIR` instead of only the `make` target), with no production impact and a simple `TMPDIR`/slug workaround for the land gate); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Severity:** test-only. A false red in the land fast gate; no product effect. Workaround: run `scripts/ci/fast_gate.sh` with a neutral `TMPDIR`, then land with `K3DM_SKIP_FAST_GATE=1`.
 **Introduced by:** `bd68d6ff` (v1.43.12, N3 tests added)
 **Should have been caught by:** review

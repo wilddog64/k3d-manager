@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: cicd
+spec:
+  description: Isolated development dashboards from the pushed k3d-manager branch.
+  sourceRepos:
+    - https://github.com/wilddog64/k3d-manager
+    - https://github.com/wilddog64/k3d-manager.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: monitoring

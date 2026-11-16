@@ -21,7 +21,31 @@ The content the hub reads must not change during this ref switch. The first
 check confirms the old release ref; after reapplying, the second check confirms
 `deploy/hub`.
 
-## Promote
+## Everyday promote
+
+For a normal release, run the end-to-end hub deployment on the hub:
+
+```sh
+make hub-deploy REF=<commit-ish>
+```
+
+It keeps the typed `promote` confirmation, reapplies ApplicationSets only when
+their manifests changed, checks their values branch, applies platform resources,
+and waits for the vulnerability exporter rollout. If a step fails, fix it and
+rerun the same command; an already-current `deploy/hub` ref continues with the
+remaining steps.
+
+The individual commands remain available as a manual fallback:
+
+```sh
+make hub-promote REF=<commit-ish>
+make appsets-reapply  # only when ApplicationSet manifests changed
+make appsets-check
+make platform-ops
+kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter --timeout=180s
+```
+
+## Promote (manual sequence)
 
 Promote a commit that is reachable from an `origin` branch and has completed
 successfully in GitHub Actions:
@@ -50,7 +74,9 @@ git cherry-pick -x <commit-sha>
 ```
 
 Cherry-pick the commits onto the release branch, push to `origin`, wait for CI
-checks to pass, and re-run `make hub-promote`.
+checks to pass, and re-run `make hub-promote`. The hub checkout follows the
+promoted `deploy/hub` ref automatically, including when a carried commit has a
+new SHA after cherry-picking.
 
 If GitHub checks are unavailable during an outage or you must intentionally
 discard uncontained commits, `BREAK_GLASS=1` skips the check-run gate and the
@@ -71,6 +97,9 @@ commits that will be added. After promoting A, B and C without intervening
 commits, successive rollbacks move to B and then A. When you want to move
 forward again, promote that commit explicitly with
 `make hub-promote REF=<commit-ish>`.
+The hub checkout follows the rollback on its next repo-sync run. A clean
+non-fast-forward checkout is reset to `deploy/hub` after a create-only backup
+ref is recorded; dirty checkouts are left in place and reported for attention.
 If `deploy/hub` holds commits added after the last promotion (not in the
 promotion stack top), `make hub-rollback` refuses and lists them unless
 overridden with `BREAK_GLASS=1`:

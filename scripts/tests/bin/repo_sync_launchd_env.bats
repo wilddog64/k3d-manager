@@ -189,6 +189,16 @@ except Exception:
 ' "$plist_path"
 }
 
+_extract_plist_env() {
+  local plist_path="$1" key="$2"
+  python3 -c '
+import plistlib, sys
+with open(sys.argv[1], "rb") as f:
+    pl = plistlib.load(f)
+sys.stdout.write(pl.get("EnvironmentVariables", {}).get(sys.argv[2], ""))
+' "$plist_path" "$key"
+}
+
 _run_sync_with_path() {
   local sync_path="$1"
   run env -i \
@@ -224,6 +234,29 @@ _run_sync_with_path() {
 
   # Expected standard tool chain with Homebrew first
   [[ "$path_val" == "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"* ]]
+}
+
+@test "E4: rendered repo-sync plist sets Pushgateway URL and preserves PATH (M3, N2)" {
+  local plist="$AGENTS_DIR/com.k3d-manager.repo-sync.plist"
+
+  run env -i HOME="$SCRATCH_HOME" PATH="$SPIES_DIR:$REAL_TOOLS_DIR:/usr/bin:/bin" K3DM_AGENT_LOAD=0 \
+    make -C "$PROJECT_ROOT" --no-print-directory install-repo-sync
+  [ "$status" -eq 0 ]
+  [ -f "$plist" ]
+  [ "$(_extract_plist_env "$plist" PUSHGATEWAY_URL)" = "http://localhost:19094" ]
+  [ "$(_extract_plist_path "$plist")" = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" ]
+  python3 - "$plist" <<'PY'
+import plistlib
+import sys
+
+with open(sys.argv[1], "rb") as stream:
+    plist = plistlib.load(stream)
+assert set(plist) == {
+    "Label", "ProgramArguments", "EnvironmentVariables", "RunAtLoad",
+    "StartInterval", "StandardOutPath", "StandardErrorPath",
+}
+assert set(plist["EnvironmentVariables"]) == {"PATH", "PUSHGATEWAY_URL"}
+PY
 }
 
 @test "E2: the job, run with only the rendered plist's environment, invokes no installer for kubectl or gh (N1)" {

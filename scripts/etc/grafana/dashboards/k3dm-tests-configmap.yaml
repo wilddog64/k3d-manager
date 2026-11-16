@@ -87,7 +87,7 @@ data:
           "id": 9,
           "type": "stat",
           "title": "Run complete",
-          "description": "A run that stops at a red stage counts only the stages that ran, see OfflineSuiteRunIncomplete.",
+          "description": "A run where a stage aborted counts only the stages that ran, see OfflineSuiteRunIncomplete.",
           "gridPos": { "x": 8, "y": 26, "w": 4, "h": 8 },
           "fieldConfig": {
             "defaults": {

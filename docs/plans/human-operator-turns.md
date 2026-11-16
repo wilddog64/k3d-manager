@@ -1,9 +1,9 @@
 # Plan: count real human operator turns, and stop calling coordinator resumes "human"
 
-**Status:** PLANNED — operator asked for it 2026-11-07; spec only, dispatch when `k3d-manager-v1.45.0` is cut
+**Status:** PLANNED — operator asked for it 2026-11-07; swapped out of v1.45.0 to ordered backlog position 1 at grooming 2026-11-15 (operator chose remote promote approval for the slot)
 **Priority:** P3 (a dashboard mislabel plus missing telemetry; nothing is broken and no decision depends on it yet)
 **Approval:** operator 2026-11-07: "the truely what I want to know if this a really human intervention or your interaction with sub-agents. can we capture turn human interaction?", then "can we aslo capture agy and codex if I use them occationaly?", then "go ahead to write a plan after v1.43.14 merged". The same conversation approved folding in the correction-cause P3 ("small P3 is fine"). Spec only. Registering the hook in the operator's live Claude Code settings and `make platform-ops` are live steps and need a separate operator go.
-**Release:** v1.45.0 (branch `k3d-manager-v1.45.0`), plan 4
+**Release:** unnumbered, ordered backlog position 1 (was v1.45.0 plan 4)
 **Depends on:** none in code. Lands after `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md` (verified offline; its live E3 is still pending), which made every `resume` carry a reason; this plan adds a turn origin and a correction cause beside that reason.
 
 ## Problem

@@ -44,10 +44,12 @@ software, with an operator who can judge the result by eye.
 | # | You will see | It failed if |
 |---|---|---|
 | M1 | From one node, `/file /summary` shows every target's used and free space, matching each machine's Explorer; a full scan lists the largest files first | A folder or node it could not read leaves a low total or a missing row with no warning |
-| M2 | Each UNC path opened has its own tab; clicking a row previews the file, and the pie matches that tab's volume | A tab shows another UNC's files, or previewing runs the file or downloads a cloud placeholder |
-| M3 | A saved plan lists files per node; confirming it deletes exactly those and logs them | Anything is deleted that the plan did not list |
-| M4 | A target crossing the threshold writes one Event Log alert naming the node | A volume is over the threshold, or a node is unreachable, and no alert appears |
-| M5 | Usage falls back under the threshold, with deletes only inside `/purge-root` | A file outside the root, or newer than `/min-age`, is gone |
+| M2 | A saved plan lists files per node; confirming it from the command line deletes exactly those and logs them | Anything is deleted that the plan did not list |
+| M3 | A target crossing the threshold writes one Event Log alert naming the node | A volume is over the threshold, or a node is unreachable, and no alert appears |
+| CLI gate | Every M1–M3 item that needs real nodes passes on ACG: UNC to other machines, unreachable nodes, fleet purge, `C:` and `D:` | Any of those is reported as working from Vagrant or `\\localhost` evidence alone |
+| M4 | Each UNC path opened has its own tab; clicking a row previews the file, and the pie matches that tab's volume | A tab shows another UNC's files, or previewing runs the file or downloads a cloud placeholder |
+| M5 | Deleting from the GUI produces the same saved plan and audit lines as the command line for the same selection | The GUI deletes anything the equivalent CLI plan would not, or skips the audit log |
+| M6 | Usage falls back under the threshold, with deletes only inside `/purge-root` | A file outside the root, or newer than `/min-age`, is gone |
 
 **The draft as the operator wrote it, frozen on 2026-11-06.** Later interpretation is measured against this. It keeps the original name `diruse` and does not mention tabs; both later decisions are under "Changes from the draft".
 
@@ -80,7 +82,7 @@ command line part:
 | Stage | Where | Proves |
 |---|---|---|
 | Offline gate | `windows-latest` CI runner, private repo | Builds, unit and black-box tests |
-| Daily development | Vagrant + Windows 11 ARM VM, on the M4 | GUI by eye, local paths, `\\localhost\c$` |
+| Daily development | Vagrant + Windows 11 ARM VM, on the M4, with a second disk as `D:` | GUI by eye, local paths on `C:` and `D:`, `\\localhost\c$` and `\\localhost\d$` |
 | Multi-node | Windows Server x64 on an ACG AWS sandbox: one central node, two or more targets | UNC, admin shares, unreachable nodes, fleet purge, real x64 |
 
 - **Vagrant on the M4 (operator, 2026-11-06: "go ahead to use M4").** The M4 has 24 GiB and 161 GB free disk, and it is where agents run; v1.57.0 dedicates the M2 to its own run. The M5 is the hub, so nothing runs there, and the operator is uninstalling its copies. The VM stays halted when not in use.
@@ -90,7 +92,7 @@ command line part:
   are unproven:
   - A Windows ARM guest under this stack is not proven on the M4. `stromweld/windows-11` publishes a VirtualBox arm64 build (read from Vagrant Cloud 2026-11-06), the M2 holds a copy and Windows 11 Arm VMs, and the operator's Ansible repo uses it, but none were booted for this check. M1 proves it first: boot, WinRM, a shared folder and `\\localhost\c$`.
   - The box is a third-party image. Using it for development is a start; anything nearer company use should come from a box built from Microsoft's Windows 11 ARM64 ISO.
-  - Licence fit. The operator holds a Windows 11 Pro retail licence (2026-11-06; the key is never recorded in a repo, plan or command). A Pro key activates only Pro, the box's edition is unread, and the terms for a VirtualBox Arm guest are unread. It does not settle company use.
+  - Licence fit. The operator holds a Windows 11 Pro retail licence (2026-11-06; the key is never recorded in a repo, plan or command). A Pro key activates only Pro, the box's edition is Windows 11 Enterprise (read 2026-11-15 from stromweld/windows-11 202511.21.0; likely an evaluation build, so the Pro key does not apply to it), and the terms for a VirtualBox Arm guest are unread. It does not settle company use.
   If VirtualBox fails that check, the fallback is `vagrant_utm`, already installed on the M4, then
   VMware Fusion with `apter-tech/vagrant-windows-11-arm64`.
 - **ARM versus x64.** Apple Silicon runs Windows on ARM, where an x64 build runs under emulation.
@@ -130,6 +132,8 @@ Every switch accepts `/name` and `--name`. The draft's `—` is read as an autoc
 | `dirused .` | Measure the current directory |
 | `dirused D:\path` | Measure a local path; `D:\` measures the drive |
 | `dirused \\node\d$\path` | Measure a UNC path |
+| `dirused \\node` | Every fixed drive on the node (`C$`, `D$`, …, found by listing its admin disk shares); one volume line per drive. Decided 2026-11-15, see Multiple drives |
+| `dirused /all` | Every fixed local drive |
 | `dirused /file targets.txt` | Measure each target listed, one per line; blank lines and `#` comments are ignored |
 | `/file targets.txt /summary` | Used, free and percent per volume, largest first, with no tree walk; takes seconds across a fleet |
 | `/top N` | Rows to show; default 50 |
@@ -143,6 +147,7 @@ Every switch accepts `/name` and `--name`. The draft's `—` is read as an autoc
 | `<target> /threshold 85` | One check: exit 2 if the volume is at or above 85% used |
 | `/file targets.txt /monitor /threshold 85 /interval 15m` | Repeat across all targets; alert on crossing, and on a node that cannot be reached |
 | `/autopurge` | Last milestone only; see "Safety rules" |
+| `/rules r.json`, `/rules-show` | Use a purge-candidate rules file for this run; print the rules in effect and where each came from. See "Purge candidates" |
 
 **Exit codes:** 0 success, 1 failure, 2 threshold exceeded, 3 partial (some targets or directories
 could not be read).
@@ -225,17 +230,64 @@ VHDX images and active logs. So it ships last, and only with all of these requir
 
 It needs its own operator go after the earlier milestones have seen real use. It may be dropped.
 
+## Purge candidates (operator, 2026-11-15)
+
+Operator: "the default files we are looking for to purge are: *.bak, various compiled object, tomcat dump file. *.log,
+c:\temp, d:\temp, and known backup/temp file pattern. this list should allow update and override".
+
+`/purge` picks from files that match a **candidate rule**, not from every large file. Each rule has an id, a category and
+either a file pattern or a folder. Every Safety rule still applies on top: a rule can never unlock `\Windows`, `\Program Files*`,
+a reparse point or a directory delete.
+
+**Built-in defaults** (operator's list in bold; the rest is Claude's proposal, confirmed or cut at the M2 spec):
+
+| Category | Rules |
+|---|---|
+| Backup | **`*.bak`**; proposed: `*.old`, `*.orig`, `*.bkp`, `*~` |
+| Compiled objects | **compiled objects**; proposed: `*.obj`, `*.o`, `*.pch`, `*.ilk`, `*.ipch`, `*.class`, `*.pyc` |
+| Tomcat / JVM dumps | **Tomcat dump files**; proposed: `*.hprof`, `java_pid*.hprof`, `hs_err_pid*.log`, `javacore*.txt`, `heapdump*.phd`, `core.*.dmp` |
+| Logs | **`*.log`**; proposed: rotated logs `*.log.[0-9]*`, Tomcat `catalina.*.log`, `localhost_access_log.*.txt` |
+| Temp folders | **files under `C:\temp` and `D:\temp`** (files only, folders stay) |
+| Temp patterns | **known temp files**; proposed: `*.tmp`, `*.temp`, `*.dmp` outside `\Windows`, `Thumbs.db` |
+
+**Update and override** (operator: "should allow update and override"):
+
+- Defaults ship inside the exe as a versioned rules document; `/rules-show` prints them.
+- A machine-wide file `%ProgramData%\dirused\purge-rules.json` on the central node, then `/rules <file>` for one run, are
+  applied in that order. Each file either **extends** the rules before it (add rules, disable a rule by id, narrow a rule
+  with `minAgeDays` or `minBytes`) or **replaces** them (`"replace": true`).
+- `/rules-show` lists the rules in effect and where each came from (built-in, machine file, run file).
+- A saved plan records the rules in effect and their hash, and the purge log records the hash, so a delete can be traced to
+  the rules that chose it.
+- Company-specific patterns live in the company's own rules file, never in the dirused repo (see "Open before any company use").
+
+**Risks for the M2 spec to settle:**
+
+- `*.bak` is also SQL Server's backup extension, and may be the only backup there is; `*.log` matches live application and
+  SQL Server transaction logs. Proposed: a default minimum age (for example 7 days) on these two rules, and files that are
+  open or locked are skipped and reported, never forced.
+- Whether `/purge` can still pick files outside the rules (for example with an explicit `/any` switch), or only through
+  `/purge-list`.
+
 ## Milestones
 
-Reads ship before deletes, and manual deletes before automatic ones. Versions belong to the new repo.
+Reads ship before deletes, and manual deletes before automatic ones. **The command line is finished and verified before
+any GUI work starts** (operator, 2026-11-15: "complete cli first. after we verify everything work then we move into gui
+development. mixing them together is not a good idea"). The GUI then calls the same scan and purge engine; it adds no
+logic of its own. Versions belong to the new repo.
 
 | # | Scope | Deletes? |
 |---|---|---|
-| M1 | ACG Windows probe, VirtualBox box check, private repo, `windows-latest` CI gate, Vagrant VM, ACG fleet script; scanner and read-only CLI: paths, UNC, `/file`, `/summary`, `/top`, `/timeout`, `/parallel`, `/json`, `/csv`, exit codes | No |
-| M2 | Read-only GUI: node list, one tab per UNC path, table, pie chart, preview pane | No |
-| M3 | Manual deletes: saved plans, `/purge`, `/purge-plan`, `/purge-list`, GUI delete and editor actions, audit log, safety rules | Yes, confirmed |
-| M4 | `/threshold`, `/monitor` across targets, alerts to the console and the central node's Windows Event Log | No |
-| M5 | `/autopurge`, after a separate go | Yes, unattended |
+| M1 | Private repo, `windows-latest` CI gate, VirtualBox box check, Vagrant VM with `D:`; scanner and read-only CLI: paths, UNC, `\\node` and `/all`, `/file`, `/summary`, `/top`, `/timeout`, `/parallel`, `/json`, `/csv`, exit codes | No |
+| M2 | CLI manual deletes: saved plans, `/purge`, `/purge-plan`, `/purge-list`, audit log, safety rules | Yes, confirmed |
+| M3 | `/threshold`, `/monitor` across targets, alerts to the console and the central node's Windows Event Log | No |
+| CLI gate | ACG Windows probe and fleet script (after the k3d-manager credentials-only ACG entry point, `docs/ideas.md` 2026-11-15); every real-node item of M1–M3 run on ACG. No GUI work before it passes | Yes, on throwaway nodes |
+| M4 | Read-only GUI: node list, one tab per UNC path, table, pie chart, preview pane | No |
+| M5 | GUI delete and editor actions, through the M2 engine and its saved plans | Yes, confirmed |
+| M6 | `/autopurge`, after a separate go | Yes, unattended |
+
+Before the CLI gate, M1–M3 are verified on the CI runner and the Vagrant VM; their real-node acceptance items are
+tagged ACG and stay open until the gate.
 
 ## Changes from the draft
 
@@ -264,6 +316,24 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
   Reconsider only if M1 shows full scans are too slow, since `/summary` and `/monitor` need no tree walk.
 - Public release, winget and public packaging (operator, 2026-11-06).
 
+## Multiple drives (operator, 2026-11-15)
+
+Operator: "ideally if we can create a d: drive that's better as most companies will put apps on d: instead of c: but need
+to be able to scan both or multiple drives if there are".
+
+- **Test machines carry `D:`.** The Vagrant VM gets a second VirtualBox disk, brought online and formatted NTFS as `D:`
+  by the provisioner. Each ACG node gets a second EBS volume as `D:` (inside ACG's 100 GB volume limit). Fixtures, such as
+  junctions, hard links and large files, go on both drives, and app-like data on `D:`.
+- **A bare node target scans every fixed drive** (decided: operator, 2026-11-15, approving `dirused-m1b-remote-targets.md`). `\\node` lists the node's
+  administrative disk shares (`NetShareEnum`, special disk shares named `<letter>$`) and measures each. Locally, `/all`
+  uses the fixed drives. Results, `/summary` and `/threshold` stay per volume, so a full `C:` is never hidden by an empty
+  `D:`. A drive that can't be read is reported, not skipped silently (exit code 3, as for unreadable folders).
+- **Not included:** removable, network-mapped and CD drives, and volumes mounted into a folder with no letter (listed as
+  a known gap until someone needs them).
+- **Hard links stay per volume** (already the rule), which matters once two drives are scanned in one run.
+- **Purge across drives** on one node is still one node, so the existing safety rules apply unchanged; the saved plan
+  lists each file's full path including the drive.
+
 ## Decided (operator, 2026-11-06)
 
 - **Dev environment:** Vagrant with VirtualBox if it works and a Windows image, on the M4.
@@ -271,6 +341,7 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 - **Audience:** private, possibly used at the operator's company; no public release.
 - **Name:** `dirused` (operator, 2026-11-06), changed from the draft's `diruse`. The new name also avoids a clash with Microsoft's old `diruse.exe` on some servers.
 - **Stack:** C#/.NET.
+- **ACG fleet script:** lives in the dirused repo (operator, 2026-11-13: "probably just its own repo: dirused"). k3d-manager adds no Windows variant of its ACG provisioning; dirused may copy patterns from `scripts/plugins/acg.sh`, not call it.
 
 ## Open before any company use
 

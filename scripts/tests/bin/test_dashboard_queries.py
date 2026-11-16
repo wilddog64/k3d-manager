@@ -5,18 +5,25 @@ import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 from unittest.mock import patch
 from pathlib import Path
+import sys
+
+import yaml
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from promtool_helper import resolve_promtool  # noqa: E402
 
 ROOT = Path(__file__).parents[3]
 DASHBOARD = Path(os.environ.get(
     "BUG_DASHBOARD_PATH", ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"))
 GUIDE = ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md"
-PROMETHEUS_IMAGE = "prom/prometheus:v3.1.0"
+REPO_SYNC_RULES = Path(os.environ.get(
+    "REPO_SYNC_RULES_PATH", ROOT / "scripts/etc/prometheus/rules/repo-sync.yaml"))
+REPO_SYNC_PRODUCER = Path(os.environ.get("REPO_SYNC_PRODUCER_PATH", ROOT / "bin/k3dm-repo-sync"))
 
 # Captured from packages/grafana-data/src/transformations/matchers/ids.ts at
 # Grafana tag v11.4.0, recorded by Claude in the 2026-11-07 bug spec.
@@ -63,6 +70,22 @@ def test_field_matcher_guard_rejects_frame_only_matchers():
             {"matcher": {"id": matcher_id}},
         ]}}]}
         assert invalid_field_matchers(synthetic) == [matcher_id]
+
+
+def test_promote_lookup_failed_is_visible_on_release_tracking_dashboard():
+    dashboard = load_dashboard()
+    panel = next(panel for panel in dashboard["panels"]
+                 if panel.get("title") == "deploy/hub behind")
+    expressions = [target.get("expr", "") for target in panel.get("targets", [])]
+    assert any("k3dm_repo_sync_promote_lookup_failed" in expr for expr in expressions)
+
+
+def test_promotable_metric_escapes_sha_and_branch_labels():
+    producer = load_module("repo_sync_metric_label_test", REPO_SYNC_PRODUCER)
+    assert producer.promotable_metric('sha"part\\tail', 'branch"part\\tail') == (
+        'k3dm_repo_sync_promotable{repo="k3d-manager",sha="sha\\"part\\\\tail",'
+        'branch="branch\\"part\\\\tail"} 1'
+    )
 
 
 def load_module(name, path):
@@ -137,6 +160,9 @@ def fixture_metrics(tmp_path):
                                           fixed_in={bug_path: {"release": release}})
     metric_text += producer._forecast_metrics(repo, now=1_800_000_000)
     metric_text += producer._bug_open_history(repo, "HEAD", days=1)
+    metric_text += ('k3dm_repo_sync_promote_backlog_commits{repo="k3d-manager"} 2\n'
+                    'k3dm_repo_sync_promotable{repo="k3d-manager",sha="a1b2c3d",branch="main"} 1\n'
+                    'k3dm_repo_sync_promote_lookup_failed{repo="k3d-manager"} 0\n')
 
     events = [{"ts": 1_800_000_000, "event": "start", "version": release,
                "slug": "fixture-dispatched", "spec": f"docs/plans/{release}-fixture-dispatched.md"}]
@@ -160,7 +186,7 @@ def fixture_metrics(tmp_path):
     # producer output is appended; the patched HTTP client never sends it.
     assert hermes.ROOT == repo
     with patch.object(hermes.urllib.request, "urlopen", side_effect=capture_push):
-        hermes._push_checkout_lag("HEAD", "k3d-manager-v1.43.14", "k3d-manager-v1.43.14")
+        hermes._push_checkout_lag("HEAD")
     metric_text += "".join(captured)
     return metric_text, set(texts)
 
@@ -212,14 +238,7 @@ def substitute_variables(expr, dashboard, series):
 
 
 def promtool_command(tmp_path):
-    local = shutil.which("promtool")
-    if local:
-        return [local, "test", "rules", "tests.yml"]
-    docker = shutil.which("docker")
-    if docker:
-        return [docker, "run", "--rm", "-v", f"{tmp_path}:/work", "-w", "/work",
-                "--entrypoint=promtool", PROMETHEUS_IMAGE, "test", "rules", "tests.yml"]
-    pytest.skip("SKIP: neither local promtool nor Docker is available; real PromQL evaluation unavailable")
+    return [resolve_promtool(), "test", "rules", "tests.yml"]
 
 
 @pytest.mark.external
@@ -238,6 +257,10 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
     tests = ["rule_files:", "- rules.yml", "evaluation_interval: 1m", "tests:",
              "- interval: 1m", "  input_series:"]
     for metric, labels, value in series:
+        if metric == "k3dm_repo_sync_promotable":
+            value = "1+0x16"
+        elif metric == "k3dm_repo_sync_promote_lookup_failed":
+            value = "0+0x45 1+0x30"
         tests.extend([f"  - series: '{metric}{labels}'", f"    values: '{value}'"])
     expected_alerts = []
     for index, (panel, target, expression) in enumerate(expressions):
@@ -257,6 +280,48 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
                           "    exp_alerts:",
                           f"    - exp_labels: {{alertname: {missing_dispatch}}}"])
         expected_alerts.append((panel, target))
+    repo_rules = yaml.safe_load(REPO_SYNC_RULES.read_text())
+    promote_rule = next(rule for group in repo_rules["spec"]["groups"]
+                        for rule in group["rules"] if rule.get("alert") == "K3dmPromoteWaiting")
+    assert promote_rule["expr"] == "k3dm_repo_sync_promotable == 1"
+    assert promote_rule["for"] == "15m"
+    rules.extend([f"  - alert: {promote_rule['alert']}",
+                  f"    expr: {json.dumps(promote_rule['expr'])}",
+                  f"    for: {promote_rule['for']}",
+                  "    labels:"])
+    for name, value in promote_rule["labels"].items():
+        rules.append(f"      {name}: {json.dumps(value)}")
+    rules.append("    annotations:")
+    for name, value in promote_rule["annotations"].items():
+        rules.append(f"      {name}: {json.dumps(value)}")
+    expected_labels = {"alertname": "K3dmPromoteWaiting", **promote_rule["labels"],
+                       "sha": "a1b2c3d", "branch": "main", "repo": "k3d-manager"}
+    tests.extend(["  - eval_time: 5m", "    alertname: K3dmPromoteWaiting", "    exp_alerts: []",
+                  "  - eval_time: 14m", "    alertname: K3dmPromoteWaiting", "    exp_alerts: []",
+                  "  - eval_time: 16m", "    alertname: K3dmPromoteWaiting", "    exp_alerts:",
+                  f"    - exp_labels: {json.dumps(expected_labels)}", "      exp_annotations:"])
+    for name, value in promote_rule["annotations"].items():
+        tests.append(f"        {name}: {json.dumps(value.replace('{{ $labels.sha }}', 'a1b2c3d'))}")
+    lookup_rule = next(rule for group in repo_rules["spec"]["groups"]
+                       for rule in group["rules"] if rule.get("alert") == "K3dmPromoteLookupFailed")
+    assert lookup_rule["expr"] == "k3dm_repo_sync_promote_lookup_failed == 1"
+    assert lookup_rule["for"] == "30m"
+    rules.extend([f"  - alert: {lookup_rule['alert']}",
+                  f"    expr: {json.dumps(lookup_rule['expr'])}",
+                  f"    for: {lookup_rule['for']}",
+                  "    labels:"])
+    for name, value in lookup_rule["labels"].items():
+        rules.append(f"      {name}: {json.dumps(value)}")
+    rules.append("    annotations:")
+    for name, value in lookup_rule["annotations"].items():
+        rules.append(f"      {name}: {json.dumps(value)}")
+    lookup_labels = {"alertname": lookup_rule["alert"], **lookup_rule["labels"], "repo": "k3d-manager"}
+    tests.extend(["  - eval_time: 45m", "    alertname: K3dmPromoteLookupFailed", "    exp_alerts: []",
+                  "  - eval_time: 75m", "    alertname: K3dmPromoteLookupFailed", "    exp_alerts: []",
+                  "  - eval_time: 76m", "    alertname: K3dmPromoteLookupFailed", "    exp_alerts:",
+                  f"    - exp_labels: {json.dumps(lookup_labels)}", "      exp_annotations:"])
+    for name, value in lookup_rule["annotations"].items():
+        tests.append(f"        {name}: {json.dumps(value)}")
     # Prometheus rule tests allow one alert_rule_test field per test case. Fold
     # individual entries into a single list under the input-series test.
     alert_start = tests.index("  alert_rule_test:")
@@ -268,13 +333,14 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
             continue
         alert_lines.append(line)
     tests = tests[:alert_start] + ["  alert_rule_test:"] + alert_lines
+    tests.extend(["- interval: 1m", "  input_series:",
+                  "  - series: 'k3dm_repo_sync_promotable{repo=\"k3d-manager\",sha=\"a1b2c3d\",branch=\"main\"}'",
+                  "    values: '1 stale'", "  alert_rule_test:",
+                  "  - eval_time: 20m", "    alertname: K3dmPromoteWaiting", "    exp_alerts: []"])
     (tmp_path / "rules.yml").write_text("\n".join(rules) + "\n")
     (tmp_path / "tests.yml").write_text("\n".join(tests) + "\n")
     command = promtool_command(tmp_path)
     result = subprocess.run(command, cwd=tmp_path, text=True, capture_output=True)
-    if result.returncode and "permission denied" in result.stderr.lower() and "docker" in command[0]:
-        pytest.skip("SKIP: Docker is installed but its daemon is unavailable to this user; "
-                    "real PromQL evaluation did not run")
     assert result.returncode == 0, result.stdout + result.stderr
 
     table_panels = [panel for panel in dashboard["panels"] if panel.get("type") == "table"]

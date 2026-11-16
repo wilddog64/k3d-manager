@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2030,SC2031
 
 # Captures for deterministic command stubs (M4 Air, 2026-11-07 UTC):
 # git ls-remote origin refs/heads/deploy/hub refs/heads/k3d-manager-v1.43.15
@@ -56,9 +57,22 @@ EOF
 # Git operations are constrained to the named scratch clone or its bare origin.
 allowed=0
 for arg in "$@"; do
-  [[ "$arg" == "$SCRATCH_REPO" || "$arg" == "$TEST_ORIGIN" || "$arg" == "--git-dir=$TEST_ORIGIN" ]] && allowed=1
+  [[ "$arg" == "$SCRATCH_REPO" || "$arg" == "$MOVE_SOURCE_REPO" || "$arg" == "$TEST_ORIGIN" || "$arg" == "--git-dir=$TEST_ORIGIN" ]] && allowed=1
 done
 [[ "$allowed" == 1 ]] || { echo "git stub refused a non-fixture target: $*" >&2; exit 97; }
+if [[ "${CHERRY_FAIL:-0}" == 1 && " $* " == *" cherry "* ]]; then
+  echo "stubbed git cherry failure" >&2
+  exit 1
+fi
+if [[ -n "${CAT_FILE_FAIL_SHA:-}" && "$*" == *"cat-file -e $CAT_FILE_FAIL_SHA^"* ]]; then
+  echo "stubbed unavailable commit $CAT_FILE_FAIL_SHA" >&2
+  exit 1
+fi
+if [[ "${MOVE_ON_LS_REMOTE:-0}" == 1 && ! -e "$MOVE_ONCE_FILE" && "$*" == *"ls-remote origin refs/heads/deploy/hub"* ]]; then
+  : > "$MOVE_ONCE_FILE"
+  "$REAL_GIT_PATH" -C "$MOVE_SOURCE_REPO" push "$TEST_ORIGIN" "$MOVE_HUB_SHA:refs/heads/race-promoter" >/dev/null 2>&1
+  "$REAL_GIT_PATH" --git-dir="$TEST_ORIGIN" update-ref refs/heads/deploy/hub "$MOVE_HUB_SHA"
+fi
 exec "$REAL_GIT_PATH" "$@"
 EOF
   cat > "$BATS_TEST_TMPDIR/stubs/gh" <<'EOF'
@@ -66,7 +80,9 @@ EOF
 # Read-only capture: m4-air.local, 2026-11-07 20:28:49 UTC:
 # gh api repos/.../check-runs => {"total_count":0,"check_runs":[]}.
 [[ "$1" == api && "$2" == --paginate && "$3" == repos/wilddog64/k3d-manager/commits/*/check-runs && "$4" == --jq && "$5" == '.check_runs[]' ]] || exit 97
-if [[ "${GH_STUB_MODE:-empty}" == success ]]; then
+if [[ "${GH_STUB_MODE:-empty}" == lookup-fail ]]; then
+  exit 1
+elif [[ "${GH_STUB_MODE:-empty}" == success ]]; then
   printf '{"status":"completed","conclusion":"success"}\n'
 elif [[ "${GH_STUB_MODE:-empty}" == pending ]]; then
   printf '{"status":"in_progress","conclusion":null}\n'
@@ -117,6 +133,20 @@ EOF
   export CALLS="$BATS_TEST_TMPDIR/calls"
   : > "$BATS_TEST_TMPDIR/kubectl-calls"
   export KUBECTL_CAPTURE="$BATS_TEST_TMPDIR/kubectl-calls"
+}
+
+@test "M4: is-green shares promote classification and distinguishes lookup failure" {
+  sha="$(git -C "$WORK" rev-parse HEAD)"
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=success "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 0 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=pending "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 3 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=failed "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 3 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=empty "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 3 ]
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=lookup-fail "$WORK/bin/k3dm-hub-promote" is-green "$sha"
+  [ "$status" -eq 2 ]
 }
 
 _run_promoter_tty() {
@@ -243,6 +273,59 @@ rollback: yes"
   git -C "$WORK" push -q origin refs/tags/hub-promote/20261107T210001Z refs/tags/hub-promote/20261107T210002Z refs/tags/hub-promote/20261107T210003Z refs/tags/hub-promote/20261107T210004Z refs/tags/hub-promote/20261107T210005Z
   git --git-dir="$ORIGIN" update-ref refs/heads/deploy/hub "$A_SHA"
   printf '5\n' > "$DATE_COUNTER"
+}
+
+@test "M3 N3: promoter commit arriving between fetch and ls-remote is preserved" {
+  _prepare_promotion_history
+  git -C "$WORK" fetch -q origin
+  git -C "$WORK" branch -f k3d-manager-v1.43.15 "$D_SHA"
+  git -C "$WORK" checkout -q feature/test
+  MOVE_SOURCE_REPO="$BATS_TEST_TMPDIR/race-source"
+  export MOVE_SOURCE_REPO
+  git clone -q --branch k3d-manager-v1.43.15 "$ORIGIN" "$MOVE_SOURCE_REPO"
+  git -C "$MOVE_SOURCE_REPO" config user.name 'Race promoter'
+  git -C "$MOVE_SOURCE_REPO" config user.email 'race-promoter@example.invalid'
+  echo promoter > "$MOVE_SOURCE_REPO/promoter-arrival.txt"
+  git -C "$MOVE_SOURCE_REPO" add promoter-arrival.txt
+  git -C "$MOVE_SOURCE_REPO" commit -qm "promoter arrival"
+  MOVE_HUB_SHA="$(git -C "$MOVE_SOURCE_REPO" rev-parse HEAD)"
+  export MOVE_HUB_SHA MOVE_SOURCE_REPO MOVE_ONCE_FILE="$BATS_TEST_TMPDIR/move-once" MOVE_ON_LS_REMOTE=1
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"deploy/hub contains 1 commit"* ]]
+  [[ "$output" == *"promoter arrival"* ]]
+  [[ "$output" != *"no commits between refs"* ]]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$MOVE_HUB_SHA" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
+@test "M3: promote fails closed on git cherry error and succeeds when restored" {
+  _make_candidate
+  old="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
+  export CHERRY_FAIL=1
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cannot check deploy/hub containment"* ]]
+  [[ "$output" == *"stubbed git cherry failure"* ]]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$old" ]
+  export CHERRY_FAIL=0
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" != "$old" ]
+}
+
+@test "M3: promote names an unavailable deploy/hub SHA and succeeds when available" {
+  _make_candidate
+  old="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
+  export CAT_FILE_FAIL_SHA="$old"
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"deploy/hub commit $old is not available locally; refusing to promote"* ]]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" = "$old" ]
+  export CAT_FILE_FAIL_SHA=
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)" != "$old" ]
 }
 
 @test "N3: appsets-reapply pins deploy/hub despite BRANCH and checked-out branch" {
@@ -633,13 +716,58 @@ rollback: yes"
 }
 
 @test "M5: status reports deploy/hub, tags and ahead count without changing refs" {
-  before="$(git -C "$WORK" show-ref | sort)"
+  before_branches="$(git -C "$WORK" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags | sort)"
+  before_head="$(git -C "$WORK" rev-parse HEAD)"
+  before_index="$(git -C "$WORK" write-tree)"
+  before_worktree="$(git -C "$WORK" status --porcelain)"
   sha="$(git -C "$WORK" ls-remote origin refs/heads/deploy/hub | cut -f1)"
   run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" RELEASE_BRANCH=k3d-manager-v1.43.15 PATH="$PATH" "$WORK/bin/k3dm-hub-promote" status < /dev/null
   [ "$status" -eq 0 ]
   [[ "$output" == *"deploy/hub: $sha"* ]]
   [[ "$output" == *"k3d-manager-v1.43.15 ahead of deploy/hub: 0"* ]]
-  [ "$(git -C "$WORK" show-ref | sort)" = "$before" ]
+  [ "$(git -C "$WORK" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags | sort)" = "$before_branches" ]
+  [ "$(git -C "$WORK" rev-parse HEAD)" = "$before_head" ]
+  [ "$(git -C "$WORK" write-tree)" = "$before_index" ]
+  [ "$(git -C "$WORK" status --porcelain)" = "$before_worktree" ]
+}
+
+@test "G regression: non-TTY promoter test completes when suite stdin is a terminal" {
+  clean_path="${PATH#"$BATS_TEST_TMPDIR/stubs:"}"
+  clean_path="$(printf '%s' "$clean_path" | tr ':' '\n' | grep -v '/libexec/bats-core$' | paste -sd: -)"
+  if script --version 2>/dev/null | grep -q util-linux; then
+    inner="$(printf '%q ' bats --tap -f 'N2: non-TTY' "$BATS_TEST_FILENAME")"
+    run env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH="$clean_path" \
+      perl -e 'alarm 60; exec @ARGV' script -qec "$inner" /dev/null
+  else
+    run env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH="$clean_path" \
+      perl -e 'alarm 60; exec @ARGV' script -q /dev/null bats -f 'N2: non-TTY' "$BATS_TEST_FILENAME"
+  fi
+  [ "$status" -eq 0 ]
+}
+
+@test "M5: status counts origin and reports stale local release position" {
+  git -C "$WORK" checkout -q k3d-manager-v1.43.15
+  for index in 1 2 3 4 5; do
+    printf 'release %s\n' "$index" >> "$WORK/release.txt"
+    git -C "$WORK" add release.txt
+    git -C "$WORK" commit -q -m "release $index"
+    if [ "$index" -eq 2 ]; then second="$(git -C "$WORK" rev-parse HEAD)"; fi
+  done
+  git -C "$WORK" push -q origin HEAD:refs/heads/k3d-manager-v1.43.15
+  git -C "$WORK" fetch -q origin
+  git -C "$WORK" reset --hard -q "$second"
+  before_branches="$(git -C "$WORK" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags | sort)"
+  before_head="$(git -C "$WORK" rev-parse HEAD)"
+  before_index="$(git -C "$WORK" write-tree)"
+  before_worktree="$(git -C "$WORK" status --porcelain)"
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" RELEASE_BRANCH=k3d-manager-v1.43.15 PATH="$PATH" "$WORK/bin/k3dm-hub-promote" status < /dev/null
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"k3d-manager-v1.43.15 ahead of deploy/hub: 5"* ]]
+  [[ "$output" == *"local k3d-manager-v1.43.15 is 3 behind / 0 ahead of origin"* ]]
+  [ "$(git -C "$WORK" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags | sort)" = "$before_branches" ]
+  [ "$(git -C "$WORK" rev-parse HEAD)" = "$before_head" ]
+  [ "$(git -C "$WORK" write-tree)" = "$before_index" ]
+  [ "$(git -C "$WORK" status --porcelain)" = "$before_worktree" ]
 }
 
 @test "Makefile hub-promote passes REF and break-glass to the command" {

@@ -44,6 +44,7 @@ def test_aggregate_targets_only_compose_tripwired_targets():
     makefile = (ROOT / "Makefile").read_text()
     assert re.search(r"^test-python: test-python-unit test-pytest$", makefile, re.M)
     assert re.search(r"^test-all: test test-bin test-python$", makefile, re.M)
+    assert "scripts/tests/tripwire.sh" not in _recipe("test-host")
 
 
 def test_the_tripwire_covers_the_cluster_cloud_and_credential_tools():
@@ -106,3 +107,106 @@ def test_offline_subcommands_pass_through_to_the_real_binary(real_tools):
 
 def test_the_command_exit_code_is_preserved(real_tools):
     assert _tripwire("exit 3", real_tools).returncode == 3
+
+
+def test_tripwire_leaves_an_absent_tool_absent_and_shims_an_installed_tool(tmp_path):
+    real_bin = tmp_path / "real-bin"
+    real_bin.mkdir()
+    kubectl = real_bin / "kubectl"
+    kubectl.write_text("#!/bin/sh\nexit 0\n")
+    kubectl.chmod(0o755)
+    assert kubectl.is_file()
+
+    system_path = ("/usr/bin", "/bin", "/usr/sbin", "/sbin")
+    tools = set(re.search(r"TRIPWIRE_TOOLS=\(([^)]*)\)", TRIPWIRE.read_text()).group(1).split())
+    missing_tool = next(
+        tool for tool in tools - {"kubectl"}
+        if not any((Path(directory) / tool).is_file() and os.access(Path(directory) / tool, os.X_OK)
+                   for directory in system_path)
+    )
+    path = os.pathsep.join((str(real_bin), *system_path))
+    result = subprocess.run(
+        [str(TRIPWIRE), "bash", "-c",
+         'if command -v "$ABSENT_TOOL" >/dev/null 2>&1; then exit 11; fi; '
+         'printf "absent=%s\\nkubectl=%s\\n" "$ABSENT_TOOL" "$(command -v kubectl)"'],
+        cwd=ROOT, env={**os.environ, "PATH": path, "ABSENT_TOOL": missing_tool},
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert f"absent={missing_tool}" in result.stdout
+    assert "k3dm-tripwire." in result.stdout
+    assert str(kubectl) not in result.stdout
+
+
+@pytest.mark.parametrize("mutation", ["create", "modify", "same-bytes", "remove", "create-dir"])
+def test_launch_agent_plist_changes_fail_and_name_the_sentinel(tmp_path, mutation):
+    watch = tmp_path / "home" / "Library" / "LaunchAgents"
+    watch.mkdir(parents=True)
+    target = watch / "com.k3d-manager.fixture.plist"
+    if mutation in {"modify", "same-bytes", "remove"}:
+        target.write_text("before\n")
+    assert watch == tmp_path / "home" / "Library" / "LaunchAgents"
+    if mutation == "create-dir":
+        watch.rmdir()
+    command = {
+        "create": f"printf after > '{target}'",
+        "modify": f"printf after > '{target}'",
+        "same-bytes": f"cat '{target}' > '{target}.tmp' && mv '{target}.tmp' '{target}'",
+        "remove": f"rm '{target}'",
+        "create-dir": f"mkdir -p '{watch}' && printf after > '{target}'",
+    }[mutation]
+    result = subprocess.run([str(TRIPWIRE), "bash", "-c", command], cwd=ROOT,
+                            env={**os.environ, "K3DM_TRIPWIRE_WATCH_DIR": str(watch)},
+                            capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode != 0
+    action = {"create": "created", "modify": "modified", "same-bytes": "modified",
+              "remove": "removed", "create-dir": "created"}[mutation]
+    assert f"[tripwire] FAIL: {target} {action} during the run" in result.stderr
+
+
+def test_future_mtime_plist_rewrite_is_reported_even_when_it_was_already_newer(tmp_path):
+    watch = tmp_path / "home" / "Library" / "LaunchAgents"
+    watch.mkdir(parents=True)
+    target = watch / "com.k3d-manager.future.plist"
+    target.write_text("before\n")
+    future_mtime = 2_145_916_800  # 2038-01-01 UTC
+    os.utime(target, (future_mtime, future_mtime))
+    assert watch == tmp_path / "home" / "Library" / "LaunchAgents"
+    assert target.stat().st_mtime > future_mtime - 1
+    command = f"printf after > '{target}'; touch -t 203801010000 '{target}'"
+    result = subprocess.run([str(TRIPWIRE), "bash", "-c", command], cwd=ROOT,
+                            env={**os.environ, "K3DM_TRIPWIRE_WATCH_DIR": str(watch)},
+                            capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode != 0
+    assert f"[tripwire] FAIL: {target} modified during the run" in result.stderr
+
+
+def test_launch_agent_watch_is_green_when_unchanged_or_missing(tmp_path):
+    missing = tmp_path / "not-created"
+    assert not missing.exists()
+    env = {**os.environ, "K3DM_TRIPWIRE_WATCH_DIR": str(missing)}
+    result = subprocess.run([str(TRIPWIRE), "bash", "-c", "true"], cwd=ROOT, env=env,
+                            capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode == 0
+    assert not result.stderr
+    assert not missing.exists()
+    unchanged = tmp_path / "home" / "Library" / "LaunchAgents"
+    unchanged.mkdir(parents=True)
+    (unchanged / "com.k3d-manager.fixture.plist").write_text("stable\n")
+    result = subprocess.run([str(TRIPWIRE), "bash", "-c", "true"], cwd=ROOT,
+                            env={**os.environ, "K3DM_TRIPWIRE_WATCH_DIR": str(unchanged)},
+                            capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode == 0
+    assert not result.stderr
+
+
+def test_launch_agent_watch_preserves_nonzero_command_status(tmp_path):
+    watch = tmp_path / "home" / "Library" / "LaunchAgents"
+    watch.mkdir(parents=True)
+    target = watch / "com.k3d-manager.fixture.plist"
+    assert watch.is_dir()
+    result = subprocess.run([str(TRIPWIRE), "bash", "-c", f"printf x > '{target}'; exit 3"], cwd=ROOT,
+                            env={**os.environ, "K3DM_TRIPWIRE_WATCH_DIR": str(watch)},
+                            capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode == 3
+    assert f"[tripwire] FAIL: {target} created" in result.stderr

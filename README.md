@@ -263,6 +263,7 @@ docs/
 ### How-To
 
 **Workstations & dev workflow**
+- **[Development hub](docs/howto/dev-hub.md)** — Start, inspect and remove the isolated vCluster on the hub
 - **[One-command machine setup](docs/howto/machine-setup.md)** — Prepare hub, worker and console Macs from role manifests
 - **[M5 hub migration](docs/howto/m5-hub-migration.md)** — Build, cut over and roll back the single-instance hub agents
 - **[Fast local gate](docs/howto/fast-gate.md)** — Check changed files before push and landing

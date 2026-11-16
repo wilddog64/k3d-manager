@@ -2,7 +2,9 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic/hygiene display issue where the Bugs dashboard shows "not yet" instead of "n/a" for fixed bugs that only have offline acceptance checks); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
+**Waiting on:** operator decision — since 2026-11-12
 **Introduced by:** unknown
 **Should have been caught by:** spec
 **Severity:** low — two v1.43.15 test-only P2s sit orange "not yet" for ever, as if a live check were owed; workaround: read the doc's Acceptance block

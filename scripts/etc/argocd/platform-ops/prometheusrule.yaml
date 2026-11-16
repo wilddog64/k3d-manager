@@ -7,6 +7,28 @@ metadata:
     release: kube-prometheus-stack
 spec:
   groups:
+    - name: dev-hub.alerts
+      rules:
+        - alert: HubVmMemoryLow
+          expr: min(node_memory_MemAvailable_bytes{job="node-exporter"}) < 3 * 1024 * 1024 * 1024
+          for: 10m
+          labels:
+            severity: warning
+            cluster: hub
+            group: dev-hub
+          annotations:
+            summary: "Hub VM available memory is below 3 GiB"
+            description: "The hub VM has less than 3 GiB of available memory for 10 minutes."
+        - alert: DevHubNearQuota
+          expr: sum(container_memory_working_set_bytes{namespace="dev-hub",container!=""}) / sum(kube_resourcequota{namespace="dev-hub",resource="limits.memory",type="hard"}) > 0.9
+          for: 10m
+          labels:
+            severity: warning
+            cluster: hub
+            group: dev-hub
+          annotations:
+            summary: "Development hub is near its memory quota"
+            description: "Development hub container memory is above 90% of its limits.memory quota for 10 minutes."
     - name: argocd.alerts
       rules:
         - alert: ArgoCDAppDegraded

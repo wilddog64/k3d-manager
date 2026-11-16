@@ -251,6 +251,67 @@ def test_complete_expected_stages_publish_run_complete_one():
     assert 'k3dm_test_run_complete{target="test-all"} 1' in payload
 
 
+def test_failing_stage_that_prints_marker_publishes_run_complete_one():
+    parsed = METRICS.parse_log(
+        "[test-all] stage-complete test\n"
+        "[test-all] stage-complete test-bin\n"
+        "[test-all] stage-complete test-python\n"
+    )
+    payload = METRICS.build_payload(
+        parsed, "test-all", 1, expected_stages=["test", "test-bin", "test-python"]
+    )
+    assert 'k3dm_test_run_complete{target="test-all"} 1' in payload
+    assert 'k3dm_test_run_classification{target="test-all",classification="failed_untriaged"} 1' in payload
+
+
+def test_parallel_log_with_stage_complete_is_accepted_by_test_metrics():
+    # Captured from real output on host m4-air.local, 2026-11-13, Bats 1.12.0, pytest 9.1.1
+    # Command: make --no-print-directory test-all PARALLEL=1 STAGE_TEST_FILES="scripts/tests/plugins/argocd_platform_ops_message.bats /tmp/failing_test.bats" STAGE_TEST_BIN_FILES="scripts/tests/bin/k3dm_slack_notify.bats" STAGE_TEST_PYTHON_FILES="scripts/tests/bin/test_cni_ipam_rules.py"
+    log_text = (
+        "FAIL /tmp/failing_test.bats 1s (rc 1)\n"
+        "PASS scripts/tests/plugins/argocd_platform_ops_message.bats 1s\n"
+        "SLOWEST /tmp/failing_test.bats 1s\n"
+        "TOTAL 1s\n"
+        "1..1\n"
+        "not ok 1 deliberate failure for capture\n"
+        "# (in test file /tmp/failing_test.bats, line 2)\n"
+        "#   `false' failed\n"
+        "1..1\n"
+        "ok 1 platform-ops: closing message reports current schedules\n"
+        "[test-all] stage-complete test\n"
+        "PASS scripts/tests/bin/k3dm_slack_notify.bats 1s\n"
+        "SLOWEST scripts/tests/bin/k3dm_slack_notify.bats 1s\n"
+        "TOTAL 1s\n"
+        "1..2\n"
+        "ok 1 slack notify: empty stdin exits 2\n"
+        "ok 2 slack notify: failed relay exits 1 without exposing URL\n"
+        "[test-all] stage-complete test-bin\n"
+        "Agent docs check passed\n"
+        "PASS scripts/tests/bin/test_cni_ipam_rules.py 1s\n"
+        "SLOWEST scripts/tests/bin/test_cni_ipam_rules.py 1s\n"
+        "TOTAL 1s\n"
+        "============================= test session starts ==============================\n"
+        "platform darwin -- Python 3.13.6, pytest-9.1.1, pluggy-1.6.0\n"
+        "rootdir: /Users/cliang/.local/share/k3d-manager/worktrees/v1.44.0/parallel-offline-tests-b\n"
+        "collected 2 items\n"
+        "\n"
+        "scripts/tests/bin/test_cni_ipam_rules.py ..                              [100%]\n"
+        "\n"
+        "============================== 2 passed in 0.03s ===============================\n"
+        "[test-all] stage-complete test-python\n"
+        "[test-all] failed:\n"
+        "FAIL /tmp/failing_test.bats 1s (rc 1)\n"
+    )
+    parsed = METRICS.parse_log(log_text)
+    assert parsed["completed_stages"] == {"test", "test-bin", "test-python"}
+    payload = METRICS.build_payload(
+        parsed, "test-all", 1, expected_stages=["test", "test-bin", "test-python"]
+    )
+    assert 'k3dm_test_run_complete{target="test-all"} 1' in payload
+    assert 'k3dm_test_cases_total{target="test-all"} 6' in payload
+    assert 'k3dm_test_cases_failed{target="test-all"} 1' in payload
+
+
 def test_partial_expected_stages_publish_run_complete_zero():
     parsed = METRICS.parse_log("[test-all] stage-complete test\n")
     payload = METRICS.build_payload(

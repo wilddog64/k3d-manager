@@ -3,6 +3,7 @@
 
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  source "${BATS_TEST_DIRNAME}/../promtool.bash"
   init_test_env
   dashboard="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml"
 }
@@ -180,7 +181,6 @@ assert "Last scrape" in panels[7]["description"]
 PY_PRESENTATION
   echo "$output"; [ "${status}" -eq 0 ]
 
-  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
   test_file="${BATS_TEST_TMPDIR}/pr-checks-history.test.json"
   run python3 - "${dashboard}" "${test_file}" <<'PY_PROMQL'
 import json, sys
@@ -278,7 +278,7 @@ Path(sys.argv[2]).write_text(json.dumps({
 }))
 PY_PROMQL
   echo "$output"; [ "${status}" -eq 0 ]
-  run promtool test rules "${test_file}"
+  run k3dm_promtool test rules "${test_file}"
   echo "$output"; [ "${status}" -eq 0 ]
 }
 

@@ -12,7 +12,7 @@
     {"version": "v1.43.13", "kind": "patch"},
     {"version": "v1.43.14", "kind": "patch"},
     {"version": "v1.43.15", "kind": "patch"},
-    {"version": "v1.43.16", "kind": "patch"},
+    {"version": "v1.43.16", "kind": "patch", "state": "folded"},
     {"version": "v1.44.0", "kind": "minor"},
     {"version": "v1.45.0", "kind": "minor"},
     {"version": "v1.46.0", "kind": "minor"},

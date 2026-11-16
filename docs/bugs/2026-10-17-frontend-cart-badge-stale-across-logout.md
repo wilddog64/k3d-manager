@@ -2,7 +2,9 @@
 
 **Status:** OPEN — cause confirmed by code read + live check; not yet fixed
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Stale header cart badge after account switch is a degraded UI state with an easy workaround (opening the Cart page refreshes the count) and no server-side data loss or cross-user cart leakage); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Branch:** `k3d-manager-v1.43.5` (moved from v1.43.4 by the operator, 2026-10-17: "move 3, and 4 to next release")
 **Approval:** pending
 **Found:** 2026-10-17, operator (logged out `developer`, logged in as `admin`, badge showed 3)

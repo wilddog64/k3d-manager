@@ -10,6 +10,8 @@ def test_real_security_is_blocked():
     if os.environ.get("K3DM_HERMETIC") == "report":
         pytest.skip("enforce-only guard assertion")
     resolved = shutil.which("security") or ""
+    if not resolved:
+        pytest.skip("security is absent on Linux")
     if any(part.startswith("k3dm-tripwire.") for part in Path(resolved).parts):
         pytest.skip("tripwire replaces the executable in make test-pytest")
     with pytest.raises(RuntimeError, match=r"security.*executable"):

@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-11-15
+
+### Added
+
+- **Agent dispatch dashboard:** a collapsed *Stall recovery* row shows hangs detected, silence before detection, diagnoses and their cost, approve/deny decisions, outcomes and clean phase-2 approvals for the selected window.
+- Add an isolated development vCluster on the hub with a memory quota, preemptible workload priority, read-only status and low-memory/quota alerts; run ArgoCD and Grafana inside it, sync only pushed-branch dashboards, and read hub Prometheus through a replicated Service.
+- **One-command hub deploy:** `make hub-deploy REF=<commit-ish>` promotes `deploy/hub` and runs `appsets-reapply`, `appsets-check`, `platform-ops` and the exporter rollout check, stopping at the first failed step with the command to rerun.
+- **Promote reminder:** the hub sync finds the newest CI-green release-branch commit `deploy/hub` lacks (`bin/k3dm-hub-promote is-green`), publishes `k3dm_repo_sync_promotable` and the backlog count, adds `promotable:` to the `hub-sync` summary, fires `K3dmPromoteWaiting` / `K3dmPromoteLookupFailed`, and shows a *deploy/hub behind* stat on k3dm Release Tracking.
+- **Hermes Slack config sensors:** a `slack_app_config` sensor (hourly by default, `K3DM_HERMES_SLACK_CONFIG_INTERVAL`) and an unsigned relay probe, with the Slack config token pair in the Keychain and a documented regenerate procedure.
+- Parallel offline test run: `make test-all PARALLEL=1` runs test suites concurrently through `_run_parallel` with per-job tripwire, failure retries, and timing cache; serial and parallel `test-all` both run all stages even when an earlier stage fails.
+
+### Fixed
+
+- **Hub Grafana:** pin the image to 12.4.15 by digest to address critical vulnerabilities in the chart's default image.
+- **dev-hub-up:** when the vCluster syncer restarts mid-install and its background proxy dies, refresh the connection, recover the release and retry the Helm install once instead of failing; an unreachable vCluster after refresh points to `make dev-hub-status`.
+- **Codex dispatch attribution:** use `K3DM_COORDINATOR` when `--coordinator` is omitted, include env-declared coordinators in metrics, and show the unreported share on Agent Dispatch.
+- **App CVE scan:** normalize `UNKNOWN` findings from CVSS scores when counting deployed VulnerabilityReports and scanning candidates, and identify digest-pinned deployed images by digest.
+- **Vault unseal watchdog:** retry up to 12 times (5-second interval) when Vault is unreachable (rc 1) during startup before skipping, preventing post-restart unseal delays.
+- **PromQL tests:** install pinned promtool 3.1.0 through machine setup and CI, and fail affected checks with setup instructions when it is missing instead of falling back to Docker or skipping.
+- **ESO after a Vault restart:** Vault's Kubernetes auth no longer stores a pod-bound `token_reviewer_jwt`; it reads and reloads its own ServiceAccount token, so deleting or rescheduling `vault-0` no longer makes every ExternalSecret fail with a 403 until the auth config is rewritten. Applies to `_vault_set_eso_reader`, `_vault_configure_secret_reader_role` and `_hub_data_repoint_vault`.
+- **Hub checkout and promote guard:** the hub checkout follows `deploy/hub` with a backup ref, and the promote guard fails closed when it cannot decide.
+- **Hub PrometheusRules:** applied through ArgoCD from `deploy/hub`, not from the checkout branch.
+- **Repo sync:** pushes to Pushgateway only when `PUSHGATEWAY_URL` is set (no stray m4-air group on the hub); the `hub-sync` summary says `promotable: unknown` when the lookup failed instead of carrying an old SHA.
+- **Hermes and Slack relay:** a refused card click keeps the card and says the decision was NOT recorded; every Slack token seen in a cycle is redacted; regenerate evidence leads with the hint.
+- **Dashboards:** forecast tiles show the open release's Earliest/Latest (forecast table removed); agent cost counts every Fable version, prices Fable 5.2, and shows a neutral reset gauge.
+- **Dispatcher:** `dev_hub_sync` and `hub_snapshot_capture` are reachable through `scripts/k3d-manager`, with a declaration guard.
+- **lib-foundation v0.5.6** (subtree): `_run_command` works under macOS bash 3.2 (guarded empty-array expansions); the ACG login records which page it saw when auto-login fails.
+- **Test hygiene:** the cluster-status test no longer rewrites the real LaunchAgent, and machine-secrets tests no longer touch the real Keychain under the tripwire.
+
+### Security
+
+- **Vault tokens off argv:** `test_vault` and its cleanup pass the root token to `kubectl exec` on stdin under `_no_trace`, never in the `sh -c` string, the EXIT trap text or xtrace (the remaining `test_eso` and `bin/get-ldap-password` sites are tracked as a v1.44.x bug).
+
+### Process
+
+- Release PR gate is a merge gate (open a normal PR, then CI, Copilot, Claude live smoke test and Claude scope check before merge); `LIVE-VERIFIED` is a recognized bug status; dead instructions removed after the 2026-11-15 prompt-debt audit (`docs/process/prompt-debt-audit-2026-11-15.md`).
+- Independent verifier and blind two-reviewer process documented in `docs/process/verification-and-review.md`.
+
 ## [1.43.15] - 2026-11-12
 
 ### Fixed

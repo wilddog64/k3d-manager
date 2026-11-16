@@ -2,9 +2,10 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.46.0` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — needs live Prometheus and Alertmanager verification; root cause not established
+**Status:** CLOSED — superseded by `2026-11-09-offline-test-all-red-on-m4-four-root-causes.md` and the pyyaml fix; reopen on recurrence (grooming 2026-11-12, operator); was: needs live Prometheus and Alertmanager verification; root cause not established
 **Priority:** P2 — failed offline test is visible on dashboard but expected warning notification is unconfirmed/missing; workaround is manual dashboard review
-**Waiting on:** investigation
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Degraded warning email notification for offline test failures while the failure status remains visible on the Grafana dashboard as a workaround); Claude proposed P2. Agreed.
+**Triage:** close — grooming 2026-11-12, operator.
 **Release:** v1.46.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
 **Severity:** medium
 **Origin:** operator screenshot 2026-10-15 ~05:35 PDT, K3DM Tests dashboard; operator reported no corresponding email

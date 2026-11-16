@@ -1,21 +1,24 @@
 # Bug: clicking a Hermes card without a fresh `/hermes-auth` replaces the card with the reauth prompt, and its buttons are lost
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** LANDED — 09ea1d02, 2026-11-14 (filed 2026-11-08)
 **Priority:** P2 — raised from P3 2026-11-11 (operator: "go ahead with your recommendation"): the Slack Promote button (part 3 of the promote-smoothing idea) needs Hermes buttons to record every press; this bug drops a Deny. Target: v1.44.0, before part 3.
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Clicking a Hermes card without an active re-auth destroys the card's approval buttons, degrading the Slack approval flow, though workarounds exist (running `/hermes-auth` beforehand or approving via CLI on the hub)); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
+**Waiting on:** live check — since 2026-11-14 (relay deployed 2026-11-15, version 2684d74b from 234bc2d1; needs the next real Hermes incident card, which a single degraded sensor cannot produce)
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
 to post the repair again, or `bin/k3dm-hermes approve <id>` on the hub
 **Approval:** operator, 2026-11-08 ("approved those two requests")
-**Intent approved:** operator, 2026-11-08
+**Intent approved:** operator, 2026-11-13
+**Intent approval words:** "apporve three intents and you can dispatch them" (vault-unseal, hermes-card amended E1, coordinator-unattributed)
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack `#grafana-notification`, 2026-11-08. The k3d-manager card for `r9-d9add2e2` was posted
 at 11:14 PST; the operator pressed Deny before running `/hermes-auth`. The card then read only "🔐 Re-authenticate
 first: run `/hermes-auth` (valid for 24h)", with the card's own 11:14 timestamp and no "Only visible to you" label;
 after `/hermes-auth` (11:47) the card no longer existed to deny (operator: "the 11:14 does not exist any more").
 **Affected:** `workers/slack-relay/index.js`
-**Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
+**Branch:** `k3d-manager-v1.44.0` (carried by grooming 2026-11-12; was v1.43.16)
 **Related:** `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md` (also edits
 `workers/slack-relay/index.js`; dispatch the two together); `docs/guides/hermes.md` setup step 3
 
@@ -68,14 +71,18 @@ must:
     text: "the not-allowlisted and approvals-not-configured replies are also ephemeral with replace_original false"
   - id: M3
     text: "Approve and Deny with a reauth key still replace the card (replace_original true), as today (control)"
+  - id: M4
+    text: "each refusal reply (approvals not configured, not allowlisted, no reauth key) names the pressed action (Approve or Deny) and the proposal ID and contains 'NOT recorded'; a successful Deny replaces the card with text naming the denier, as Approve does"
 must_not:
   - id: N1
     text: "a guard reply to a block action omits replace_original or sets it true (red on pre-fix code, which omits it; paired with M3)"
+  - id: N2
+    text: "a refusal reply omits the proposal ID or the words 'NOT recorded' (red on pre-fix code, whose reply is only the reauth prompt)"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1]
+    proves: [M1, M2, M3, M4, N1, N2]
     kind: offline
-    intent: "tests click a Hermes card's buttons as a user who has not re-authenticated, as one not on the approver list, and on a relay with no approvals store, and check each reply tells Slack to leave the card in place; a re-authenticated Approve and Deny still replace the card"
+    intent: "tests click a Hermes card's buttons as a user who has not re-authenticated, as one not on the approver list, and on a relay with no approvals store, and check each reply tells Slack to leave the card in place and says plainly that your Deny (or Approve) of that proposal was NOT recorded; a re-authenticated Approve and Deny still replace the card and name who decided"
   - id: E2
     proves: [M1]
     kind: live
@@ -117,3 +124,32 @@ Before your last message, do all of these and paste the evidence:
   A successful Deny should also reply as plainly as Approve does (`replaceResponseUrl … denied by <@user>`).
   Acceptance: a test per refusal path (no KV, not allowed, no re-auth) asserting the reply contains the action ID and
   "NOT recorded".
+
+## Verification — 2026-11-14 (Claude)
+
+Landed as `09ea1d02` (Luna, gpt-6-luna; Fable lows applied by Claude before land).
+
+- **E1 (offline):** `node --test workers/slack-relay/test/relay.test.mjs` passed 49/49 outside the sandbox. The new
+  refusal test loops over 3 refusal cases × Approve/Deny. It asserts exactly one `response_url` post, ephemeral,
+  `replace_original === false`, the literal `Your <decision> of r2-0123abcd was NOT recorded`, and no KV writes.
+- **E2 (offline, pre-fix red):** the same tests against the pre-fix `index.js` gave 48/49, with the refusal test red.
+- **Mutants:** dropping `replace_original: false` on the reauth path, dropping "NOT recorded", removing the body line,
+  and a second card-replacing post after the refusal each turn exactly one test red.
+- **Fable review:** nothing above low; L1, L2, L4 and L5 applied. L3 (cards posted inside a thread) is unverified and
+  is part of E3.
+- **E3 (live): pending.** Run `make deploy-worker`, then press Approve on a Hermes card without a fresh `/hermes-auth`.
+  Expected: the card and its buttons stay, and an ephemeral reply names the action, the ID and "NOT recorded".
+- **Independent verifier (Opus, Acceptance block only, own harness with signed Slack requests):** fix gave
+  `SUMMARY M1=PASS M2=PASS M3=PASS M4=PASS N1=PASS N2=PASS` (rc 0). Pre-fix gave `M1=FAIL M2=FAIL M3=PASS M4=FAIL
+  N1=FAIL N2=FAIL` (rc 1); M3 is the unchanged success-path control. The repo suite passed 49/49 and the tree was clean.
+  Errors seen: smartcd `cd` hook (rc 127) and an unquoted zsh separator, both from the verifier's own shell, not the code.
+
+## Live check attempt (Claude, 2026-11-15) — no card; relay deployed
+
+The operator ran `make deploy-worker` on the M5 at checkout `234bc2d1` (contains `09ea1d02`): `k3dm-slack-relay` Current
+Version ID `2684d74b-a204-486d-ba3c-2eb4c36afd02`. To force a card, CI run `43724397763` was re-run and its attempt 2
+cancelled (R4 precondition), but no card can follow from that alone: `Correlator.process`
+(`scripts/lib/hermes/correlator.py:17`) opens an incident only when two or more sensors are degraded within the last 3
+cycles, and proposals are posted only on an incident or escalation (`bin/k3dm-hermes:283`). Attempt 3 restored CI.
+Hermes also still holds `r9-d9add2e2` (the card this bug destroyed on 2026-11-08) in `pending_repairs`, so pending
+proposals do not expire.

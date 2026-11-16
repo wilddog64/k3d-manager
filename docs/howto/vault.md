@@ -43,7 +43,7 @@ vault write pki_int/issue/k3d-manager \
 
 See **[Vault PKI Configuration](../api/vault-pki.md)** for full PKI variable reference, air-gapped setup, and example workflows.
 
-For an OrbStack restart, use the [coordinated OrbStack upgrade procedure](orbstack-upgrade.md), which waits for the watchdog before using the DR unseal copy.
+For an OrbStack restart, use the [coordinated OrbStack upgrade procedure](orbstack-upgrade.md), which waits for the watchdog before using the DR unseal copy. After a restart, the watchdog retries for about a minute (each status check times out after 5 seconds) before waiting for its next run.
 
 ## Common Operations
 

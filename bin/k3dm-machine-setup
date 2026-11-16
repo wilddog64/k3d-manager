@@ -67,10 +67,26 @@ manifest_dir="${REPO_ROOT}/scripts/etc/machine"
 sudoers_file="${K3DM_SUDOERS_FILE:-/etc/sudoers.d/k3d-manager}"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
 report() { printf '%-32s %s\n' "$1" "$2"; }
+install_promtool() {
+  [[ "$role" == control || "$role" == console || "$role" == hub ]] || return 0
+  if [[ "$mode" != setup ]]; then
+    local candidate version
+    candidate="$HOME/.local/bin/promtool"
+    if [[ ! -x "$candidate" ]]; then candidate="$(command -v promtool 2>/dev/null || true)"; fi
+    if [[ -n "$candidate" && -x "$candidate" ]] && version="$("$candidate" --version 2>/dev/null)" && [[ "$version" == *'promtool, version 3.1.0'* ]]; then
+      report promtool ok
+    else
+      record_failure promtool missing
+    fi
+    return 0
+  fi
+  if _install_promtool; then report promtool installed
+  else record_failure promtool 'missing (see installer output)'; fi
+}
 
 if [[ "$platform" == linux ]]; then
   linux_control() {
-    local prefix=/home/linuxbrew/.linuxbrew pin commit expected actual installer raw kind name path target item
+    local prefix=/home/linuxbrew/.linuxbrew pin commit expected actual installer raw kind name path target item candidate version
     if [[ ! -d "$prefix" || ! -w "$prefix" ]] || ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1 || ! command -v gcc >/dev/null 2>&1 || ! command -v file >/dev/null 2>&1 || ! command -v pgrep >/dev/null 2>&1; then
       printf '%s\n' 'Homebrew Linux prerequisites are missing. Run these commands as an administrator:' 'sudo apt-get update' 'sudo apt-get install -y build-essential procps curl file git' 'sudo install -d -o "'"$(id -un)"'" -g "'"$(id -gn)"'" -m 0755 /home/linuxbrew/.linuxbrew'
       return 1
@@ -121,6 +137,18 @@ if [[ "$platform" == linux ]]; then
       fi
     done 3< "${manifest_dir}/repos.list"
     for item in 'macOS Homebrew package' 'Keychain and secrets' 'LaunchAgents' 'FROM= file copy' 'operator include' 'shell links and agent-settings repos' 'smartcd'; do report "$item" 'skipped (linux)'; done
+    if [[ "$mode" == setup ]]; then
+      if _install_promtool; then report promtool installed
+      else failed=1; report promtool 'missing (installer failed)'; fi
+    else
+      candidate="$HOME/.local/bin/promtool"
+      if [[ ! -x "$candidate" ]]; then candidate="$(command -v promtool 2>/dev/null || true)"; fi
+      if [[ -n "$candidate" && -x "$candidate" ]] && version="$("$candidate" --version 2>/dev/null)" && [[ "$version" == *'promtool, version 3.1.0'* ]]; then
+        report promtool ok
+      else
+        failed=1; report promtool missing
+      fi
+    fi
     return "$failed"
   }
   linux_control
@@ -732,6 +760,7 @@ fi
 preflight
 ensure_ec2_ssh_key
 if (( brew_available )); then install_tools; else report brew-phase 'skipped (Homebrew unavailable)'; fi
+install_promtool
 check_ai_clis
 ensure_python_tools
 install_repos

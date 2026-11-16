@@ -2,7 +2,9 @@
 
 **Status:** OPEN — redo on v1.43.16 (operator, 2026-11-09; was v1.43.15). The 2026-11-01 Codex run exited 0 but was never landed; its base fell ~200 changed lines behind `bin/k3dm-machine-setup`, so the task was abandoned and the fix is to be redispatched fresh. The old function is kept below as a reference.
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Automated hub setup omits ACG Node packages and Playwright Chromium, but manual installation (`npm install && npx playwright install chromium`) works around the failure); Claude proposed P3. Higher stands until the operator decides.
+**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
+**Waiting on:** operator decision — since 2026-11-12
 **Intent approved:** operator, 2026-11-08 ("approve machine-setup intents")
 **Severity:** low — one manual `npm install` per checkout clears it; found on the M5 hub
 **Approval:** operator, 2026-11-01 (hub migration gap, filed as found)

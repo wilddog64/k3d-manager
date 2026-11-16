@@ -2,7 +2,9 @@
 
 **Status:** OPEN — narrowed 2026-11-06: one stale Job still fires, and `acg-expiry-check` failure bursts have no logs left
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-06
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Alerting and ACG expiry Slack notifications are degraded by a stale retained Job object and intermittent `acg-expiry-check` webhook failures, while manual job deletion and webhook rotation/email alerts serve as workar…); Claude proposed P2. Agreed.
+**Triage:** carry → v1.44.0 (live check, no code) — grooming 2026-11-12, operator.
+**Waiting on:** live check — since 2026-11-12
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
 **Branch:** k3d-manager-v1.43.14

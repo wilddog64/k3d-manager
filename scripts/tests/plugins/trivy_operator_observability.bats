@@ -128,7 +128,7 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
 }
 
 @test "trivy observability: hub values skip the ephemeral e2e vCluster namespace" {
-  run grep -E '^excludeNamespaces: "vclusters"$' "${SETTINGS}"
+  run grep -E '^excludeNamespaces: "vclusters,dev-hub"$' "${SETTINGS}"
   [ "${status}" -eq 0 ]
 
   run grep -E '^excludeNamespaces:.*vclusters' "${ACG_SETTINGS}"

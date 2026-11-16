@@ -78,6 +78,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | `_install_macmon` | Install macmon with Homebrew on Apple Silicon macOS; skips other platforms. |
 | `_install_virtualbox` | Install VirtualBox with its Homebrew cask on macOS when `VBoxManage` is missing. |
 | `_install_vagrant` | Install Vagrant with its Homebrew cask on macOS when `vagrant` is missing. |
+| `_install_promtool` | Install the pinned Prometheus `promtool` release after verifying its platform-specific SHA-256 checksum. |
 | `_install_kubernetes_cli` | Install `kubectl` (Debian/RedHat/mac). |
 | `_install_orbstack` | Install OrbStack on macOS. |
 | `_install_bats_from_source` | Build and install BATS from source tarball. |
@@ -85,6 +86,12 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | `_ensure_node` | Install Node.js + npm for CLI tooling. |
 | `_ensure_cargo` | Install Rust `cargo` via apt/dnf/homebrew. |
 | `_ensure_copilot_cli` | Ensures the Copilot CLI binary is installed (via `brew install copilot-cli` or the official release installer) and authenticated (`_copilot_auth_check`). Exits via `_err` if installation fails. |
+
+### Parallel Command Runner
+
+`_run_parallel [--jobs N] --out DIR [--order-by FILE] [--retry-failed] [--flaky-ok] -- CMD [ARG...]`
+
+Reads NUL-separated items from stdin and runs `CMD ARG... <item>` with bounded concurrency. It writes per-item logs, return codes and elapsed seconds under `DIR`, then prints a sorted summary and writes `times.txt` for later ordering. Failed items can be retried once; flaky results count as success only with `--flaky-ok`.
 
 ### Copilot CLI Integration
 

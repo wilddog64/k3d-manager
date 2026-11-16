@@ -1,12 +1,13 @@
 #!/usr/bin/env bats
 
-BASE="${BASE:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops}"
+AGENT_DASHBOARD_DIR="${AGENT_DASHBOARD_DIR:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops}"
 FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/agent-dispatch-dashboard-pre-split.yaml"
-EXPORTER="${BATS_TEST_DIRNAME}/../../../bin/k3dm-dispatch-metrics"
+BASELINE_FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/agent-dispatch-dashboard-028b898f.yaml"
+export EXPORTER="${EXPORTER:-${BATS_TEST_DIRNAME}/../../../bin/k3dm-dispatch-metrics}"
 
 @test "agent dispatch dashboard: valid ConfigMap JSON and datasource" {
-  run python3 - "$BASE" <<'PY'
-import json, sys
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
+import json, re, sys
 from pathlib import Path
 base=Path(sys.argv[1])
 for filename,key,uid in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json","k3dm-agent-dispatch"),
@@ -22,10 +23,10 @@ PY
 }
 
 @test "agent dispatch dashboard: verification ladder contract" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" "${BATS_TEST_DIRNAME}/../../../docs/guides/grafana-dashboards/k3dm-agent-dispatch.md" <<'PY'
-import json, re, subprocess, sys
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "${BATS_TEST_DIRNAME}/../../../docs/guides/grafana-dashboards/k3dm-agent-dispatch.md" "$BASELINE_FIXTURE" <<'PY'
+import json, re, sys
 from pathlib import Path
-dashboard_path, guide_path = map(Path, sys.argv[1:])
+dashboard_path, guide_path, baseline_path = map(Path, sys.argv[1:])
 def load(path):
     text = path.read_text()
     return json.loads("\n".join(line[4:] for line in text.split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
@@ -57,14 +58,14 @@ for phrase in ("offline_tested", "deployed", "live_verified", "gate_coverage_sta
 section = guide_path.read_text().split("## Verification ladder", 1)[1].split("\n## ", 1)[0]
 for phrase in ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed", "gate_coverage_start", "evidence hash"):
     assert phrase in section, phrase
-dashboard_repo_path = "scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
-baseline_text = subprocess.run(["git", "-C", str(dashboard_path.parent), "show", f"028b898f:{dashboard_repo_path}"], check=True, capture_output=True, text=True).stdout
+baseline_text = baseline_path.read_text()
 baseline_json = json.loads("\n".join(line[4:] for line in baseline_text.split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
 assert next(item for item in baseline_json["panels"] if item["id"] == 105)["type"] == "bargauge"
 old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
-assert set(old) == set(new)
-for panel_id in old.keys() - {105, 12}:
+assert set(new) == set(old) | {123,124}
+assert new[123]["title"] == "Unreported coordinator share"
+for panel_id in old.keys() - {105, 12, 103}:
     assert old[panel_id] == new[panel_id], panel_id
 print("ok: verification ladder contract; other panels unchanged")
 PY
@@ -72,15 +73,103 @@ PY
   [[ "$output" == *"ok: verification ladder contract; other panels unchanged"* ]]
 }
 
+@test "agent dispatch dashboard: stall recovery row and metrics match the contract" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json, re, sys
+from pathlib import Path
+d=json.loads("\n".join(x[4:] for x in Path(sys.argv[1]).read_text().split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panels={p["id"]:p for p in d["panels"]}
+old=panels[103]
+assert old["title"] == "Repeated failed attempts"
+assert old["description"] == "Tasks whose last two or more finished attempts were unsuccessful. A run that hangs without exiting shows under Stall recovery."
+assert old["targets"][0]["expr"] == "sum(k3dm_dispatch_stalled_tasks)"
+fixture_path=Path(sys.argv[1]).parents[3]/"tests/fixtures/agent-dispatch-dashboard-028b898f.yaml"
+fixture=json.loads("\n".join(x[4:] for x in fixture_path.read_text().split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+original=next(p for p in fixture["panels"] if p["id"]==103)
+for field in ("gridPos","fieldConfig","options"): assert old[field]==original[field],field
+row=panels[124]
+assert row["title"] == "Stall recovery" and row["collapsed"] is True
+children={p["title"]:p for p in row["panels"]}
+expected={"Hangs detected":"sum(k3dm_dispatch_stall_incidents{window=\"$window\"}) or vector(0)",
+"Median silence before detection":"max(k3dm_dispatch_stall_silent_seconds_median{window=\"$window\"} / 60) or vector(0)",
+"Diagnoses by result":"sum by (status) (k3dm_dispatch_stall_diagnoses{window=\"$window\"})",
+"Diagnosis spend, all releases":"max(k3dm_dispatch_stall_diagnosis_cost_usd_all_versions) or vector(0)",
+"Operator decisions":"sum by (decision) (k3dm_dispatch_stall_decisions{window=\"$window\"})",
+"Median minutes to decide":"max(k3dm_dispatch_stall_decision_minutes_median{window=\"$window\"}) or vector(0)",
+"After resume":"sum by (outcome) (k3dm_dispatch_stall_outcomes{window=\"$window\"})",
+"Clean approvals (phase 2 gate)":"sum(k3dm_dispatch_stall_clean_approvals{window=\"$window\"}) or vector(0)",
+"Incidents":"max by (slug,stall,reason,diagnosis,decision,outcome) (k3dm_dispatch_task_stall_incident{window=\"$window\"}) / 60"}
+assert set(children)==set(expected)
+for title,expr in expected.items(): assert children[title]["targets"][0]["expr"]==expr,(title,children[title]["targets"])
+for title,panel in children.items():
+    for target in panel.get("targets",[]):
+        expr=target.get("expr","")
+        if "or vector(0)" in expr:
+            assert re.fullmatch(r"(?:sum|max)\s*\(.+\) or vector\(0\)",expr),(title,expr)
+spend=children["Diagnosis spend, all releases"]
+assert spend["description"] == "Paid from the $100 API credit, which expires 2026-12-08."
+assert spend["fieldConfig"]["defaults"]["thresholds"]["steps"] == [{"color":"green","value":None},{"color":"yellow","value":50},{"color":"red","value":80}]
+print("ok: stall recovery dashboard contract")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: stall recovery dashboard contract"* ]]
+}
+
+@test "agent dispatch dashboard: fixture exporter series satisfy every stall selector label" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" <<'PY'
+import json, os, re, subprocess, sys, tempfile, time
+from pathlib import Path
+dashboard_path, exporter = Path(sys.argv[1]), Path(sys.argv[2])
+d=json.loads("\n".join(x[4:] for x in dashboard_path.read_text().split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+row=next(p for p in d["panels"] if p.get("title")=="Stall recovery")
+now=time.time(); version="v1.44.0"; slug="fixture-incident"; stall="stall-fixture"
+with tempfile.TemporaryDirectory(prefix="stall-dashboard-") as scratch:
+    fixture=Path(scratch); root=fixture/"worktrees"; home=fixture/"home"; root.mkdir(); home.mkdir()
+    ledger=root/"ledger.jsonl"
+    rows=[
+      {"ts":now-30,"event":"start","version":version,"slug":slug},
+      {"ts":now-20,"event":"stall_detected","version":version,"slug":slug,"stall":stall,"reason":"silent","silent_s":120},
+      {"ts":now-19,"event":"stall_diagnosis","version":version,"slug":slug,"stall":stall,"status":"ok","cost_usd":0.42},
+      {"ts":now-18,"event":"stall_proposal","version":version,"slug":slug,"stall":stall},
+      {"ts":now-17,"event":"stall_decision","version":version,"slug":slug,"stall":stall,"decision":"approved"},
+      {"ts":now-16,"event":"stall_resume","version":version,"slug":slug,"stall":stall,"rc":0},
+      {"ts":now-15,"event":"land","version":version,"slug":slug},
+    ]
+    ledger.write_text("\n".join(json.dumps(x) for x in rows)+"\n")
+    env=os.environ.copy(); env.update({"K3DM_WORKTREE_ROOT":str(root),"HOME":str(home),"XDG_CACHE_HOME":str(home/"cache"),"K3DM_DISPATCH_PUSHGATEWAY_URL":"http://127.0.0.1:9","K3DM_PUSHGATEWAY_URL":"http://127.0.0.1:9"})
+    assert Path(env["K3DM_WORKTREE_ROOT"])==root and ledger.parent==root and Path(env["HOME"])==home
+    assert env["K3DM_DISPATCH_PUSHGATEWAY_URL"]==env["K3DM_PUSHGATEWAY_URL"]=="http://127.0.0.1:9"
+    output=subprocess.run([sys.executable,str(exporter),"--dry-run","--codex-home",str(home/".codex"),"--claude-projects",str(home/".claude"),"--claude-cache",str(home/"claude.json"),"--claude-usage-cache",str(home/"usage.json")],env=env,check=True,capture_output=True,text=True).stdout
+    series={}
+    for line in output.splitlines():
+        match=re.match(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?\s+\S+$',line)
+        if not match: continue
+        labels=dict(re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"',match.group(2) or ""))
+        series.setdefault(match.group(1),[]).append(labels)
+    for panel in row["panels"]:
+        for target in panel.get("targets",[]):
+            for metric,selector in re.findall(r'(k3dm_dispatch_stall_[a-z0-9_]+|k3dm_dispatch_task_stall_incident)\{([^}]*)\}',target.get("expr","")):
+                wanted={k:("7d" if v=="$window" else v) for k,v in re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"',selector)}
+                assert any(all(labels.get(k)==v for k,v in wanted.items()) for labels in series.get(metric,[])),(panel["title"],metric,wanted,series.get(metric,[]))
+print("ok: fixture series satisfy stall panel selectors")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: fixture series satisfy stall panel selectors"* ]]
+}
+
 @test "agent dispatch dashboard: every queried metric is exported" {
-  run python3 - "$BASE" "$EXPORTER" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" "$EXPORTER" <<'PY'
 import json,re,sys
 from pathlib import Path
 base=Path(sys.argv[1]); dashboards=[]
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
     text=(base/filename).read_text(); dashboards.append(json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines())))
 exporter=Path(sys.argv[2]).read_text()
-queries="\n".join(t.get("expr","") for d in dashboards for p in d["panels"] for t in p.get("targets",[]))
+def all_panels(panels):
+    for panel in panels:
+        yield panel
+        yield from all_panels(panel.get("panels",[]))
+queries="\n".join(t.get("expr","") for d in dashboards for p in all_panels(d["panels"]) for t in p.get("targets",[]))
 for metric in set(re.findall(r"\bk3dm_(?:dispatch|claude|codex|agy)_[a-z0-9_]+",queries)):
     assert metric in exporter,metric
 print("ok")
@@ -90,7 +179,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Claude context and compaction row panels exist below existing rows" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
@@ -115,7 +204,7 @@ PY
 }
 
 @test "agent dispatch dashboard: landing success aggregates both sides" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 panel=next(p for p in d["panels"] if p["id"]==2); numerator,denominator=[side.strip() for side in panel["targets"][0]["expr"].split(" / ")]
@@ -127,7 +216,7 @@ PY
 }
 
 @test "agent dispatch dashboard: panel rectangles do not overlap" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -146,7 +235,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Codex API cost shows priced total and excluded sessions" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
 by_id={p["id"]:p for p in d["panels"]}
@@ -163,7 +252,7 @@ PY
 }
 
 @test "agent dispatch dashboard: per-spec panels use readable units and grouped targets" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 panel5=next(p for p in panels if p["id"]==5); assert panel5["fieldConfig"]["defaults"]["unit"]=="short"
@@ -176,7 +265,7 @@ PY
 }
 
 @test "agent dispatch dashboard: final exit gap and operator coverage are exposed" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 panels={p["title"]:p for p in d["panels"]}
@@ -200,7 +289,7 @@ PY
 }
 
 @test "agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
@@ -216,7 +305,7 @@ PY
 }
 
 @test "agent dispatch dashboard: rework rate stat reads the selected window" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 p=next(p for p in d["panels"] if p["title"]=="Rework rate")
@@ -227,7 +316,7 @@ PY
 }
 
 @test "agent dispatch dashboard: verified delivery stats use exported metrics without overlap" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 by_id={p["id"]:p for p in panels}; tokens=by_id[40]; awaiting=by_id[41]
@@ -241,7 +330,7 @@ PY
 }
 
 @test "agent dispatch dashboard: stat and bar gauge panels use explicit colours" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1]); dashboards=[]
@@ -267,7 +356,7 @@ PY
 }
 
 @test "agent dashboards: panel ids exactly match the pre-split dashboard and assigned groups" {
-  run python3 - "$BASE" "$FIXTURE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" "$FIXTURE" <<'PY'
 import json,sys
 from pathlib import Path
 base,fixture=Path(sys.argv[1]),Path(sys.argv[2])
@@ -277,18 +366,19 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106}|set(range(42,49))
+all_ids += [p["id"] for d in new for row in d["panels"] if row.get("type")=="row" for p in row.get("panels",[])]
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106,123,124}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,116,117,118,119,120,121,122}
 assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 106 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 117 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
-  run python3 - "$BASE" "$FIXTURE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" "$FIXTURE" <<'PY'
 import json,sys
 from pathlib import Path
 base,fixture=Path(sys.argv[1]),Path(sys.argv[2])
@@ -297,7 +387,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122):
+    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -322,7 +412,7 @@ PY
 }
 
 @test "agent activity: repo gauge height, row layout, and protected panel data" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
 import json,sys
 from pathlib import Path
 text=Path(sys.argv[1]).read_text()
@@ -354,7 +444,7 @@ PY
 }
 
 @test "agent dashboards: each dashboard has unique panel ids and no overlapping rectangles" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -373,7 +463,7 @@ PY
 }
 
 @test "agent dashboards: all dashboards have the tag-based Agents link" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -389,7 +479,7 @@ PY
 }
 
 @test "agent dashboards: Activity has three time windows and Dispatch and Cost keep the query variable" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -410,7 +500,7 @@ PY
 }
 
 @test "agent activity: Claude row fills the width and bar gauge names read beside each bar" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
@@ -440,7 +530,7 @@ PY
 }
 
 @test "agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,re,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
@@ -515,7 +605,7 @@ PY
 }
 
 @test "agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs" {
-  run python3 - "$BASE" <<'PYTEST'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PYTEST'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -543,7 +633,7 @@ PYTEST
 }
 
 @test "agent dispatch: per spec shows which agent landed each spec" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
@@ -564,7 +654,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Log opens the filtered run log dashboard" {
-  run python3 - "$BASE" <<'PYTEST'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PYTEST'
 import json,re,sys
 from pathlib import Path
 from urllib.parse import quote, urlsplit, parse_qs
@@ -604,7 +694,7 @@ PYTEST
 }
 
 @test "agent cost: Claude tokens by kind splits the selected window by cache kind" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-cost.yaml").read_text()
@@ -622,7 +712,7 @@ PY
 }
 
 @test "agent cost: daily Claude tokens and cost panels split by kind" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-cost.yaml").read_text()
@@ -659,7 +749,7 @@ PY
 }
 
 @test "agent dashboards: labels and titles stay readable and release-only stats say why they are empty" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -687,7 +777,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Per spec exposes unknown worker and coordinator identities" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
@@ -705,7 +795,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Per spec shows handoff and measured cost fields within width budget" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1]) / "grafana-dashboard-agent-dispatch.yaml").read_text()
@@ -734,7 +824,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Per spec spans the full width and its columns fit without scrolling" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
@@ -749,7 +839,7 @@ PY
 }
 
 @test "agent dispatch: blank evidence paths remain visible clickable links and gaps are explicit" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 panel=next(p for p in d["panels"] if p["id"]==47)
@@ -769,7 +859,7 @@ PY
 }
 
 @test "agent dispatch: unrecorded attribution is labeled without overwriting known identities" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 panel=next(p for p in d["panels"] if p["id"]==12)
@@ -777,7 +867,7 @@ props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for
 for field in ["Worker model","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
     opts=props[field]["mappings"][0]["options"]
     assert opts=={"unknown":{"text":"not recorded"}}
-assert len(d["panels"])==35
+assert len(d["panels"])==37
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -785,7 +875,7 @@ PY
 }
 
 @test "agent cost: whole-system API panels meet the cost and denominator contract" {
-  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
 by_title={p["title"]:p for p in d["panels"]}
@@ -824,7 +914,7 @@ PY
 }
 
 @test "agent cost: new attribution panels exist with exprs, unpriced note, no Ledger coverage, and no overlaps" {
-  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 from pathlib import Path
 path=Path(sys.argv[1]); text=path.read_text()
@@ -866,7 +956,7 @@ PY
 }
 
 @test "agent cost: Codex API cost queries never add the mode and category series together" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,re,sys
 from pathlib import Path
 base=Path(sys.argv[1])
@@ -888,7 +978,7 @@ PY
 }
 
 @test "agent cost: Codex spend by category is readable and shows tokens as counts" {
-  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
 spend={p["title"]:p for p in d["panels"]}["Codex spend by category"]
@@ -910,7 +1000,7 @@ PY
 }
 
 @test "agent cost: API cost expression stub matches the 7d baseline and missing release term" {
-  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
 p={x["title"]:x for x in d["panels"]}
@@ -928,7 +1018,7 @@ PY
 }
 
 @test "agent activity: configured setting and observed compaction point are distinct" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
 import json,sys
 text=open(sys.argv[1]).read()
 d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
@@ -953,7 +1043,7 @@ PYTEST
 }
 
 @test "agent activity: wasted reread share and empty mapping" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
 import json, sys
 from pathlib import Path
 text=Path(sys.argv[1]).read_text()
@@ -976,7 +1066,7 @@ PY
 }
 
 @test "agent activity: repo gauges cap named series and preserve the remainder" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
 import json,sys
 from pathlib import Path
 text=Path(sys.argv[1]).read_text()
@@ -995,7 +1085,7 @@ PYTEST
 }
 
 @test "agent activity: agy data source names local host and source without overlap" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read()
 panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
@@ -1021,7 +1111,7 @@ PY
 }
 
 @test "agent dispatch: outcome row accommodates nine labels and preserves subsequent layout" {
-  run python3 - "$BASE" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
 import json,sys
 from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
@@ -1057,24 +1147,26 @@ PY
 }
 
 @test "agent dispatch dashboard: S1 gate panels exist and match query and description contract" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" <<'PY'
 import json, re, sys
 from pathlib import Path
 d = json.loads("\n".join(x[4:] for x in open(sys.argv[1]).read().split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
 exporter = Path(sys.argv[2]).read_text()
 panels = {p["title"]: p for p in d["panels"]}
 
-expected_panels = ["Stalled tasks", "Live verification pending", "Verification ladder", "Split work"]
+expected_panels = ["Repeated failed attempts", "Live verification pending", "Verification ladder", "Split work"]
 for title in expected_panels:
     assert title in panels, f"missing panel: {title}"
     desc = panels[title].get("description", "").lower()
-    assert "self-reported and advisory" in desc, f"{title} description missing advisory note: {desc}"
+    if title != "Repeated failed attempts":
+        assert "self-reported and advisory" in desc, f"{title} description missing advisory note: {desc}"
 
 series_by_panel = {
-    "Stalled tasks": "k3dm_dispatch_stalled_tasks",
+    "Repeated failed attempts": "k3dm_dispatch_stalled_tasks",
     "Live verification pending": "k3dm_dispatch_live_pending_tasks",
     "Verification ladder": "k3dm_dispatch_ladder_tasks",
 }
+assert panels["Repeated failed attempts"].get("description") == "Tasks whose last two or more finished attempts were unsuccessful. A run that hangs without exiting shows under Stall recovery."
 for title, series in series_by_panel.items():
     exprs = "\n".join(t.get("expr", "") for t in panels[title].get("targets", []))
     assert series in exprs, f"{title} targets do not query {series}: {exprs}"
@@ -1107,7 +1199,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Split work outer join on synthetic metrics" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" "${BATS_TEST_DIRNAME}/../fixtures/dispatch-gates/synthetic.jsonl" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" "${BATS_TEST_DIRNAME}/../fixtures/dispatch-gates/synthetic.jsonl" <<'PY'
 import json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
@@ -1212,7 +1304,7 @@ PY
 }
 
 @test "agent activity: Claude quota panels exist, query quota metrics, and do not overlap" {
-  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
 import json, sys
 text = open(sys.argv[1]).read()
 d = json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n", 1)[1].splitlines()))
@@ -1256,7 +1348,7 @@ PY
 }
 
 @test "agent cost: unpriced Claude messages stat sits beside Claude cost and is red above 0" {
-  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
 by_id={p["id"]:p for p in panels}
@@ -1277,17 +1369,38 @@ PY
 }
 
 @test "agent cost: Fable row has daily tokens on own axis and weekly limit gauge" {
-  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
 fable_row=next((p for p in panels if p.get("type")=="row" and p.get("title")=="Fable"),None)
 assert fable_row is not None, "Fable row not found"
 daily=next((p for p in panels if "fable" in p.get("title","").lower() and any("k3dm_dispatch_claude_daily_tokens" in t.get("expr","") for t in p.get("targets",[]))),None)
 assert daily is not None, "Fable daily tokens panel not found"
-assert any("claude-fable-5-1" in t.get("expr","") for t in daily["targets"])
+assert any('model=~"claude-fable-.*"' in t.get("expr","") for t in daily["targets"])
+assert "all Fable versions" in daily["description"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Fable reset time has a neutral colour while used ratio keeps thresholds" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
 gauge=next((p for p in panels if p.get("type")=="gauge" and any("weekly_fable" in t.get("expr","") for t in p.get("targets",[]))),None)
 assert gauge is not None, "Fable weekly limit gauge not found"
 assert any("k3dm_claude_quota_resets_at_seconds" in t.get("expr","") for t in gauge["targets"])
+defaults=gauge["fieldConfig"]["defaults"]
+assert any(p.get("matcher",{}).get("options")=="resets at" and any(
+    prop.get("id")=="color" and prop.get("value",{}).get("mode")=="fixed"
+    and prop.get("value",{}).get("fixedColor")=="#8e8e8e"
+    for prop in p.get("properties",[])) for p in gauge["fieldConfig"]["overrides"]), "reset gauge needs fixed neutral colour"
+assert any(p.get("matcher",{}).get("options")=="resets at" and any(
+    prop.get("id")=="thresholds" and [s.get("color") for s in prop.get("value",{}).get("steps",[])]==["#8e8e8e"]
+    for prop in p.get("properties",[])) for p in gauge["fieldConfig"]["overrides"]), "reset gauge needs its own single neutral threshold step"
+assert defaults["thresholds"]["steps"][-2:]==[
+    {"color":"yellow","value":0.7}, {"color":"red","value":0.9}]
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -1295,7 +1408,7 @@ PY
 }
 
 @test "agent dispatch dashboard: Landed specs table places Worker model column right after Agent" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 per_spec=next(p for p in panels if p.get("id")==12)

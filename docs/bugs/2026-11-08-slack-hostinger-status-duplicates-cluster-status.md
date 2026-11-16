@@ -2,7 +2,9 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Retiring a redundant, unused `/hostinger-status` Slack slash command where `/cluster-status hostinger` already covers the same checks and more, and the Slack command was already deleted in the Slack UI); Claude proposed P3. Agreed.
+**Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
+**Waiting on:** dispatch — since 2026-11-12
 **Introduced by:** pre-existing (`/hostinger-status` added in v1.7.1, `0c9b2707`; `/cluster-status [provider]` later
 covered the same checks)
 **Should have been caught by:** live check

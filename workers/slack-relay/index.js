@@ -262,10 +262,14 @@ async function handleInteractivity(req, event) {
   }
   event.waitUntil((async () => {
     const kv = approvalsKv()
-    if (!kv) return postResponseUrl(responseUrl, '⚠️ Hermes approvals are not configured on the relay')
-    if (!approverAllowed(userId)) return postResponseUrl(responseUrl, '⛔ You are not authorized to approve Hermes repairs')
+    const decision = action.action_id === 'hermes_approve' ? 'Approve' : 'Deny'
+    if (!kv) return postResponseUrl(responseUrl,
+      `⚠️ Your ${decision} of ${actionId} was NOT recorded: Hermes approvals are not configured on the relay`, true, '', false)
+    if (!approverAllowed(userId)) return postResponseUrl(responseUrl,
+      `⛔ Your ${decision} of ${actionId} was NOT recorded: you are not authorized to approve or deny Hermes repairs`, true, '', false)
     if (!await kv.get(`reauth:${userId}`)) {
-      return postResponseUrl(responseUrl, '🔐 Re-authenticate first: run `/hermes-auth` (valid for 24h)')
+      return postResponseUrl(responseUrl,
+        `🔐 Your ${decision} of ${actionId} was NOT recorded: re-authenticate with /hermes-auth (valid for 24h), then press again`, true, '', false)
     }
     if (action.action_id === 'hermes_approve') {
       await kv.put(`approval:${actionId}`,
@@ -301,10 +305,11 @@ async function relay(endpoint, payload, meta = {}) {
   }
 }
 
-async function postResponseUrl(url, text, ephemeral = true, threadTs = '') {
+async function postResponseUrl(url, text, ephemeral = true, threadTs = '', replaceOriginal) {
   if (!url) return
   const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
   if (threadTs) body.thread_ts = threadTs
+  if (replaceOriginal !== undefined) body.replace_original = replaceOriginal
   await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

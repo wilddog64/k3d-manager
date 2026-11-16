@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Capture Slack config-token rotation behaviour for docs/plans/v1.44.0-hermes-slack-config-sensors.md (capture 4).
+# Token values stay in shell variables and stdin; only key names, ok/error codes and header names are printed.
+set -euo pipefail
+
+APP_ID="${SLACK_APP_ID:-A0B863SCQUV}"
+ACCESS_SERVICE="k3dm-slack-config-token"
+REFRESH_SERVICE="k3dm-slack-config-refresh-token"
+UA="k3dm-hermes/1"
+API="https://slack.com/api"
+MODE="${1:-check}"
+
+hdr="$(mktemp "${TMPDIR:-/tmp}/slack-rotate-hdr.XXXXXX")"
+trap 'rm -f "$hdr"; unset old_a old_r new_a new_r resp resp2' EXIT
+
+kc_read() { security find-generic-password -a k3dm -s "$1" -w 2>/dev/null || true; }
+
+kc_write() {
+  local service="$1" value="$2" hex
+  hex="$(printf '%s' "$value" | xxd -p | tr -d '\n')"
+  printf 'add-generic-password -U -a k3dm -s %s -X %s\n' "$service" "$hex" | security -i >/dev/null 2>&1
+  [[ "$(kc_read "$service")" == "$value" ]]
+}
+
+manifest() {
+  printf '%s' "$1" | sed 's/^/Authorization: Bearer /' \
+    | curl -s -m 10 -A "$UA" -H @- --data-urlencode "app_id=${APP_ID}" "${API}/apps.manifest.export"
+}
+
+rotate() {
+  printf '%s' "$1" | curl -s -m 10 -A "$UA" -D "$hdr" --data-urlencode refresh_token@- "${API}/tooling.tokens.rotate"
+}
+
+summary() { jq -c '{ok, error, keys: (keys), ttl: (if .exp and .iat then .exp - .iat else null end)}'; }
+
+store_pair() {
+  local json="$1" r a
+  r="$(printf '%s' "$json" | jq -j '.refresh_token // empty')"
+  a="$(printf '%s' "$json" | jq -j '.token // empty')"
+  if [[ -z "$r" || -z "$a" ]]; then echo "store: response has no token pair"; return 1; fi
+  if ! kc_write "$REFRESH_SERVICE" "$r"; then echo "store: REFRESH WRITE FAILED"; return 1; fi
+  echo "store: refresh token written and read back"
+  if ! kc_write "$ACCESS_SERVICE" "$a"; then echo "store: ACCESS WRITE FAILED"; return 1; fi
+  echo "store: access token written and read back"
+}
+
+date -u +"run: %Y-%m-%dT%H:%M:%SZ on $(hostname -s), mode ${MODE}"
+old_a="$(kc_read "$ACCESS_SERVICE")"
+old_r="$(kc_read "$REFRESH_SERVICE")"
+echo "stored: access prefix ${old_a:0:5} length ${#old_a}; refresh prefix ${old_r:0:5} length ${#old_r}"
+[[ -n "$old_a" && -n "$old_r" ]] || { echo "missing Keychain item; store both first"; exit 1; }
+
+echo -n "manifest with stored access token: "; manifest "$old_a" | jq -c '{ok, error}'
+[[ "$MODE" == "rotate" ]] || { echo "check only; run with 'rotate' to capture rotation"; exit 0; }
+
+resp="$(rotate "$old_r")"
+echo -n "rotate #1 (stored refresh token): "; printf '%s' "$resp" | summary
+if [[ "$(printf '%s' "$resp" | jq -r '.ok')" != "true" ]]; then
+  echo "rotate rejected; Keychain left unchanged"
+  exit 1
+fi
+store_pair "$resp"
+new_a="$(kc_read "$ACCESS_SERVICE")"
+echo -n "manifest with NEW access token: "; manifest "$new_a" | jq -c '{ok, error}'
+echo -n "manifest with OLD access token: "; manifest "$old_a" | jq -c '{ok, error}'
+echo "rate-limit headers from rotate #1:"; grep -i 'retry-after\|ratelimit' "$hdr" | sed 's/\r$//' || echo "  (none)"
+
+resp2="$(rotate "$old_r")"
+echo -n "rotate #2 (OLD refresh token again): "; printf '%s' "$resp2" | summary
+if [[ "$(printf '%s' "$resp2" | jq -r '.ok')" == "true" ]]; then
+  echo "old refresh token was still valid; storing this newest pair"
+  store_pair "$resp2"
+  new_a="$(kc_read "$ACCESS_SERVICE")"
+  echo -n "manifest with newest access token: "; manifest "$new_a" | jq -c '{ok, error}'
+fi
+echo "done; paste everything above"

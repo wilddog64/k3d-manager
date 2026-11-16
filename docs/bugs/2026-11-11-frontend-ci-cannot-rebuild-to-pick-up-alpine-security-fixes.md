@@ -2,7 +2,7 @@
 
 **Status:** LANDED 2026-11-11 on shopping-cart-frontend `fix/ci-rebuild-alpine-fixes` (`34cfac9`; not yet on main) — found 2026-11-11 by Claude during the operator-approved manual rebuild for CVE-2026-9947 / CVE-2026-87636 (libxslt)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-11
+**Waiting on:** live check — since 2026-11-11
 **Severity:** medium — a fixed Alpine package cannot reach the live frontend without a code commit, so a CVSS 9.6 libxslt fix sits published but unshipped
 **Introduced by:** pre-existing
 **Should have been caught by:** spec

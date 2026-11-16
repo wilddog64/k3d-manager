@@ -1,8 +1,27 @@
 #!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
 
 setup() {
+  export REAL_HOME="$HOME"
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  mkdir -p "$HOME"
   export STUB_BIN="${BATS_TEST_TMPDIR}/bin"
   mkdir -p "${STUB_BIN}"
+  export LAUNCHCTL_LOG="${BATS_TEST_TMPDIR}/launchctl.log"
+  : > "$LAUNCHCTL_LOG"
+  cat >"${STUB_BIN}/launchctl" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$LAUNCHCTL_LOG"
+exit 0
+STUB
+  cat >"${STUB_BIN}/lsof" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+  cat >"${STUB_BIN}/security" <<'STUB'
+#!/usr/bin/env bash
+exit 1
+STUB
   cat >"${STUB_BIN}/kubectl" <<'STUB'
 #!/usr/bin/env bash
 if [[ "$*" == *"get secret cluster-ubuntu-k3s"* ]]; then
@@ -33,6 +52,14 @@ STUB
   export PATH="${STUB_BIN}:${PATH}"
   export CLUSTER_PROVIDER=k3s-aws APP_CONTEXT=ubuntu-k3s INFRA_CONTEXT=k3d-k3d-cluster
   export ARGOCD_NAMESPACE=cicd
+}
+
+@test "cluster-status restore path bootstraps launch agents under the test HOME" {
+  [[ "$(uname -s)" == Darwin ]] || skip "macOS only"
+  run bin/cluster-status
+  [ "$status" -eq 0 ]
+  grep -F "bootstrap gui/" "$LAUNCHCTL_LOG" | grep -F "$HOME/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+  run ! grep -F "$REAL_HOME/Library/LaunchAgents" "$LAUNCHCTL_LOG"
 }
 
 @test "cluster-status reports a present app-cluster registration" {

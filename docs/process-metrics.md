@@ -45,3 +45,52 @@ under the new rule.
 |---|---|---|---|---|---|---|
 | v1.44.0 | | | | | | |
 | v1.45.0 | | | | | | |
+
+## Triage sessions
+
+| Date | Trigger | Bugs triaged | Outcome | Classification agreement | Notes |
+|---|---|---|---|---|---|
+| 2026-11-12 | post-merge `/release-groom` (v1.43.15) | 79 | carry 26, close 6, status corrected 6, out at P3 cap 9, passed over 31 (7 of them v1.43.16 picks, not counted) | Argon on 76: 43 equal, 29 higher, 4 lower; operator kept Claude's P on all 33 | Argon read "degraded with a workaround" as P2 for hygiene and test-only bugs: one systematic difference, not 29 separate ones. 869,027 Argon tokens, uncounted by any dashboard. Claude first computed the P3 cap with Argon's raises standing (17 vs 10) and corrected it before recording. `docs/grooming/2026-11-12.md` |
+
+## Review findings log (side-by-side Fable trial)
+
+Started 2026-11-12 (operator: "we can try to experience this side by side workflow a bit"). Every dispatch diff,
+first run and each correction, gets a Fable review in parallel with Claude's own read, before land. Fable is briefed
+with the diff, spec and related files, never Claude's findings. Claude verifies every finding against the code.
+One row per reviewer per review. **Confirmed** = held up when checked; **Rejected** = wrong or not a defect;
+**Overlap** = also found by the other reviewer; **First-use** = would have failed on the first live run.
+Judged after 2–3 releases.
+
+| Date | Dispatch (run) | Reviewer | Tokens | Findings | Confirmed | Rejected | Overlap | First-use |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-12 | dev-hub-vcluster-b (1) | Fable | 107,610 | 13 | 11 (2 low pending) | 0 | 1 | 3 |
+| 2026-11-12 | dev-hub-vcluster-b (1) | Claude | — | 2 | 2 | 0 | 1 | 1 |
+| 2026-11-12 | dev-hub-vcluster-b (2) | Fable | 135,495 | 5 + 7 low | 5 checked (H1 reproduced by both; M3 read by Claude), rest plausible | 0 | 1 | 2 (M2 teardown advice, M3 silent exit) |
+| 2026-11-12 | dev-hub-vcluster-b (2) | Claude | — | 1 | 1 | 0 | 1 | 0 |
+| 2026-11-12 | dev-hub-vcluster-b (3) | Fable | 132,304 | 5 + 1 unverified | 5 (F1 reproduced by Fable and Claude; F2 read plus Fable mutant; F4 chart templates read by Claude) | 0 | 1 | 4 (protected-branch test can't fail, N4 weak, chart no-op keys, untested BRANCH paths) |
+| 2026-11-12 | dev-hub-vcluster-b (3) | Claude | — | 1 | 1 | 0 | 1 | 0 |
+| 2026-11-12 | dev-hub-vcluster-b (4) | Fable | 110,524 | 6 | 2 verified by Claude (BRANCH test indistinguishable, empty-kubeconfig -f check); 4 read-plausible, sent as low | 0 | 0 | 6 |
+| 2026-11-12 | dev-hub-vcluster-b (4) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+| 2026-11-13 | dev-hub-vcluster-b (5) | Fable | 121,151 | 11 | 4 verified by Claude (no probe on create path, dead inner branch, DRY_RUN fails, N1 too narrow); 7 read-plausible, 5 sent | 0 | 0 | 1 (first `dev-hub-up` may hit an unready proxy, inferred) |
+| 2026-11-13 | dev-hub-vcluster-b (5) | Claude | — | 0 new (6 round-4 fixes re-checked) | 0 | 0 | 0 | 0 |
+| 2026-11-13 | deploy-hub-behind-alert (1) | Fable | 93,816 | 13 | 6 verified by Claude (cap test can't fail, unknown cycle resets for:, lookup_failed unread, except-pass reads none, split outside try, hardcoded origin); 7 sent; 3 deferred (squash ancestry, rollback, SHA length) | 0 | 0 | 2 (silent producer, alert reset) |
+| 2026-11-13 | deploy-hub-behind-alert (1) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+| 2026-11-13 | hermes-slack-config-sensors (0) | Fable | 106,033 | 14 | 4 confirmed by Claude (transient rotate error sets regenerate, pre-lock double rotate, notified set on failed post, N6 test unstubbed); independent verifier also found N8 GREEN, N4 weak, M6 untested — all sent in correction 1 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (0) | Claude | — | 0 new beyond Fable | 0 | 0 | 0 | 0 |
+| 2026-11-13 | dev-hub-vcluster-b (6) | Fable | 92,567 | 6 | 3 shown by mutant/ad hoc test, 1 inferred, 1 nit; all low → captured as P3 `docs/bugs/2026-11-13-dev-hub-b-dry-run-and-untested-probe-paths.md`, not a round 7 | — | — | — | — |
+| 2026-11-13 | dev-hub-vcluster-b (6) | Claude | — | 0 | 0 | 0 | 0 | 0 |
+| 2026-11-13 | dev-hub-vcluster-b (7) | — | — | — | No Fable review: mechanical split of `dev_hub_up` (pre-commit `_agent_audit` if-count gate, never run in six rounds because the worker cannot commit); Claude checked it as a verbatim move | — | — | — | — |
+| 2026-11-13 | deploy-hub-behind-alert (1) r1 review | Fable | 107,373 | 8 + nits | 4 medium, 3 confirmed by Claude (fetch-failure carry-forward, E5 guard untested, is-green rc conflation); sent as correction 2 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (1) | Fable | 129,772 | 10 + nits | 3 medium, 2 confirmed by Claude (N8 guard swallowed by `except Exception`, raw Slack error in data/state); 7 sent in correction 2, 3 accepted as out of scope | — | — | — | — |
+| 2026-11-13 | deploy-hub-behind-alert (2) | Fable | 119,966 | 7 | 0 medium; 3 low (2 test gaps, detached-head stale counts), 1 spec wording, 1 nit, 2 info; spec wording and nit fixed in the plan doc, the rest captured as P3 `docs/bugs/2026-11-13-deploy-hub-behind-alert-r2-test-gaps-and-detached-head.md`, not a round 3 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (2) | Fable | 159,552 | 10 | 2 medium confirmed by Claude (raw refresh token in state.json; `invalid_auth` never rotates), 6 low (4 confirmed by reading), 2 nits; 7 surviving mutants; all sent as correction 3 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (3) | Fable | 127,620 | 13 | 2 medium confirmed by Claude (rotation every poll when the post-rotate manifest fails auth; poll-cycle test runs real ssh to 3 hosts + writes real HOME heartbeat, present since r2 and missed by r2 review), 5 low, 6 nits; all r3 items + mutants confirmed RED; sent as correction 4 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (4) | Fable | 153,838 | 8 | 1 medium confirmed by Claude (subprocess guard matches argv[0] only; child script k3dm-disk-metrics reaches real ssh with 0 hits), 4 low (L3 confirmed: rejected refresh re-submitted hourly), 2 nits; rotation rate measured 1/h at default, 12/h at 60 s floor; sent as correction 5 | — | — | — | — |
+| 2026-11-13 | hermes-slack-config-sensors (5) | Fable | 75,926 | 7 | 0 medium; 4 low + 3 nit captured as P3 docs/bugs/2026-11-13-hermes-slack-config-r5-residual-lows.md; ≤1 rotate/h in every case; 12/12 flag states recover; 16/86 mutants survive | — | — | — | — |
+| 2026-11-13 | dev-hub-helm-wait (2) | Fable | 95,187 | 6 | 1 medium confirmed by Claude (helm history captured with 2>&1, so a stderr warning on success corrupts the parsed JSON; dev_hub.sh:63-64, 85-86); 5 low (empty status passes, M4 max_by mutant survives, weak uninstall-fallback assert, whole-line greps, grafana-side N4/N5 missing); Helm v4.3.1 semantics checked against upstream source, all correct. All 6 sent to Luna as correction 2. |
+| 2026-11-13 | dev-hub-helm-wait (3) | Fable (`claude-fable-5-2`) | 80,583 | 4 | 1 medium test gap reproduced by Claude (2>&1 on the 2nd history call stays 68/68 green); 3 low, 2 sent to Luna, 1 (unbounded stderr in error text) accepted | 0 |
+| 2026-11-13 | parallel-offline-tests-b (1) | Fable (`claude-fable-5-2`) | 102,845 | 11 + 3 Claude-raised confirmed | 2 high (pytest shim fails on this host; kill marker never suppressed) and 3 medium spot-checked by Claude; 12 of 13 sent to Flash; overlap with Claude: BATS_SHELL, pytest chain, unit guard, no parallel kill test | 0 |
+
+Model version (2026-11-13, Claude tokens per day panel and agent transcripts): every Fable row above ran on `claude-fable-5-2` (red series from 2026-11-11). The only `claude-fable-5-1` use was 2026-11-10 (815K tokens, the first Fable run, a read-only review of the v1.54.0 plans), before the trial and with no row. Rows from here on name the resolved model ID.
+
+Quota (operator gauge, 2026-11-13): the two 2026-11-13 Fable reviews (215K tokens together) used 4% of the Fable weekly limit, about 2% per review, so roughly 50 reviews fit in a week. Update (operator gauge, same day): 9% after two more reviews (237K tokens), about 2.3% per review on larger correction diffs; the estimate becomes about 40 reviews a week.

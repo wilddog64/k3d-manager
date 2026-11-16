@@ -3,7 +3,7 @@
 **Status:** LANDED — `d033731a`, 2026-11-07. Exporter reads five_hour and seven_day from the status line cache only and emits k3dm_claude_quota_used_ratio, _resets_at_seconds and _sample_timestamp_seconds; Agent Activity gains Claude weekly, 5h and reading-age panels (ids 113-115). test_dispatch_metrics.py 197 passed and agent_dispatch_dashboard.bats 44/44 in the land run
 **Fix commit:** `d033731a`
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-07
+**Waiting on:** operator decision — since 2026-11-15 (export verified matching after a refresh; publish cadence is event-only, see the 2026-11-15 section)
 Live check (operator): make platform-ops from k3d-manager-v1.43.15; on the machine the exporter runs on, with Claude Code running there, Agent Activity shows Claude weekly and 5h quota matching the status line and a reading age under a few minutes.
 **Severity:** low — the operator can see Claude plan usage only in the Claude Code status line, so whether the $100 Max plan is the right size cannot be judged from the dashboards
 **Approval:** operator, 2026-11-07 ("yes, file a P3 bug and dispatch to Flash 3.8")
@@ -128,3 +128,17 @@ interface:
   - bin/k3dm-dispatch-metrics --claude-usage-cache PATH (Prometheus text output)
   - scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml
 ```
+
+## Live check and finding (operator + Claude, 2026-11-15, M4)
+
+The operator compared Agent Activity (weekly 34%, 5h 20%, **reading age 13.9 hours**) with the status line (5h 20%,
+7d 37%). The panels read the right series (`grafana-dashboard-agent-activity.yaml:620`, `limit="seven_day"`; `:674`
+`five_hour`). The 3% gap is staleness: `bin/k3dm-dispatch-metrics` is the only publisher, and it runs only on dispatch
+events (`bin/k3dm-codex-dispatch:63`, `:423`) and after an OrbStack upgrade (`bin/k3dm-orbstack-upgrade:133`), never
+on a schedule. The status line cache itself was fresh (`/tmp/claude/statusline-usage-cache.json`, written within the
+minute). After `make dispatch-metrics` at 16:42Z, Pushgateway held `seven_day` 0.37 and `five_hour` 0.2, matching the
+status line. The export works; its cadence does not.
+
+**Follow-up (needs operator decision):** publish the quota on a schedule, for example a small M4 LaunchAgent running
+`make dispatch-metrics` (or a quota-only mode) every 10 minutes, so the reading age stays under the 5-hour window it
+measures. It could share the LaunchAgent pattern planned in `docs/plans/argon-bug-classifier.md`.

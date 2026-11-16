@@ -1,8 +1,11 @@
 # Bug: promtool tests fail or skip on every Mac because only CI installs promtool
 
-**Status:** OPEN — child C2 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`; spec written
+**Status:** LANDED (6f7187ab, 42fe44fa, 0a9e053c on k3d-manager-v1.44.0) — child C2 of `docs/bugs/2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`
+**Part A:** done upstream — `_install_promtool` merged in lib-foundation #83 (`5d301c1`), released v0.5.5 (#84) and subtree-pulled here in `5f832339` (Claude, 2026-11-14). Part B (k3d-manager) remains.
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-12 (capture-first triage; nothing dispatched)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only issue where `promtool`-dependent tests fail or skip on local Macs while CI still runs them and runtime behavior is unaffected); Claude proposed P2. Claude's higher P2 stands until the operator decides.
+**Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator. Priority: operator kept Claude's P2 over Argon's P3.
+**Waiting on:** live check — since 2026-11-14 (machine-setup on the M5 and M2; CI run on the pushed head)
 **Introduced by:** `docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md` fix (v1.43.5), which
 installed promtool in the CI `lint` job only
 **Should have been caught by:** spec (the 2026-10-24 fix covered one environment; its 2026-10-30 Recurrence named
@@ -94,6 +97,32 @@ pinned installer (`homebrew-install.linux.pin`), so those lists already reach it
 reimplement Homebrew's upgrades and dependencies tool by tool. Recorded as an idea row if the operator wants it
 groomed.
 
+## Files
+
+Part B only (Part A is done upstream; `_install_promtool` is in the subtree at `scripts/lib/foundation`, loaded by
+`scripts/lib/system.sh`). Added 2026-11-14 by Claude; C1 (`d96547df`) has landed, so the `e2e_observability.bats`
+overlap is gone.
+
+- `bin/k3dm-machine-setup` (new `_install_promtool` step for `control`, `console`, `hub`; not `worker`)
+- `scripts/tests/bin/machine_setup.bats` (the new step runs for the three roles and not for `worker`, `_install_promtool` stubbed)
+- `.github/workflows/ci.yml` (the "Install promtool" step near line 91: source `scripts/lib/system.sh`, call `_install_promtool`, keep appending `$HOME/.local/bin` to `GITHUB_PATH`)
+- `scripts/tests/promtool_helper.py` (new, `resolve_promtool()`)
+- `scripts/tests/promtool.bash` (new, `k3dm_promtool`)
+- `scripts/tests/bin/test_dashboard_queries.py`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/tests/bin/test_orbstack_metrics.py`
+- `scripts/tests/bin/test_vectordb_bug_metrics.py`
+- `scripts/tests/observability/test_kine_compaction_stalled.py`
+- `scripts/tests/observability/test_cve_fix_available_alert.py`
+- `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
+- `scripts/tests/plugins/e2e_observability.bats`
+- `scripts/tests/plugins/grafana_dashboard_appsets.bats`
+- `CHANGELOG.md` (one `### Fixed` bullet)
+- Added 2026-11-14 by Claude after review: `scripts/tests/bin/machine_setup_acceptance.bats` (its complete-host fixture needs a promtool), `scripts/tests/bin/test_promtool_helper.py` (Python resolver contract), `scripts/tests/lib/promtool_helper.bats` (new, bash resolver contract); `.github/workflows/ci.yml` also covers the `alertmanager-behaviour` job, which runs the two `observability/` files.
+
+Acceptance items M1, N1, N3 and E1 were proven by Part A upstream (lib-foundation #83); E2 is Claude's live check.
+The worker proves M2 (machine-setup half; CI half is E5 on the PR), M3, M4, N2, E3 and E4.
+
 ## Contract readers
 
 | Reader | Changes? |
@@ -172,3 +201,11 @@ interface:
 - Part B: E3 and E4 run and pass. E4's red run against the pre-fix files is shown.
 - No `docker` in any changed test file. `git grep -n "entrypoint=promtool" scripts/tests` is empty.
 - The worker does not run the real download (E2) or machine setup on a real host. Those are Claude's.
+
+## Landed 2026-11-14
+
+- Part B landed as `6f7187ab` (Claude), pushed, `offline_tested` marked. `--test` (7 pytest files, 6 bats suites, real promtool 3.1.0): 0 failures. The fast gate was skipped with `K3DM_SKIP_FAST_GATE=1` after two refusals, both outside the fix:
+  1. m4-air had no promtool. Claude installed the pinned 3.1.0 into `~/.local/bin` with `_install_promtool` under `/bin/bash` 3.2 (sha256 verified), which also exercises lib-foundation v0.5.6.
+  2. N3 misparsed land's run directory, which contains this slug (`docs/bugs/2026-11-14-machine-setup-acceptance-n3-misparses-install-in-path.md`). Fixed in `42fe44fa`.
+- The pre-push fast gate then failed on `test_kine_compaction_stalled.py::test_notification_reaches_platform_warning_only`: the suite reuses the notify suite's Alertmanager fixture via `__wrapped__` but not its autouse `require_docker` skip, so under the tripwire (`docker` blocked, 97) it errored. Pre-existing; Part B only made the file touched. Fixed in `0a9e053c` (skip on `notify.docker_reason()`): under the tripwire 1 passed, 1 skipped; with real Docker 2 passed.
+- Remaining live: E2 (real download) on the M5 and M2 via `make machine-setup`, and CI green on the pushed head.

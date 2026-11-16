@@ -1785,8 +1785,8 @@ data:
         {
           "id": 103,
           "type": "stat",
-          "title": "Stalled tasks",
-          "description": "Self-reported and advisory. Tasks with stall state open.",
+          "title": "Repeated failed attempts",
+          "description": "Tasks whose last two or more finished attempts were unsuccessful. A run that hangs without exiting shows under Stall recovery.",
           "gridPos": {
             "h": 6,
             "w": 6,
@@ -2151,6 +2151,492 @@ data:
             "showHeader": true,
             "sortBy": []
           }
+        },
+        {
+          "id": 123,
+          "type": "stat",
+          "title": "Unreported coordinator share",
+          "description": "Share of start events in the selected range whose coordinator identity was unreported.",
+          "gridPos": {"h": 6, "w": 3, "x": 21, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_coordinator_unreported_share{window=\"$window\"}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.2}]}}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "none", "justifyMode": "auto"}
+        },
+        {
+          "id": 124,
+          "type": "row",
+          "title": "Stall recovery",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 82
+          },
+          "panels": [
+            {
+              "id": 125,
+              "type": "stat",
+              "title": "Hangs detected",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 0,
+                "y": 83
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum(k3dm_dispatch_stall_incidents{window=\"$window\"}) or vector(0)",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+              }
+            },
+            {
+              "id": 126,
+              "type": "stat",
+              "title": "Median silence before detection",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 6,
+                "y": 83
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "max(k3dm_dispatch_stall_silent_seconds_median{window=\"$window\"} / 60) or vector(0)",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "m",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+              }
+            },
+            {
+              "id": 127,
+              "type": "bargauge",
+              "title": "Diagnoses by result",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 12,
+                "y": 83
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (status) (k3dm_dispatch_stall_diagnoses{window=\"$window\"})",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none"
+                },
+                "overrides": []
+              },
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                }
+              }
+            },
+            {
+              "id": 128,
+              "type": "stat",
+              "title": "Diagnosis spend, all releases",
+              "description": "Paid from the $100 API credit, which expires 2026-12-08.",
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 83
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "max(k3dm_dispatch_stall_diagnosis_cost_usd_all_versions) or vector(0)",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "currencyUSD",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 50
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+              }
+            },
+            {
+              "id": 129,
+              "type": "bargauge",
+              "title": "Operator decisions",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 91
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (decision) (k3dm_dispatch_stall_decisions{window=\"$window\"})",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none"
+                },
+                "overrides": []
+              },
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                }
+              }
+            },
+            {
+              "id": 130,
+              "type": "stat",
+              "title": "Median minutes to decide",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 12,
+                "y": 91
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "max(k3dm_dispatch_stall_decision_minutes_median{window=\"$window\"}) or vector(0)",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "m",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+              }
+            },
+            {
+              "id": 131,
+              "type": "bargauge",
+              "title": "After resume",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 91
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (outcome) (k3dm_dispatch_stall_outcomes{window=\"$window\"})",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none"
+                },
+                "overrides": []
+              },
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                }
+              }
+            },
+            {
+              "id": 132,
+              "type": "stat",
+              "title": "Clean approvals (phase 2 gate)",
+              "description": "Claude's correction approved unchanged and landed with no further correction. Auto-resume is considered only after several.",
+              "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 99
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum(k3dm_dispatch_stall_clean_approvals{window=\"$window\"}) or vector(0)",
+                  "instant": true
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+              }
+            },
+            {
+              "id": 133,
+              "type": "table",
+              "title": "Incidents",
+              "description": "",
+              "gridPos": {
+                "h": 8,
+                "w": 16,
+                "x": 8,
+                "y": 99
+              },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "max by (slug,stall,reason,diagnosis,decision,outcome) (k3dm_dispatch_task_stall_incident{window=\"$window\"}) / 60",
+                  "instant": true,
+                  "format": "table"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "m"
+                },
+                "overrides": []
+              },
+              "options": {
+                "showHeader": true,
+                "footer": {
+                  "show": false,
+                  "reducer": [
+                    "sum"
+                  ],
+                  "fields": ""
+                },
+                "sortBy": []
+              },
+              "transformations": [
+                {
+                  "id": "organize",
+                  "options": {
+                    "excludeByName": {
+                      "Time": true,
+                      "__name__": true
+                    },
+                    "renameByName": {
+                      "slug": "slug",
+                      "stall": "stall",
+                      "reason": "reason",
+                      "Value": "silent minutes",
+                      "diagnosis": "diagnosis",
+                      "decision": "decision",
+                      "outcome": "outcome"
+                    },
+                    "indexByName": {
+                      "slug": 0,
+                      "stall": 1,
+                      "reason": 2,
+                      "Value": 3,
+                      "diagnosis": 4,
+                      "decision": 5,
+                      "outcome": 6
+                    }
+                  }
+                }
+              ]
+            }
+          ]
         }
       ]
     }

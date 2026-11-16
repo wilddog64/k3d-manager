@@ -4,7 +4,9 @@
 **Filed:** 2026-09-16 by k3dm-hermes
 **Status:** OPEN — all fixes merged; only the live Tier 1 rerun remains (triage 2026-10-09)
 **Priority:** P3 — test-substrate only; production payment is healthy
-**Waiting on:** live check
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (All code and test fixes are already merged; only a live Tier 1 e2e verification rerun and doc closure remain); Claude proposed P3. Agreed.
+**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
+**Waiting on:** live check — since 2026-11-12
 **Previous status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); option (b) IMPLEMENTED on feature branches (payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager substrate), pending PRs, image pins and a live Tier 1 run. Health fix (substrate broker + `spring.rabbitmq`) IMPLEMENTED: payment `9778e21` + k3d-manager substrate.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`

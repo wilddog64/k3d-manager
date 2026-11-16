@@ -1,5 +1,6 @@
 # Bug: secret.yaml placeholder causes perpetual ESO-ArgoCD OutOfSync loop
 
+**Status:** LANDED — `secret.yaml` is gone from product-catalog `k8s/base/kustomization.yaml` on `main` (checked 2026-10-10)
 **Date:** 2026-05-24
 **File:** `shopping-cart-product-catalog/k8s/base/kustomization.yaml`
 **Branch:** `docs/next-improvements` (shopping-cart-product-catalog)
