@@ -9,7 +9,7 @@ setup() {
   mkdir -p "$SCRATCH/bin" "$SCRATCH/home/.config/k3d-manager" "$SCRATCH/state"
   printf 'worker\n' > "$SCRATCH/home/.config/k3d-manager/machine-role"
   export HOME="$SCRATCH/home" XDG_CONFIG_HOME="$SCRATCH/home/.config"
-  unset PUSHGATEWAY_URL
+  unset PUSHGATEWAY_URL K3DM_HUB_HOST K3DM_REPO_SYNC_HOSTNAME
   export K3DM_REPO_SYNC_STATE_DIR="$SCRATCH/state" K3DM_REPO_SYNC_TIMEOUT=3
   export K3DM_REPO_SYNC_REPOS="$SCRATCH/clone"
   REAL_GIT="$(command -v git)"
@@ -139,6 +139,8 @@ prepare_hub_checkout() {
   cp "$PROJECT_ROOT/scripts/etc/machine/deploy-paths.tsv" "$HUB_ROOT/scripts/etc/machine/deploy-paths.tsv"
   chmod +x "$HUB_ROOT/bin/k3dm-repo-sync"
   printf 'hub\n' > "$XDG_CONFIG_HOME/k3d-manager/machine-role"
+  K3DM_HUB_HOST="$(hostname | cut -d. -f1)"
+  export K3DM_HUB_HOST
   export K3DM_REPO_SYNC_REPOS="$HUB_ROOT"
   assert_scratch_repo "$K3DM_REPO_SYNC_REPOS"
 }
@@ -257,6 +259,58 @@ run_sync() {
   grep -q 'k3dm_repo_sync_behind_commits{repo="k3d-manager"}' "$CURL_BODY"
   grep -q 'k3dm_repo_sync_last_success_timestamp_seconds{repo="k3d-manager"}' "$CURL_BODY"
   grep -q 'k3dm_repo_sync_result{repo="k3d-manager",result="current"} 1' "$CURL_BODY"
+}
+
+@test "hub role on non-hub host skips Pushgateway update and warns" {
+  install_stubs
+  prepare_hub_checkout
+  [ "$(command -v curl)" = "$SCRATCH/stubs/curl" ]
+  [ "$(< "$XDG_CONFIG_HOME/k3d-manager/machine-role")" = "hub" ]
+
+  export PUSHGATEWAY_URL=http://127.0.0.1:9
+  export K3DM_REPO_SYNC_HOSTNAME=m4-air
+  unset K3DM_HUB_HOST
+  [ -z "${K3DM_HUB_HOST:-}" ]
+
+  run_sync "$HUB_ROOT"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CURL_LOG" ]
+  [ ! -s "$CURL_CALLS" ]
+  [[ "$output" == *"WARNING: this host (m4-air) is not the hub host (m5-air); skipping Pushgateway update"* ]]
+  [ -s "$SCRATCH/state/state.json" ]
+}
+
+@test "hub role on hub host pushes Pushgateway metrics when host matches hub" {
+  install_stubs
+  prepare_hub_checkout
+  [ "$(command -v curl)" = "$SCRATCH/stubs/curl" ]
+  [ "$(< "$XDG_CONFIG_HOME/k3d-manager/machine-role")" = "hub" ]
+
+  # M2: K3DM_REPO_SYNC_HOSTNAME=m5-air, K3DM_HUB_HOST unset -> push to .../instance/m5-air
+  export PUSHGATEWAY_URL=http://127.0.0.1:9
+  export K3DM_REPO_SYNC_HOSTNAME=m5-air
+  unset K3DM_HUB_HOST
+  [ -z "${K3DM_HUB_HOST:-}" ]
+
+  run_sync "$HUB_ROOT"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$CURL_CALLS" | tr -d ' ')" -eq 1 ]
+  grep -q -- '-X PUT' "$CURL_LOG"
+  grep -Fq 'http://127.0.0.1:9/metrics/job/k3dm_repo_sync/instance/m5-air' "$CURL_LOG"
+  [[ "$output" != *"skipping Pushgateway update"* ]]
+
+  # M3: K3DM_HUB_HOST=M4-Air.local and K3DM_REPO_SYNC_HOSTNAME=m4-air -> push happens (case-insensitive, domain ignored)
+  : > "$CURL_LOG"
+  : > "$CURL_CALLS"
+  export K3DM_REPO_SYNC_HOSTNAME=m4-air
+  export K3DM_HUB_HOST=M4-Air.local
+
+  run_sync "$HUB_ROOT"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$CURL_CALLS" | tr -d ' ')" -eq 1 ]
+  grep -q -- '-X PUT' "$CURL_LOG"
+  grep -Fq 'http://127.0.0.1:9/metrics/job/k3dm_repo_sync/instance/m4-air' "$CURL_LOG"
+  [[ "$output" != *"skipping Pushgateway update"* ]]
 }
 
 @test "hub skips Pushgateway when URL is unset or empty" {
