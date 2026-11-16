@@ -18,12 +18,34 @@ GH_REPO="${GH_REPO:-wilddog64/k3d-manager}"
 die() { printf '[hub-promote] ERROR: %s\n' "$*" >&2; exit 1; }
 git_cmd() { _run_command --soft -- git -C "$REPO_ROOT" "$@"; }
 
+merged_pr_contains() {
+  local target="$1" old="$2" rows number head merge remote_head
+  rows="$(_run_command --soft -- gh api --paginate "repos/$GH_REPO/commits/$old/pulls" --jq '.[] | select(.merged_at != null) | [.number,.head.sha,.merge_commit_sha] | @tsv')" || return 1
+  while IFS=$'\t' read -r number head merge; do
+    [[ "$number" =~ ^[0-9]+$ && "$head" =~ ^[0-9a-f]{40,64}$ && "$merge" =~ ^[0-9a-f]{40,64}$ ]] || continue
+    remote_head="$(git_cmd ls-remote "$REMOTE" "refs/pull/$number/head")" || continue
+    [[ "${remote_head%%$'\t'*}" == "$head" ]] || continue
+    git_cmd cat-file -e "$head^{commit}" 2>/dev/null || git_cmd fetch --no-tags "$REMOTE" "refs/pull/$number/head" >/dev/null 2>&1 || continue
+    git_cmd cat-file -e "$merge^{commit}" 2>/dev/null || continue
+    git_cmd merge-base --is-ancestor "$old" "$head" || continue
+    git_cmd merge-base --is-ancestor "$merge" "$target" || continue
+    printf '%s\n' "$number"
+    return 0
+  done <<< "$rows"
+  return 1
+}
+
 uncontained_commits() {
-  local target="$1" old="$2"
+  local target="$1" old="$2" list pr
   if [[ "$old" =~ ^0+$ || -z "$target" || -z "$old" ]]; then
     return 0
   fi
-  git_cmd cherry "$target" "$old" | awk '$1 == "+" {print $2}'
+  list="$(git_cmd cherry "$target" "$old" | awk '$1 == "+" {print $2}')" || return 1
+  if [[ -n "$list" ]] && pr="$(merged_pr_contains "$target" "$old")"; then
+    printf '[hub-promote] note: deploy/hub %s is contained in merged PR #%s whose merge commit is in %s (squash merge); not treating its commits as uncontained\n' "$old" "$pr" "$target" >&2
+    return 0
+  fi
+  [[ -z "$list" ]] || printf '%s\n' "$list"
 }
 
 print_uncontained_list() {
@@ -117,7 +139,7 @@ show_and_confirm() {
 }
 
 record_move() {
-  local old="$1" new="$2" action="$3" ref="${4:-}" break_glass="${5:-0}" stamp tag message existing push_output push_log
+  local old="$1" new="$2" action="$3" ref="${4:-}" break_glass="${5:-0}" skip_checks="${6:-0}" stamp tag message existing push_output push_log
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   tag="$TAG_PREFIX$stamp"
   existing="$(git_cmd ls-remote --tags "$REMOTE" "refs/tags/$tag")"
@@ -126,6 +148,10 @@ record_move() {
   [[ -z "$existing" ]] || die "local promotion tag $tag already exists; retry after the next UTC second"
   printf -v message 'action: %s\nold: %s\nnew: %s\nREF: %s' "$action" "$old" "$new" "${ref:-$new}"
   [[ "$break_glass" != 1 ]] || message+=$'\nmode: break-glass'
+  if [[ "$skip_checks" == 1 ]]; then
+    message+=$'\nmode: skip-check-runs'
+    message+=$'\nreason: '"$SKIP_CHECK_RUNS_REASON"
+  fi
   if [[ "$action" == rollback ]]; then message+=$'\nrollback: yes'; fi
   local lease="refs/heads/$BRANCH:$old"
   [[ ! "$old" =~ ^0+$ ]] || lease="refs/heads/$BRANCH:"
@@ -258,7 +284,7 @@ rollback() {
 }
 
 main() {
-  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] | rollback [BREAK_GLASS=1] | status'
+  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1] | rollback [BREAK_GLASS=1] | status | is-contained TARGET OLD'
   case "$1" in
     is-green)
       [[ $# == 2 && -n "$2" ]] || die 'usage: k3dm-hub-promote is-green <sha>'
@@ -269,6 +295,14 @@ main() {
         *) exit 2 ;;
       esac
       ;;
+    is-contained)
+      [[ $# == 3 && -n "$2" && -n "$3" ]] || exit 2
+      local target old contained
+      target="$(git_cmd rev-parse --verify "$2^{commit}" 2>/dev/null)" || exit 2
+      old="$(git_cmd rev-parse --verify "$3^{commit}" 2>/dev/null)" || exit 2
+      contained="$(uncontained_commits "$target" "$old")" || exit 2
+      [[ -z "$contained" ]] || exit 1
+      ;;
     status) [[ $# == 1 ]] || die 'status takes no arguments'; status ;;
     rollback)
       [[ $# -ge 1 && $# -le 2 ]] || die 'usage: k3dm-hub-promote rollback [BREAK_GLASS=1]'
@@ -277,9 +311,13 @@ main() {
       rollback "$break_glass"
       ;;
     promote)
-      [[ $# -ge 2 && $# -le 3 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1]'
-      local ref="$2" break_glass="${3:-${BREAK_GLASS:-0}}" old new
+      [[ $# -ge 2 && $# -le 4 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1]'
+      local ref="$2" break_glass="${3:-${BREAK_GLASS:-0}}" skip_checks="${4:-${SKIP_CHECK_RUNS:-0}}" old new
       [[ "$break_glass" == 0 || "$break_glass" == 1 ]] || die 'BREAK_GLASS must be 0 or 1'
+      [[ "$skip_checks" == 0 || "$skip_checks" == 1 ]] || die 'SKIP_CHECK_RUNS must be 0 or 1'
+      if [[ "$skip_checks" == 1 ]]; then
+        [[ -n "${SKIP_CHECK_RUNS_REASON:-}" && "$SKIP_CHECK_RUNS_REASON" != *$'\n'* && "$SKIP_CHECK_RUNS_REASON" =~ [^[:space:]] ]] || die 'SKIP_CHECK_RUNS=1 needs SKIP_CHECK_RUNS_REASON="<why>" (one line)'
+      fi
       git_cmd fetch "$REMOTE" --prune
       new="$(resolve_on_origin "$ref")"
       old="$(remote_sha 1)"
@@ -302,9 +340,13 @@ main() {
           exit 1
         fi
       fi
-      if [[ "$break_glass" != 1 ]]; then check_runs "$new"; fi
+      if [[ "$skip_checks" == 1 ]]; then
+        printf '[hub-promote] WARNING: check-run gate skipped for %s: %s\n' "$new" "$SKIP_CHECK_RUNS_REASON" >&2
+      else
+        check_runs "$new"
+      fi
       show_and_confirm "$old" "$new" promote "$ref"
-      record_move "$old" "$new" promote "$ref" "$break_glass"
+      record_move "$old" "$new" promote "$ref" "$break_glass" "$skip_checks"
       printf '[hub-promote] next: make appsets-check, then make platform-ops\n'
       ;;
     *) die "unknown action '$1'" ;;

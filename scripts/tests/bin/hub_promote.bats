@@ -75,10 +75,18 @@ if [[ "${MOVE_ON_LS_REMOTE:-0}" == 1 && ! -e "$MOVE_ONCE_FILE" && "$*" == *"ls-r
 fi
 exec "$REAL_GIT_PATH" "$@"
 EOF
+  export PULLS_JSON="$BATS_TEST_TMPDIR/pulls.json"
+  printf '[]\n' > "$PULLS_JSON"
   cat > "$BATS_TEST_TMPDIR/stubs/gh" <<'EOF'
 #!/usr/bin/env bash
 # Read-only capture: m4-air.local, 2026-11-07 20:28:49 UTC:
 # gh api repos/.../check-runs => {"total_count":0,"check_runs":[]}.
+# Read-only capture: m4-air.local, 2026-11-16, gh 2.104.0: `gh api repos/wilddog64/k3d-manager/commits/9f5f0d89/pulls` returned PR objects with number, state, merged_at, merge_commit_sha, head.sha; this stub keeps those fields.
+if [[ "$1" == api && "$2" == --paginate && "$3" == repos/wilddog64/k3d-manager/commits/*/pulls && "$4" == --jq ]]; then
+  [[ "${PULLS_FAIL:-0}" != 1 ]] || exit 1
+  jq -r "$5" "$PULLS_JSON"
+  exit
+fi
 [[ "$1" == api && "$2" == --paginate && "$3" == repos/wilddog64/k3d-manager/commits/*/check-runs && "$4" == --jq && "$5" == '.check_runs[]' ]] || exit 97
 if [[ "${GH_STUB_MODE:-empty}" == lookup-fail ]]; then
   exit 1
@@ -483,11 +491,17 @@ REF: $promoted"
   [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
 }
 
-@test "H4: break glass skips only checks and still needs confirmation and records mode" {
+@test "H4 E5: break glass still requires green checks" {
   _make_candidate
-  _run_promoter_tty promote empty promote k3d-manager-v1.43.15 1
+  hub_before="$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)"
+  for mode in empty pending failed lookup-fail; do
+    _run_promoter_tty promote "$mode" promote k3d-manager-v1.43.15 1
+    [ "$status" -ne 0 ]
+    [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$hub_before" ]
+    [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+  done
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 1
   [ "$status" -eq 0 ]
-  [[ "$output" == *"moved deploy/hub"* ]]
   tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}')"
   git -C "$WORK" fetch -q origin "$tag_ref"
   [[ "$(git -C "$WORK" cat-file -p FETCH_HEAD)" == *"mode: break-glass"* ]]
@@ -772,7 +786,7 @@ rollback: yes"
 
 @test "Makefile hub-promote passes REF and break-glass to the command" {
   _make_candidate
-  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=empty make -C "$WORK" --no-print-directory hub-promote REF=HEAD BREAK_GLASS=1 < /dev/null
+  run env HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" PATH="$PATH" GH_STUB_MODE=success make -C "$WORK" --no-print-directory hub-promote REF=HEAD BREAK_GLASS=1 < /dev/null
   [ "$status" -ne 0 ]
   [[ "$output" == *"action: promote"* ]]
   [[ "$output" == *"REF: HEAD"* ]]
@@ -980,4 +994,211 @@ _prepare_kept_pin_promotion() {
   [[ "$output" == *"uncontained commits on deploy/hub"* ]]
   [[ "$output" == *"$promoter_short"* ]]
   [[ "$output" == *"carry them over: git cherry-pick -x"* ]]
+}
+
+_make_squash_release() {
+  [ "$(cd "$(git -C "$WORK" remote get-url origin)" && pwd -P)" = "$ORIGIN" ]
+  git -C "$WORK" checkout -qb rel-old k3d-manager-v1.43.15
+  printf '1\n' > "$WORK/f1.txt"
+  git -C "$WORK" add f1.txt
+  git -C "$WORK" commit -qm c1
+  printf 'c2\n' > "$WORK/f2.txt"
+  git -C "$WORK" add f2.txt
+  git -C "$WORK" commit -qm c2
+  OLD_SHA="$(git -C "$WORK" rev-parse HEAD)"
+  git -C "$WORK" push -q origin HEAD:refs/heads/deploy/hub
+  printf '2\n' > "$WORK/f1.txt"
+  git -C "$WORK" commit -qam c3
+  HEAD_SHA="$(git -C "$WORK" rev-parse HEAD)"
+  git -C "$WORK" push -q origin "$HEAD_SHA:refs/pull/160/head"
+  git -C "$WORK" checkout -q k3d-manager-v1.43.15
+  git -C "$WORK" merge --squash rel-old >/dev/null
+  git -C "$WORK" commit -qm squash
+  MERGE_SHA="$(git -C "$WORK" rev-parse HEAD)"
+  printf 'candidate\n' > "$WORK/candidate.txt"
+  git -C "$WORK" add candidate.txt
+  git -C "$WORK" commit -qm candidate
+  NEW_SHA="$(git -C "$WORK" rev-parse HEAD)"
+  git -C "$WORK" push -q origin HEAD:refs/heads/k3d-manager-v1.43.15
+  jq -n --arg h "$HEAD_SHA" --arg m "$MERGE_SHA" '[{number:160,state:"closed",merged_at:"2026-11-16T00:00:00Z",merge_commit_sha:$m,head:{sha:$h}}]' > "$PULLS_JSON"
+  [[ "$(git -C "$WORK" cherry "$NEW_SHA" "$OLD_SHA")" == *+* ]]
+  run ! git -C "$WORK" merge-base --is-ancestor "$OLD_SHA" "$NEW_SHA"
+  git -C "$WORK" merge-base --is-ancestor "$OLD_SHA" "$HEAD_SHA"
+  git -C "$WORK" merge-base --is-ancestor "$MERGE_SHA" "$NEW_SHA"
+  run ! git -C "$WORK" merge-tree --write-tree "$NEW_SHA" "$OLD_SHA" >/dev/null 2>&1
+}
+
+@test "E1: squash PR permits promotion" {
+  _make_squash_release
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"merged PR #160"* ]]
+  [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$NEW_SHA" ]
+  tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}')"
+  [ -n "$tag_ref" ]
+  git -C "$WORK" fetch -q origin "$tag_ref"
+  [[ "$(git -C "$WORK" cat-file -p FETCH_HEAD)" != *"mode: break-glass"* ]]
+}
+
+@test "E2: status recognises squash PR" {
+  _make_squash_release
+  run env RELEASE_BRANCH=k3d-manager-v1.43.15 "$WORK/bin/k3dm-hub-promote" status
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"uncontained commits on deploy/hub"* ]]
+}
+
+@test "R1: promoter tip is not contained" {
+  _make_squash_release
+  _create_promoter_commit_on_hub
+  run ! git -C "$WORK" cat-file -e "$NEW_SHA:cve-pin.txt" 2>/dev/null
+  printf '[]\n' > "$PULLS_JSON"
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not in"* && "$output" == *"$(git -C "$WORK" rev-parse --short "$PROMOTER_SHA")"* ]]
+  [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$PROMOTER_SHA" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
+@test "R2: merge commit outside target refuses" {
+  _make_squash_release
+  run ! git -C "$WORK" merge-base --is-ancestor "$HEAD_SHA" "$NEW_SHA"
+  jq --arg h "$HEAD_SHA" '.[0].merge_commit_sha=$h' "$PULLS_JSON" > "$PULLS_JSON.tmp"
+  mv "$PULLS_JSON.tmp" "$PULLS_JSON"
+  _assert_squash_refused
+}
+
+@test "R3: mismatched remote PR head refuses" {
+  _make_squash_release
+  git -C "$ORIGIN" update-ref refs/pull/160/head "$OLD_SHA"
+  _assert_squash_refused
+}
+
+@test "R4: unmerged PR refuses" {
+  _make_squash_release
+  jq '.[0].merged_at=null' "$PULLS_JSON" > "$PULLS_JSON.tmp"
+  mv "$PULLS_JSON.tmp" "$PULLS_JSON"
+  _assert_squash_refused
+}
+
+@test "R5: failed PR lookup refuses" {
+  _make_squash_release
+  export PULLS_FAIL=1
+  _assert_squash_refused
+}
+
+@test "R6: PR head without old refuses" {
+  _make_squash_release
+  head="$(git -C "$WORK" rev-parse "$OLD_SHA^" )"
+  run ! git -C "$WORK" merge-base --is-ancestor "$OLD_SHA" "$head"
+  jq --arg h "$head" '.[0].head.sha=$h' "$PULLS_JSON" > "$PULLS_JSON.tmp"
+  mv "$PULLS_JSON.tmp" "$PULLS_JSON"
+  git -C "$ORIGIN" update-ref refs/pull/160/head "$head"
+  _assert_squash_refused
+}
+
+_assert_squash_refused() {
+  _run_promoter_tty promote success promote k3d-manager-v1.43.15 0
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not in"* ]]
+  [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$OLD_SHA" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
+@test "E7: is-contained recognises squash and rejects bad input and promoter" {
+  _make_squash_release
+  run "$WORK/bin/k3dm-hub-promote" is-contained "$NEW_SHA" "$OLD_SHA"
+  [ "$status" -eq 0 ]
+  _create_promoter_commit_on_hub
+  printf '[]\n' > "$PULLS_JSON"
+  run "$WORK/bin/k3dm-hub-promote" is-contained "$NEW_SHA" "$PROMOTER_SHA"
+  [ "$status" -eq 1 ]
+  run "$WORK/bin/k3dm-hub-promote" is-contained "$NEW_SHA"
+  [ "$status" -eq 2 ]
+  run "$WORK/bin/k3dm-hub-promote" is-contained "$NEW_SHA" bad-sha
+  [ "$status" -eq 2 ]
+}
+
+@test "E8: skip checks requires reason and preserves containment and confirmation" {
+  _make_candidate
+  hub_before="$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)"
+  for reason in '' '   ' $'two\nlines'; do
+    export SKIP_CHECK_RUNS_REASON="$reason"
+    _run_promoter_tty promote lookup-fail promote k3d-manager-v1.43.15 0 1
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"needs SKIP_CHECK_RUNS_REASON"* ]]
+    [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$hub_before" ]
+    [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+  done
+  unset SKIP_CHECK_RUNS_REASON
+  _run_promoter_tty promote lookup-fail promote k3d-manager-v1.43.15 0 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"needs SKIP_CHECK_RUNS_REASON"* ]]
+  [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$hub_before" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+  export SKIP_CHECK_RUNS_REASON='GitHub outage'
+  run env GH_STUB_MODE=lookup-fail "$WORK/bin/k3dm-hub-promote" promote k3d-manager-v1.43.15 0 1 < /dev/null
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"confirmation requires a TTY"* ]]
+  _run_promoter_tty promote lookup-fail promote k3d-manager-v1.43.15 0 1
+  [ "$status" -eq 0 ]
+  tag_ref="$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*' | awk '$2 !~ /\^\{\}$/ {print $2}')"
+  git -C "$WORK" fetch -q origin "$tag_ref"
+  tag_data="$(git -C "$WORK" cat-file -p FETCH_HEAD)"
+  [[ "$tag_data" == *"mode: skip-check-runs"* && "$tag_data" == *"reason: GitHub outage"* ]]
+}
+
+@test "E8: skip checks cannot bypass uncontained commit" {
+  _make_candidate
+  _create_promoter_commit_on_hub
+  export SKIP_CHECK_RUNS_REASON='GitHub outage'
+  _run_promoter_tty promote lookup-fail promote k3d-manager-v1.43.15 0 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not in"* ]]
+  [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$PROMOTER_SHA" ]
+  [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+}
+
+@test "E8: make passes both flags" {
+  root="$BATS_TEST_TMPDIR/make-fixture"
+  mkdir -p "$root/bin"
+  root="$(cd "$root" && pwd -P)"
+  cp "$REPO/Makefile" "$root/Makefile"
+  export MAKE_RECORD="$root/record"
+  cat > "$root/bin/k3dm-hub-promote" <<'STUB'
+#!/usr/bin/env bash
+[[ "$PWD/bin/k3dm-hub-promote" == "$MAKE_FIXTURE_ROOT/bin/k3dm-hub-promote" ]] || exit 98
+printf '%s\n' "$@" "${SKIP_CHECK_RUNS_REASON:-}" > "$MAKE_RECORD"
+STUB
+  chmod +x "$root/bin/k3dm-hub-promote"
+  export MAKE_FIXTURE_ROOT="$root"
+  [[ "$root" == "$(cd "$BATS_TEST_TMPDIR" && pwd -P)/"* && -x "$root/bin/k3dm-hub-promote" ]]
+  run make --no-print-directory -C "$root" hub-promote REF=x BREAK_GLASS=1 SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON='gh outage'
+  if [ "$status" -ne 0 ]; then printf '%s\n' "$output" >&3; fi
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MAKE_RECORD")" = $'promote\nx\n1\n1\ngh outage' ]
+}
+
+@test "E4 E8: bypass flags still require origin reachability and confirmation" {
+  _make_candidate
+  printf 'local only\n' > "$WORK/local-only.txt"
+  git -C "$WORK" add local-only.txt
+  git -C "$WORK" commit -qm 'local only'
+  local_sha="$(git -C "$WORK" rev-parse HEAD)"
+  hub_before="$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)"
+  export SKIP_CHECK_RUNS_REASON='GitHub outage'
+  for flags in '1 0' '0 1'; do
+    read -r break_flag skip_flag <<< "$flags"
+    _run_promoter_tty promote success promote "$local_sha" "$break_flag" "$skip_flag"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not reachable from an origin branch"* ]]
+    [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$hub_before" ]
+    [ -z "$(git -C "$WORK" ls-remote --tags origin 'refs/tags/hub-promote/*')" ]
+  done
+  for flags in '1 0' '0 1'; do
+    read -r break_flag skip_flag <<< "$flags"
+    run env GH_STUB_MODE=success "$WORK/bin/k3dm-hub-promote" promote refs/remotes/origin/k3d-manager-v1.43.15 "$break_flag" "$skip_flag" < /dev/null
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"confirmation requires a TTY"* ]]
+    [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$hub_before" ]
+  done
 }

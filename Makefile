@@ -475,7 +475,7 @@ appsets-check:
 
 ## Promote an origin commit to the live hub after checks and typed confirmation
 hub-promote:
-	@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}"
+	@bin/k3dm-hub-promote promote "$${REF:-}" "$${BREAK_GLASS:-0}" "$${SKIP_CHECK_RUNS:-0}"
 
 ## Promote REF and reconcile the hub, verifying the exporter rollout
 hub-deploy:
@@ -2312,7 +2312,7 @@ help:
 	@echo "    make sync-main             Revert services-git to main and refresh"
 	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
 	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
-	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 optional)"
+	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 or SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=... optional)"
 	@echo "    make hub-deploy REF=...    Promote, reconcile and verify the hub (typed confirmation required)"
 	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
 	@echo "    make hub-rollback          Return deploy/hub to the state before the last promotion"
