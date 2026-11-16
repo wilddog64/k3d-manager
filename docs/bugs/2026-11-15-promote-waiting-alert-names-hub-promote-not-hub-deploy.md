@@ -1,11 +1,12 @@
 # Bug: K3dmPromoteWaiting tells the operator to run `make hub-promote` instead of `make hub-deploy`
 
-**Status:** LANDED — description changed to `make hub-deploy` on k3d-manager-v1.44.0, 2026-11-15 (Copilot raised it on PR #161); live once promoted to deploy/hub
+**Status:** LIVE-VERIFIED — fix 9919a452 promoted to deploy/hub 50a42198 (2026-11-16); hub PrometheusRule reads `Run: make hub-deploy REF={{ $labels.sha }}` (Copilot raised it on PR #161)
 **Priority:** P3 (the named command works but only moves the ref; the follow-up steps then raise `K3dmDeployPending`)
 **Introduced by:** v1.44.0 plan `hub-deploy-one-command` (landed without the string change the behind-alert plan assigned to it); alert added in c763e239
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** live check
+**Fix commit:** 9919a452
+**Live evidence:** 2026-11-16 · run operator-m5-kubectl-get-prometheusrules · env hub/k3d-k3d-cluster-deploy-hub-50a42198 · scenario prometheusrule-repo-sync-description-make-hub-deploy-line-3236 · commit 9919a452 · proves fix
 **Prior art:** none (exact-slug pass; `make find-similar-docs` unavailable on the M4: vector store needs context `k3d-k3d-cluster`)
 
 ## What happens

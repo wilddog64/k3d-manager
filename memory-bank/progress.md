@@ -789,3 +789,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: dirused elevated-mode idea moved from docs/ideas.md to new docs/dirused/ideas.md (operator: dirused ideas stay out of ideas.md).
 - 2026-11-16: dirused v0.0.1 tagged at 1926d2e; Release run 43794113905 green; prerelease with win-x64/win-arm64 self-contained zips + sha256 (x64 checksum and contents verified). Operator tests at office 2026-11-16.
 - 2026-11-16: v1.44.0 hub promoted to 50a42198; PR #161 hub smoke PASS (make status HEALTHY, all apps Synced/Healthy, promoted repo-sync rule live).
+- 2026-11-16: PR #161 Claude scope check PASS — 5 plans (v1.44.0 plans 1-5), every feat/fix commit traced to a plan or bug doc (3 unreferenced: 2 lint cleanups of plan code, 9919a452 alert fix now LIVE-VERIFIED); trivy dev-hub exclude belongs to plan 4; process/.claude/agent-doc changes are tooling; no open P0/P1. Remaining gate: CI.
