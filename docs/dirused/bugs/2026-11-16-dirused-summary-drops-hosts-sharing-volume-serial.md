@@ -33,3 +33,9 @@ machine, not across machines.
 
 Add the target's host (its UNC server, or the local machine) to the duplicate key, so duplicates are removed only within one host. JSON and CSV output with `/summary`
 run through `Prepare` as well; check whether they drop hosts in the same way.
+
+## Evidence: single-host runs (operator, 2026-11-16)
+
+- `dirused /summary \\us03l12agt02\d$` on its own: `used 9.1 GB, free 190.7 GB, total 199.9 GB, 4.6% used`. So agt02 is reachable and its usage differs from agt01 (1.0%),
+  yet the `/file` run left it out. The combined run printed no error line at all, so no failing node hid it. This matches the duplicate check on serial number only.
+- `dirused /summary \\us03l12agt11\d$` returned `UNREACHABLE (53)`. That name is l**12**agt11; the list holds l**11**agt11, which the combined run did show, so this result does not bear on the bug.
