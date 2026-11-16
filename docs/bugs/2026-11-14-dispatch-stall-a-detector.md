@@ -205,6 +205,12 @@ parent bug doc): `K3DM_DISPATCH_STALL_SECONDS`, `K3DM_DISPATCH_STALL_MAX_PROCS`,
 `K3DM_STALL_DRAIN_CMD` (child B), the files `$run/stall-handled-<id>` and `$run/stall-<ts>/` (children B and C read the dir),
 and the launchd label `com.k3d-manager.dispatch-stall-watch`.
 
+## Staging (coordinator, 2026-11-16)
+
+Two Luna runs stopped short on the full scope (run 1 wrote nothing; run 2 wrote the OrbStack guard and red tests only). Split:
+- **A1** (v1.44.1, resume 3): status probe, `stalled` / `stalled --live`, OrbStack guard. M1-M6, M14; N1, N4, N6, N7, N10-N12; E1, E2, E6.
+- **A2** (dispatch after A1 lands): watcher, plist, install targets, howto. M7-M13, M15; N2, N3, N5, N8, N9; E3-E5, E7, E8.
+
 ## Acceptance
 
 Scope: v1.44.1 only (see "Scope for v1.44.1" and "Settled 2026-11-16"). This also fixes the parent bug's symptom
