@@ -781,3 +781,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-15: dirused #7 fix-up 82442a0 pushed (live-check $codes +1707, README stale L2 note removed); CI rerunning. #8 CLEAN/MERGEABLE, CI green — told operator OK to merge; E4 live still owed after merge.
 - 2026-11-15: dirused #8 merged as 25671fb (operator); ledger state_mark offline_tested at merge; bug doc LANDED, waiting on live E4. #7 fix-up 82442a0 CI pending.
 - 2026-11-16: dirused E3 flake captured (docs/dirused/bugs/2026-11-16-dirused-e3-flakes-when-grace-expires-on-ci.md): windows push CI at 2c4134f failed twice (403/463 ms ≥ 400 ms abandon wait); PR run same SHA green. Introduced by #8. Blocks #7 merge (windows required, strict). Waiting on operator decision.
+- 2026-11-16: E3 flake fix option 1 approved; PR wilddog64/dirused#9 (58b7073, E3 Timeout 200ms→1s) opened by Claude; Argon review running. Then update #7 branch.
