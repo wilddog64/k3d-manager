@@ -1,11 +1,11 @@
 # dirused `/timeout` cannot bound a volume probe that never returns
 
-**Status:** LANDED — merged in wilddog64/dirused#8 as 25671fb (operator, 2026-11-16T02:16Z); Claude verified offline (E1/E2 red at b475154, 22/22 green, 5/5 reruns); CI green run 43787415008; Argon blind review (Copilot capped), Claude-verified, 0 confirmed findings
+**Status:** LIVE-VERIFIED — every check that passed at b475154 still passes, incl. L7 (/timeout 2s) and L8 (/summary /timeout 30s); merged in wilddog64/dirused#8 as 25671fb (operator, 2026-11-16T02:16Z); Claude verified offline (E1/E2 red at b475154, 22/22 green, 5/5 reruns); CI green run 43787415008; Argon blind review (Copilot capped), Claude-verified, 0 confirmed findings
 **Priority:** P3 — a dead SMB server can stall one worker past `/timeout`; other targets still finish (workaround: Ctrl+C after the rest report, or a smaller `/file`)
 **Introduced by:** wilddog64/dirused 97a47fc (M1b phase 1b, merged in febe79d)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Claude verification)
-**Waiting on:** live check — since 2026-11-16 (make vm-live regression E4)
+**Live evidence:** 2026-11-16 · run operator-make-vm-live-tmux-work-1.1 · env dirused-dev-vm · scenario live-check-L1-L10 (10/10 pass, build 02:36:18Z) · commit 1926d2e · proves E4
 **Fix commit:** 588f0c2 (merged as 25671fb, wilddog64/dirused PR #8)
 **Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Luna (`gpt-6-luna`, Codex) implements; spec with Acceptance next
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).

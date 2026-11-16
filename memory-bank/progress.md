@@ -784,3 +784,4 @@ Compressed 2026-11-07. Entries before 2026-11-01 (v1.43.14 open) are in `memory-
 - 2026-11-16: E3 flake fix option 1 approved; PR wilddog64/dirused#9 (58b7073, E3 Timeout 200ms→1s) opened by Claude; Argon review running. Then update #7 branch.
 - 2026-11-16: Argon on #9 changes-requested; Claude verified: narrows-not-removes accepted, E1/E2 exposure recorded as watch item, rest rejected. #9 recommended to merge on green.
 - 2026-11-16: dirused #9 merged (609d183) and #7 merged (1926d2e). Ledger offline_tested for dirused-unreachable-1707 at merge. Bug docs: 1707 LANDED (live L2 owed), E3 flake LANDED (watch CI). One make vm-live owed for #7 L2 + #8 E4.
+- 2026-11-16: make vm-live (operator) 10/10 on main 1926d2e build 02:36:18Z — dirused 1707 (L2) and timeout (E4) LIVE-VERIFIED; ledger live_verified both slugs. Remaining dirused live: /parallel P1 (ACG gate).
