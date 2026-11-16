@@ -66,7 +66,10 @@ spec:
                     attempt=$((attempt + 1))
                   done
                   echo "[unseal-watchdog] vault sealed — replaying shard"
-                  vault operator unseal "$(cat "$SHARD_FILE")" >/dev/null 2>&1 || true
+                  out="$(vault operator unseal "$(cat "$SHARD_FILE")" 2>&1)"
+                  unseal_rc=$?
+                  echo "[unseal-watchdog] unseal rc=$unseal_rc"
+                  printf '%s\n' "$out" | grep -F -v -- "$(cat "$SHARD_FILE")" | grep -E 'Error|error|Code:|^\* ' | head -5 | sed 's/^/[unseal-watchdog] /'
                   if vault status >/dev/null 2>&1; then
                     echo "[unseal-watchdog] unseal succeeded"
                   else
