@@ -797,3 +797,32 @@ def test_investigation_rejects_any_explicit_fix_header(header):
             "reference opaque-proof · env local · scenario health · proves m1\n")
     assert pa.doc_investigation_evidence(text + header + "\n") is None
     assert pa.doc_has_fix_commit(text + header + "\n")
+
+
+@pytest.mark.parametrize("decision,arrow", [("carry", "→"), ("patch", "→"), ("carry", "->"), ("patch", "->")])
+def test_doc_release_triage_overrides_added_and_branch(decision, arrow):
+    text = f"**Branch:** k3d-manager-v1.44.0\n**Triage:** {decision} {arrow} v1.45.0 — operator\n"
+    assert pa.doc_release(text, "v1.44.0") == ("v1.45.0", "triage_line")
+
+
+def test_doc_release_patch_overrides_branch():
+    text = "**Branch:** k3d-manager-v1.44.0\n**Triage:** patch → v1.44.1\n"
+    assert pa.doc_release(text) == ("v1.44.1", "triage_line")
+
+
+def test_doc_release_triage_overrides_release_and_release_overrides_branch():
+    text = "**Release:** v1.44.1 — planned\n**Branch:** k3d-manager-v1.44.0\n"
+    assert pa.doc_release(text, "v1.43.0") == ("v1.44.1", "release_line")
+    assert pa.doc_release(text + "**Triage:** carry → v1.45.0\n") == ("v1.45.0", "triage_line")
+
+
+@pytest.mark.parametrize("triage", ["passed over", "close", "status corrected"])
+@pytest.mark.parametrize("release", ["P3 batch", "deferred to v1.45.0", "TBD", "carried to v1.44.0 unless later"])
+def test_doc_release_ignores_free_form_metadata(triage, release):
+    text = f"**Triage:** {triage}\n**Release:** {release}\n"
+    assert pa.doc_release(text, "v1.43.0") == ("v1.43.0", "added_tag")
+    assert pa.doc_release(text + "**Branch:** k3d-manager-v1.44.0\n") == ("v1.44.0", "branch_line")
+
+
+def test_doc_release_carry_overrides_added_release():
+    assert pa.doc_release("**Triage:** carry → v1.45.0\n", "v1.44.0") == ("v1.45.0", "triage_line")

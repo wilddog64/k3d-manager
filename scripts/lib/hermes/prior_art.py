@@ -117,6 +117,8 @@ _CLOSED_RE = re.compile(
     r"|^Fixed (?:on|in)\b", re.IGNORECASE
 )
 _BRANCH_RELEASE_RE = re.compile(r"^\*\*Branch:\*\*.*?v(\d+\.\d+\.\d+)", re.MULTILINE)
+_TRIAGE_RELEASE_RE = re.compile(r"^\*\*Triage:\*\*[ \t]*(?:carry|patch)[ \t]*(?:→|->)[ \t]*v(\d+\.\d+\.\d+)\b", re.MULTILINE)
+_RELEASE_RE = re.compile(r"^\*\*Release:\*\*[ \t]*v(\d+\.\d+\.\d+)\b", re.MULTILINE)
 _DEFERRED_RE = re.compile(r"^DEFERRED\b", re.IGNORECASE)
 _IMPLEMENTED_RE = re.compile(r"^IMPLEMENTED\b", re.IGNORECASE)
 _VERIFIED_RE = re.compile(r"^(?:VERIFIED|LIVE-VERIFIED)\b", re.IGNORECASE)
@@ -279,6 +281,10 @@ def doc_investigation_evidence(text):
 
 
 def doc_release(text, added_release=None):
+    for pattern, source in ((_TRIAGE_RELEASE_RE, "triage_line"), (_RELEASE_RE, "release_line")):
+        match = pattern.search(text)
+        if match:
+            return f"v{match.group(1)}", source
     match = _BRANCH_RELEASE_RE.search(text)
     if match:
         return f"v{match.group(1)}", "branch_line"
