@@ -1,7 +1,7 @@
 ## Handoff 2026-11-16 ~02:45Z — dirused P3s: both exited, verified, PRs #7/#8 open
 
-- **PR #7 (1707, Flash):** 47d0572 test + 562de4a fix on p3-unreachable-1707; diff = spec. Red proof pending: CI on temp branch `redcheck-1707-test-only` (47d0572) windows job must FAIL; delete that branch after. Then make vm-live L2.
-- **PR #8 (hung probe, Luna):** c9c59d6 tests + 588f0c2 fix on p3-timeout-hung-probe. Claude verified: E1/E2 red at b475154 (30 s / 2 min), 22/22 green, 5/5 reruns; MRES.Set-after-Dispose probe: no throw. Evidence scratchpad verify-hung-probe.md. Then make vm-live regression (E4).
+- **PR #7 (1707, Flash):** 47d0572 test + 562de4a fix; offline verified: CI windows red on 47d0572 (run 43787406779, exactly the 3 new tests), fix green (run 43787367644); temp branch deleted. Next: Copilot, then make vm-live L2.
+- **PR #8 (hung probe, Luna):** CI green run 43787368953. c9c59d6 tests + 588f0c2 fix on p3-timeout-hung-probe. Claude verified: E1/E2 red at b475154 (30 s / 2 min), 22/22 green, 5/5 reruns; MRES.Set-after-Dispose probe: no throw. Evidence scratchpad verify-hung-probe.md. Then make vm-live regression (E4).
 - **Both:** CI + Copilot (review requested), fix findings, operator merges; then `mark --state offline_tested --sha <merge>` (verify refuses: no landed task). WIP 3 until merged/marked.
 
 - **Operator approved all intents 2026-11-16.** Dispatched: `dirused-unreachable-1707` (agy gemini-3.8-flash-medium, branch p3-unreachable-1707, spec docs/bugs/2026-11-16-dirused-unreachable-node-error-1707-not-mapped.md) and `dirused-timeout-hung-probe` (codex gpt-6-luna, branch p3-timeout-hung-probe, spec docs/bugs/2026-11-16-dirused-timeout-cannot-bound-hung-volume-probe.md). Both branches created on origin at b475154. WIP = 3 (limit).

@@ -5,7 +5,7 @@
 **Introduced by:** wilddog64/dirused 97a47fc (M1b phase 1b, merged in febe79d)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Claude verification)
-**Waiting on:** live check — since 2026-11-16 (CI + Copilot on PR #8, then make vm-live regression E4)
+**Waiting on:** live check — since 2026-11-16 (CI green run 43787368953 at 588f0c2; next Copilot on PR #8, then make vm-live regression E4)
 **Fix commit:** 588f0c2 (wilddog64/dirused PR #8, not merged)
 **Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Luna (`gpt-6-luna`, Codex) implements; spec with Acceptance next
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).
