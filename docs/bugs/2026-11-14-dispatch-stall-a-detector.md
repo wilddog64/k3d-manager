@@ -357,3 +357,12 @@ Test fixtures (all stubbed, from a real read-only capture where one exists):
   and `shellcheck bin/k3dm-dispatch-stall-watch bin/k3dm-codex-dispatch` if shellcheck is present (report if not).
 - Rerun any red outside the worker sandbox before calling it a regression (seatbelt can fake both greens and reds).
 - Leave changes uncommitted; do not push; do not run E8 (operator or Claude); do not touch `docs/bugs/`.
+
+## Recurrence: Linux CI red after A2 (2026-11-16)
+
+Push CI on bdf87d9d failed `test (1)`: `dispatch_stall_state.bats` "M4: fallback needs exactly one database born within ten
+seconds of the log" (line 159). Linux Python has no `os.stat().st_birthtime`. The probe's fallback catches the AttributeError
+and gives no db signal, as designed (agy dispatches run on macOS), but the test assumed birth time exists. Fix: on a host without
+birth time, the test asserts `running` with no db signal and `stalled` from the process limit, then skips the birth-time cases.
+Reproduced on macOS by hiding `st_birthtime` through a `sitecustomize.py` on PYTHONPATH: the old test failed at the same line, the
+new one passes. Should have been caught by: offline test (Linux run before land). `reference_linux_only_ci_reds_reproduce_locally`.

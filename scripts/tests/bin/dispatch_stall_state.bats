@@ -155,6 +155,15 @@ snapshot() {
   old="$(($(date +%s)-100))"
   sqlite3 "$candidate" 'create table steps(id); insert into steps values(1);'
   printf 'db=%s steps=1 since=%s\n' "$candidate" "$old" >"$TEST_RUN/stall-watch.state"
+  if ! python3 -c 'import os, sys; os.stat(sys.argv[1]).st_birthtime' "$candidate" 2>/dev/null; then
+    run "$SCRIPT" status task
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'state: running'* ]]
+    export TEST_PROC_COUNT=3 K3DM_DISPATCH_STALL_MAX_PROCS=2
+    run "$SCRIPT" status task
+    [[ "$output" == *'state: stalled'* ]]
+    skip "no file birth time on this host: fallback gives no db signal, process limit still applies (asserted above)"
+  fi
   run "$SCRIPT" status task
   [[ "$output" == *'state: stalled'* ]]
   sqlite3 "$second" 'create table steps(id); insert into steps values(1);'
