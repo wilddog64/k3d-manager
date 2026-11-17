@@ -58,6 +58,7 @@ a new exit code when a volume is red; top 3 folders only for red/yellow volumes 
 | `README.md` | Change 8 |
 | `tests/Dirused.Tests/FullnessTests.cs` | new: tests 1-8 |
 | `tests/Dirused.Tests/SummaryTests.cs`, `tests/Dirused.Tests/OutputCompatTests.cs` | update only assertions the new CSV column or tag breaks; say which in the report |
+| `tests/Dirused.Tests.Portable/RendererTests.cs`, `tests/Dirused.Tests.Portable/FleetRunnerTests.cs` | (added 2026-11-17 after run 1) same rule: update only the assertions the footer line, `level` JSON field or CSV column break. This project is what CI runs on Linux (`ci.yml:13`, `release.yml:19`) and must stay 36/36 |
 
 ## Contract readers
 
@@ -107,7 +108,7 @@ return 3 before checking crit (8); drop the warn<crit check (5).
 
 ## Gates
 
-`dotnet build -c Release` and `dotnet test` if the SDK is available in your sandbox; otherwise say so (Claude runs both on the
+`dotnet test tests/Dirused.Tests.Portable -c Release -p:NuGetAudit=false` (must pass; runs on macOS), then `dotnet build -c Release` and `dotnet test` if the SDK is available in your sandbox; otherwise say so (Claude runs both on the
 dirused-dev VM and CI).
 
 ## Definition of Done
