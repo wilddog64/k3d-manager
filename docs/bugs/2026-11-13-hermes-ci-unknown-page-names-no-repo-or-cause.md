@@ -4,7 +4,7 @@
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The `ci` sensor's broad exception handler masks the failing repository, workflow, and underlying error in both Slack pages and logs, degrading alert diagnostics while leaving manual GitHub Actions inspection as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator
-**Waiting on:** live check — since 2026-11-16 (E3: next real CI unknown page names repo and cause)
+**Waiting on:** live check — since 2026-11-17 (fixed code deployed and running; E3 needs the next real ci unknown/degraded record)
 **Branch:** k3d-manager-v1.44.1
 **Introduced by:** pre-existing
 **Should have been caught by:** review
@@ -138,3 +138,7 @@ a test that never reaches the error path cannot pass. The fetch stub is built fr
 fail on the old code, and `pytest scripts/tests/hermes` passes 390/390 on the fix. The existing ci tests were not edited (N2).
 The token-leak test feeds in an exception that contains the token and asserts the token is absent from evidence, stdout and stderr (N1).
 E3 is live and still owed.
+
+## Live check status 2026-11-17 (Claude)
+
+Deployed, not yet exercised. The M5 checkout is 6fe58dcb (contains c3642f8f), fast-forwarded 2026-11-17T00:21Z; launchd `com.k3d-manager.hermes` restarted at 02:05Z, after it. The Hermes log holds 3458 `ci` records; none is unknown or degraded since the promote (last: 02:06:21Z healthy, "required CI checks successful"). The last unknown records (2026-11-14, "CI status source unavailable") are pre-fix. E3 stays open until a real unknown or degraded record appears; Claude reads it then.

@@ -6,7 +6,7 @@
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)
 **Should have been caught by:** spec (the guard's spec did not consider that releases are squash-merged to `main` and the next release is cut from `main`)
 **Prior art:** `docs/bugs/2026-11-10-hub-promote-discards-cve-promoter-commits.md` (grep `cherry`/`squash`, read) — this bug is a false positive of that fix
-**Waiting on:** live check — since 2026-11-16 (E4/E6 on the hub: next real promote of a squash-merged release, operator)
+**Waiting on:** live check — since 2026-11-17 (E9 passed; E8 at the post-merge first promote of squash-merged v1.44.1, operator)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (P2, flagged: every first promote of a release needs BREAK_GLASS) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
@@ -473,3 +473,7 @@ Resolutions: Q1 accept tip-only for v1.44.1; Q2 accept (rollback in an outage ne
 2. Rollback (`rollback`, `:246`) now also calls the API. In a GitHub outage a rollback with a squash-merged old tip refuses and needs BREAK_GLASS. Accept?
 3. Scope: carrying SKIP_CHECK_RUNS (a new flag) into a bug-fix patch. Kept because run 2 is not landed piecemeal; say if it should move to a minor release and BREAK_GLASS narrowing alone ships.
 4. A merge commit later reverted in `target` still counts as containing the PR (ancestry only). Out of scope; the check-run gate and review cover it.
+
+## Live verification 2026-11-17 (Claude)
+
+E9 PASS on the M4 (git 2.56.1, shipped `bin/k3dm-hub-promote` at cf555224): `is-contained b5b931df 50a42198` rc 0 naming PR #161; `b5b931df 9f5f0d89` rc 0 naming PR #160; `b5b931df ebf0a1c9` rc 1; `aa1196ed 50a42198` rc 1, all as specified. E8 cannot run before the merge: the first promote of the squash-merged release is the post-merge `make hub-promote REF=<main merge commit>`, which must go through with no BREAK_GLASS. Evidence: `<run>/live-evidence-e9.txt`.

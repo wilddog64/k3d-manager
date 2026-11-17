@@ -1,11 +1,12 @@
 # hub-promote pushes run the pre-push hook with REF and BREAK_GLASS exported, so refusal tests fail
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 4476316a (Flash; Claude verified: E1 red pre-fix, hub_promote 59/59, appsets green)
+**Status:** LIVE-VERIFIED — 2026-11-17, E3 by Claude (ledger live_verified 4476316a). Was: VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 4476316a (Flash; Claude verified: E1 red pre-fix, hub_promote 59/59, appsets green)
+**Live evidence:** 2026-11-17 · run hub-promote-20261117T001751Z · env m4/operator-tmux-promote · scenario real-promote-tag-push-with-pre-push-hook · commit 6fe58dcb · proves E3
+**Fix commit:** 4476316a
 **Priority:** P2 — the promote half-completes (deploy/hub moves, tag push refused); workaround: push the tag with --no-verify
 **Introduced by:** unknown
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-16 (E3 at the next real hub-promote)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 — operator 2026-11-16 ("fix in v1.44.1")
 **Prior art:** docs/bugs/2026-11-08-hub-promote-no-op-promote-tags-and-breaks-rollback.md (name match) — read, different root cause; `make find-similar-docs` printed nothing (not run successfully)
@@ -97,3 +98,7 @@ evidence:
 ```
 
 **Intent approved:** operator, 2026-11-16
+
+## Live verification 2026-11-17 (Claude)
+
+E3 PASS. The real promote at 2026-11-17T00:17:51Z (`hub-promote/20261117T001751Z`) ran in the operator's tmux on the M4, on the `k3d-manager-v1.44.1` checkout containing 4476316a. The pre-push hook ran its three checks before each push; `deploy/hub` b5b931df..6fe58dcb and the tag both pushed in that one run, with no `--no-verify`. `git ls-remote origin`: deploy/hub=6fe58dcb, tag fa0ad902 → 6fe58dcb. Evidence: `<run>/live-evidence.txt`.

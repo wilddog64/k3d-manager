@@ -1,3 +1,9 @@
+## 2026-11-17 ~02:25Z — v1.44.1 live checks (operator: "let's work on those 6 live verification")
+
+- PASS: push-hook E3, release-column E3 (LIVE-VERIFIED); containment E9. Waiting: containment E8 (post-merge promote), Hermes E3 (next real ci page).
+- Need go: root-token E5 (test_eso + test_vault on hub; test_vault rewrites auth/kubernetes/config with the same host + cluster CA, read 02:20Z), stall-A E8 (make install-dispatch-stall-watch on M4 + toy frozen agy dispatch + Slack notice).
+- Review gate: Copilot capped to 2026-12-01; Argon review of #162 covers code (delta docs/README only).
+
 ## 2026-11-17 ~00:20Z — v1.44.1 PROMOTED: deploy/hub 6fe58dcb, tag hub-promote/20261117T001751Z
 
 - Operator ran hub-promote + appsets-check + platform-ops; Claude confirmed `make hub-promote-status` (deploy/hub 6fe58dcb).

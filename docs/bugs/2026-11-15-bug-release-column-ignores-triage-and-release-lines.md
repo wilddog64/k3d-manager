@@ -1,13 +1,14 @@
 # Bug: the bug tables put every triaged bug in the release it was filed on, ignoring `**Triage:**` and `**Release:**`
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 8cff0301 on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 8 tests red pre-fix, 140 green; corpus diff 179 docs, ~25 move to their groomed release, rest same release from an explicit line)
+**Status:** LIVE-VERIFIED — 2026-11-17, E3 by Claude on the dashboard data source (ledger live_verified 8cff0301). Was: VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 8cff0301 on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 8 tests red pre-fix, 140 green; corpus diff 179 docs, ~25 move to their groomed release, rest same release from an explicit line)
+**Live evidence:** 2026-11-17 · run hub-prometheus-k3dm_bug_info-v1.44.1 · env hub/k3d-k3d-cluster · scenario bugs-dashboard-release-v1.44.1-lists-triaged-bugs · commit 6fe58dcb · proves E3
+**Fix commit:** 8cff0301
 **Priority:** P2
 **Classified:** not run (queued for the next triage)
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
 **Prior art:** exact-slug glob, none; read `docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md` (different root cause: status, not release)
-**Waiting on:** live check — since 2026-11-16 (E3: Bugs dashboard after the next metrics run; operator)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 — operator 2026-11-16 ("yes", pulled in from carry → v1.45.0 because the dashboard cannot show v1.44.1 progress without it)
 
@@ -107,3 +108,6 @@ interface: none
 
 **Intent approved:** operator, 2026-11-16
 
+## Live verification 2026-11-17 (Claude)
+
+E3 PASS on the Bugs dashboard's data source, read-only on the M5 hub Prometheus: `k3dm_bug_current_release_info` is v1.44.1 and `k3dm_bug_info{release="v1.44.1"}` has 17 rows (12 fixed, 5 open P3s captured on the branch). Every groomed v1.44.1 bug is listed, including those filed under earlier releases and moved by `Triage:`/`Release:` lines (containment 2026-11-12, stray Pushgateway 2026-11-13, Hermes ci 2026-11-13), which the pre-fix code put under their filing release. The operator may still glance at the Grafana panel; the data it renders is proven here. Evidence: `<run>/live-evidence.txt`.
