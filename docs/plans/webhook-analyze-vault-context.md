@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
-**Status:** OPEN
+**Status:** LANDED bea02b84 2026-11-17; live evidence pending
 **Covers:** `docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` Fix 5 (cause 4).
 The rest of that bug is `docs/plans/hermes-vault-sealed.md`.
 **Approval:** operator, 2026-11-17 — part of "one plan covering both bugs, in v1.44.2"; split out for

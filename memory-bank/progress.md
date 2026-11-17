@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: LANDED fadf8438 (hermes-vault-sealed, Luna) and bea02b84 (webhook-analyze-vault-context, Flash), Claude-verified (pre-fix red, mutations, suites green); pushed. CHANGELOG [Unreleased] + bug/plan Status LANDED, Waiting on: live check. Next: promote, live E4.
 - 2026-11-17: hub checkout -> k3d-manager-v1.44.2 and 3 failed acg-expiry-check Jobs deleted (operator go). hermes-vault-sealed review adjudicated and split into Luna (hermes) + Flash (webhook-analyze-vault-context) plans.
 - 2026-11-17 ~12:45Z: 3 hub alert emails diagnosed live (read-only, pane work:1.0): 1 new P3 bug (promote-waiting on squash-merged branch), 2 Recurrence sections. Go pending: hub checkout -> v1.44.2, delete 3 failed acg-expiry-check Jobs.
 - 2026-11-17: abandoned v1.44.0 deploy-hub-batch-review + test-hygiene-batch-review (operator go); worktrees and task branches removed; open dispatch list empty (WIP 0/3).

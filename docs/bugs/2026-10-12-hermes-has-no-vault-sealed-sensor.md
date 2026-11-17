@@ -2,11 +2,11 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.44.2`
-**Status:** OPEN
+**Status:** LANDED on `k3d-manager-v1.44.2` 2026-11-17 (fadf8438); verified offline by Claude
 **Priority:** P2 — raised 2026-11-17 (operator): without it Hermes misreads a seal as many problems and offered the wrong repair (`2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Hermes status observability is degraded by not surfacing sealed Vault state on the dashboard, with a workaround of inspecting the `vault-sealed` pod label directly or observing downstream ExternalSecrets status); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** patch → v1.44.2 (P2), prerequisite of `2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` (operator, 2026-11-17: "go ahead"). Earlier: passed over, 1st — grooming 2026-11-12.
-**Waiting on:** dispatch — since 2026-11-17 (plan `docs/plans/hermes-vault-sealed.md`, reviewed by Argon + Fable)
+**Waiting on:** live check — since 2026-11-17 (promote, then dashboard row; Vault-restart check needs an operator go)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 

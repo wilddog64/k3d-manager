@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Hermes `vault_seal` sensor.** Hermes reads the Vault pod labels each cycle and reports Vault as unsealed, sealed (from the second sealed cycle) or unknown. It only reads labels: no exec, no Vault API call, no Secret read, and no repair can unseal.
+
+### Fixed
+
+- **Hermes no longer offers the cosign restore (r7) while Vault is sealed.** r7 now needs an unsealed Vault and at most 2 failing ExternalSecrets, and approval is refused if that changes. On 2026-11-17 it was offered for 19 of 20 failing ExternalSecrets during a planned Vault restart.
+- **Hermes incident cards lead with "Root cause: Vault sealed"** while Vault is sealed, and skip the LLM summary for that incident.
+- **Every Hermes repair card says whether to press Approve** ("Recommended: Approve — <when>. If you do nothing: <what>."), on both the Slack button card and the text card.
+- **A resolved Hermes incident names each withdrawn proposal** and says nothing needs approving, so the old buttons are no longer left looking actionable.
+- **Alert diagnoses check Vault first.** The webhook's ArgoCD alert analysis reads the Vault seal labels and the `vault-backend` ClusterSecretStore once per job. When Vault is sealed it says so and skips Gemini; otherwise Gemini sees both summaries. Before, it blamed app configuration and probes during a Vault seal.
+
 ## [1.44.1] - 2026-11-17
 
 Bug-fix release: the 12 bugs groomed into v1.44.1 on 2026-11-15, plus the CI split. Each fix was verified offline by Claude: its new tests fail on the pre-fix code and pass on the fix.

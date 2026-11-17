@@ -1,11 +1,11 @@
 # Bug: Hermes offers the cosign signing-restore repair (r7) when every ExternalSecret fails because Vault is sealed
 
-**Status:** OPEN
+**Status:** LANDED on `k3d-manager-v1.44.2` 2026-11-17 (fadf8438 Fix 1–4, bea02b84 Fix 5); verified offline by Claude
 **Priority:** P2 — raised from P3 (operator, 2026-11-17: "go ahead"). The operator approves repairs from Slack while away; a card that recommends nothing, and offers the wrong repair during an upstream outage, cannot be judged from a phone.
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-17 (Fix 1–4: `docs/plans/hermes-vault-sealed.md`; Fix 5: `docs/plans/webhook-analyze-vault-context.md`)
+**Waiting on:** live check — since 2026-11-17 (promote, then dashboard row; Vault-restart check needs an operator go)
 **Prior art:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, related root cause (no sealed-Vault signal), different symptom (wrong repair offered). That bug is the prerequisite for this one and ships first in the same release.
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`

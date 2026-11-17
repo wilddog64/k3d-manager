@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
-**Status:** OPEN
+**Status:** LANDED fadf8438 2026-11-17; live evidence pending
 **Covers:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (stage A) and
 `docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` Fix 1–4 (stage B).
 Fix 5 (webhook alert diagnosis) is the separate dispatch `docs/plans/webhook-analyze-vault-context.md`.
