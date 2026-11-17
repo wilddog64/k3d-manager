@@ -5,7 +5,7 @@
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-17 (E0: operator prints the Keychain shard fingerprint to compare with f1bffbb8cc7e; then stage 2 spec)
+**Waiting on:** operator decision — since 2026-11-17 (E0 confirmed the Secret is stale; choose: one-time Secret repair now, and stage 2 in v1.44.1 or v1.44.2)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
@@ -200,3 +200,9 @@ Operator go ("go ahead for those two"). `vault_install_unseal_watchdog` was run 
 No shard value was printed. Vault stayed sealed, as expected before stage 2.
 
 `message authentication failed` is Vault's response to a well-formed key that does not belong to this Vault's current key set. That fits the stale-Secret hypothesis: the `vault-unseal` Secret holds a shard from an earlier init. E0 (Keychain fingerprint) confirms or refutes it before stage 2 is specced. Ledger `live_verified` mark at dd7c18ed (stage 1).
+
+## E0, 2026-11-17 (operator, M5 local terminal, login Keychain unlocked)
+
+SHA-256 prefix (CR/LF stripped) of Keychain item `k3d-manager-vault-unseal` / `secrets/vault:shard1`: `4d9e743984dd`.
+Cluster Secret `secrets/vault-unseal` `shard-1`: `f1bffbb8cc7e`. They differ, and the Keychain value is not the empty-string hash (`e3b0c44298fc`), so a real shard was read.
+Together with E5 (`cipher: message authentication failed`): **the `vault-unseal` Secret holds a shard from an earlier Vault init; the Keychain shard is current.** The stale-Secret hypothesis is proven. Stage 2 is unblocked.
