@@ -1,6 +1,6 @@
 # dirused M1c — summary fixes, `/summary /top N`, faster remote scans
 
-**Status:** draft — Part A waiting on intent approval; Part B waiting on proof (P1, P2)
+**Status:** draft — Part A waiting on intent approval; Part B waiting on proof (P1, P2). A3 superseded by `docs/plans/dirused-m1d-top-level-default.md` (2026-11-17); Part B now speeds up `/exact` only
 **Repo / branch:** wilddog64/dirused; Part A `m1c-summary-top` from `main` at 1926d2e; Part B `m1c-fast-scan` after Part A merges
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); this file sits in k3d-manager only so `codex-dispatch start` can read it
 **Bugs fixed:** `docs/dirused/bugs/2026-11-16-dirused-summary-drops-hosts-sharing-volume-serial.md`, `docs/dirused/bugs/2026-11-16-dirused-all-scans-local-host-with-remote-targets.md`
