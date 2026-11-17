@@ -181,7 +181,8 @@ evidence:
 interface: dirused command line (text, JSON, CSV output)
 ```
 
-**Intent approved:** Part A (M1, N1, E1): operator, 2026-11-17, delegated — "go ahead for that, and you can dispatch the tasks on you will". Part B (M2–M4, N2, N3, E2–E4): pending B2.
+**Intent approved:** operator, 2026-11-17
+**Approval words and scope:** "go ahead for that, and you can dispatch the tasks on you will" (delegated). Covers Part A (M1, N1, E1) now; Part B (M2–M4, N2, N3, E2–E4) is dispatched only after the office probe B2.
 
 ## Dispatch now: Part A only
 
