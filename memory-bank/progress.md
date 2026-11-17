@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 ~19:00Z: dirused M2a fullness levels dispatched (Luna). WIP 3/3.
 - 2026-11-17 ~18:45Z: stall-watch Slack notice shows ~/ (d2a72d35); P3 bug filed for other Slack senders.
 - 2026-11-17 ~18:30Z: dispatched stage 2 (Flash) and OOB M1 (Luna, resumed once after a no-change exit). WIP 2/3.
 - 2026-11-17 16:56Z: dirused PR #13 merged (3865f28, CI 4/4 on 83b9ca0); v0.0.4 tagged, Release run 44130794197 green, pre-release with win-x64 + win-arm64 zips and sha256. Waiting on operator office tests (B2 probe, E4 /timeout stop line, /file servers.list SVI system only).
