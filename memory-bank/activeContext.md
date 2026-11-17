@@ -3,6 +3,7 @@
 - Combined plan written: `docs/plans/hermes-vault-sealed.md` (stage A vault_seal sensor, stage B r7 gating/cards). spec_intent passes except the Intent line. Intent approved by operator 2026-11-17 (E1, E5); spec_intent OK. Checklist sections added (Before You Start, Rules, DoD). **Waiting on:** Argon + Fable blind spec review running (started 2026-11-17), then Claude adjudicates, logs trial pair 4, dispatches.
 - Spec fixes found while checking against code: sensor debounce must be `max(0, threshold-1)` (`_debounced` is `count > threshold`); r7 adds `vault_seal` to `reads` + `_evidence` (digest coverage); sensor test 8 reworded (r7 now reads vault_seal). External proof: vault-helm v0.30.1 raft config has `service_registration "kubernetes"`; hub runs HA+raft.
 - Triage due (63 bug docs at operator decision) — announced.
+- Alert emails checked live via hub pane work:1.0 (~12:45Z): K3dmPromoteWaiting 1c12925 = new P3 docs/bugs/2026-11-17-promote-waiting-stuck-on-squash-merged-release-branch.md (hub checkout still on merged v1.44.1 branch); KubeJobFailed x3 acg-expiry-check (2026-11-11) = Recurrence on 2026-11-06 watchdog KubeJobFailed bug; E2EVerificationStale product-catalog/vcluster = Recurrence on 2026-11-10 e2e-stale bug (clears after Wed run). Awaiting operator go: switch hub checkout to v1.44.2; delete 3 failed acg-expiry-check Jobs.
 
 ## Handoff 2026-11-17 ~12:35Z — v1.44.1 SHIPPED; dirused v0.0.3 released — START HERE
 
