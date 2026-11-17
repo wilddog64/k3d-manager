@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: stall dashboard labels made plain-word + Incidents column widths (tests green, pushed). Filed P3 docs/bugs/2026-11-17-dispatch-stall-metrics-cannot-answer-effectiveness-questions.md (precision / recovery / false recovery / attention saved; stages B+C unbuilt, carry v1.45.0 — fold Q2/Q3 fields into stage B spec before dispatch). Waiting on: operator decision (Q4 baseline). CI green on bcddea35; promote next.
 - 2026-11-17: operator go to promote. CI lint red on f1b243f0 (ruff F401: shutil/subprocess unused after the test_approvals.py guard removal; land gate runs tests, not lint) -> fixed 7b7dd65a, ruff 0.15.8 whole-tree green locally. Promote waits on CI for 7b7dd65a.
 - 2026-11-17: LANDED fadf8438 (hermes-vault-sealed, Luna) and bea02b84 (webhook-analyze-vault-context, Flash), Claude-verified (pre-fix red, mutations, suites green); pushed. CHANGELOG [Unreleased] + bug/plan Status LANDED, Waiting on: live check. Next: promote, live E4.
 - 2026-11-17: hub checkout -> k3d-manager-v1.44.2 and 3 failed acg-expiry-check Jobs deleted (operator go). hermes-vault-sealed review adjudicated and split into Luna (hermes) + Flash (webhook-analyze-vault-context) plans.
