@@ -1,11 +1,11 @@
 # Bug: hub unseal watchdog replays a shard Vault rejects, and hides the error
 
-**Status:** VERIFIED — stage 1 live-checked 2026-11-17 (E5 pass: the watchdog log now shows rc=2 and Vault's reason, no shard printed); stage 2 (the real fix) still open, gated on E0. 2026-11-16 independent offline verifier (claude) passed. Was: LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
+**Status:** VERIFIED — stage 2 landed 06444b31 + 5151fe0d on k3d-manager-v1.44.2, 2026-11-17 (Flash, finished by Claude: stdin guard on the existence check, S2-3 stderr capture, B4-16 path-match fix); Claude verified offline: S2-1/2/3/5 + B4-18 red pre-fix, S2-4 guard green, 5 mutations each red, hub_data + vault_k8s_auth_config 127/127, shellcheck clean. Stage 1 live-checked 2026-11-17 (E5 pass). stage 1 live-checked 2026-11-17 (E5 pass: the watchdog log now shows rc=2 and Vault's reason, no shard printed); stage 2 (the real fix) still open, gated on E0. 2026-11-16 independent offline verifier (claude) passed. Was: LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
 **Priority:** P2 (proposed: a hub Vault restart stays sealed until the operator runs `deploy_vault --re-unseal` from the Keychain; workaround exists)
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-17 (stage 2 spec for v1.44.2; live Secret already repaired)
+**Waiting on:** live check — since 2026-11-17 (stage 2 runs only in a hub recovery or `hub_data_repoint_vault`; promote does not exercise it — next DR drill on the hub path, operator go)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
