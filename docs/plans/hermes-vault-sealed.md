@@ -14,6 +14,16 @@ Stage B reads the `vault_seal` record that stage A creates, and both stages edit
 `scripts/lib/hermes/` and `scripts/tests/hermes/test_hermes.py`. One dispatch keeps to the
 one-dispatch-per-file rule and lets the stage B tests use the real stage A sensor.
 
+## Before You Start
+
+1. Read `memory-bank/activeContext.md` and both bug docs in full.
+2. `git pull` on `k3d-manager-v1.44.2`.
+3. Read every target file before editing it: `scripts/lib/hermes/sensors.py` (`hostnet_drift`,
+   `_debounced`), `scripts/lib/hermes/repairs.py` (`REPAIRS`, `_r7_precondition`, `_evidence`,
+   `_records_digest`, `propose`, `approve`), `scripts/lib/hermes/correlator.py`,
+   `scripts/lib/hermes/approvals.py`, `bin/k3dm-hermes` (sensor list, resolved branch),
+   `bin/k3dm-webhook` (`_run_analyze`), and the two test files.
+
 ## What to do
 
 Do stage A, then stage B, in one working tree. The bug docs hold the detailed spec; follow each one's
@@ -35,13 +45,28 @@ Combined Files: the union of both Files tables. CHANGELOG `[Unreleased]` gets `#
 - Do NOT change sensors other than adding `vault_seal`, or change the exporter or dashboard JSON.
 - Do NOT add a Claude API provider (that is a feature, logged in `docs/ideas.md`).
 - Do NOT commit, push or open a PR. Claude verifies and commits.
+- Do NOT update `memory-bank/`.
 - Do NOT modify files outside the combined Files list.
+
+## Rules
+
+- LF line endings only; keep existing indentation, quoting and naming; no unsolicited refactors.
+- No test calls a real `kubectl`, Slack, Gemini or the Vault API; stubs only.
+- Pre-fix red: run the new tests against the unmodified tree first and record which fail.
 
 ## Gates
 
 `pytest scripts/tests/hermes/test_hermes.py scripts/tests/bin/test_webhook_analyze_routing.py`,
 `make test-pytest`. Every mutation listed in either bug doc must turn its test red. Report each
 mutation and the test that caught it.
+
+## Definition of Done
+
+- [ ] Stage A and stage B implemented; only files in the combined Files list changed (`git status`).
+- [ ] Both pytest files green; `make test-pytest` green.
+- [ ] Pre-fix red recorded for N1 and N2 tests.
+- [ ] Every listed mutation turns its named test red (table: mutation → test → red).
+- [ ] Report back to Claude: changed files, test output, mutation table. No commit.
 
 ## Acceptance
 
