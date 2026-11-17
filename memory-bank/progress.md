@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: dirused#14 CI green 4/4 (6f09162).
 - 2026-11-17: dirused#14 windows CI 1 red (footer assertion) → fixed 6f09162, CI re-running.
 - 2026-11-17: Argon blind review of dirused#14 dispatched.
 - 2026-11-17: dirused M2a landed 90ce085, PR dirused#14 open; CI + Argon review pending.

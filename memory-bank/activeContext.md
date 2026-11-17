@@ -1,5 +1,6 @@
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-17: dirused#14 CI green 4/4 on head 6f09162 (push + pull_request; windows runs tests 1-8). Merge waits on the Argon review.
 - 2026-11-17 ~18:40Z: dirused#14 CI on 90ce085: portable green, windows 54/55 — all 8 new tests pass; SummaryTests E2 Assert.Single broke on the footer (missed by run 1). Claude fixed the assertion (6f09162: 2 lines + footer prefix, not exact counts, since the runner volume is 79.9%). CI re-running; Argon review still on 90ce085 (delta is test-only).
 - 2026-11-17 ~18:25Z: blind Argon review of dirused#14 dispatched (docs/plans/dirused-m2a-review.md, slug dirused-m2a-review, linked --role review to dirused-m2a-fullness-levels; not counted in WIP).
 - 2026-11-17 ~18:20Z: dirused M2a LANDED as 90ce085 on m2a-fullness-levels (land --allow-out-of-scope: 3 Portable test files added to spec Files after runs 1-2, tools/PACKAGE-README.txt per Contract readers). Portable 37/37; mutation GetType gate → test 9 red (verified by Claude). PR wilddog64/dirused#14 (normal). Next: CI (windows job runs tests 1-8), Argon blind review, live E4 by operator at office. dirused checkout now on m2a-fullness-levels. WIP 2/3.
