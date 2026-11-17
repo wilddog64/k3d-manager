@@ -138,3 +138,20 @@ interface: none
 ```
 
 **Intent approved:** operator, 2026-11-17
+
+
+## Live run 2026-11-17 15:01Z (Claude, operator go "go ahead for E5 and E2")
+
+Webhook restarted first (`make restart-webhook`, new PID 14:58:57Z). `secrets/vault-0` deleted 15:01:11Z (unsealed before);
+Hermes was kicked with `launchctl kickstart` while sealed. Watchdog unsealed it on its 15:05 run (`sealed=false` 15:06:41Z);
+all 9 ExternalSecrets back to `True`.
+
+- `vault_seal` records: 15:02:52Z `healthy`, evidence `sealed: vault-0` (first sealed cycle, debounced); 15:06:03Z
+  `healthy`, `unsealed: 1 pod(s)`. Never degraded, so no "Root cause: Vault sealed" card: **E5 not met, not failed.**
+  A Hermes cycle takes about 70 s to reach `vault_seal`, and a kickstart during a running cycle is a no-op, so only one
+  sealed sample fit in the ~4 min seal.
+- `ArgoCDAppDegraded` holds `for: 5m`, longer than the seal, so no alert fired and the webhook had nothing to diagnose:
+  **E2 not exercised.**
+- Finding: with a working watchdog, a pod restart self-heals inside one Hermes cycle, so the debounce correctly stays
+  quiet. E5 and E2 can only be observed on a seal that outlasts the watchdog (the case that matters), or by pausing the
+  watchdog CronJob for about 12 minutes. Operator decision.

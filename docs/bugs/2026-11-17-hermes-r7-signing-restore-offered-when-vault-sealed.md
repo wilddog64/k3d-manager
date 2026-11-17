@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-17 (dashboard row live-verified 2026-11-17 14:28Z after promote 44e06edd; the Vault-restart check needs an operator go)
+**Waiting on:** operator decision — since 2026-11-17 (dashboard row live-verified 14:28Z; the 15:01Z pod-restart run unsealed inside one Hermes cycle, so E5/E2 need a longer seal: pause the watchdog or wait for a real outage; see `docs/plans/hermes-vault-sealed.md`)
 **Prior art:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, related root cause (no sealed-Vault signal), different symptom (wrong repair offered). That bug is the prerequisite for this one and ships first in the same release.
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
