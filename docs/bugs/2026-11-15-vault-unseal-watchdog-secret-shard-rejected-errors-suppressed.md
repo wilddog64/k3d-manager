@@ -211,3 +211,7 @@ Together with E5 (`cipher: message authentication failed`): **the `vault-unseal`
 ## One-time Secret repair, 2026-11-17 (operator, M5, login Keychain unlocked)
 
 Operator ran a Claude-written script that read the Keychain shard, refused to write unless its fingerprint was `4d9e743984dd`, and patched `secrets/vault-unseal` `shard-1` over stdin (`jq -Rs` → `kubectl patch --patch-file /dev/stdin`; no shard in argv, history or output). Output: before `f1bffbb8cc7e`, `secret/vault-unseal patched`, after `4d9e743984dd`, OK. Claude confirmed `4d9e743984dd` read-only at 01:20:44Z and deleted the script from the M5. The watchdog's next Vault restart should now unseal on its own; stage 2 (v1.44.2) keeps the Secret in step on future Keychain restores.
+
+## Auto-unseal confirmed after the repair, 2026-11-17 (Claude, operator go "go ahead to do that")
+
+`secrets/vault-0` deleted 01:23:20Z (unsealed before). Watchdog job `vault-unseal-watchdog-29914645` (01:25:00Z): `vault sealed — replaying shard`, `unseal rc=0`, `unseal succeeded`; Vault `sealed: false` at 01:25:28Z with no operator step. The live hub now recovers from a Vault restart on its own. Stage 2 (v1.44.2) is still needed so a future Keychain restore does not leave the Secret stale again.
