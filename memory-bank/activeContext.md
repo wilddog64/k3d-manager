@@ -340,3 +340,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - Review row `dirused-m3-review` abandoned with reason; adjudication table posted on #19.
 - Waiting: Windows CI on 4d8bb1c; operator merges #18 → CHANGELOG entry on m3 → #19 → tag v0.0.9.
 - ~23:55Z: Windows CI red on 4d8bb1c — H10 (from 2af7fb0) compared raw CSV free bytes of the runner's C: across two runs (moved 4096 B). Not a product bug; H10 now masks digits before comparing (7890e4c, pushed). Windows tests 58/59 otherwise green; CI rerunning on 7890e4c.
+- CI green on dirused #19 head 7890e4c (portable + windows, push and PR runs). Waiting: operator merges #18 → CHANGELOG entry on m3 → #19 → tag v0.0.9.
