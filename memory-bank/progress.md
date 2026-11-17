@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: idea — /clear metrics + Agent Activity panels (docs/ideas.md, inbox).
 - 2026-11-17 ~19:00Z: dirused M2a fullness levels dispatched (Luna). WIP 3/3.
 - 2026-11-17 ~18:45Z: stall-watch Slack notice shows ~/ (d2a72d35); P3 bug filed for other Slack senders.
 - 2026-11-17 ~18:30Z: dispatched stage 2 (Flash) and OOB M1 (Luna, resumed once after a no-change exit). WIP 2/3.
