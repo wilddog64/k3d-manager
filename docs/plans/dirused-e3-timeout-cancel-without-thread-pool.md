@@ -1,9 +1,10 @@
 # dirused — `/timeout` cancel must not wait for a thread-pool thread (E3 flake diagnosis, then fix)
 
-**Status:** DRAFT — intent pending
+**Status:** READY — intent approved; dispatch next
 **Bug:** `docs/dirused/bugs/2026-11-16-dirused-e3-flakes-when-grace-expires-on-ci.md`
 **Tracked:** separately from k3d-manager releases; this file sits in k3d-manager only so `codex-dispatch start` can read it
-**Intent approved:** —
+**Intent approved:** operator, 2026-11-17
+**Intent approval words:** "approve E3 4 intents" (evidence intents E1–E4)
 **Approval words:** operator 2026-11-17, "yes" to "should I write the E3 diagnosis spec?" (diagnose first, no grace floor)
 **Repo / branch:** wilddog64/dirused, `fix/e3-timeout-cancel` from `main`
 **Implementer:** Flash (agy `gemini-3.8-flash-medium`). **Verifier:** Claude, from the Acceptance block only.

@@ -5,7 +5,7 @@
 **Introduced by:** wilddog64/dirused 588f0c2 (PR #8, merged as 25671fb) — added the hard-abandon wait at timeout + `min(timeout, 2s)`
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon)
-**Waiting on:** operator decision — since 2026-11-17 (intent approval of the diagnosis spec; operator chose diagnose first, no grace floor)
+**Waiting on:** dispatch — since 2026-11-17 (spec intent approved)
 **Approved:** operator 2026-11-16 ("approved 1")
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` not run (vector store context missing earlier today).
 **Filed:** 2026-11-16
