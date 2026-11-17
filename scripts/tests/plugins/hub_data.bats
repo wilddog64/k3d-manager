@@ -1386,7 +1386,7 @@ STUB
   grep -q SENTINELVALUE "$TEST_ROOT/identity-seen"
   run grep -q SENTINELVALUE "$CALL_LOG"
   [ "$status" -eq 1 ]
-  run grep -q keychain "$CALL_LOG"
+  run grep -qx keychain "$CALL_LOG"
   [ "$status" -eq 1 ]
 }
 
