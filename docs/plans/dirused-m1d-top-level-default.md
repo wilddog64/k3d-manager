@@ -71,6 +71,27 @@ and proceed. Exit codes unchanged.
 ### C6. Docs
 README: new default output example, `/deep`, `/exact`, what "on disk" means, the hard-link note for fast mode; `/help` as in C1.
 
+## Files
+
+| File | Change |
+|---|---|
+| `src/Dirused.Common/Options.cs` | `Deep`, `Exact` (C1) |
+| `src/Dirused.Common/ArgParser.cs` | `/deep [n]`, `/exact`, `/summary` override, help (C1) |
+| `src/Dirused.Core/Scanner.cs` | fast default, depth filter, `PerFileCalls` (C2) |
+| `src/Dirused.Core/Targets/RemoteScan.cs` | pass the scan settings through (C2) |
+| `src/Dirused.Cli/Program.cs` | settings, `/summary` override, combined `/top`, multi-target warning (C2, C3, C5) |
+| `src/Dirused.Common/Renderers/Format.cs` | `Format.Short` (C3) |
+| `src/Dirused.Common/Renderers/TextRenderer.cs` | new layout (C3) |
+| `src/Dirused.Common/Renderers/JsonRenderer.cs` | `exact` field (C4) |
+| `src/Dirused.Common/Renderers/CsvRenderer.cs` | depth-filtered rows (C4) |
+| `src/Dirused.Common/ScanResult.cs` | `Exact` on the result, if needed for C4 |
+| `tests/Dirused.Tests/ScannerTests.cs` | tests 1–5 |
+| `tests/Dirused.Tests/OutputCompatTests.cs` | new layout |
+| `tests/Dirused.Tests/RemoteTargetTests.cs` | new layout |
+| `tests/Dirused.Tests.Portable/RendererTests.cs` | tests 6, 7, 10; fixtures |
+| `tests/Dirused.Tests.Portable/ArgParserTests.cs` | tests 8, 9 |
+| `README.md` | C6 |
+
 ## Contract readers
 
 Not a shared k3d-manager contract (no k3d-manager file reads dirused output; grep 2026-11-17). dirused output is a user contract and the default
