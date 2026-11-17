@@ -1,11 +1,11 @@
 # Bug: hub unseal watchdog replays a shard Vault rejects, and hides the error
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
+**Status:** VERIFIED — stage 1 live-checked 2026-11-17 (E5 pass: the watchdog log now shows rc=2 and Vault's reason, no shard printed); stage 2 (the real fix) still open, gated on E0. 2026-11-16 independent offline verifier (claude) passed. Was: LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
 **Priority:** P2 (proposed: a hub Vault restart stays sealed until the operator runs `deploy_vault --re-unseal` from the Keychain; workaround exists)
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-16 (E0 Keychain fingerprint vs f1bffbb8cc7e, E5 watchdog log on the hub; operator)
+**Waiting on:** live check — since 2026-11-17 (E0: operator prints the Keychain shard fingerprint to compare with f1bffbb8cc7e; then stage 2 spec)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
@@ -183,3 +183,20 @@ Test notes for the worker: stub `vault operator unseal` to print, on stderr, exa
 - 00:40:34Z Claude deleted `secrets/vault-0` (operator go). The 00:50:00Z watchdog job logged `vault sealed — replaying shard` then `unseal attempt complete (still sealed or unreachable)`; Vault 1.20.1 stayed sealed (`vault status`: Sealed true, 00:50:52Z). The shard was again not accepted (same symptom as the original report).
 - The deployed CronJob still runs the pre-fix line `vault operator unseal "$(cat "$SHARD_FILE")" >/dev/null 2>&1 || true`: `make hub-promote` / `platform-ops` do not reapply this CronJob; only `vault_install_unseal_watchdog` does. Claude's pre-restart check grepped for `rc=$?`, which matched the old status-probe loop, not the stage-1 `unseal rc=` line — a false positive.
 - Next: operator unseals with `hub_data_unseal_dr`; then, with a go, run `vault_install_unseal_watchdog` on the hub, confirm the CronJob contains `unseal rc=`, and redo E5. The rollout step belongs in this bug's deploy notes.
+
+## Live check E5, 2026-11-17 (Claude): PASS for stage 1
+
+Operator go ("go ahead for those two"). `vault_install_unseal_watchdog` was run from the hub checkout at 6fe58dcb (rc 0; the rendered CronJob now contains `unseal rc=`). `secrets/vault-0` was deleted at 01:00:35Z. Job `vault-unseal-watchdog-29914625` (01:05:00Z) logged:
+
+```
+[unseal-watchdog] vault sealed — replaying shard
+[unseal-watchdog] unseal rc=2
+[unseal-watchdog] Error unsealing: Error making API request.
+[unseal-watchdog] Code: 400. Errors:
+[unseal-watchdog] error decrypting using seal shamir: cipher: message authentication failed
+[unseal-watchdog] unseal attempt complete (still sealed or unreachable)
+```
+
+No shard value was printed. Vault stayed sealed, as expected before stage 2.
+
+`message authentication failed` is Vault's response to a well-formed key that does not belong to this Vault's current key set. That fits the stale-Secret hypothesis: the `vault-unseal` Secret holds a shard from an earlier init. E0 (Keychain fingerprint) confirms or refutes it before stage 2 is specced. Ledger `live_verified` mark at dd7c18ed (stage 1).
