@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 04:55Z: operator chose no /elevate flag; "queue M1f after M1e" — docs/plans/dirused-m1f-backup-privilege.md (enable SeBackupPrivilege when the token holds it, denied-folder hint). Proof on VM (local + SMB) after M1e merges, then spec.
 - 2026-11-17 04:40Z: dirused M1e intents approved (operator "approve intents"); dispatched to Flash (agy) on dirused m1e-listing-file-ids from 96e8d83. v0.0.3 to be cut after M1e merges (M1d+M1e) for E4 office timing.
 - 2026-11-17 04:30Z: dirused#11 MERGED (96e8d83). M1e spec written (docs/plans/dirused-m1e-listing-file-ids.md): dedup hard links via FileIdBothDirectoryInfo listing; proof on VM 20/20 FileId match over SMB, C:\Windows 12.14G vs exact 11.9G in 11.6s; listing AllocationSize wrong (WOF) so unused. Waiting on intent approval, then dispatch (Flash). Supersedes M1c B1.
 - 2026-11-17 04:20Z: dirused E3 done: v0.0.2 ~95s vs PR 8f81d0a ~20s on \\localhost\c$ (4.7x); live-check 10/10. Finding: default double-counts hard links (C:\Windows 20G vs 11.9G exact); operator decision on mitigation before merge. E4 after v0.0.3 release build.
