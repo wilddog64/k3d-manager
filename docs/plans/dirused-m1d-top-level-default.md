@@ -154,4 +154,5 @@ evidence:
 interface: dirused command line (text, JSON, CSV output)
 ```
 
-**Intent approved:** operator, 2026-11-17 ("approve intents and you can dispatch to the agents you pick")
+**Intent approved:** operator, 2026-11-17
+**Approval words:** "approve intents and you can dispatch to the agents you pick"
