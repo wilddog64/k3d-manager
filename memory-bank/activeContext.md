@@ -16,7 +16,7 @@
 
 **Waiting on the operator:**
 1. dirused E4 (office): run the v0.0.3 build against one office agent; report wall time + the Windows row. Then mark M1e spec LIVE-VERIFIED (docs/plans/dirused-m1e-listing-file-ids.md) and decide the L7 vm-live warm-cache follow-up.
-2. Go to `abandon --yes` two stale v1.44.0 dispatch rows: deploy-hub-batch-review, test-hygiene-batch-review.
+2. DONE 2026-11-17: both stale v1.44.0 review rows abandoned (open list empty).
 
 **v1.44.2 scope (bug-fix patch; Branch lines name k3d-manager-v1.44.2):**
 - `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` — ships first; needs an Acceptance block + intent approval.
