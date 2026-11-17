@@ -1,8 +1,9 @@
 # Bug: dispatch stall, child A: a `stalled` state and a watcher that captures, stops and tells the operator
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — A1 f3828ad9 (probe, stalled listing, OrbStack guard); A2 c91b4409 + 25d349c3, 16e6014f (watcher, launchd agent, install targets; machine manifests). Claude + independent Opus verifier; N2/N9 mutants red
+**Status:** LIVE-VERIFIED — 2026-11-17, E8 on the M4 (Claude, operator go). Was: VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — A1 f3828ad9 (probe, stalled listing, OrbStack guard); A2 c91b4409 + 25d349c3, 16e6014f (watcher, launchd agent, install targets; machine manifests). Claude + independent Opus verifier; N2/N9 mutants red
+**Live evidence:** 2026-11-17 · run e8-toy-stall-0306Z · env m4-air/dispatch-stall-watch · scenario frozen-agy-steps-threshold-2700 · commit 16e6014f · proves E8
+**Fix commit:** f3828ad9 (A1), 16e6014f (A2)
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** live check — since 2026-11-16 (E8: operator runs make install-dispatch-stall-watch, then a real stall is captured and announced)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (already planned there, operator 2026-11-14) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
@@ -366,3 +367,18 @@ and gives no db signal, as designed (agy dispatches run on macOS), but the test 
 birth time, the test asserts `running` with no db signal and `stalled` from the process limit, then skips the birth-time cases.
 Reproduced on macOS by hiding `st_birthtime` through a `sitecustomize.py` on PYTHONPATH: the old test failed at the same line, the
 new one passes. Should have been caught by: offline test (Linux run before land). `reference_linux_only_ci_reds_reproduce_locally`.
+
+## Live verification 2026-11-17 (Claude, operator go: "approve E5 and stall -A E8")
+
+E8 on the M4 after `make install-dispatch-stall-watch`. A toy agy dispatch (`e8-toy-stall`, stub agy holding a conversation db with 5 steps,
+then `sleep 5400`) started 02:16:30Z; the watcher began counting silence at 02:21:00Z.
+- 03:06:05Z tick: evidence folder `stall-20261117T030605Z/` (summary, notice, ps, log tail, status, diff) in the run folder; marker
+  `stall-handled-96369-1794881790`; exactly one `stall_detected` ledger line, `silent_s 2705`, `procs 2`, `killed 0`.
+- `status e8-toy-stall` at 03:07Z: `stalled (silent 2780s, 2 procs)`.
+- The sleeping process was still alive after capture (elapsed 61 min at 03:17Z).
+- Slack: the 03:06Z and 03:11Z posts failed with `HTTP 404 no_service`; the watcher logged each failure, wrote no `notified` marker and retried,
+  as specified. Cause: the M4 Keychain item `k3dm-slack-webhook` still held the revoked URL (recurrence appended to
+  `docs/bugs/2026-11-06-hermes-slack-webhook-item-still-holds-revoked-url.md`). The operator replaced the item at 03:14:32Z (k3d-manager app
+  webhook); the 03:16Z tick posted the plain notice (operator screenshot, 19:16 PST) and wrote `notified`.
+Evidence: `live-evidence.txt` in the `2026-11-14-dispatch-stall-a-detector.run` and `2026-11-14-dispatch-stall-a2-watcher.run` folders; ledger
+`live_verified` marks for both slugs. Toy dispatch abandoned, its processes stopped and its db deleted; the watcher stays installed.
