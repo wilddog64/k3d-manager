@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 15:40Z: dirused M1g Part A verified by Claude on the VM (E1 green, pre-fix + 3 mutants red, live /timeout 2s names folder); committed a242be0, PR wilddog64/dirused#13 (Windows CI pending). Part B still held on office probe B2.
 - 2026-11-17 15:25Z: E5 run 2: Root cause card + no r7 met; resolved pending ESO; E2 unexercised. Filed vault-sealed post-land review findings (P2 proposed).
 - 2026-11-17 ~15:35Z: dirused M1g spec written; Part A dispatched to Luna (dirused repo, branch m1g-timeout-folder-parallel-walk); Part B held on office probe.
 - 2026-11-17 15:01Z: Vault restart for E5/E2: auto-unseal OK again; E5/E2 not observable on a sub-5-min seal (debounce + alert for: 5m); waiting on operator decision.

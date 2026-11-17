@@ -1,6 +1,6 @@
 # dirused M1g — a timeout names the folder it stopped in; parallel walk inside one drive
 
-**Status:** Part A ready for dispatch (Luna). Part B held: the VM proof below does not show a gain; waiting on the operator's office probe (B2)
+**Status:** Part A LANDED on branch a242be0, PR wilddog64/dirused#13 (E1 verified by Claude on the dirused-dev VM 2026-11-17 15:36Z: pre-fix red, 3 mutants red; live `\\localhost\c$ /timeout 2s` named one folder). Part B held: the VM proof below does not show a gain; waiting on the operator's office probe (B2)
 **Repo / branch:** wilddog64/dirused; `m1g-timeout-folder-parallel-walk` from `main` at 6c66022 (M1e merged, PR #12)
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); out-of-band repo, no ideas-backlog step (operator, 2026-11-17). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Operator words (2026-11-17):** "go ahead for that, and you can dispatch the tasks on you will" — after the office run below and Claude's two suggestions (name the stuck folder; parallel walk inside one target).
