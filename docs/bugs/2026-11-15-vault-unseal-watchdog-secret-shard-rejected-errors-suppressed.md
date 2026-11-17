@@ -1,6 +1,6 @@
 # Bug: hub unseal watchdog replays a shard Vault rejects, and hides the error
 
-**Status:** LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — stage 1 dd7c18ed on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 3 tests red pre-fix, green on fix; no set -e/pipefail in the pod script; envsubst limited to 3 vars; shard lines filtered before printing). Stage 2 (hub_data.sh) not started
 **Priority:** P2 (proposed: a hub Vault restart stays sealed until the operator runs `deploy_vault --re-unseal` from the Keychain; workaround exists)
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check

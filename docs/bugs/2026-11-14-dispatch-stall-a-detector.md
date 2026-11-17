@@ -1,6 +1,6 @@
 # Bug: dispatch stall, child A: a `stalled` state and a watcher that captures, stops and tells the operator
 
-**Status:** LANDED — A1 f3828ad9 (probe, stalled listing, OrbStack guard); A2 c91b4409 + 25d349c3, 16e6014f (watcher, launchd agent, install targets; machine manifests). Claude + independent Opus verifier; N2/N9 mutants red
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — A1 f3828ad9 (probe, stalled listing, OrbStack guard); A2 c91b4409 + 25d349c3, 16e6014f (watcher, launchd agent, install targets; machine manifests). Claude + independent Opus verifier; N2/N9 mutants red
 **Priority:** P2 (operator, 2026-11-14)
 **Waiting on:** live check — since 2026-11-16 (E8: operator runs make install-dispatch-stall-watch, then a real stall is captured and announced)
 **Branch:** k3d-manager-v1.44.1

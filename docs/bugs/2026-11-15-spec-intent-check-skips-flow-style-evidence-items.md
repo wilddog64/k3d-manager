@@ -1,6 +1,6 @@
 # Bug: spec-intent gate never checks evidence items written in YAML flow style
 
-**Status:** LANDED — d09d98f2 on k3d-manager-v1.44.1, 2026-11-16 (Flash, one correction for the `- E1: {…}` shape found by a whole-corpus run; Claude verified: 11 tests red pre-fix, 29/29 green; corpus diff shows only the two map-style plans newly refused, the accepted fail-closed case)
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — d09d98f2 on k3d-manager-v1.44.1, 2026-11-16 (Flash, one correction for the `- E1: {…}` shape found by a whole-corpus run; Claude verified: 11 tests red pre-fix, 29/29 green; corpus diff shows only the two map-style plans newly refused, the accepted fail-closed case)
 **Priority:** P2 (raised from P3 at grooming 2026-11-15: a gate that silently passes; no wrong dispatch known)
 **Introduced by:** unknown (`scripts/lib/spec_intent.py`)
 **Should have been caught by:** offline test

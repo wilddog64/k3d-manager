@@ -1,6 +1,6 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** LANDED — host guard 3b0def6b + fixture 5b308552 (2026-11-16); recurred 2026-11-14 from a pre-fix dispatch worktree (first fix 22ca679c, VERIFIED live 2026-11-14)
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — host guard 3b0def6b + fixture 5b308552 (2026-11-16); recurred 2026-11-14 from a pre-fix dispatch worktree (first fix 22ca679c, VERIFIED live 2026-11-14)
 **Waiting on:** live check — since 2026-11-16 (E4 after promote; operator deletes m4-air group, retire two stale review worktrees)
 **Branch:** k3d-manager-v1.44.1
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)

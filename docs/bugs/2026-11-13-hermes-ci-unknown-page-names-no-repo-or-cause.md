@@ -1,6 +1,6 @@
 # Bug: Hermes "ci check unknown 30+ min" page names no repo, workflow or cause
 
-**Status:** LANDED — c3642f8f (2026-11-16); captured 2026-11-13
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — c3642f8f (2026-11-16); captured 2026-11-13
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (The `ci` sensor's broad exception handler masks the failing repository, workflow, and underlying error in both Slack pages and logs, degrading alert diagnostics while leaving manual GitHub Actions inspection as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator

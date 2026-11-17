@@ -1,6 +1,6 @@
 # hub-promote containment check refuses the first promote of every release: `git cherry` cannot see squash merges
 
-**Status:** LANDED — 63cf163e on k3d-manager-v1.44.1, 2026-11-16 (Luna, after two spec corrections; Claude verified: 8 new tests red on pre-fix code, 88/88 green on fix, containment-check error fails closed; Claude converted 5 bare `! cmd` fixture preconditions to `run !` at land)
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 63cf163e on k3d-manager-v1.44.1, 2026-11-16 (Luna, after two spec corrections; Claude verified: 8 new tests red on pre-fix code, 88/88 green on fix, containment-check error fails closed; Claude converted 5 bare `! cmd` fixture preconditions to `run !` at land)
 **Priority:** P2 (proposed: blocks every first promote of a new release; workaround BREAK_GLASS=1 after a manual check, which also skips the green-checks gate)
 **Classified:** pending second-agent classification
 **Introduced by:** `aa97c491` (v1.43.15, the uncontained-commits guard from `2026-11-10-hub-promote-discards-cve-promoter-commits.md`)

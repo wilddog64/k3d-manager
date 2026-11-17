@@ -1,6 +1,6 @@
 # Bug: the CI job named `lint` runs the full offline test suite
 
-**Status:** LANDED — f20d1b2b on k3d-manager-v1.44.1 (2026-11-16); E4 push-run green, pull_request run pending the release PR
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — f20d1b2b on k3d-manager-v1.44.1 (2026-11-16); E4 push-run green, pull_request run pending the release PR
 **Priority:** P2 — raised by the operator 2026-11-16 ("we really need to fix this slow ci. this a big hurdle"); was P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (CI job hygiene/test-only issue where offline test suites are bundled into the `lint` job, delaying lint feedback without breaking functionality); Claude proposed P3. Agreed.
 **Triage:** passed over, 1st — grooming 2026-11-12, operator.

@@ -1,6 +1,6 @@
 # Bug: the bug tables put every triaged bug in the release it was filed on, ignoring `**Triage:**` and `**Release:**`
 
-**Status:** LANDED — 8cff0301 on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 8 tests red pre-fix, 140 green; corpus diff 179 docs, ~25 move to their groomed release, rest same release from an explicit line)
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 8cff0301 on k3d-manager-v1.44.1, 2026-11-16 (Luna; Claude verified: 8 tests red pre-fix, 140 green; corpus diff 179 docs, ~25 move to their groomed release, rest same release from an explicit line)
 **Priority:** P2
 **Classified:** not run (queued for the next triage)
 **Introduced by:** pre-existing

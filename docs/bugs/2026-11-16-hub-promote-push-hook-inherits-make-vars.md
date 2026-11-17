@@ -1,6 +1,6 @@
 # hub-promote pushes run the pre-push hook with REF and BREAK_GLASS exported, so refusal tests fail
 
-**Status:** LANDED — 4476316a (Flash; Claude verified: E1 red pre-fix, hub_promote 59/59, appsets green)
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 4476316a (Flash; Claude verified: E1 red pre-fix, hub_promote 59/59, appsets green)
 **Priority:** P2 — the promote half-completes (deploy/hub moves, tag push refused); workaround: push the tag with --no-verify
 **Introduced by:** unknown
 **Should have been caught by:** offline test

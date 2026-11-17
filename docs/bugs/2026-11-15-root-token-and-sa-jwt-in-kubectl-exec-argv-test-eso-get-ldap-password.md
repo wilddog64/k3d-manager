@@ -1,6 +1,6 @@
 # Bug: Vault tokens and a ServiceAccount JWT passed in `kubectl exec` argv (`test_eso`, `test_vault` login, `bin/get-ldap-password`)
 
-**Status:** LANDED — 2f8bd1ae on k3d-manager-v1.44.1, 2026-11-16 (Luna, after one spec correction; Claude verified: new tests red on pre-fix code 3/5 with both positive controls green, green on fix; mutants m1-m6 red; no token left in any sh -c string)
+**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 2f8bd1ae on k3d-manager-v1.44.1, 2026-11-16 (Luna, after one spec correction; Claude verified: new tests red on pre-fix code 3/5 with both positive controls green, green on fix; mutants m1-m6 red; no token left in any sh -c string)
 **Priority:** P2 (proposed: A02 security-rule violation; tokens visible in process lists on the host and in the pod, and under xtrace; dev/test paths, no known leak)
 **Introduced by:** pre-existing
 **Should have been caught by:** review
