@@ -1,8 +1,9 @@
 # Bug: vectordb runs pgvector on the floating `pg17` tag, not a pinned version
 
-**Status:** LANDED — 74c8c7f3 on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: new test red on pre-fix manifest, digest matches Docker Hub and the live pod)
+**Status:** LIVE-VERIFIED — live E2 2026-11-17 (Claude, hub m5-air at deploy/hub 6fe58dcb: vectordb-0 runs 0.8.7-pg17@sha256:b513c485…, Running; ledger live_verified). Landed 74c8c7f3 on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: new test red on pre-fix manifest, digest matches Docker Hub and the live pod)
+**Fix commit:** 74c8c7f3
+**Live evidence:** 2026-11-17 · run claude-tmux-m5-kubectl-get-vectordb-pod · env hub/k3d-k3d-cluster-deploy-hub-6fe58dcb · scenario vectordb-0-imageid-pinned-digest-after-platform-ops · commit 74c8c7f3 · proves E2
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-16 (E2 after hub-promote + platform-ops)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (one-line pin; A08 rule) — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** pre-existing
