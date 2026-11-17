@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 16:56Z: dirused PR #13 merged (3865f28, CI 4/4 on 83b9ca0); v0.0.4 tagged, Release run 44130794197 green, pre-release with win-x64 + win-arm64 zips and sha256. Waiting on operator office tests (B2 probe, E4 /timeout stop line, /file servers.list SVI system only).
 - 2026-11-17 16:55Z: dirused M1h-b verified on VM (7/7; pre-fix 4 red; dir-row/depth/unextended/any-exception mutants each red; full 45/47 known VM reds; portable 36/36) and landed 83b9ca0 on #13. CSV reflection test kept (no stopped-scan seam via Program.Run). Next: CI green on 83b9ca0 -> merge #13 -> tag v0.0.4 (release.yml on v* tag) -> operator office tests.
 - 2026-11-17 16:50Z: Argon delta review of #13 (a242be0..ae4b253): 5 findings, all verified by Claude (SVI 0 B dir row; SVI as target exits 0; \\?\ root mismatch; non-denied-error test gap; CSV test via reflection). Spec dirused-m1h-b-review-fixes dispatched to Luna. CI on ae4b253 green 4/4. v0.0.4 waits on M1h-b.
 - 2026-11-17 16:40Z: dirused M1h verified on VM (targeted 4/4; any-depth + no-Win32 mutants red; renderer mutant red locally; .NET UNC parent check confirmed) and landed ae4b253 on m1g branch, pushed to #13. Gap: any-exception mutant survives (no test that a non-denied error on SVI stays INCOMPLETE). Argon delta review (a242be0..ae4b253) dispatched; then merge #13, tag v0.0.4.
