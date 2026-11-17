@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: dirused v0.0.6 release build failed (order-dependent test); fix dispatched to Luna, ships as v0.0.7.
 - 2026-11-17: dirused #15 merged 13bd6c4, v0.0.6 tagged; Argon 2 low findings -> M2c.
 - 2026-11-17: dirused M2b landed 46d22df, PR #15 open, Argon review running. M1 E5 live-observed. P3 bug: open --count ignores link-set review role.
 - 2026-11-17: multi-project M1 landed 6972d10a (per-project versions, ledger project, open --count); E5 live pending. P3 bug: stall-watch events lack project.
