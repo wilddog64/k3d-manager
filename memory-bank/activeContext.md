@@ -2,9 +2,9 @@
 
 - Operator ran hub-promote + appsets-check + platform-ops; Claude confirmed `make hub-promote-status` (deploy/hub 6fe58dcb).
   The 18 commits after 6fe58dcb are docs/memory-bank only (no code drift). The push-hook fix ran for real: the tag push went through cleanly.
-- E3 flake new hypothesis (Claude, from reading ScanRunner.cs on main): workers use Task.Factory.StartNew without LongRunning and block
-  pool threads on done.Wait, so CancelAfter's callback can queue behind thread-pool starvation on a 2-vCPU runner. Not yet proven. If true,
-  it's a product bug at high /parallel, and LongRunning is the fix rather than a grace floor.
+- E3 flake: workers already use LongRunning (ScanRunner.cs:139; Claude first misread this). Remaining hypothesis: CancelAfter's timer callback
+  queues to a starved thread pool. Spec docs/plans/dirused-e3-timeout-cancel-without-thread-pool.md (red-first; stop if not reproducible), intent pending.
+- PR #162 opened (v1.44.1 release, f9248a48). Blind Argon diff review running (Copilot allowance exhausted). v1.45.0 multi-project-records intent APPROVED (operator 2026-11-17).
 - Next: live checks one at a time (pgvector E2 first); /create-pr can open now (live smoke gates merge, not creation); intent review of multi-project-records.
 
 ## Handoff 2026-11-17 ~00:30Z — v1.44.1 verified offline; dirused M1c-A PR #10 awaits office check — START HERE

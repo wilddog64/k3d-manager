@@ -5,7 +5,7 @@
 **Introduced by:** wilddog64/dirused 588f0c2 (PR #8, merged as 25671fb) — added the hard-abandon wait at timeout + `min(timeout, 2s)`
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon)
-**Waiting on:** operator decision — since 2026-11-16 (product grace floor, or diagnose why a cancelled cooperative scan misses a 1 s grace)
+**Waiting on:** operator decision — since 2026-11-17 (intent approval of the diagnosis spec; operator chose diagnose first, no grace floor)
 **Approved:** operator 2026-11-16 ("approved 1")
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` not run (vector store context missing earlier today).
 **Filed:** 2026-11-16
@@ -47,3 +47,9 @@ A 1 s lateness is hard to explain by timer jitter alone, so the jitter diagnosis
 cancel reaches the delegate's token at all on the abandon path (`ScanRunner.cs`: the linked `timeoutCts`, its disposal, and when the worker
 stops waiting), before choosing fix option 2. Seen while verifying M1c-A; not caused by it (the failing run is the unchanged base commit).
 
+
+## Decision and spec (2026-11-17)
+
+Operator chose to diagnose first, not add a grace floor. Workers already run with `LongRunning` (`ScanRunner.cs:139`) and each scan has its own thread,
+so neither uses the pool. `CancelAfter` (`ScanRunner.cs:43`), however, delivers the timeout through a thread-pool callback, which can queue behind a starved pool.
+Spec: `docs/plans/dirused-e3-timeout-cancel-without-thread-pool.md`. Its first commit must reproduce the failure (red on `main`) before any product change.
