@@ -325,3 +325,11 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - Spec `docs/plans/dirused-m3-html-output.md` (d7f90700), low risk, Intent approved. Dispatched slug `dirused-m3-html-output`, branch `m3-html-output` (from main aa54c2b), version v0.0.9, Luna. Program.Run tests (H10/H11/H14) live in the Windows suite — verify on PR Windows CI; portable H1-H9, H12-H13 run locally.
 - Gotcha: `codex-dispatch start --spec` needs a repo-relative path; branch must exist on origin first.
 - WIP: 1 (this). Next: watch exit, verify, land, PR (add CHANGELOG section), tag v0.0.9.
+
+### 2026-11-17 ~23:20Z — dirused M3 landed, PR #19, Argon review running
+- Luna finished; Claude verified: portable 55/55, builds 0/0, diff --check clean; pre-fix does not compile on aa54c2b; mutations (no encode → H7 red, host order reversed → H6 red, CRIT→WARN → H6 red); sample HTML levels correct.
+- Claude removed H6's temp-dir sample write; dropped Luna's standalone CHANGELOG.md (PR #18 owns it) — add M3 `[Unreleased]` entry to m3 branch after #18 merges, before tag v0.0.9.
+- Landed 2af7fb0 with `--allow-out-of-scope` (FleetRunnerTests usage assertion + two new portable test files: spec Files table gave bare file names — spec defect). Verify recorded pass.
+- PR wilddog64/dirused#19 open (normal). Windows CI = evidence for H10/H11/H14. Blind Argon review dispatched: slug `dirused-m3-review` (spec docs/plans/dirused-m3-review.md).
+- Gotchas: verify evidence needs `verifier: claude` and `tests_from: acceptance` exactly.
+- Next: Argon result → adjudicate; Windows CI green; operator merges #18 then #19; CHANGELOG entry; tag v0.0.9; office live L15 + open C:\temp\output.html from a fleet run.
