@@ -1,3 +1,12 @@
+## 2026-11-17 ~00:20Z — v1.44.1 PROMOTED: deploy/hub 6fe58dcb, tag hub-promote/20261117T001751Z
+
+- Operator ran hub-promote + appsets-check + platform-ops; Claude confirmed `make hub-promote-status` (deploy/hub 6fe58dcb).
+  The 18 commits after 6fe58dcb are docs/memory-bank only (no code drift). The push-hook fix ran for real: the tag push went through cleanly.
+- E3 flake new hypothesis (Claude, from reading ScanRunner.cs on main): workers use Task.Factory.StartNew without LongRunning and block
+  pool threads on done.Wait, so CancelAfter's callback can queue behind thread-pool starvation on a 2-vCPU runner. Not yet proven. If true,
+  it's a product bug at high /parallel, and LongRunning is the fix rather than a grace floor.
+- Next: live checks one at a time (pgvector E2 first); /create-pr can open now (live smoke gates merge, not creation); intent review of multi-project-records.
+
 ## Handoff 2026-11-17 ~00:30Z — v1.44.1 verified offline; dirused M1c-A PR #10 awaits office check — START HERE
 
 **Objective:** finish v1.44.1 (live checks, then /create-pr) and close dirused M1c-A (operator office check, merge, tag).
