@@ -1,6 +1,6 @@
 # dirused M1e — hard links counted once, from the directory listing
 
-**Status:** dispatched — Flash (agy), 2026-11-17
+**Status:** LANDED — dirused 5d4b51b + aad521e (verifier fixes) on m1e-listing-file-ids, PR wilddog64/dirused#12 (2026-11-17); CI green; E3 done; Argon review pending; E4 after v0.0.3
 **Repo / branch:** wilddog64/dirused; `m1e-listing-file-ids` from `main` at 96e8d83 (M1d merged, PR #11)
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); out-of-band repo, no ideas-backlog step (operator, 2026-11-17). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Operator words (2026-11-17):** "go for 1" — merge M1d now, fix the hard-link overcount next in M1e.
@@ -152,3 +152,19 @@ interface: dirused command line (text, JSON, CSV output)
 
 **Intent approved:** operator, 2026-11-17
 **Approval words:** "approve intents"
+
+## E3 result (Claude, dirused-dev VM BENTO ARM64, 2026-11-17T03:58Z, `\\localhost\c$`)
+
+| | M1d (8f81d0a) | M1e (5d4b51b) |
+|---|---|---|
+| default | 20.8s / 20.6s, Windows 20G | 13.5s / 13.6s, Windows 12G |
+| `/exact` | 96.1s / 94.1s, Windows 12G (7.6G on disk) | 39.3s / 38.9s, same values |
+
+Top-level rows now sum below the volume's 20G used. JSON keys `target,volume,directories,files,errors,complete,exact` and CSV header `kind,target,path,logical_bytes,on_disk_bytes` unchanged.
+Output: scratchpad `e3/bench-m1e-out.txt` (session e25df53e). aad521e changes only no-ID servers and empty share roots, so it does not affect these numbers.
+
+## Verifier (Opus, Acceptance only, 2026-11-17)
+
+M1–M4 and N1–N3 pass. Blocking: Windows CI red on a wrong assertion (RemoteTargetTests:142, top-level file rows only), fixed in aad521e.
+Taken: a FileId of 0 or all-ones is not deduplicated (new test); ERROR_FILE_NOT_FOUND on the first listing call means an empty share root (no test, no empty share available).
+Left (low): denied-directory wording now "Access is denied."; `\\?\` targets show prefixed paths in the listing branch; a mid-listing failure loses that folder's partial entries; Ctrl-C waits for the current listing; an error code other than 87/1/50 from a rejecting redirector is a scan error, not a fallback.

@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 06:05Z: dirused PR #12 opened (M1e, head aad521e). E3: default 20.7s→13.5s, Windows 20G→12G; /exact 95s→39s. vm-live on aad521e ran; blind Argon review running.
 - 2026-11-17 05:45Z: dirused M1e verifier (Opus): code meets M1-M4/N1-N3, but Windows CI red on test defect (RemoteTargetTests:142, top-level file rows only). Claude fixed in aad521e + hardening (FileId 0/MaxValue not deduped, ERROR_FILE_NOT_FOUND on first listing = empty share root) + Test_MissingFileIdIsNotDeduplicated. CI aad521e green (windows 35/35, portable 35/35). E3 VM bench running.
 - 2026-11-17 05:30Z: dirused M1e exited OK; Claude reviewed diff (matches spec), committed 5d4b51b in worktree, landed on m1e-listing-file-ids (portable 35/35), pushed; CI running. Opus verifier (Acceptance only) running; E3 VM timing (M1d 8f81d0a build vs M1e) running.
 - 2026-11-17 05:05Z: operator chose to wait for M1e before v0.0.3 (no tag from 96e8d83). Sequence: M1e exit → verify → CI → VM timing + Acceptance verifier → PR → operator merge → tag v0.0.3 → E4 office checklist. M1f after.
