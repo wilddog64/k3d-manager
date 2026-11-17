@@ -885,6 +885,45 @@ def hostnet_drift(run, state, threshold=2):
         return record("hostnet_drift", "unknown", "host-network drift source unavailable")
 
 
+def vault_seal(run, state, context=None, threshold=2):
+    """Report Vault seal state from service-registration pod labels only."""
+    ctx = context or os.environ.get("K3DM_HERMES_JOB_CONTEXT", "k3d-k3d-cluster")
+    try:
+        argv = ["kubectl", "--context", ctx, "-n", "secrets", "get", "pods", "-l",
+                "app.kubernetes.io/name=vault,component=server", "-o", "json",
+                "--request-timeout=10s"]
+        code, output = run(argv, {})
+        payload = json.loads(output) if code == 0 and output else {}
+        items = payload.get("items")
+        if not isinstance(items, list) or not items:
+            return record("vault_seal", "unknown", "vault seal state unavailable")
+        pods = []
+        sealed_names = []
+        for item in items:
+            metadata = item.get("metadata", {})
+            labels = metadata.get("labels", {})
+            if "vault-sealed" not in labels:
+                return record("vault_seal", "unknown", "vault seal state unavailable")
+            name = metadata.get("name", "?")
+            sealed = labels["vault-sealed"] == "true"
+            pods.append({"name": name, "sealed": sealed,
+                         "initialized": (labels.get("vault-initialized") == "true"
+                                         if "vault-initialized" in labels else None),
+                         "active": (labels.get("vault-active") == "true"
+                                    if "vault-active" in labels else None)})
+            if sealed:
+                sealed_names.append(name)
+        data = {"pods": pods}
+        if sealed_names:
+            status = ("degraded" if _debounced("vault_seal", True,
+                                                max(0, threshold - 1), state) else "healthy")
+            return record("vault_seal", status, "sealed: " + ", ".join(sealed_names[:3]), data=data)
+        _debounced("vault_seal", False, threshold, state)
+        return record("vault_seal", "healthy", f"unsealed: {len(pods)} pod(s)", data=data)
+    except Exception:
+        return record("vault_seal", "unknown", "vault seal state unavailable")
+
+
 def _template_fingerprint(pod_spec):
     containers = []
     for container in ((pod_spec or {}).get("initContainers", []) +

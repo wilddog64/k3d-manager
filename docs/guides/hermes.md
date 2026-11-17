@@ -205,6 +205,8 @@ flap does not trip it). Sensors are read-only except that the Slack config senso
    Kubernetes and ArgoCD cannot see because they poll only the probe groups. It is disabled by
    default and files debounced deltas into `docs/bugs/` through the same path as e2e and status
    triage.
+8. **`vault_seal`** — reads only Vault pod labels to report whether Vault is sealed. It has no
+   repair because unsealing belongs to the in-cluster watchdog, not Hermes.
 
 ### `data_layer` unknown — evidence → cause
 

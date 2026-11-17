@@ -16,6 +16,7 @@ class Correlator:
         del history[:-self.correlation_window]
         contributors = sorted({sensor for cycle in history for sensor in cycle})
         active = len(contributors) >= 2
+        vault_sealed = self._vault_sealed(records)
         was_active = state.get("incident_active", False)
         notified = state.get("incident_sensors", [])
         if active and not was_active:
@@ -23,7 +24,7 @@ class Correlator:
             state["incident_sensors"] = contributors
             event = {"kind": "incident", "sensors": contributors,
                      "text": self._template(records, contributors, "incident")}
-            return self._enrich(event, state, llm, today)
+            return self._enrich(event, state, llm, today, vault_sealed)
         if active and was_active:
             joined = [sensor for sensor in contributors if sensor not in notified]
             if not joined:
@@ -32,7 +33,7 @@ class Correlator:
             event = {"kind": "escalation", "sensors": contributors,
                      "text": self._template(records, contributors,
                                             f"escalation ({', '.join(joined)} joined)")}
-            return self._enrich(event, state, llm, today)
+            return self._enrich(event, state, llm, today, vault_sealed)
         if not active and was_active:
             state["incident_active"] = False
             state["incident_sensors"] = []
@@ -40,19 +41,30 @@ class Correlator:
         return None
 
     @staticmethod
+    def _vault_sealed(records):
+        return any(item.get("sensor") == "vault_seal" and item.get("status") == "degraded"
+                   for item in records)
+
+    @staticmethod
     def _template(records, contributors, kind):
         details = [f"{item['sensor']}: {item['evidence']} ({item['sampled_at']})"
                    for item in records if item["sensor"] in contributors]
         unknown = [item["sensor"] for item in records if item["status"] == "unknown"]
         context = f" Source unavailable: {', '.join(unknown)}." if unknown else ""
-        return f"Hermes {kind}: {' + '.join(contributors)}. {'; '.join(details)}.{context}"
+        text = f"Hermes {kind}: {' + '.join(contributors)}. {'; '.join(details)}.{context}"
+        vault = next((item for item in records if item.get("sensor") == "vault_seal" and
+                      item.get("status") == "degraded"), None)
+        if vault:
+            text = (f"Root cause: Vault sealed ({vault.get('evidence', '')}). ESO and ArgoCD failures listed below follow from it. "
+                    "The unseal watchdog retries every 5 minutes; nothing to approve unless Vault is still sealed after 15 minutes.\n" + text)
+        return text
 
-    def _enrich(self, event, state, llm, today):
+    def _enrich(self, event, state, llm, today, vault_sealed=False):
         day = today or datetime.now(timezone.utc).date().isoformat()
         budget = state.setdefault("llm_budget", {"day": day, "count": 0})
         if budget.get("day") != day:
             budget.update({"day": day, "count": 0})
-        if llm and self.provider != "claude" and budget["count"] < self.daily_budget:
+        if llm and not vault_sealed and self.provider != "claude" and budget["count"] < self.daily_budget:
             budget["count"] += 1
             try:
                 event["text"] = llm(event["text"], self.provider) or event["text"]

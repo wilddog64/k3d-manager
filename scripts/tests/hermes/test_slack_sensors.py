@@ -615,7 +615,9 @@ def test_rotation_state_is_saved_before_later_poll_failure(monkeypatch, tmp_path
     path = tmp_path / "state.json"
     with pytest.raises(RuntimeError, match="later failure"):
         module._poll_cycle({}, path, now=1000, status_runner=None)
-    assert forwarded == [((None,), {"may_rotate": True, "now": 1000, "state_path": path})]
+    # agent-audit: allow assert-removed same assertion, now also expecting withdraw_on_resolve=True from _poll_cycle
+    assert forwarded == [((None,), {"may_rotate": True, "now": 1000, "state_path": path,
+                                   "withdraw_on_resolve": True})]
     import json
     saved = json.loads(path.read_text())
     assert saved["slack_config"]["expires_at"] == 44100

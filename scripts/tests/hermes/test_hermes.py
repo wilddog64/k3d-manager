@@ -3,6 +3,7 @@ from io import BytesIO
 import importlib.machinery
 import importlib.util
 import json
+import inspect
 import re
 import sys
 from urllib.error import HTTPError, URLError
@@ -16,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 from hermes.correlator import Correlator
 from hermes import repairs
 from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, kine, kine_log_signals,
-                            _human_age, _human_bytes, hostnet_drift, node_pressure, reachability,
+                            _human_age, _human_bytes, hostnet_drift, vault_seal, node_pressure, reachability,
                             stale_acg_registration,
                             status_checks, token_expiry_advisory, values_branch)
 from hermes.slack import post_summary
@@ -284,7 +285,7 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
     calls = []
     runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
-    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
+    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "vault_seal", "kine", "ci",
                  "alert_delivery", "vectordb", "superseded_jobs"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
@@ -308,7 +309,7 @@ def test_c13_poll_time_and_permissions_are_forwarded_to_slack_sensor(monkeypatch
     seen = []
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "")
     for name in ("eso", "argocd", "values_branch", "reachability", "node_pressure", "data_layer",
-                 "hostnet_drift", "superseded_jobs", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
+                 "hostnet_drift", "vault_seal", "superseded_jobs", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: record(sensor_name, "healthy", "fixture"))
     monkeypatch.setattr(k3dm_hermes, "slack_app_config",
@@ -330,7 +331,7 @@ def test_c6_rotation_metadata_is_saved_before_later_cycle_failure(monkeypatch, t
     path = tmp_path / "state.json"
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "")
     for name in ("eso", "argocd", "values_branch", "reachability", "node_pressure", "data_layer",
-                 "hostnet_drift", "superseded_jobs", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
+                 "hostnet_drift", "vault_seal", "superseded_jobs", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: record(sensor_name, "healthy", "fixture"))
     def rotated(_api, state, **_kwargs):
@@ -382,7 +383,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     monkeypatch.setattr(k3dm_hermes, "slack_app_config", lambda *_args, **_kwargs: sensor("slack_app_config", "healthy"))
     monkeypatch.setattr(k3dm_hermes, "slack_relay_reachable", lambda *_args, **_kwargs: sensor("slack_relay_reachable", "healthy"))
-    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
+    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "vault_seal", "kine", "ci",
                  "alert_delivery", "vectordb", "superseded_jobs"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
@@ -1233,6 +1234,139 @@ def test_hostnet_drift_healthy_degraded_after_two_cycles_and_unknown_on_failure(
     assert degraded["status"] == "degraded"
     assert "monitoring/node-exporter" in degraded["evidence"]
     assert hostnet_drift(lambda *_: (1, ""), {})["status"] == "unknown"
+
+
+def _vault_payload(labels):
+    return json.dumps({"items": [{"metadata": {"name": "vault-0", "labels": labels}}]})
+
+
+def test_vault_seal_unsealed_is_healthy():
+    result = vault_seal(lambda *_: (0, _vault_payload({"vault-sealed": "false",
+        "vault-initialized": "true", "vault-active": "true"})), {})
+    assert result["status"] == "healthy" and result["evidence"] == "unsealed: 1 pod(s)"
+
+
+def test_vault_seal_sealed_degrades_on_second_cycle():
+    state = {}
+    run = lambda *_: (0, _vault_payload({"vault-sealed": "true", "vault-initialized": "true",
+                                          "vault-active": "true"}))
+    assert vault_seal(run, state)["status"] == "healthy"
+    second = vault_seal(run, state)
+    assert second["status"] == "degraded" and second["evidence"] == "sealed: vault-0"
+
+
+def test_vault_seal_no_pods_is_unknown():
+    assert vault_seal(lambda *_: (0, '{"items":[]}'), {})["status"] == "unknown"
+
+
+def test_vault_seal_missing_label_is_unknown():
+    result = vault_seal(lambda *_: (0, _vault_payload({"vault-initialized": "true",
+                                                       "vault-active": "true"})), {})
+    assert result["status"] == "unknown"
+
+
+def test_vault_seal_kubectl_error_is_unknown():
+    assert vault_seal(lambda *_: (1, ""), {})["status"] == "unknown"
+
+
+def test_vault_seal_argv_is_read_only():
+    calls = []
+    runner = lambda argv, _env: calls.append(argv) or (0, _vault_payload({
+        "vault-sealed": "false", "vault-initialized": "true", "vault-active": "true"}))
+    vault_seal(runner, {}, context="ctx")
+    assert calls == [["kubectl", "--context", "ctx", "-n", "secrets", "get", "pods", "-l",
+                      "app.kubernetes.io/name=vault,component=server", "-o", "json",
+                      "--request-timeout=10s"]]
+
+
+def test_vault_seal_data_is_boolean():
+    result = vault_seal(lambda *_: (0, _vault_payload({"vault-sealed": "false",
+        "vault-initialized": "true", "vault-active": "true"})), {})
+    assert result["data"]["pods"][0] == {"name": "vault-0", "sealed": False,
+        "initialized": True, "active": True}
+
+
+def test_vault_seal_no_repair_can_unseal():
+    for entry in repairs.REPAIRS.values():
+        source = inspect.getsource(entry["build_command"]).lower()
+        assert "unseal" not in source and "vault operator" not in source
+    readers = [key for key, entry in repairs.REPAIRS.items() if "vault_seal" in entry["reads"]]
+    assert readers == ["r7"]
+
+
+def test_vault_seal_run_cycle_includes_record(monkeypatch):
+    names = ("eso", "argocd", "values_branch", "reachability", "node_pressure", "data_layer",
+             "hostnet_drift", "vault_seal", "superseded_jobs", "kine", "vectordb", "alert_delivery",
+             "slack_app_config", "slack_relay_reachable", "ci", "app_health")
+    for name in names:
+        monkeypatch.setattr(k3dm_hermes, name, lambda *a, __name=name, **kw: {
+            "sensor": __name, "status": "healthy", "evidence": "ok", "data": {}})
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "")
+    monkeypatch.setattr(k3dm_hermes, "_save_state", lambda *_: None)
+    records, _event = k3dm_hermes._run_cycle({})
+    assert any(item["sensor"] == "vault_seal" for item in records)
+
+
+def test_root_cause_vault_sealed_leads_and_skips_llm():
+    calls, corr = [], Correlator(correlation_window=1)
+    records = [sensor("vault_seal", "degraded"), sensor("eso", "degraded"), sensor("argocd", "degraded")]
+    event = corr.process(records, {}, lambda *args: calls.append(args) or "rewritten")
+    assert event["text"].startswith("Root cause: Vault sealed") and calls == []
+
+
+def test_root_cause_absent_when_vault_healthy():
+    calls, corr = [], Correlator(correlation_window=1)
+    records = [sensor("vault_seal", "healthy"), sensor("eso", "degraded"), sensor("argocd", "degraded")]
+    corr.process(records, {}, lambda *args: calls.append(args) or "rewritten")
+    assert calls and "Root cause" not in calls[0][0]
+
+
+def _cycle_with_stubs(monkeypatch, state, event):
+    names = ("eso", "argocd", "values_branch", "reachability", "node_pressure", "data_layer",
+             "hostnet_drift", "vault_seal", "superseded_jobs", "kine", "vectordb", "alert_delivery",
+             "slack_app_config", "slack_relay_reachable", "ci", "app_health")
+    for name in names:
+        monkeypatch.setattr(k3dm_hermes, name, lambda *a, __name=name, **kw: {
+            "sensor": __name, "status": "healthy", "evidence": "ok", "data": {}})
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "")
+    monkeypatch.setattr(k3dm_hermes, "_save_state", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes.Correlator, "process", lambda *_: event)
+
+
+def test_resolved_lists_withdrawn_and_clears(monkeypatch):
+    proposal = {"action_id": "r7-12345678", "name": "Restore", "expires_at": "2099-01-01T00:00:00Z"}
+    state = {"pending_repairs": {proposal["action_id"]: proposal}}
+    _cycle_with_stubs(monkeypatch, state, {"kind": "resolved", "sensors": [], "text": "resolved"})
+    monkeypatch.setattr(k3dm_hermes.repairs, "propose", lambda *_: (_ for _ in ()).throw(AssertionError()))
+    _, event = k3dm_hermes._run_cycle(state, withdraw_on_resolve=True)
+    assert proposal["action_id"] in event["text"] and "Nothing to approve" in event["text"]
+    assert state["pending_repairs"] == {}
+
+
+def test_resolved_without_pending_keeps_text(monkeypatch):
+    state = {"pending_repairs": {}}
+    _cycle_with_stubs(monkeypatch, state, {"kind": "resolved", "sensors": [], "text": "today's text"})
+    _, event = k3dm_hermes._run_cycle(state, withdraw_on_resolve=True)
+    assert event["text"] == "today's text"
+
+
+def test_resolved_keeps_pending_on_approval_resample(monkeypatch):
+    proposal = {"action_id": "r7-12345678", "name": "Restore", "expires_at": "2099-01-01T00:00:00Z"}
+    state = {"pending_repairs": {proposal["action_id"]: proposal}}
+    _cycle_with_stubs(monkeypatch, state, {"kind": "resolved", "sensors": [], "text": "resolved"})
+    monkeypatch.setattr(k3dm_hermes.repairs, "propose", lambda *_: [])
+    k3dm_hermes._run_cycle(state)
+    assert state["pending_repairs"].get(proposal["action_id"]) == proposal
+
+
+def test_recommended_line_on_text_card(monkeypatch):
+    proposal = {"action_id": "r2-12345678", "name": "repair", "command": "run", "approve_when": "condition",
+                "if_ignored": "still broken"}
+    state = {}
+    _cycle_with_stubs(monkeypatch, state, {"kind": "incident", "sensors": ["eso"], "text": "incident"})
+    monkeypatch.setattr(k3dm_hermes.repairs, "propose", lambda *_: [proposal])
+    _, event = k3dm_hermes._run_cycle(state)
+    assert "Recommended: Approve — " in event["text"] and "If you do nothing: " in event["text"]
 
 
 def test_kine_log_signals_ignores_compact_rev_key_in_slow_sql():

@@ -60,6 +60,9 @@ def interactive_blocks(message, proposals, nonce):
     for item in proposals:
         value = f"{item['action_id']}|{nonce}"
         detail = f"*{item['name']}* (`{item['action_id']}`)\nBlast radius: {item['blast_radius']}"
+        if item.get("approve_when") and item.get("if_ignored"):
+            detail += (f"\nRecommended: Approve — {item['approve_when']}. "
+                       f"If you do nothing: {item['if_ignored']}.")
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": detail[:2900]}})
         blocks.append({"type": "actions", "block_id": item["action_id"], "elements": [
             {"type": "button", "action_id": "hermes_approve", "style": "primary",
