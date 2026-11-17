@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-17 (after the vault-sealed sensor bug lands)
+**Waiting on:** operator decision — since 2026-11-17 (intent approval on the combined plan `docs/plans/hermes-vault-sealed.md`, then dispatch)
 **Prior art:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, related root cause (no sealed-Vault signal), different symptom (wrong repair offered). That bug is the prerequisite for this one and ships first in the same release.
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
@@ -37,6 +37,7 @@ Deterministic rules decide; an LLM never decides whether to approve.
    - the `vault_seal` record is `healthy` (degraded or unknown or missing → not offered);
    - the `N/M not synced` count parsed from the `eso` evidence has `N <= 2`; evidence that does not parse → not offered.
    Because `approve()` re-runs the precondition, the same rule refuses an approval if Vault seals between proposal and tap.
+   Add `vault_seal` to r7's `reads` tuple (`repairs.py:291`) and to r7's entry in `_evidence` (`repairs.py:320`), so the proposal evidence shows Vault's state and the approval digest (`_records_digest`) changes if Vault seals after the proposal.
 2. **Root cause first** (`scripts/lib/hermes/correlator.py`, `_template` and `_enrich`). When the `vault_seal` record is degraded, the incident text starts with
    `Root cause: Vault sealed (<evidence>). ESO and ArgoCD failures listed below follow from it. The unseal watchdog retries every 5 minutes; nothing to approve unless Vault is still sealed after 15 minutes.`
    followed by the existing per-sensor details, and `_enrich` does not call the LLM for that event.

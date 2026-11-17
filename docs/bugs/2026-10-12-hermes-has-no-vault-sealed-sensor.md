@@ -6,7 +6,7 @@
 **Priority:** P2 — raised 2026-11-17 (operator): without it Hermes misreads a seal as many problems and offered the wrong repair (`2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Hermes status observability is degraded by not surfacing sealed Vault state on the dashboard, with a workaround of inspecting the `vault-sealed` pod label directly or observing downstream ExternalSecrets status); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** patch → v1.44.2 (P2), prerequisite of `2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` (operator, 2026-11-17: "go ahead"). Earlier: passed over, 1st — grooming 2026-11-12.
-**Waiting on:** dispatch — since 2026-11-17 (ships before the r7 fix; needs an Acceptance block and intent approval)
+**Waiting on:** operator decision — since 2026-11-17 (intent approval on the combined plan `docs/plans/hermes-vault-sealed.md`, then dispatch)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 
@@ -22,6 +22,20 @@ visible signal would have been ExternalSecrets going stale, which points away fr
 carries the service-registration labels `vault-sealed`, `vault-initialized` and `vault-active`
 (read on 2026-10-12: `vault-sealed=false`, `vault-initialized=true`, `vault-active=true`).
 
+## External behaviour proof
+
+The labels come from Vault's Kubernetes service registration, not from this repo:
+- Upstream `hashicorp/vault-helm` at tag `v0.30.1` (the pin, `scripts/plugins/vault.sh:9`), read
+  2026-11-17 via `gh api`: `values.yaml:930` puts `service_registration "kubernetes" {}` in the
+  `server.ha.raft.config` default; `templates/server-statefulset.yaml:39-41` sets pod labels
+  `app.kubernetes.io/name: vault` and `component: server`.
+- The hub deploys `server.ha.enabled: true` with `raft.enabled: true`
+  (`scripts/plugins/vault.sh:938-943`) in namespace `secrets` (`VAULT_NS_DEFAULT`, line 7), so that
+  default applies.
+- Live read on the hub, 2026-10-12: `vault-sealed=false`, `vault-initialized=true`,
+  `vault-active=true` on `vault-0`. The M4 has no `k3d-k3d-cluster` context (checked 2026-11-17);
+  live evidence E4 re-proves it on the hub.
+
 ## Fix
 
 1. `scripts/lib/hermes/sensors.py`: new `vault_seal(run, state, context=None, threshold=2)`, shaped
@@ -32,8 +46,10 @@ carries the service-registration labels `vault-sealed`, `vault-initialized` and 
      read a Secret.
    - No pods, or any pod missing the `vault-sealed` label → `unknown`,
      `vault seal state unavailable`.
-   - Any pod with `vault-sealed=true`, debounced with `_debounced("vault_seal", …)` → `degraded`,
-     evidence `sealed: <pod names>` (at most 3).
+   - Any pod with `vault-sealed=true`, debounced exactly like `hostnet_drift`
+     (`_debounced("vault_seal", True, max(0, threshold - 1), state)`; `_debounced` returns
+     `count > threshold`, so with the default `threshold=2` the second sealed cycle is the first
+     `degraded` one) → `degraded`, evidence `sealed: <pod names>` (at most 3).
    - Otherwise `healthy`, evidence `unsealed: <n> pod(s)`.
    - `data`: `{"pods": [{"name", "sealed", "initialized", "active"}]}` with the label values as
      booleans (`None` when a label is absent).
@@ -71,7 +87,10 @@ a real `kubectl`.
 6. The command the stub receives contains `get` and `pods` and does not contain `exec`, `secret` or
    `unseal`.
 7. `data["pods"][0]["sealed"]` is a bool.
-8. `repairs.py` has no rule that names `vault_seal` (assert by reading the repair table).
+8. No repair can unseal Vault: for every `REPAIRS` entry, `inspect.getsource(entry["build_command"])`
+   contains neither `unseal` nor `vault operator`, and the only entry whose `reads` includes
+   `vault_seal` is r7, where it can only block the repair (r7 test 1 in the r7 bug doc). Updated
+   2026-11-17: r7 now reads `vault_seal`, so "no rule names `vault_seal`" no longer holds.
 
 Mutations (each must turn a test red): treat a missing label as healthy (test 4); drop the debounce
 (test 2); read `vault-initialized` instead of `vault-sealed` (test 2).
