@@ -842,7 +842,7 @@ function _hub_data_run_step() {
 }
 
 function _hub_data_repoint_vault() {
-  local context="$1" dir="${2:-}" root_token count idx shard ns="secrets" release="vault"
+  local context="$1" dir="${2:-}" root_token count idx shard ns="secrets" release="vault" verb
   root_token="$(_hub_data_generate_root "$ns" "$release")" || return 1
   _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$root_token" || return 1
   count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)" || return 1
@@ -859,6 +859,23 @@ function _hub_data_repoint_vault() {
     [[ -z "$dir" ]] || printf '%s\n' skipped > "$dir/unseal_keys_cache"
   else
     _vault_cache_unseal_keys "$ns" "$release" "${shards[@]}" || return 1
+    verb="create"
+    if _kubectl --context "$context" -n "$ns" get secret vault-unseal </dev/null >/dev/null 2>&1; then
+      verb="replace"
+    fi
+    printf '%s\n' "${shards[@]}" | jq -Rn --arg n "$count" '
+      [inputs] as $s |
+      {
+        apiVersion: "v1",
+        kind: "Secret",
+        metadata: {name: "vault-unseal", namespace: "secrets"},
+        type: "Opaque",
+        stringData: (
+          {"key-shares": $n, "key-threshold": $n} +
+          ([range(0; $s | length)] | map({("shard-" + ((. + 1) | tostring)): $s[.]}) | add)
+        )
+      }' | _no_trace _kubectl --context "$context" "$verb" -f - || return 1
+    printf '[hub-recover] vault-unseal Secret rewritten from restored shards (%s shard(s))\n' "$count" >&2
     [[ -z "$dir" ]] || printf '%s\n' cached > "$dir/unseal_keys_cache"
   fi
   printf '%s' "$root_token" | jq -Rs '{apiVersion:"v1",kind:"Secret",metadata:{name:"vault-root",namespace:"secrets"},type:"Opaque",stringData:{root_token:.}}' | _kubectl --context "$context" apply -f - || return 1
