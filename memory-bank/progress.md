@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 03:45Z: dirused#11 CI green on 173bd47 (test-helper fix after Flash RunTotals bug); independent Opus Acceptance verifier running; E3/E4 pending.
 - 2026-11-17 03:30Z: dirused M1d landed on dirused m1d-top-level-default (b9420b6, Claude review vs spec, portable 34/34); PR wilddog64/dirused#11 open; next: Windows CI, independent verifier, E3 (vm-live timing), E4 (operator office timing).
 - 2026-11-17 03:16Z: stall-A E8 LIVE-VERIFIED on the M4 (capture, status, 1 stall_detected killed 0, process alive, Slack notice after the operator replaced the revoked M4 webhook item 03:14Z); live_verified marked on both stall-A slugs; toy cleaned up; watcher stays installed. dirused M1d dispatched to Flash.
 - 2026-11-17: dirused M1d spec written (docs/plans/dirused-m1d-top-level-default.md): fast top-level default, /deep, /exact, size after path; ideas row withdrawn (OOB repo, direct dispatch). Intents approved (operator, 2026-11-17); dispatched to Flash (agy gemini-3.8-flash-medium) on dirused branch m1d-top-level-default.
