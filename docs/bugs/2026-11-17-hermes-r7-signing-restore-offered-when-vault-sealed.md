@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-17 (intent approval for the Acceptance block below)
+**Waiting on:** dispatch — since 2026-11-17 (after the vault-sealed sensor bug lands)
 **Prior art:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, related root cause (no sealed-Vault signal), different symptom (wrong repair offered). That bug is the prerequisite for this one and ships first in the same release.
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
@@ -134,4 +134,4 @@ evidence:
 interface: none
 ```
 
-**Intent approved:** pending — operator
+**Intent approved:** operator, 2026-11-17 ("approved your for intent")
