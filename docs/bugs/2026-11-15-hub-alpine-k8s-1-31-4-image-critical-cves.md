@@ -1,13 +1,14 @@
 # Bug: six hub CronJobs run `alpine/k8s:1.31.4` with 27 critical and 218 high CVEs
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 9a0d0afe on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: 3 tests red on pre-fix code, green on fix; no live 1.31.4 reference left outside history)
+**Status:** LIVE-VERIFIED — 2026-11-17, hub trivy-operator reports 5 critical (the accepted 5) for alpine/k8s:1.33.13 at the pinned digest, down from 27; all 5 deployed alpine/k8s CronJobs run the digest. Was: LANDED — 9a0d0afe on k3d-manager-v1.44.1, 2026-11-16 (Flash; Claude verified: 3 tests red on pre-fix code, green on fix; no live 1.31.4 reference left outside history)
 **Priority:** P2
 **Classified:** not run (queued for the next triage)
 **Introduced by:** pre-existing (pin added in v1.23.0 `7253ece4` and v1.24.0 `fd281c85`)
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
 **Prior art:** `make find-similar-docs` unavailable (vector store context missing on M4); exact-slug glob for `*alpine-k8s*` and `*rotator*`: none
-**Waiting on:** live check — since 2026-11-16 (E2 after hub-promote + platform-ops: 6 CronJobs on 1.33.13 digest, 5 accepted critical)
+**Fix commit:** 9a0d0afe
+**Live evidence:** 2026-11-17 · run claude-ssh-m5-vulnerabilityreports-0105Z · env hub/k3d-k3d-cluster-deploy-hub-6fe58dcb · scenario cronjob-images-and-trivy-reports-after-promote · commit 6fe58dcb · proves E2
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 — operator 2026-11-15 ("go with your recommendation")
 
@@ -139,3 +140,9 @@ interface: none
 - The eight files in Files edited as in Fix; no other file touched; no digest other than the one above.
 - E1 passes on the worktree, and the new test in Fix 7 is shown red on the pre-fix manifests.
 - Commit and push to `origin/<branch>` verified with `git log origin/<branch>`; no cluster, make-install or registry write.
+
+## Live check 2026-11-17 (Claude)
+
+- Deployed alpine/k8s CronJobs on the hub (5): `cicd/argocd-credential-rotator`, `identity/ldap-password-rotator`, `monitoring/grafana-credential-rotator`, `platform-ops/app-cve-scan`, `platform-ops/cve-remediation-verify`, all `docker.io/alpine/k8s:1.33.13@sha256:e521cee1…`. The sixth reference, `keycloak-credential-rotator.yaml`, has no CronJob on the hub (manifest only).
+- trivy-operator VulnerabilityReports for the 1.33.13 image: criticalCount 5 (identity, monitoring, platform-ops), matching the accepted list.
+- Follow-up, not a fix failure: two reports from before the promote are still present, `cicd/cronjob-argocd-credential-rotator-rotate` and `platform-ops/cronjob-app-cve-scan-app-cve-scanner`, tag 1.31.4, 27 critical, created 2026-11-16 23:27Z. trivy-operator had not rescanned them about 45 minutes after the promote. Until it does they can keep the critical-CVE alert and dashboard counts at 27. Claude rechecks later; if they persist, deleting the two stale reports (operator go) makes trivy-operator rescan.
