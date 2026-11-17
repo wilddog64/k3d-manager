@@ -385,3 +385,136 @@ def _assert_http_rejected(monkeypatch, path, body, token, expected_status):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+_VAULT_PODS_ARGV = [
+    "kubectl", "-n", "secrets", "get", "pods",
+    "-l", "app.kubernetes.io/name=vault,component=server",
+    "-o", "json",
+]
+_STORE_ARGV = [
+    "kubectl", "get", "clustersecretstore", "vault-backend",
+    "-o", "json",
+]
+
+
+def _canned_vault_pods(sealed="false", initialized="true", active="true", name="vault-0"):
+    return json.dumps({
+        "apiVersion": "v1",
+        "kind": "PodList",
+        "items": [
+            {
+                "metadata": {
+                    "name": name,
+                    "labels": {
+                        "vault-sealed": str(sealed).lower(),
+                        "vault-initialized": str(initialized).lower(),
+                        "vault-active": str(active).lower(),
+                    },
+                }
+            }
+        ],
+    })
+
+
+def _canned_store(status="True", reason="Valid"):
+    return json.dumps({
+        "apiVersion": "external-secrets.io/v1beta1",
+        "kind": "ClusterSecretStore",
+        "metadata": {"name": "vault-backend"},
+        "status": {
+            "conditions": [
+                {
+                    "type": "Ready",
+                    "status": status,
+                    "reason": reason,
+                    "message": "store is ready",
+                }
+            ]
+        },
+    })
+
+
+def test_analyze_vault_sealed_skips_gemini(monkeypatch, analyze_env, tmp_path):
+    recorded_argv = []
+
+    def stub_spawn(cmd, **kwargs):
+        recorded_argv.append(list(cmd))
+        if cmd == _VAULT_PODS_ARGV:
+            return (_canned_vault_pods(sealed="true", name="vault-0"), False)
+        if cmd == _STORE_ARGV:
+            return (_canned_store(), False)
+        return ("diagnostic output", False)
+
+    gemini_calls = []
+    posted_messages = []
+    monkeypatch.setattr(wh, "_posix_spawn_capture", stub_spawn)
+    monkeypatch.setattr(wh, "_call_gemini", lambda prompt: gemini_calls.append(prompt) or "gemini output")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, **kwargs: posted_messages.append(text) or "123")
+    monkeypatch.setattr(wh, "_slack_post", lambda url, text: posted_messages.append(text) or True)
+
+    _run(monkeypatch, tmp_path, [_alert("AppDegraded", "api")])
+
+    assert gemini_calls == []
+    assert len(posted_messages) == 1
+    assert "Vault is sealed right now (vault-0)" in posted_messages[0]
+    assert "api" in posted_messages[0]
+
+
+def test_analyze_vault_unsealed_prompt_has_summaries(monkeypatch, analyze_env, tmp_path):
+    recorded_argv = []
+
+    def stub_spawn(cmd, **kwargs):
+        recorded_argv.append(list(cmd))
+        if cmd == _VAULT_PODS_ARGV:
+            return (_canned_vault_pods(sealed="false", name="vault-0"), False)
+        if cmd == _STORE_ARGV:
+            return (_canned_store(status="True", reason="Valid"), False)
+        return ("diagnostic output", False)
+
+    gemini_calls = []
+    monkeypatch.setattr(wh, "_posix_spawn_capture", stub_spawn)
+    monkeypatch.setattr(wh, "_call_gemini", lambda prompt: gemini_calls.append(prompt) or "analysis")
+
+    _run(monkeypatch, tmp_path, [_alert("AppDegraded", "api")])
+
+    assert len(gemini_calls) == 1
+    prompt = gemini_calls[0]
+    assert "Vault pods: vault-0 sealed=false" in prompt
+    assert "ClusterSecretStore vault-backend: Ready=True" in prompt
+    assert "metadata" not in prompt
+
+
+def test_analyze_vault_reads_are_exact_and_once(monkeypatch, analyze_env, tmp_path):
+    recorded_argv = []
+
+    def stub_spawn(cmd, **kwargs):
+        recorded_argv.append(list(cmd))
+        if cmd == _VAULT_PODS_ARGV:
+            return (_canned_vault_pods(sealed="false", name="vault-0"), False)
+        if cmd == _STORE_ARGV:
+            return (_canned_store(status="True", reason="Valid"), False)
+        return ("diagnostic output", False)
+
+    monkeypatch.setattr(wh, "_posix_spawn_capture", stub_spawn)
+
+    _run(monkeypatch, tmp_path, [_alert("AppDegraded", "api"), _alert("HighCPU", "worker")])
+
+    assert recorded_argv.count(_VAULT_PODS_ARGV) == 1
+    assert recorded_argv.count(_STORE_ARGV) == 1
+
+
+def test_analyze_vault_unreadable_fails_open(monkeypatch, analyze_env, tmp_path):
+    def stub_spawn(cmd, **kwargs):
+        if cmd in (_VAULT_PODS_ARGV, _STORE_ARGV):
+            return ("", True)
+        return ("diagnostic output", False)
+
+    gemini_calls = []
+    monkeypatch.setattr(wh, "_posix_spawn_capture", stub_spawn)
+    monkeypatch.setattr(wh, "_call_gemini", lambda prompt: gemini_calls.append(prompt) or "analysis")
+
+    _run(monkeypatch, tmp_path, [_alert("AppDegraded", "api")])
+
+    assert len(gemini_calls) == 1
+    assert "Vault pods: state unavailable" in gemini_calls[0]
