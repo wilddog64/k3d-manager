@@ -158,3 +158,17 @@ Argon was stronger on tests that would break in the worker's tree; Fable was str
 fallback, a false must_not). Cost: Fable about 130K tokens, 18 tool calls, about 4 minutes; Argon one agy call.
 After review the plan was split for the operator's Flash/Luna instruction: Hermes (Luna) and webhook Fix 5 (Flash,
 `docs/plans/webhook-analyze-vault-context.md`).
+
+## Post-land diff reviews — 2026-11-17, Fable only (no Argon pair)
+
+The two vault-sealed landings went in without a diff review. With Fable quota spare (operator, 2026-11-17), each diff got a
+blind Fable review after land; Claude re-read every finding against the code.
+
+- webhook bea02b84: about 67K tokens. 2 medium (stderr merged into the JSON capture fails the sealed check open; tests record
+  argv but never assert it) and 4 minor, all confirmed; 0 refuted.
+- Hermes fadf8438: about 97K tokens. 3 correctness (odd label value reads unsealed; r7 precondition vacuous on empty pods;
+  resolved-text timestamp and fixed "without a repair") and 1 doc gap, confirmed; lower test-hygiene items not adjudicated.
+- Filed as `docs/bugs/2026-11-17-vault-sealed-landed-review-findings.md`.
+
+**Read:** a diff review found a real fail-open (W1) that two blind spec reviews could not see, since it lives in an existing
+helper the spec told the worker to reuse. Evidence for keeping a diff review on medium-risk landings.

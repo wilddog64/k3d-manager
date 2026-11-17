@@ -147,3 +147,26 @@ all 9 ExternalSecrets back to `True`.
 - Finding: with a working watchdog, a pod restart self-heals inside one Hermes cycle, so the debounce correctly stays
   quiet. E5 and E2 can only be observed on a seal that outlasts the watchdog (the case that matters), or by pausing the
   watchdog CronJob for about 12 minutes. Operator decision.
+
+## Live run 2 2026-11-17 15:15Z, watchdog paused (Claude, operator go "let's pause the watchdog CronJob for 12 mins")
+
+Safety timer first (hub, `sleep 900` then un-suspend). 15:15:27Z: `vault-unseal-watchdog` suspended, `secrets/vault-0` deleted.
+15:27:30Z: CronJob un-suspended, one manual watchdog Job run, `vault-sealed=false` 15:27:31Z, safety timer stopped. Read from the hub
+Hermes log (`~/Library/Logs/k3dm-hermes.log`) and Alertmanager (`127.0.0.1:19093`), read-only.
+
+| Time (UTC) | Hermes |
+|---|---|
+| 15:16:34 | `vault_seal` healthy, `sealed: vault-0` (first sealed sample, debounced); eso healthy `Ready=False` (debounced) |
+| 15:18:33 | `vault_seal` **degraded**, `sealed: vault-0`; eso healthy `Ready=False; Ready=False` (still one failing sample) |
+| 15:25:15 | `vault_seal` degraded; eso **degraded** (`Ready=False; 3/20 not synced …`); argocd healthy (one degraded app, debounced) |
+
+- **15:25:15Z incident (eso + vault_seal):** text starts "Root cause: Vault sealed (sealed: vault-0). ESO and ArgoCD failures listed
+  below follow from it. The unseal watchdog retries every 5 minutes; nothing to approve unless Vault is still sealed after 15
+  minutes." `approvals: []`: **no r7 offered.** E5's "Root cause" and "no r7" parts are met.
+- A lone seal opened nothing at 15:18 (one contributor); the incident waited for ESO to degrade too (`correlator.py:18`, two
+  contributors). Known from Pair 4 review ("a lone seal posts nothing"); it cost about 7 minutes here, not a defect against this plan.
+- The text names ArgoCD although ArgoCD was not a contributor: H5 in `docs/bugs/2026-11-17-vault-sealed-landed-review-findings.md`.
+- **E2 not exercised again:** Alertmanager had no `ArgoCDAppDegraded` (the one degraded app did not hold `for: 5m`), and the
+  hub webhook log has no `Vault is sealed right now` line.
+- After unseal, 4 of 9 ExternalSecrets stayed `SecretSyncedError` (last failure 15:25Z, refresh 15m), so eso stays degraded and
+  the resolved message waits on ESO's retry.
