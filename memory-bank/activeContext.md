@@ -1,3 +1,28 @@
+## Handoff 2026-11-17 ~12:35Z — v1.44.1 SHIPPED; dirused v0.0.3 released — START HERE
+
+**Objective next session:** open v1.44.2 (branch `k3d-manager-v1.44.2`, cut from main 666b27b7, pushed) and close dirused M1e with the office E4 check.
+
+**Done this session (verified):**
+- v1.44.1 merged 666b27b7 (PR #162), tag + GitHub release v1.44.1 (latest), enforce_admins restored, promoted to hub (deploy/hub 666b27b7, tag hub-promote/20261117T121641Z, no break-glass). Retro docs/retro/2026-11-17-v1.44.1-retrospective.md (342deb67).
+- Containment bug LIVE-VERIFIED (E8 at that promote; ledger live_verified; 0b2da4d2). All v1.44.1 live checks done except Hermes CI page E3 (waits on a real ci unknown/degraded record; bug stays OPEN, Waiting on: live check).
+- dirused #12 (M1e, hard links counted once via listing FileIds) merged 6c660229; enforce_admins re-enabled; v0.0.3 tagged, release run 44080730448 published a pre-release with win-x64 + win-arm64 zips + sha256.
+- The Slack "Dispatch stalled: e8-toy-stall" message the operator saw at 19:16 PST was the 03:16Z E8 test notice (unread), not a new stall: no newer stall-* evidence.
+
+**Waiting on the operator:**
+1. dirused E4 (office): run the v0.0.3 build against one office agent; report wall time + the Windows row. Then mark M1e spec LIVE-VERIFIED (docs/plans/dirused-m1e-listing-file-ids.md) and decide the L7 vm-live warm-cache follow-up.
+2. Go to `abandon --yes` two stale v1.44.0 dispatch rows: deploy-hub-batch-review, test-hygiene-batch-review.
+
+**v1.44.2 scope (bug-fix patch; Branch lines name k3d-manager-v1.44.2):**
+- `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` — ships first; needs an Acceptance block + intent approval.
+- `docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` — P2, intent approved; depends on the sensor (`vault_seal` record). One plan covering both (operator).
+- Unseal watchdog stage 2: `docs/bugs/2026-11-15-vault-unseal-watchdog-secret-shard-rejected-errors-suppressed.md` — stage 2 spec to write (promote does not reapply the CronJob; live Secret already repaired).
+
+**Other queue:** dirused M1f (backup privilege; VM proofs P1/P2 first, then spec + intent); dirused E3 timeout spec (intent pending); `_run_parallel` bug doc; stale trivy reports (cicd argocd-credential-rotator, platform-ops app-cve-scan, tag 1.31.4) await rescan; triage due (63 bug docs at operator decision); grooming 2026-11-22; 5 Argon P3s from #162 in docs/issues/2026-11-17-argon-pr162-review-findings.md.
+
+**Notes:** Copilot capped until 2026-12-01 (Argon reviews release PRs). Bug docs going LIVE-VERIFIED need **Fix commit:** and a **Live evidence:** commit that contains it — after a squash merge cite the pre-merge hub commit (e.g. 6fe58dcb), not the main merge commit. MEMORY.md 8.3 KB, CLAUDE.md 10.5 KB (under budget).
+
+**Next, in order:** 1) say "triage due" at start; 2) spec the Vault-sealed sensor + r7 plan (Acceptance, intent), then watchdog stage 2; 3) dirused E4 result → close M1e; 4) M1f proofs.
+
 ## 2026-11-17 ~02:25Z — v1.44.1 live checks (operator: "let's work on those 6 live verification")
 
 - PASS: push-hook E3, release-column E3 (LIVE-VERIFIED); containment E9. Waiting: containment E8 (post-merge promote), Hermes E3 (next real ci page).
