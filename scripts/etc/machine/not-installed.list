@@ -35,3 +35,5 @@ browser.argocd-https|user LaunchAgent managed by cluster-up
 browser.keycloak-http|user LaunchAgent managed by cluster-up
 browser.hostinger-frontend-http|user LaunchAgent managed by cluster-up
 browser.sandbox-frontend-http|user LaunchAgent managed by cluster-up
+install-dispatch-stall-watch|operator-run: make install-dispatch-stall-watch on the machine that runs dispatches; detect-and-tell only (docs/bugs/2026-11-14-dispatch-stall-a-detector.md, live E8)
+dispatch-stall-watch|operator-run LaunchAgent on the machine that runs dispatches, loaded by make install-dispatch-stall-watch (live E8)

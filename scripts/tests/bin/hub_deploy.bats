@@ -32,6 +32,7 @@ EOF
 #!/usr/bin/env bash
 [[ -f "$FIXTURE_ROOT" ]] || exit 98
 printf 'promote %s\n' "$*" >> "$CALLS"
+printf 'skip=%s reason=%s\n' "${SKIP_CHECK_RUNS:-0}" "${SKIP_CHECK_RUNS_REASON:-}" >> "$CALLS"
 if [[ "${REQUIRE_TTY:-0}" == 1 && "$1" == promote ]]; then
   [[ -t 0 ]] || { printf 'confirmation requires a TTY\n' >&2; exit 1; }
   printf "Type 'promote' to continue: " >&2
@@ -163,4 +164,11 @@ EOF
   [[ "$output" == *'bin/k3dm-hub-deploy "$REF"'* ]]
   grep -q '^\.PHONY:.*hub-deploy' "$WORK/Makefile"
   [[ "$output" == *'usage: make hub-deploy REF='* ]] || grep -q 'hub-deploy REF=\.\.\.' "$WORK/Makefile"
+}
+
+@test "hub-deploy passes check-run outage environment" {
+  [[ "$(cat "$FIXTURE_ROOT")" == fixture ]]
+  run env SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=outage PROMOTE_TO_SHA="$OTHER_SHA" "$WORK/bin/k3dm-hub-deploy" fixture-other
+  [ "$status" -eq 0 ]
+  grep -qx 'skip=1 reason=outage' "$CALLS"
 }

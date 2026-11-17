@@ -503,13 +503,19 @@ def main():
             if not url:
                 print("WARNING: PUSHGATEWAY_URL is not set; skipping Pushgateway update", file=sys.stderr)
             else:
-                data = "\n".join(metrics) + "\n"
-                try:
-                    subprocess.run(["curl", "--silent", "--show-error", "--fail", "-X", "PUT", "--data-binary", data,
-                                    f"{url}/metrics/job/k3dm_repo_sync/instance/{socket.gethostname().split('.')[0]}"],
-                                   check=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                except Exception:
-                    print("WARNING: Pushgateway update failed", file=sys.stderr)
+                host = (os.environ.get("K3DM_REPO_SYNC_HOSTNAME", "").strip() or socket.gethostname()).split(".")[0]
+                hub_host_env = os.environ.get("K3DM_HUB_HOST", "").strip() or "m5-air.local"
+                hub_host = hub_host_env.split(".")[0]
+                if host.lower() != hub_host.lower():
+                    print(f"WARNING: this host ({host}) is not the hub host ({hub_host}); skipping Pushgateway update", file=sys.stderr)
+                else:
+                    data = "\n".join(metrics) + "\n"
+                    try:
+                        subprocess.run(["curl", "--silent", "--show-error", "--fail", "-X", "PUT", "--data-binary", data,
+                                        f"{url}/metrics/job/k3dm_repo_sync/instance/{host}"],
+                                       check=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except Exception:
+                        print("WARNING: Pushgateway update failed", file=sys.stderr)
         return 0
     finally:
         try:

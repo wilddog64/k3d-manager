@@ -323,3 +323,24 @@ def test_fixed_in_status_backfilled_onto_an_existing_doc_is_unknown(tally_module
         "docs/bugs/new.md": {"release": "v1.1.0", "source": "status_change", "commit": sweep_commit},
         "docs/bugs/old.md": {"release": "unknown", "source": "status_backfill", "commit": sweep_commit},
     }
+
+
+def test_counts_only_uses_explicit_triage_and_release_without_history(tally_module, monkeypatch):
+    bugs = tally_module.ROOT / "docs/bugs"
+    bugs.mkdir(parents=True)
+    assert bugs.resolve().is_relative_to(tally_module.ROOT.resolve())
+    (bugs / "triage.md").write_text("**Status:** OPEN\n**Triage:** carry → v1.45.0\n")
+    (bugs / "release.md").write_text("**Status:** OPEN\n**Release:** v1.44.1\n")
+    _dated_commit(tally_module.ROOT, "explicit releases", "2026-01-01T00:00:00Z")
+    subprocess.run(["git", "tag", "v1.44.0"], cwd=tally_module.ROOT, check=True)
+    original = tally_module._git
+
+    def tracked(*args):
+        assert not args or args[0] != "log"
+        return original(*args)
+
+    monkeypatch.setattr(tally_module, "_git", tracked)
+    releases, _ = tally_module._scan("HEAD", include_fixed=False)
+    assert releases["v1.45.0"]["by_source"] == {"triage_line": 1}
+    assert releases["v1.44.1"]["by_source"] == {"release_line": 1}
+    assert "v1.44.0" not in releases

@@ -140,7 +140,8 @@ def _scan(ref, include_fixed=True):
     texts = _read_blobs(ref, paths)
     required_paths = None
     if not include_fixed and REPO_NAME == "k3d-manager":
-        required_paths = {path for path in paths if doc_release(texts[path])[1] != "branch_line"}
+        explicit_sources = {"branch_line", "triage_line", "release_line"}
+        required_paths = {path for path in paths if doc_release(texts[path])[1] not in explicit_sources}
     added_releases = _added_releases(ref, branch, required_paths)
     result = {}
     for path in paths:

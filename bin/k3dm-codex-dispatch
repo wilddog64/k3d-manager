@@ -295,6 +295,7 @@ _dispatch_usage() {
 Usage:
   bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--primary-coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
+  bin/k3dm-codex-dispatch stalled [--live]
   bin/k3dm-codex-dispatch open [--version vX.Y.Z]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope] [--allow-instruction-files]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--model ID] [--coordinator VENDOR/MODEL]
@@ -1000,10 +1001,169 @@ EOF
   echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
 }
 
+_dispatch_stall_newest_log() {
+  local run="$1" prefix="$2" file newest="" mtime newest_time=-1
+  for file in "$run/$prefix.log" "$run/$prefix"-[0-9]*.log; do
+    [[ -f "$file" ]] || continue
+    mtime="$(_run_command --soft --quiet perl -e 'print((stat shift)[9] // 0)' "$file")" || continue
+    if ((mtime > newest_time)); then newest="$file"; newest_time="$mtime"; fi
+  done
+  [[ -n "$newest" ]] || return 1
+  printf '%s\n' "$newest"
+}
+
+_dispatch_stall_processes() {
+  _run_command --soft --quiet ps -axo pid=,ppid=,command=
+}
+
+_dispatch_stall_count() (
+  local db="$1" tmp result
+  tmp="$(_run_command --soft --quiet mktemp -d)" || return 1
+  trap '_run_command --soft --quiet rm -rf -- "$tmp"' EXIT
+  _run_command --soft --quiet cp -p "$db" "$tmp/data.db" || return 1
+  if [[ -e "$db-wal" ]]; then
+    _run_command --soft --quiet cp -p "$db-wal" "$tmp/data.db-wal" || return 1
+  fi
+  _run_command --soft --quiet chmod u+w "$tmp/data.db" || return 1
+  if [[ -e "$tmp/data.db-wal" ]]; then
+    _run_command --soft --quiet chmod u+w "$tmp/data.db-wal" || return 1
+  fi
+  result="$(_run_command --soft --quiet sqlite3 "$tmp/data.db" 'select count(*) from steps')" || return 1
+  [[ "$result" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$result"
+)
+
+_dispatch_stall_db_sample() {
+  local run="$1" table="$2" worker pid line db="" candidate="" log steps
+  worker="$(_dispatch_start_marker_value "$run" pid)"
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    while IFS= read -r line; do
+      case "$line" in
+        n"$HOME"/.gemini/antigravity-cli/conversations/*.db)
+          line="${line#n}"
+          if [[ -z "$db" ]]; then db="$line"; elif [[ "$db" != "$line" ]]; then return 1; fi ;;
+      esac
+    done < <(_run_command --soft --quiet lsof -Fn -p "$pid" 2>/dev/null || true)
+  done < <(printf '%s\n' "$table" | _dispatch_worker_pid="$worker" _run_command --soft --quiet awk '
+    { pid[NR]=$1; parent[NR]=$2 }
+    END { seen[ENVIRON["_dispatch_worker_pid"]]=1
+      for (pass=1; pass<=NR; pass++) for (i=1; i<=NR; i++)
+        if (seen[parent[i]]) seen[pid[i]]=1
+      for (i=1; i<=NR; i++) if (seen[pid[i]] && pid[i]!=ENVIRON["_dispatch_worker_pid"]) print pid[i]
+    }')
+  if [[ -z "$db" ]]; then
+    log="$(_dispatch_stall_newest_log "$run" agy)" || return 1
+    candidate="$(_run_command --soft --quiet python3 - "$log" "$HOME/.gemini/antigravity-cli/conversations" <<'PY'
+import glob, os, sys
+try:
+    start = os.stat(sys.argv[1]).st_birthtime
+    matches = [p for p in glob.glob(os.path.join(sys.argv[2], '*.db'))
+               if start <= os.stat(p).st_birthtime <= start + 10]
+    if len(matches) == 1:
+        print(matches[0])
+except (OSError, AttributeError):
+    pass
+PY
+)" || return 1
+    db="$candidate"
+  fi
+  [[ -n "$db" && -f "$db" ]] || return 1
+  steps="$(_dispatch_stall_count "$db")" || return 1
+  [[ "$steps" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\t%s\n' "$db" "$steps"
+}
+
+_dispatch_stall_probe() {
+  local worktree="$1" run="$2" table proc_count seconds_limit proc_limit agent now silent=0 log session rollout sample db steps state_line state_db state_steps since started
+  seconds_limit="${K3DM_DISPATCH_STALL_SECONDS:-2700}"
+  proc_limit="${K3DM_DISPATCH_STALL_MAX_PROCS:-200}"
+  [[ "$seconds_limit" =~ ^[0-9]+$ ]] || seconds_limit=2700
+  [[ "$proc_limit" =~ ^[0-9]+$ ]] || proc_limit=200
+  seconds_limit=$((10#$seconds_limit)); proc_limit=$((10#$proc_limit))
+  table="$(_dispatch_stall_processes)" || table=""
+  proc_count="$(printf '%s\n' "$table" | _dispatch_probe_path="$worktree" _dispatch_probe_pid="$$" _run_command --soft --quiet awk '
+    { pid[NR]=$1; parent[NR]=$2; command[NR]=$0; sub(/^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/, "", command[NR]) }
+    END { own[ENVIRON["_dispatch_probe_pid"]]=1
+      for (pass=1; pass<=NR; pass++) for (i=1; i<=NR; i++) if (own[parent[i]]) own[pid[i]]=1
+      path=ENVIRON["_dispatch_probe_path"]; n=0
+      for (i=1; i<=NR; i++) { p=index(command[i],path); tail=substr(command[i],p+length(path),1)
+        if (!own[pid[i]] && p && (tail=="" || tail=="/" || tail ~ /[[:space:]]/)) n++ }
+      print n
+    }')" || proc_count=0
+  now="$(_run_command --soft --quiet perl -e 'print time')"
+  agent="$(_run_command --soft --quiet cat "$run/agent" 2>/dev/null || printf codex)"
+  if [[ "$agent" == agy ]]; then
+    sample="$(_dispatch_stall_db_sample "$run" "$table")" || sample=""
+    if [[ -n "$sample" && -f "$run/stall-watch.state" ]]; then
+      IFS=$'\t' read -r db steps <<< "$sample"
+      IFS= read -r state_line < "$run/stall-watch.state" || true
+      state_db="${state_line%% steps=*}"; state_db="${state_db#db=}"
+      state_steps="${state_line##* steps=}"; since="${state_steps##* since=}"
+      state_steps="${state_steps%% since=*}"
+      started="$(_dispatch_start_marker_value "$run" started)"
+      if [[ ( "$state_db" == "$db" || "$state_db" == "${db##*/}" ) && "$state_steps" == "$steps" && "$since" =~ ^[0-9]+$ && "$started" =~ ^[0-9]+$ ]] && ((since >= started && now > since)); then
+        silent=$((now-since))
+      fi
+    fi
+  else
+    log="$(_dispatch_stall_newest_log "$run" codex)" || log=""
+    if [[ -n "$log" ]]; then
+      session="$(_run_command --soft --quiet sed -n 's/^session id: //p' "$log" | _run_command --soft --quiet head -n 1)"
+      rollout="$(_run_command --soft --quiet python3 - "${CODEX_HOME:-$HOME/.codex}/sessions" "$session" <<'PY'
+import glob, os, sys
+if sys.argv[2] and all(c.isalnum() or c == '-' for c in sys.argv[2]):
+    files = glob.glob(os.path.join(glob.escape(sys.argv[1]), '**', 'rollout-*-' + glob.escape(sys.argv[2]) + '.jsonl'), recursive=True)
+    if len(files) == 1:
+        print(files[0])
+PY
+)" || rollout=""
+      [[ -n "$rollout" ]] || rollout="$log"
+      silent="$(_run_command --soft --quiet perl -e 'my $t=(stat shift)[9]; print defined($t) ? time-$t : 0' "$rollout")" || silent=0
+    elif [[ -f "$run/start" ]]; then
+      silent="$(_run_command --soft --quiet perl -e 'my $t=(stat shift)[9]; print defined($t) ? time-$t : 0' "$run/start")" || silent=0
+    fi
+  fi
+  [[ "$silent" =~ ^[0-9]+$ ]] || silent=0
+  if (( (seconds_limit > 0 && silent > seconds_limit) || (proc_limit > 0 && proc_count > proc_limit) )); then
+    printf '%s %s\n' "$silent" "$proc_count"
+    return 0
+  fi
+  return 1
+}
+
+_dispatch_latest_version_dir() {
+  _run_command --soft --quiet find "$_dispatch_worktree_root" -mindepth 1 -maxdepth 1 -type d -name 'v*' 2>/dev/null |
+    _run_command --soft --quiet sort -V | _run_command --soft --quiet tail -n 1
+}
+
+_dispatch_stalled() {
+  local mode="${1:-}" version task run slug values
+  [[ -z "$mode" || "$mode" == --live ]] || _dispatch_error 'stalled accepts only --live'
+  version="$(_dispatch_latest_version_dir)" || version=""
+  [[ -n "$version" ]] || return 0
+  for run in "$version"/*.run; do
+    [[ -d "$run" && ! -f "$run/exit" && ! -f "$run/landed" ]] || continue
+    task="${run%.run}"; [[ -d "$task" ]] || continue
+    _dispatch_worker_matches_start "$run" || continue
+    slug="${task##*/}"
+    if [[ "$mode" == --live ]]; then
+      printf '%s\t%s\t%s\t%s\n' "$slug" "${version##*/}" "$run" "$task"
+    elif values="$(_dispatch_stall_probe "$task" "$run")"; then
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "${version##*/}" "$run" "$task" "${values%% *}" "${values#* }"
+    fi
+  done
+  return 0
+}
+
 _dispatch_status() {
   local rel version task slug run state spec pid exit_code
-  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
-  [[ -d "$_dispatch_worktree_root/$version" ]] || return 0
+  local GIT_OPTIONAL_LOCKS=0
+  export GIT_OPTIONAL_LOCKS
+  rel="$(_dispatch_release_branch)"
+  version="$(_dispatch_latest_version_dir)" || version=""
+  [[ -n "$version" ]] || return 0
+  version="${version##*/}"
   for task in "$_dispatch_worktree_root/$version"/*; do
     [[ -d "$task" && "$task" != *.run ]] || continue
     slug="$(basename "$task")"; run="$task.run"
@@ -1014,7 +1174,12 @@ _dispatch_status() {
       if [[ -f "$run/violation" ]]; then state="VIOLATION: agent committed"
       elif [[ "$exit_code" == 0 ]]; then state="exited successfully"; else state="exited nonzero ($exit_code)"; fi
     elif _dispatch_worker_matches_start "$run"; then
-      state=running
+      local stall_values
+      if stall_values="$(_dispatch_stall_probe "$task" "$run")"; then
+        state="stalled (silent ${stall_values%% *}s, ${stall_values#* } procs)"
+      else
+        state=running
+      fi
     elif [[ -s "$run/start" ]]; then
       state="terminated unexpectedly (see $run/supervisor.log)"
     elif [[ -f "$run/pid" ]] && kill -0 "$(<"$run/pid")" 2>/dev/null; then
@@ -1543,8 +1708,10 @@ main() {
   (($#)) || { _dispatch_usage; exit 2; }
   case "$1" in
     _worker) shift; _dispatch_worker "$@" ;;
+    _stall-sample) shift; (($# == 1)) || _dispatch_error "_stall-sample requires a run"; _dispatch_stall_db_sample "$1" "$(_dispatch_stall_processes)" ;;
     start) shift; _dispatch_start "$@" ;;
     open) shift; _dispatch_open "$@" ;;
+    stalled) shift; (($# <= 1)) || _dispatch_error "stalled accepts at most one option"; _dispatch_stalled "${1:-}" ;;
     status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
     land) shift; _dispatch_land "$@" ;;
     resume) shift; _dispatch_resume "$@" ;;

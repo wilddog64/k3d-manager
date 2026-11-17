@@ -267,3 +267,7 @@ For a side-by-side comparison, dispatch the same spec under separate slugs, such
 ### Record local agy activity
 
 `make agy-wrapper-install` symlinks `${AGY_WRAPPER_DIR:-$HOME/.local/share/k3d-manager/bin}/agy` to `bin/k3dm-agy` and prints `type -a agy`. Put that directory at the front of `PATH`, ahead of the real agy, and confirm the wrapper appears first. The install refuses to replace an existing `agy` there that is not the wrapper, because the agy installer itself puts the real binary in `~/.local/bin`; never point `AGY_WRAPPER_DIR` at the real binary's directory. `make agy-wrapper-uninstall` removes that symlink only when it still points to this repository's wrapper. The wrapper records run timing, exit status, mode, validated model and repo labels, an optional dispatch slug, and filtered token usage from print-mode JSON. It does not record arguments, prompts, output, or environment values. Interactive runs have no usage. Help and informational subcommands are passed through without recording. Only runs through the wrapper appear in the agy dashboard row.
+
+### Stall watch
+
+A live dispatch may report `stalled`. `K3DM_DISPATCH_STALL_SECONDS` (default 2700) controls the silence threshold, and `K3DM_DISPATCH_STALL_MAX_PROCS` (default 200, provisional) controls the process threshold; zero disables the corresponding check. Install the watcher with `make install-dispatch-stall-watch`. In v1.44.1 it detects stalls and tells the operator; it does not stop anything.

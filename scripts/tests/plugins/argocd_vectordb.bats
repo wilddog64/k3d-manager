@@ -10,9 +10,13 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   [ "${status}" -eq 0 ]
 }
 
-@test "vectordb uses the pinned pgvector pg17 image and not latest" {
-  run grep -rnE 'image:[[:space:]]*pgvector/pgvector:pg17([[:space:]]*)$' "${MANIFEST_DIR}"
+@test "vectordb uses the pinned pgvector 0.8.7-pg17 image by digest and not a floating tag" {
+  run grep -rnE 'image:[[:space:]]*pgvector/pgvector:[0-9]+\.[0-9]+\.[0-9]+-pg17@sha256:[0-9a-f]{64}([[:space:]]*)$' "${MANIFEST_DIR}"
   [ "${status}" -eq 0 ]
+  run grep -rnE 'image:[[:space:]]*pgvector/pgvector:0\.8\.7-pg17@sha256:b513c48566e4777cd3370451400000c78eda6a08131d68f4c31d4a76f27bd8fd([[:space:]]*)$' "${MANIFEST_DIR}"
+  [ "${status}" -eq 0 ]
+  run grep -rnE 'image:[^#]*:pg17([[:space:]]*)$' "${MANIFEST_DIR}"
+  [ "${status}" -eq 1 ]
   run grep -rnE 'image:[^#]*:latest([[:space:]]*)$' "${MANIFEST_DIR}"
   [ "${status}" -eq 1 ]
 }

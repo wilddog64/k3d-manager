@@ -1,11 +1,14 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** OPEN — recurred 2026-11-14 from a pre-fix dispatch worktree (was VERIFIED live 2026-11-14, landed 22ca679c)
-**Waiting on:** operator decision — since 2026-11-14 (second guard; delete the group after Part B lands)
+**Status:** LIVE-VERIFIED — 2026-11-17, hub Pushgateway shows only instance=m5-air, advancing over two sync cycles after the m4-air group was deleted. Was: LANDED — host guard 3b0def6b + fixture 5b308552 (2026-11-16); recurred 2026-11-14 from a pre-fix dispatch worktree (first fix 22ca679c, VERIFIED live 2026-11-14)
+**Fix commit:** 3b0def6b
+**Live evidence:** 2026-11-17 · run claude-ssh-m5-pushgateway-3-samples-0043-0054Z · env hub/k3d-k3d-cluster-deploy-hub-6fe58dcb · scenario m4-air-group-deleted-then-two-repo-sync-cycles · commit 6fe58dcb · proves E4,E5
+**Branch:** k3d-manager-v1.44.1
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Stray metric pushes from worker checkouts over the SSH forward trigger recurring false Prometheus alerts and pollute dashboard panels, though the hub's actual sync remains healthy and the stale Pushgateway group can be manually deleted as a workaround.)
 **Triage:** patch → v1.44.1 — triage 2026-11-14, operator
-**Intent approved:** operator ("go ahead"), 2026-11-14
+**Intent approved:** operator, 2026-11-16
+**Approval note:** ("Approve all 9")
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; memory `feedback_pushgateway_tests_leak_to_real_hub` (same class). `make find-similar-docs` not run
@@ -288,3 +291,92 @@ on the M4, 19094 is an ssh forward to the hub. The landed fix protects only chec
 Proposed second guard (operator decision): publish repo-sync metrics only when the host is the hub host, and/or scope the
 rules to `instance="m5-air"`; or base dispatch worktrees on the current release head. Operator, after Part B lands, on the
 M5: `curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air` (earlier it comes back).
+
+## Second guard spec (Claude, 2026-11-16)
+
+**Decision (operator, 2026-11-16):** "Add a code guard too": retire the two stale v1.44.0 review worktrees
+(`deploy-hub-batch-review`, `test-hygiene-batch-review`, the only worktrees still carrying the pre-fix
+`localhost:19094` fallback, checked by content on 2026-11-16), delete the stray group, and add a host guard.
+
+### Fix
+
+In `bin/k3dm-repo-sync`, the hub-role push block (`:502-511`): push only when this machine's short hostname equals
+the short form of `K3DM_HUB_HOST` (default `m5-air.local`, the same default `Makefile:68` uses). Otherwise print
+`WARNING: this host (<short>) is not the hub host (<hub short>); skipping Pushgateway update` and skip the push.
+Compute the short hostname once, from `K3DM_REPO_SYNC_HOSTNAME` if set (test hook), else
+`socket.gethostname().split('.')[0]`, and use the same value for the `instance` label, so tests and the label agree.
+The comparison is case-insensitive. An empty `K3DM_HUB_HOST` counts as unset (default applies).
+
+### Files
+
+- `bin/k3dm-repo-sync`
+- `scripts/tests/bin/repo_sync.bats`
+- `scripts/tests/bin/repo_sync_promote_backlog.bats` (added by Claude at land, 2026-11-16: hub-role fixture that reads the pushed body; sets `K3DM_HUB_HOST` to this host)
+
+### Contract readers
+
+- `bin/k3dm-repo-sync:506` — writer; the `instance` label value is unchanged on the hub (`m5-air`).
+- `scripts/tests/bin/repo_sync_promote_backlog.bats:12` — reader (missed at spec time, found by the land gate 2026-11-16): runs as hub and greps `curl.body`, so it must name this host as the hub.
+- `Makefile:68` — reader of `K3DM_HUB_HOST` (default `m5-air.local`); unchanged, same default.
+- Repo-sync alert rules and the Release Tracking "deploy/hub behind" stat read `job="k3dm_repo_sync"` series; the hub
+  keeps pushing, so they are unaffected. Worker should grep `k3dm_repo_sync_` under `scripts/etc` and list hits.
+
+### Acceptance
+
+```yaml
+must:
+  - M1: hub role, PUSHGATEWAY_URL set, K3DM_REPO_SYNC_HOSTNAME=m4-air, K3DM_HUB_HOST unset -> no curl call; stderr names both hosts
+  - M2: hub role, PUSHGATEWAY_URL set, K3DM_REPO_SYNC_HOSTNAME=m5-air, K3DM_HUB_HOST unset -> exactly one curl PUT to .../instance/m5-air
+  - M3: K3DM_HUB_HOST=M4-Air.local and K3DM_REPO_SYNC_HOSTNAME=m4-air -> push happens (case-insensitive, domain ignored)
+must_not:
+  - N1: a non-hub host pushes when PUSHGATEWAY_URL is set (red on pre-fix code: M1's setup pushes today)
+  - N2: the hub stops pushing (guarded by M2 as the positive control)
+evidence:
+  - id: E1
+    proves: [M1, N1]
+    offline: "bats scripts/tests/bin/repo_sync.bats -f 'non-hub host'"
+    intent: "A Mac that is not the hub no longer sends repo-sync numbers to the hub, even if a test or script points it at the hub's Pushgateway."
+  - id: E2
+    proves: [M2, M3, N2]
+    offline: "bats scripts/tests/bin/repo_sync.bats -f 'hub host'"
+    intent: "The real hub still sends its repo-sync numbers, so the hub-lag and promote alerts keep working."
+  - id: E3
+    proves: [N1]
+    offline: "Claude reverts the guard in a scratch copy and shows E1 turns red"
+    intent: "The new test really catches a non-hub push; it is not a test that always passes."
+  - id: E4
+    proves: [M2, N2]
+    live: "Claude or the operator, on the M5 after the stray group is deleted and the fix is on deploy/hub: curl -s 127.0.0.1:19094/metrics | grep k3dm_repo_sync_last_success shows only instance=\"m5-air\" across two sync cycles"
+    intent: "On the real hub, only the hub's own repo-sync group appears and it keeps updating; the m4-air group stays gone."
+interface:
+  env: [K3DM_HUB_HOST, K3DM_REPO_SYNC_HOSTNAME, PUSHGATEWAY_URL]
+```
+
+Tests use the existing curl stub and a scratch `XDG_CONFIG_HOME` with `machine-role` set to `hub`; the fixture asserts
+the stub path and scratch config before running (test controls rule).
+
+### Worker definition of done
+
+- E1-E3 pass offline; `make test-shard` for the shard containing `repo_sync.bats` is green.
+- Do not edit any other file; do not run repo-sync against the real config or Pushgateway.
+
+### Operator steps (after landing, not the worker)
+
+- Close the two stale review rows and remove their worktrees (Claude, with operator go).
+- On the M5: `curl -s -X DELETE http://127.0.0.1:19094/metrics/job/k3dm_repo_sync/instance/m4-air`.
+
+### Landed 2026-11-16 (Claude)
+
+`3b0def6b` is the guard (Gemini Flash). `5b308552` is a coordinator fixture fix. Verified in a scratch worktree at the pre-fix HEAD
+with the new tests copied in: "hub role on non-hub host skips…" and "hub role on hub host pushes…" fail on the old code,
+which is the E3 revert check. All 28 tests in `repo_sync.bats` pass on the fix.
+The land gate found a reader the spec missed: `repo_sync_promote_backlog.bats` runs as hub and reads the pushed body,
+so E11 and E12 went red. Its fixture now sets `K3DM_HUB_HOST` to this host. That file is added to Files and Contract readers,
+and the land used `--allow-out-of-scope` because the scope check reads the spec snapshot taken at dispatch.
+Repo-sync suites on land: repo_sync, repo_sync_promote_backlog (21), repo_sync_launchd_env and hub_sync (16) all pass.
+Spec escape: **Should have been caught by:** spec (contract-reader grep covered `scripts/etc`, not `scripts/tests`).
+
+
+## Live check 2026-11-17 (Claude)
+
+Operator deleted the `instance="m4-air"` group at about 00:42Z (it had come back, 9 series). Read-only samples of the hub Pushgateway at 00:43:33Z, 00:49:03Z and 00:54:33Z show only `push_time_seconds{instance="m5-air",job="k3dm_repo_sync"}`, moving 1794875886 -> 1794876540 -> 1794876861. No m4-air group reappeared. Ledger `live_verified` mark at fix 3b0def6b. Still open housekeeping, not part of the fix: retire the two stale review worktrees.

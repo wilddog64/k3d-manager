@@ -33,6 +33,20 @@ if [ "$1" = "status" ]; then
   exit "${DEFAULT_STATUS_RC:-1}"
 fi
 if [ "$1" = "operator" ] && [ "$2" = "unseal" ]; then
+  if [ "${REJECT_UNSEAL:-0}" = 1 ]; then
+    # captured 2026-11-16, M4, hashicorp/vault:1.20.1 (file storage, random key); rc=2, stderr only
+    cat >&2 <<'ERROR'
+Error unsealing: Error making API request.
+
+URL: PUT http://127.0.0.1:8200/v1/sys/unseal
+Code: 400. Errors:
+
+* unable to retrieve stored keys: invalid key: failed to decrypt keys from storage: error decrypting seal wrapped value
+error decrypting using seal shamir: cipher: message authentication failed
+ERROR
+    [ "${ECHO_SHARD:-0}" != 1 ] || printf 'Error leaked: %s\n' "$3" >&2
+    exit 2
+  fi
   exit 0
 fi
 exit 0
@@ -74,6 +88,7 @@ run_script() {
   CALLS_FILE="$CALLS_FILE" \
   STATUS_RESPONSES_FILE="$STATUS_RESPONSES_FILE" \
   DEFAULT_STATUS_RC="${DEFAULT_STATUS_RC:-1}" \
+  REJECT_UNSEAL="${REJECT_UNSEAL:-0}" ECHO_SHARD="${ECHO_SHARD:-0}" \
   SHARD_FILE="$SHARD_FILE" \
   VAULT_ADDR="http://vault.secrets.svc:8200" \
   sh "$script_file"
@@ -209,4 +224,31 @@ run_script() {
   local unseal_calls
   unseal_calls=$(grep -c "vault operator unseal" "$CALLS_FILE" || true)
   [ "$unseal_calls" -eq 1 ]
+}
+
+@test "N1: rejected unseal reports captured Vault error and exit code" {
+  [ "$(PATH="$BIN_DIR:$PATH" command -v vault)" = "$BIN_DIR/vault" ]
+  [ "$SHARD_FILE" = "$TEST_DIR/shard-1" ] && [ -f "$SHARD_FILE" ]
+  printf '2\n2\n' > "$STATUS_RESPONSES_FILE"
+  REJECT_UNSEAL=1
+  run run_script
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"unseal rc=2"* ]]
+  [[ "$output" == *"Code: 400. Errors:"* ]]
+  [[ "$output" == *"invalid key: failed to decrypt keys"* ]]
+}
+
+@test "M4: echoed shard is filtered from rejection output" {
+  [ "$(PATH="$BIN_DIR:$PATH" command -v vault)" = "$BIN_DIR/vault" ]
+  [ "$SHARD_FILE" = "$TEST_DIR/shard-1" ] && [ -f "$SHARD_FILE" ]
+  # Positive control: the stub really emits the shard before filtering.
+  run env CALLS_FILE="$CALLS_FILE" REJECT_UNSEAL=1 ECHO_SHARD=1 "$BIN_DIR/vault" operator unseal "$(cat "$SHARD_FILE")"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"$(cat "$SHARD_FILE")"* ]]
+  printf '2\n2\n' > "$STATUS_RESPONSES_FILE"
+  REJECT_UNSEAL=1 ECHO_SHARD=1
+  run run_script
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"invalid key: failed to decrypt keys"* ]]
+  [[ "$output" != *"$(cat "$SHARD_FILE")"* ]]
 }

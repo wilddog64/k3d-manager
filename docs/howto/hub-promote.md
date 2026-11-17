@@ -67,7 +67,7 @@ make platform-ops
 `make hub-promote` verifies that `deploy/hub` does not contain commits missing
 from the target ref (such as image-pin commits written to `deploy/hub` by the CVE
 promoter). If any uncontained commits exist, the promote refuses, lists each
-dropped commit subject, and prints the command to carry them over:
+dropped commit subject, and prints the command to carry them over. Squash-merged releases are recognised by merged PR head ancestry; this requires `gh` access to `GH_REPO`.
 
 ```sh
 git cherry-pick -x <commit-sha>
@@ -78,10 +78,13 @@ checks to pass, and re-run `make hub-promote`. The hub checkout follows the
 promoted `deploy/hub` ref automatically, including when a carried commit has a
 new SHA after cherry-picking.
 
-If GitHub checks are unavailable during an outage or you must intentionally
-discard uncontained commits, `BREAK_GLASS=1` skips the check-run gate and the
-containment refusal. The commit must still be on `origin`, and the terminal
-confirmation and promotion record are still required:
+To intentionally discard uncontained commits, `BREAK_GLASS=1` skips only the
+containment refusal. Green checks, origin reachability, typed confirmation and
+the promotion record still apply. During a GitHub outage use `SKIP_CHECK_RUNS=1`
+and a one-line `SKIP_CHECK_RUNS_REASON`; the tag records the reason. An outage
+with uncontained commits needs both flags. Pass the reason in the environment
+(e.g. `SKIP_CHECK_RUNS_REASON='outage' make hub-promote REF=... SKIP_CHECK_RUNS=1`)
+or avoid `$` in a make variable, because make expands it:
 
 ```sh
 make hub-promote REF=<commit-ish> BREAK_GLASS=1

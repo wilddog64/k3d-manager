@@ -80,6 +80,161 @@ def test_positive_control_accepts_complete_recent_spec(tmp_path):
     assert check(path) == []
 
 
+def test_block_item_missing_intent_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - id: E1\n    kind: offline\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E1 is missing intent"]
+
+
+def test_flow_item_missing_intent_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - {id: E1, proves: [M1], kind: offline}\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E1 is missing intent"]
+
+
+def test_flow_item_empty_intent_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        '  - {id: E1, intent: ""}\n',
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E1 is missing intent"]
+
+
+def test_flow_item_multiline_missing_intent_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - {id: E1,\n     proves: [M1],\n     kind: offline}\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E1 is missing intent"]
+
+
+def test_flow_item_without_id_missing_intent_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - {proves: [M1], offline: true}\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item 1 is missing intent"]
+
+
+def test_mixed_block_and_flow_evidence_names_failing_item(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - id: E1\n    intent: visible result\n  - {kind: live}\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item 2 is missing intent"]
+
+
+def test_flow_item_intent_in_quoted_text_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        '  - {id: E1, text: "the intent: is shown"}\n',
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E1 is missing intent"]
+
+
+def test_flow_item_with_intent_accepted(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        '  - {id: E1, intent: "You will see a result."}\n',
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == []
+
+
+def test_intent_approved_header_trailing_note_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - id: E1\n    intent: visible result\n",
+        '**Intent approved:** operator, 2026-11-08 ("approved")',
+    )
+    assert check(path) == [
+        "**Intent approved:** line must end at the date (operator, YYYY-MM-DD); put any note on another line"
+    ]
+
+
+def test_intent_approved_header_pending_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - id: E1\n    intent: visible result\n",
+        "**Intent approved:** pending — operator",
+    )
+    assert check(path) == ["missing **Intent approved:** header"]
+
+
+def test_unreadable_evidence_item_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - {id: E1, proves: [M1]\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E1 is not a mapping the checker can read"]
+
+
+def test_keyed_flow_items_with_intent_accepted(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        '  - E1: {proves: [M1, N1], offline: true, intent: "a rollback keeps CVE image pins ..."}\n'
+        '  - E2: {proves: [M2, N3], offline: true, intent: "before you type promote, you see ..."}\n',
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == []
+
+
+def test_keyed_flow_item_missing_intent_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - E3: {proves: [M1], offline: true}\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E3 is missing intent"]
+
+
+def test_mixed_keyed_flow_and_block_evidence_names_failing_item(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        '  - E1: {proves: [M1], offline: true, intent: "visible result"}\n'
+        "  - id: E2\n"
+        "    kind: offline\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E2 is missing intent"]
+
+
+def test_keyed_flow_item_unreadable_refused(tmp_path):
+    path = _spec(
+        tmp_path,
+        "2026-11-08",
+        "  - E4: {proves: [M1]\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    assert check(path) == ["evidence item E4 is not a mapping the checker can read"]
+
+
 def test_checker_subprocess_without_yaml_dependency(tmp_path):
     module = Path(__file__).resolve().parents[2] / "lib/spec_intent.py"
     if os.environ.get("SPEC_INTENT_CHECKER_BASELINE") == "1":
@@ -253,6 +408,39 @@ def test_dispatch_positive_control_passes_intent_gate_before_offline_fetch_failu
         repo,
         env,
         "  - id: E1\n    intent: Visible result.\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "could not fetch origin/" in output
+    assert "spec intent approval is required" not in output
+    assert not marker.exists()
+
+
+def test_dispatch_flow_item_missing_intent_refused_before_agent_launch(
+    tmp_path, monkeypatch
+):
+    repo, marker, env = _scratch_dispatch_repo(tmp_path, monkeypatch)
+    result = _run_dispatch(
+        repo,
+        env,
+        "  - {id: E1, proves: [M1], kind: offline}\n",
+        "**Intent approved:** operator, 2026-11-08",
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "evidence item E1" in output
+    assert not marker.exists()
+
+
+def test_dispatch_flow_item_positive_control_passes_intent_gate(
+    tmp_path, monkeypatch
+):
+    repo, marker, env = _scratch_dispatch_repo(tmp_path, monkeypatch)
+    result = _run_dispatch(
+        repo,
+        env,
+        "  - {id: E1, intent: Visible result.}\n",
         "**Intent approved:** operator, 2026-11-08",
     )
     output = result.stdout + result.stderr

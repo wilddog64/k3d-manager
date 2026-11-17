@@ -53,3 +53,13 @@ interface:
   - "bin/k3dm-slack-notify"
   - "Keychain items: k3dm-slack-webhook, k3dm-platform-ops-slack-url"
 ```
+
+## Recurrence 2026-11-17 — the M4 item was never replaced
+
+Found by stall-A E8 (`docs/bugs/2026-11-14-dispatch-stall-a-detector.md`) on the M4 (`m4-air`), 03:06:05Z: the stall watcher captured the toy
+stall correctly, then `bin/k3dm-slack-notify` failed with `Slack summary post failed: HTTP 404 no_service`
+(`~/.local/share/k3d-manager/logs/dispatch-stall-watch.log`). The M4 Keychain item `k3dm-slack-webhook` (account `k3dm`) was last modified
+2026-06-03 01:10:04Z (`security find-generic-password -s k3dm-slack-webhook`, attributes only, no secret read), so it still holds the URL revoked
+before 2026-11-06; the 2026-11-06 hand fix was made on the M5 only. Every Slack notice sent from the M4 (stall watcher, and any other
+`k3dm-slack-notify` caller run there) has failed since. The watcher behaved as specified: failure logged, no `notified` marker, retried each tick.
+Fix: the operator replaces the M4 item from the current URL (`docs/howto/platform-ops-notifications.md:42`). No code change.

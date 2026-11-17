@@ -6,10 +6,12 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import time
 import re
 import fcntl
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from datetime import datetime, timezone
 
@@ -1055,17 +1057,32 @@ def _older_than(value, max_age_seconds, now):
         return False
 
 
+def _ci_cause(exc):
+    if (isinstance(exc, HTTPError) or type(exc).__name__ == "HTTPError") and getattr(exc, "code", None) is not None:
+        return f"GitHub API HTTP {exc.code}"
+    if isinstance(exc, TimeoutError) or type(exc).__name__ == "TimeoutError":
+        return "timeout"
+    if isinstance(exc, URLError) or type(exc).__name__ == "URLError":
+        return "network error"
+    if isinstance(exc, ValueError):
+        if getattr(exc, "args", None) and exc.args and exc.args[0] == "missing workflow run":
+            return "no workflow runs"
+        return "invalid response"
+    return exc.__class__.__name__
+
+
 def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, now=None):
     token = token if token is not None else _keychain_secret(GITHUB_SERVICE)
     if not token:
         return _unavailable("ci", GITHUB_SERVICE)
     repos = repos or ["wilddog64/k3d-manager"]
     now = now or datetime.now(timezone.utc)
-    try:
-        bad = []
-        first_bad = {}
-        rerunnable = {}
-        for repo_name in repos:
+    bad = []
+    failed = []
+    first_bad = {}
+    rerunnable = {}
+    for repo_name in repos:
+        try:
             run = fetch(f"/repos/{repo_name}/actions/runs", {"Authorization": f"token {token}"})
             runs = run.get("workflow_runs", []) if isinstance(run, dict) else []
             if not runs:
@@ -1075,15 +1092,18 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
                            {"Authorization": f"token {token}"})
             if not isinstance(checks, dict):
                 raise ValueError("invalid checks")
+            wf_name = latest.get("name") or "CI"
+            branch = latest.get("head_branch") or "unknown-branch"
             for check in checks.get("check_runs", []):
                 conclusion = None
+                check_name = check.get("name") or "check"
                 if check.get("conclusion") in ("failure", "timed_out", "cancelled"):
                     conclusion = check["conclusion"]
-                    bad.append(f"{repo_name} {check.get('name', 'check')} {conclusion}")
+                    bad.append(f"{repo_name} {wf_name}@{branch} {check_name} {conclusion}")
                 elif check.get("status") == "in_progress" and _older_than(
                         check.get("started_at"), max_age_seconds, now):
                     conclusion = "stuck"
-                    bad.append(f"{repo_name} {check.get('name', 'check')} stuck")
+                    bad.append(f"{repo_name} {wf_name}@{branch} {check_name} stuck")
                 if conclusion is None:
                     continue
                 candidate = {"repo": repo_name, "run_id": latest["id"],
@@ -1093,14 +1113,21 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
                     first_bad = candidate
                 if not rerunnable and conclusion in ("timed_out", "cancelled", "stuck"):
                     rerunnable = candidate
-        ci_data = rerunnable or first_bad
-        if bad:
-            status = "degraded" if _debounced("ci", True, threshold, state) else "healthy"
-            return record("ci", status, ", ".join(bad[:3]), data=ci_data)
-        _debounced("ci", False, threshold, state)
-        return record("ci", "healthy", "required CI checks successful")
-    except Exception:
-        return record("ci", "unknown", "CI status source unavailable")
+        except Exception as exc:
+            cause = _ci_cause(exc)
+            failed.append(f"{repo_name}: {cause}")
+            code = getattr(exc, "code", None)
+            code_str = str(code) if code is not None else "-"
+            print(f"Hermes ci unknown: {repo_name} {exc.__class__.__name__} {code_str}", file=sys.stderr)
+            continue
+    ci_data = rerunnable or first_bad
+    if bad:
+        status = "degraded" if _debounced("ci", True, threshold, state) else "healthy"
+        return record("ci", status, ", ".join(bad[:3]), data=ci_data)
+    if failed:
+        return record("ci", "unknown", "; ".join(failed[:3]))
+    _debounced("ci", False, threshold, state)
+    return record("ci", "healthy", "required CI checks successful")
 
 
 GITHUB_EXPIRY_HEADER = "github-authentication-token-expiration"

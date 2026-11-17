@@ -1060,6 +1060,7 @@ function vault_install_unseal_watchdog() {
    else
       _live_vault_image="$(_kubectl -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
    fi
+   command -v envsubst >/dev/null 2>&1 || _err "[vault] envsubst not found on PATH (brew install gettext); not applying the unseal watchdog"
    VAULT_NS="$ns" \
    VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-${_live_vault_image:-hashicorp/vault:1.18.3}}" \
    VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${ns}.svc:8200}" \

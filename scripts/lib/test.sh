@@ -578,13 +578,14 @@ function test_eso() {
     vault_started=1
   fi
 
-  root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
+  _no_trace eval 'root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath="{.data.root_token}" | base64 -d)'
+  _no_trace eval '_VAULT_TEST_ROOT_TOKEN="$root_token"'
 
-  trap "_cleanup_eso_test '$vault_ns' '$vault_release' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name' '$vault_started'" EXIT TERM
+  trap "_cleanup_eso_test '$vault_ns' '$vault_release' '$vault_secret_path' '' '$es_ns' '$es_name' '$store_name' '$vault_started'" EXIT TERM
 
   _info "Creating secret in Vault..."
-  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN='$root_token' vault kv put secret/$vault_secret_path $secret_key='$secret_val'"
+  _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put "secret/$1" "$2=$3"' sh "$vault_secret_path" "$secret_key" "$secret_val" <<<"$root_token"
 
   _kubectl create namespace "$es_ns" >/dev/null 2>&1 || true
 
@@ -646,7 +647,8 @@ function _cleanup_eso_test() {
   local vault_ns="$1"
   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
   local vault_secret_path="$3"
-  local root_token="$4"
+  local root_token="${4:-}"
+  [[ -n "$root_token" ]] || _no_trace eval 'root_token="${_VAULT_TEST_ROOT_TOKEN:-}"'
   local es_ns="$5"
   local es_name="$6"
   local store_name="$7"
@@ -657,14 +659,23 @@ function _cleanup_eso_test() {
   _kubectl -n "$es_ns" delete externalsecret "$es_name" --ignore-not-found >/dev/null 2>&1
   _kubectl -n "$es_ns" delete secret "$es_name" --ignore-not-found >/dev/null 2>&1
   _kubectl delete clustersecretstore "$store_name" --ignore-not-found >/dev/null 2>&1
-  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/$vault_secret_path" >/dev/null 2>&1 || true
+  _no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv delete "secret/$1"' sh "$vault_secret_path" <<<"$root_token" >/dev/null 2>&1 || true
 
   if [[ "$vault_started" -eq 1 ]]; then
     "${SCRIPT_DIR}/k3d-manager" undeploy_vault "$vault_ns" >/dev/null 2>&1 || true
   fi
 
   _kubectl delete namespace "$es_ns" --ignore-not-found >/dev/null 2>&1
+  unset _VAULT_TEST_ROOT_TOKEN
+}
+
+function _test_vault_k8s_login() {
+  local vault_ns="$1" vault_pod="$2" sa="$3" test_ns="$4"
+  local sa_jwt
+  sa_jwt=$(_kubectl create token "$sa" -n "$test_ns")
+  vault_token=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r JWT; printf %s "$JWT" | vault write -field=token auth/kubernetes/login role="$1" jwt=-' sh "$sa" <<<"$sa_jwt")
 }
 
 function test_vault() {
@@ -776,14 +787,11 @@ POD
   fi
 
   # Kubernetes auth token exchange (authoritative validation)
-  local sa_jwt
-  sa_jwt=$(_kubectl create token "$sa" -n "$test_ns")
   local vault_token
-  vault_token=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "vault write -field=token auth/kubernetes/login role=$sa jwt=$sa_jwt")
+  _no_trace _test_vault_k8s_login "$vault_ns" "$vault_pod" "$sa" "$test_ns"
   local value
-  value=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN=$vault_token vault kv get -field=${secret_key} secret/${vault_secret_path}")
+  value=$(_no_trace _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -field="$1" "secret/$2"' sh "$secret_key" "$vault_secret_path" <<<"$vault_token")
   if [[ "$value" != "$secret_val" ]]; then
     _err "Kubernetes auth token exchange failed"
   fi

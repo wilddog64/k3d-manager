@@ -8,7 +8,7 @@ setup() {
 
   LDAP_NAMESPACE=identity \
   VAULT_NAMESPACE=secrets \
-  LDAP_ROTATOR_IMAGE=alpine/k8s:1.31.4 \
+  LDAP_ROTATOR_IMAGE=docker.io/alpine/k8s:1.33.13@sha256:e521cee1f1cb8699bc6e906b4ce6fe50e84addae97f52d5dcf05d3974002ac26 \
   LDAP_ROTATION_SCHEDULE='0 0 1 * *' \
   LDAP_POD_LABEL='app.kubernetes.io/component=openldap' \
   LDAP_PORT=1389 \

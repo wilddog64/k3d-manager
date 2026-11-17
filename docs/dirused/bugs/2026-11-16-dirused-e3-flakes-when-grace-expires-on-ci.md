@@ -1,11 +1,11 @@
 # dirused E3 flakes on Windows CI: the 200 ms grace expires before the cooperative scan returns
 
-**Status:** LANDED — merged in wilddog64/dirused#9 as 609d183 (operator, 2026-11-16); CI windows + portable green at 58b7073, then #7 (with the fix merged in) green at b270d5e
+**Status:** OPEN — recurred 2026-11-16 at 1926d2e, after the #9 test-only change (609d183); the 1 s timeout did not hold
 **Priority:** P3 — test-only, but `windows` is a required check on dirused `main`, so each flake blocks a merge until a rerun passes
 **Introduced by:** wilddog64/dirused 588f0c2 (PR #8, merged as 25671fb) — added the hard-abandon wait at timeout + `min(timeout, 2s)`
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon)
-**Waiting on:** scheduled run — since 2026-11-16 (watch the next few windows CI runs for E1/E2/E3 timing failures)
+**Waiting on:** dispatch — since 2026-11-17 (spec intent approved)
 **Approved:** operator 2026-11-16 ("approved 1")
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` not run (vector store context missing earlier today).
 **Filed:** 2026-11-16
@@ -36,3 +36,20 @@ Argon blind review, verified by Claude:
 - E3 still fails if partial-result handling breaks (`FleetRunnerTests.cs:70`), so its guard survives the change.
 - Watch item, not fixed: E1 (`quick` must finish within its 600 ms abandon window) and E2's second sub-test (`manyCalls == 4` needs each scan thread to start within 400 ms) carry the same kind of exposure. It's smaller there, since the margin covers thread start-up rather than a timer callback plus a wake-up. Neither has failed in CI. If one does, give it the same treatment.
 - Rejected: an `ObjectDisposedException` on `ct.WaitHandle` can only happen after abandonment, which already fails the test, and the scan thread's catch absorbs it. E4's `max8 > 2` predates PR #8.
+
+## Recurrence (2026-11-16, Claude)
+
+`CI / windows (push)` on branch `m1c-summary-all-bugs` at 1926d2e, run 43981702417, failed E3 at `FleetRunnerTests.cs:70` (`Assert.Contains`, partial entry missing) in 2 s.
+`main` at the same SHA passed. The test already carries the #9 change (`Timeout: 1s`, so a 1 s grace), and 2 s is the full timeout plus grace,
+so the scan was abandoned again: the delegate had not returned within 1 s of the cancel.
+
+A 1 s lateness is hard to explain by timer jitter alone, so the jitter diagnosis above is weaker now. Next step is to check whether the
+cancel reaches the delegate's token at all on the abandon path (`ScanRunner.cs`: the linked `timeoutCts`, its disposal, and when the worker
+stops waiting), before choosing fix option 2. Seen while verifying M1c-A; not caused by it (the failing run is the unchanged base commit).
+
+
+## Decision and spec (2026-11-17)
+
+Operator chose to diagnose first, not add a grace floor. Workers already run with `LongRunning` (`ScanRunner.cs:139`) and each scan has its own thread,
+so neither uses the pool. `CancelAfter` (`ScanRunner.cs:43`), however, delivers the timeout through a thread-pool callback, which can queue behind a starved pool.
+Spec: `docs/plans/dirused-e3-timeout-cancel-without-thread-pool.md`. Its first commit must reproduce the failure (red on `main`) before any product change.

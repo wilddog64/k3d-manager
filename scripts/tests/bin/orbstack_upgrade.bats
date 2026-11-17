@@ -251,6 +251,9 @@ _report() { find "$HOME/.k3dm/orbstack-upgrade" -type f -name '*.json' -print -q
   run env DISPATCH_STATUS='state: running' DRY_RUN=1 "$SCRIPT"
   [ "$status" -eq 2 ]
   [[ "$output" == *'Codex dispatch task is running'* ]]
+  run env DISPATCH_STATUS='state: stalled (silent 3000s, 5 procs)' DRY_RUN=1 "$SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'Codex dispatch task is running'* ]]
   run env PS_OUTPUT='make platform-ops' DRY_RUN=1 "$SCRIPT"
   [ "$status" -eq 2 ]
   [[ "$output" == *'lifecycle or platform-ops command is running'* ]]

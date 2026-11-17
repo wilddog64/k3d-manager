@@ -33,3 +33,19 @@ setup() {
   [[ "$output" == *"image: target.example/vault:target"* ]]
   [[ "$output" != *"_kubectl"* ]]
 }
+
+@test "missing envsubst fails before apply" {
+  local stub_bin="${BATS_TEST_TMPDIR}/no-envsubst"
+  mkdir -p "$stub_bin"
+  ln -s "$(command -v mktemp)" "$stub_bin/mktemp"
+  unset -f envsubst
+  _kubectl() { printf '%s\n' "$*" >> "$WATCHDOG_LOG"; }
+  [ -d "$stub_bin" ] && [ ! -e "$stub_bin/envsubst" ]
+  run bash -c 'PATH="$1"; command -v envsubst' _ "$stub_bin"
+  [ "$status" -ne 0 ]
+  PATH="$stub_bin" run vault_install_unseal_watchdog secrets
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"envsubst not found on PATH"* ]]
+  run grep -q 'apply' "$WATCHDOG_LOG"
+  [ "$status" -ne 0 ]
+}
