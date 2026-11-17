@@ -1,7 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
-- 2026-11-17: dirused M1d spec written (docs/plans/dirused-m1d-top-level-default.md): fast top-level default, /deep, /exact, size after path; ideas row withdrawn (OOB repo, direct dispatch). Waiting on intent approval.
+- 2026-11-17: dirused M1d spec written (docs/plans/dirused-m1d-top-level-default.md): fast top-level default, /deep, /exact, size after path; ideas row withdrawn (OOB repo, direct dispatch). Intents approved (operator, 2026-11-17); dispatched to Flash (agy gemini-3.8-flash-medium) on dirused branch m1d-top-level-default.
 - 2026-11-17 ~02:45Z: memory-bank compressed — activeContext 300 KB → 44 KB, progress 227 KB → 11 KB; older text moved verbatim to `memory-bank/archive/{activeContext,progress}-2026-11-17.md`; new "Open items (2026-11-17)" section at the top of activeContext; Standing rules and Dispatcher closeout sections kept.
 - 2026-11-16 ~23:55Z: local CI gates on 127c7a3a all green: test-shard 1-4/4 rc 0, pytest 2137 passed, shellcheck/bash -n/yamllint/validate-manifests rc 0, lint-python (ruff 0.15.8, scratch venv) all checks passed. Next: operator hub-promote of release head (52 ahead of deploy/hub b5b931df) = push-hook E3, then live checks one at a time.
 - 2026-11-17: v1.44.1 promoted to hub (deploy/hub 6fe58dcb, tag hub-promote/20261117T001751Z); live checks next.

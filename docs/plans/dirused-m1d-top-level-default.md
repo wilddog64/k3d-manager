@@ -1,6 +1,6 @@
 # dirused M1d — fast top-level default, `/deep <level>`, `/exact`, readable sizes
 
-**Status:** draft — waiting on intent approval
+**Status:** dispatched — Flash (agy), 2026-11-17
 **Repo / branch:** wilddog64/dirused; `m1d-top-level-default` from `main` at 784e1a6
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); out-of-band repo, no ideas-backlog step (operator, 2026-11-17: "this does not go to ideas.md as repo is OOB … can we dispatch these now?"). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Operator words (2026-11-17):** "instead of list all contents of a given drive, can we just list top level directories with the size (human readble 10k, 1m, 1G, ...)"; "what is logical 27.2 kb on disk 28.0 kb … can we make this more readable?"; "can we put size after the path?"; "yes, we can add /deep <level> and /exact but I am not sure if we want to have these to apply to multiple node from /file though".
@@ -154,4 +154,4 @@ evidence:
 interface: dirused command line (text, JSON, CSV output)
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-17 ("approve intents and you can dispatch to the agents you pick")
