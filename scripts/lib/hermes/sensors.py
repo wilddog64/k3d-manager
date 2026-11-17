@@ -902,7 +902,7 @@ def vault_seal(run, state, context=None, threshold=2):
         for item in items:
             metadata = item.get("metadata", {})
             labels = metadata.get("labels", {})
-            if "vault-sealed" not in labels:
+            if labels.get("vault-sealed") not in ("true", "false"):
                 return record("vault_seal", "unknown", "vault seal state unavailable")
             name = metadata.get("name", "?")
             sealed = labels["vault-sealed"] == "true"

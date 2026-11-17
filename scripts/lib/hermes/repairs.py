@@ -202,7 +202,7 @@ def _r7_precondition(records, history, _state):
             bool(match) and int(match.group(1)) <= 2 and
             "cosign-public-key" in eso.get("evidence", "").lower() and
             vault is not None and vault_status == "healthy" and
-            all(pod.get("sealed") is False for pod in pods) and
+            bool(pods) and all(pod.get("sealed") is False for pod in pods) and
             _sustained(history, lambda cycle: "eso" in cycle, 2))
 
 

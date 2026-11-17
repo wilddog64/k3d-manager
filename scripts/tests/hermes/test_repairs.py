@@ -388,6 +388,13 @@ def test_r7_offered_when_only_cosign_fails():
     assert "unsealed" in proposal["evidence"]
 
 
+def test_r7_not_offered_when_vault_seal_has_no_pods():
+    records = _r7_case("1/20 not synced: cosign-public-key")
+    vault = next(item for item in records if item["sensor"] == "vault_seal")
+    vault["data"] = {"pods": []}
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
 def test_r7_approve_refused_when_vault_seals(monkeypatch):
     records = _r7_case("1/20 not synced: cosign-public-key")
     current = state([["eso"], ["eso"]])

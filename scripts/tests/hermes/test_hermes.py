@@ -1265,6 +1265,12 @@ def test_vault_seal_missing_label_is_unknown():
     assert result["status"] == "unknown"
 
 
+def test_vault_seal_unexpected_label_value_is_unknown():
+    for value in ("True", "", "yes"):
+        assert vault_seal(lambda *_: (0, _vault_payload({"vault-sealed": value})), {})["status"] == "unknown"
+    assert vault_seal(lambda *_: (0, _vault_payload({"vault-sealed": "false"})), {})["status"] == "healthy"
+
+
 def test_vault_seal_kubectl_error_is_unknown():
     assert vault_seal(lambda *_: (1, ""), {})["status"] == "unknown"
 
@@ -1314,6 +1320,22 @@ def test_root_cause_vault_sealed_leads_and_skips_llm():
     assert event["text"].startswith("Root cause: Vault sealed") and calls == []
 
 
+def test_root_cause_names_only_contributing_sensors():
+    vault = sensor("vault_seal", "degraded")
+    eso = sensor("eso", "degraded")
+    argocd = sensor("argocd", "degraded")
+    text = Correlator(correlation_window=1).process([vault, eso], {})["text"]
+    assert "ESO failures listed below follow from it." in text
+    assert "ArgoCD" not in text
+    text = Correlator(correlation_window=1).process([vault, eso, argocd], {})["text"]
+    assert "ESO and ArgoCD failures" in text
+    text = Correlator._template([vault], ["vault_seal"], "incident")
+    assert "failures listed below" not in text
+    text = Correlator._template([vault, eso, argocd, sensor("ci", "degraded")],
+                                ["eso", "argocd", "ci", "vault_seal"], "incident")
+    assert "ESO, ArgoCD and ci failures" in text
+
+
 def test_root_cause_absent_when_vault_healthy():
     calls, corr = [], Correlator(correlation_window=1)
     records = [sensor("vault_seal", "healthy"), sensor("eso", "degraded"), sensor("argocd", "degraded")]
@@ -1341,6 +1363,26 @@ def test_resolved_lists_withdrawn_and_clears(monkeypatch):
     _, event = k3dm_hermes._run_cycle(state, withdraw_on_resolve=True)
     assert proposal["action_id"] in event["text"] and "Nothing to approve" in event["text"]
     assert state["pending_repairs"] == {}
+
+
+def test_resolved_text_has_utc_zone(monkeypatch):
+    proposal = {"action_id": "r7-12345678", "name": "Restore", "expires_at": "2099-01-01T00:00:00Z"}
+    state = {"pending_repairs": {proposal["action_id"]: proposal}}
+    _cycle_with_stubs(monkeypatch, state, {"kind": "resolved", "sensors": [], "text": "resolved"})
+    _, event = k3dm_hermes._run_cycle(state, withdraw_on_resolve=True)
+    assert re.search(r"resolved at \d\d:\d\dZ ", event["text"])
+
+
+def test_resolved_text_names_attempted_repair(monkeypatch):
+    proposal = {"action_id": "r7-12345678", "name": "Restore", "expires_at": "2099-01-01T00:00:00Z"}
+    for attempted, expected in [(["r2"], "after repair r2"), ([], "without a repair")]:
+        state = {"pending_repairs": {proposal["action_id"]: proposal},
+                 "repairs_attempted_this_incident": attempted}
+        _cycle_with_stubs(monkeypatch, state, {"kind": "resolved", "sensors": [], "text": "resolved"})
+        _, event = k3dm_hermes._run_cycle(state, withdraw_on_resolve=True)
+        assert expected in event["text"]
+        if attempted:
+            assert "without a repair" not in event["text"]
 
 
 def test_resolved_without_pending_keeps_text(monkeypatch):

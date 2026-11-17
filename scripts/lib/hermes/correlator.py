@@ -55,7 +55,12 @@ class Correlator:
         vault = next((item for item in records if item.get("sensor") == "vault_seal" and
                       item.get("status") == "degraded"), None)
         if vault:
-            text = (f"Root cause: Vault sealed ({vault.get('evidence', '')}). ESO and ArgoCD failures listed below follow from it. "
+            names = [{"eso": "ESO", "argocd": "ArgoCD"}.get(name, name)
+                     for name in sorted(contributors, key=lambda name: (name != "eso", name))
+                     if name != "vault_seal"]
+            joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1] if names else ""
+            consequence = f"{joined} failures listed below follow from it. " if names else ""
+            text = (f"Root cause: Vault sealed ({vault.get('evidence', '')}). {consequence}"
                     "The unseal watchdog retries every 5 minutes; nothing to approve unless Vault is still sealed after 15 minutes.\n" + text)
         return text
 

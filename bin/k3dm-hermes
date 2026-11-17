@@ -273,6 +273,7 @@ def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path
     if event and event["kind"] in ("incident", "escalation"):
         state["incident_nonce"] = secrets.token_hex(8)
     if event and event["kind"] == "resolved":
+        attempted = list(state.get("repairs_attempted_this_incident", []))
         state["repairs_attempted_this_incident"] = []
         state.pop("incident_nonce", None)
     withdrawn = []
@@ -283,7 +284,8 @@ def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path
         proposals = []
         if withdrawn:
             names = ", ".join(f"{item['action_id']} ({item['name']})" for item in withdrawn)
-            event["text"] = (f"Hermes incident resolved at {timestamp()[11:16]} without a repair. "
+            tail = "after repair " + ", ".join(attempted) if attempted else "without a repair"
+            event["text"] = (f"Hermes incident resolved at {timestamp()[11:16]}Z {tail}. "
                              f"Withdrawn: {names}. Nothing to approve; old buttons are refused.")
     else:
         proposals = repairs.propose(records, state)
