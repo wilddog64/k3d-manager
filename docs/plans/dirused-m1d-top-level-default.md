@@ -25,7 +25,9 @@ A bare `dirused \\node` or drive root walks the whole drive and prints the 50 la
 - `Options` gains `int Deep = 1` and `bool Exact = false`.
 - `/deep <n>`: integer 1–32, else error `/deep requires an integer between 1 and 32`.
 - `/exact`: flag.
-- `/summary` with `/deep` or `/exact` → error `/summary reads volume usage only; drop /deep and /exact`.
+- `/summary` alone: unchanged (volume usage only, no walk) — the fleet-level overview.
+- `/summary` with `/deep` or `/exact`: `/deep` / `/exact` override it — the walk runs and the normal listing prints (it already starts with each
+  volume line); no error, no warning (operator, 2026-11-17: "we still need summary for higher level overview but /deep and /exact can override it").
 - Help text (keep every line within 80 columns; `ShortUsageText` gains `[/deep N] [/exact]`):
   `/deep <n>           Directory levels to list, 1-32 (default: 1)` and
   `/exact              On-disk sizes and hard-link dedup (slower)`.
@@ -90,11 +92,12 @@ Windows tests (`tests/Dirused.Tests`, real temp trees):
 Portable tests (`tests/Dirused.Tests.Portable`):
 6. `Format.Short` for every example in C3.
 7. Text row padding: sizes right-aligned in one column; redirected output pads; an over-wide console row uses two spaces.
-8. Parser: `/deep 0`, `/deep 33`, `/deep x` rejected; `/summary /exact` and `/summary /deep 2` rejected; help lines within 80 columns.
+8. Parser: `/deep 0`, `/deep 33`, `/deep x` rejected; `/summary /deep 2` and `/summary /exact` parse, and their options say walk (Summary
+   overridden); `/summary` alone still selects the volume-only path (control); help lines within 80 columns.
 9. Two targets plus `/deep 2` and no `/timeout` → the stderr line once; with `/timeout 5m` → no line; one target → no line (controls).
 10. `/exact` row with a compressed-file fixture (on-disk < logical by > 1 cluster) shows `(… on disk)`; a 27.2 KB / 28 KB row shows nothing extra.
 
-Mutations (each turns a test red): call `Remember()` in fast mode (2); drop the depth filter (1, 3); print `logical`/`on disk` labels (7); pad by
+Mutations (each turns a test red): make `/summary` win over `/deep` (8); call `Remember()` in fast mode (2); drop the depth filter (1, 3); print `logical`/`on disk` labels (7); pad by
 the longest path across all targets instead of per target (7, if fixtures use two targets); skip the warning (9).
 
 Gates: `dotnet test` on the dirused CI (Windows and portable jobs), all green on the PR head.
@@ -113,6 +116,8 @@ must:
     text: text rows are path first, size after, sizes in one right-aligned column in short units (27K, 1.2G); /exact adds "(S on disk)" only where it differs by more than one cluster
   - id: M5
     text: JSON and CSV keep raw byte counts and today's field and column names; JSON says whether the scan was exact
+  - id: M7
+    text: /summary alone stays the volume-only overview; /deep or /exact given with it overrides it and runs the listing
   - id: M6
     text: with more than one target, /deep or /exact and no /timeout, one stderr line suggests /timeout and /summary, and the run proceeds
 must_not:
@@ -121,7 +126,7 @@ must_not:
   - id: N2
     text: the default text output lists a path deeper than one level below the target, or prints "logical" / "on disk" labels (red today)
   - id: N3
-    text: /summary starts walking directories because /deep or /exact was given
+    text: /summary alone walks directories, or /summary with /deep or /exact skips the walk
 evidence:
   - id: E1
     proves: [M1, M2, M3, N1, N2]
@@ -129,7 +134,7 @@ evidence:
     command: dotnet test tests/Dirused.Tests --filter "FullyQualifiedName~Scanner|FullyQualifiedName~TopLevel"
     intent: A plain dirused on a drive shows only its top-level folders with their total sizes, without the slow per-file checks.
   - id: E2
-    proves: [M4, M5, M6, N3]
+    proves: [M4, M5, M6, M7, N3]
     kind: offline
     command: dotnet test tests/Dirused.Tests.Portable
     intent: Sizes read like 27K or 1.2G after each path in a neat column, scripts still get exact byte counts, and fleet runs warn before a slow deep scan.
