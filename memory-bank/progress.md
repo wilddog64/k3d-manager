@@ -1,7 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
-- 2026-11-17 ~16:00Z: operator chose fix-now for vault-sealed review findings ("dispatch two small ones"): specs webhook-vault-sealed-review-fixes (W1-W6) + hermes-vault-sealed-review-fixes (H1-H3,H5) dispatched to Luna (6169c3a1); H4 guide by Claude. dirused v0.0.4 requested by operator (needs Argon review of #13, merge, tag); System Volume Information label idea (M1h) proposed, not yet filed.
+- 2026-11-17 ~16:00Z: operator chose fix-now for vault-sealed review findings ("dispatch two small ones"): specs webhook-vault-sealed-review-fixes (W1-W6) + hermes-vault-sealed-review-fixes (H1-H3,H5) dispatched to Codex (6169c3a1) — ran on gpt-6.1-terra, not Luna: started without --model (so did M1g Part A); left running; H4 guide by Claude. dirused v0.0.4 requested by operator (needs Argon review of #13, merge, tag); System Volume Information label idea (M1h) proposed, not yet filed.
 - 2026-11-17 15:40Z: dirused M1g Part A verified by Claude on the VM (E1 green, pre-fix + 3 mutants red, live /timeout 2s names folder); committed a242be0, PR wilddog64/dirused#13 (CI 4/4 green on a242be0, incl. Windows; merge waits on blind Argon review). Part B still held on office probe B2.
 - 2026-11-17 15:25Z: E5 run 2: Root cause card + no r7 met; resolved pending ESO; E2 unexercised. Filed vault-sealed post-land review findings (P2 proposed).
 - 2026-11-17 ~15:35Z: dirused M1g spec written; Part A dispatched to Luna (dirused repo, branch m1g-timeout-folder-parallel-walk); Part B held on office probe.

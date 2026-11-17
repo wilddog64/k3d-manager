@@ -6,7 +6,7 @@
 **Covers:** W1–W6 in `docs/bugs/2026-11-17-vault-sealed-landed-review-findings.md` (follow-up to `docs/plans/webhook-analyze-vault-context.md`, bea02b84).
 **Risk:** low (parsing and argv of two read-only kubectl reads in one webhook job; tests)
 **Reviewed:** Claude only (low risk; findings already confirmed by a Fable diff review and re-read by Claude)
-**Agent:** Luna (Codex)
+**Agent:** Codex — ran on gpt-6.1-terra (config default; dispatched without `--model gpt-6-luna`)
 
 ## Problem
 
