@@ -314,3 +314,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-11: dispatch-table P3 VERIFIED live (Worker model column; cost-attribution-coverage worker gemini-3.8-flash-medium). Agent-cost P3 waits only on a Fable-row gauge screenshot.
 
 - 2026-11-11: job 40d0e3dd (cluster-up aws) succeeded with the Keycloak bootout workaround (proven, doc bef89132); fix 3b0e6534 still needs a post-promote cluster-up. Added `make promote REF=` (df0f7c22: hub-promote → appsets-check → platform-ops, stops at first failure). Operator to run `make promote REF=df0f7c22` on M5 tmux this afternoon once CI is green.
+
+### 2026-11-17 ~22:40Z — dirused CHANGELOG (PR #18)
+- dirused had no changelog; release notes were `--generate-notes` (PR titles only). Added `CHANGELOG.md` (v0.0.1-v0.0.8, user-facing; v0.0.6 marked no-download) and changed `release.yml` to publish the tag's CHANGELOG section (falls back to generated notes with a warning). PR wilddog64/dirused#18 open, operator merges.
+- Existing releases v0.0.1-v0.0.5, v0.0.7, v0.0.8 notes replaced with their CHANGELOG sections via `gh release edit`.
+- `/html` confirmed not built: it is M3, spec not yet written (operator decisions recorded in the 2026-11-17 entries). Next: write M3 spec, dispatch to Luna; each future dirused PR adds its CHANGELOG section before tagging.
