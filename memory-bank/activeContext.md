@@ -55,6 +55,7 @@
 
 ## Grooming 2026-11-22 agenda
 - Pull `docs/plans/v1.51.0-bug-count-query-translation.md` forward into the next open minor, displacing a not-started plan (operator 2026-11-17 "sounds good"); triage `docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md` with it.
+- Ideas rows 2026-11-17 (Task Forest): dispatch-ledger reconcile + review-child folding; one "needs you" view.
 - Ideas rows 2026-11-16/17: Claude-API reviewer, Claude-API Hermes writer.
 
 ## 2026-11-16 ~13:30Z — v1.44.1: fix the 10 groomed bugs before the release PR (operator)
