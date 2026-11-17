@@ -273,3 +273,20 @@ STUB
     [ -s "$TEST_NOTICES" ]
   done
 }
+
+@test "S1: notice shows the evidence path under ~/, never the home directory" {
+  export K3DM_WORKTREE_ROOT="$HOME/.local/share/k3d-manager/worktrees"
+  export TEST_RUN="$K3DM_WORKTREE_ROOT/v1.0.0/task.run" TEST_TREE="$K3DM_WORKTREE_ROOT/v1.0.0/task"
+  mkdir -p "$TEST_RUN" "$TEST_TREE"
+  printf 'pid=123\nstarted=123\n' > "$TEST_RUN/start"
+  printf 'hello\n' > "$TEST_RUN/codex.log"
+  [[ "$TEST_RUN" == "$HOME/"* ]]
+  run "$REPO/bin/k3dm-dispatch-stall-watch"
+  [ "$status" -eq 0 ]
+  local dir
+  dir="$(find "$TEST_RUN" -maxdepth 1 -type d -name 'stall-*')"
+  [ -n "$dir" ]
+  grep -qF "evidence ~/.local/share/k3d-manager/worktrees/v1.0.0/task.run/${dir##*/}" "$TEST_NOTICES"
+  run grep -qF "$HOME" "$TEST_NOTICES" "$dir/notice.txt"
+  [ "$status" -eq 1 ]
+}

@@ -72,7 +72,9 @@ _watch_capture() {
     (( 10#$n > run_number )) && run_number=$((10#$n))
   done
   json="$(_run_command --soft --quiet jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$repo" --arg stall "${dir##*/}" --argjson run "$run_number" --arg reason "$reason" --argjson silent "$silent" --argjson procs "$procs" --argjson ts "$(_run_command --soft --quiet perl -e 'print time')" '{ts:$ts,event:"stall_detected",version:$version,slug:$slug,repo:$repo,stall:$stall,run:$run,reason:$reason,silent_s:$silent,procs:$procs,killed:0}')" && printf '%s\n' "$json" >> "$_root/ledger.jsonl" || echo "[stall-watch] ledger write failed: $run" >&2
-  printf 'Dispatch stalled: %s %s silent %s seconds, %s processes; evidence %s\n' "$slug" "$version" "$silent" "$procs" "$dir" > "$dir/notice.txt"
+  local shown="$dir" home_mark=\~
+  [[ -z "${HOME:-}" || "$dir" != "$HOME"/* ]] || shown="$home_mark/${dir#"$HOME"/}"
+  printf 'Dispatch stalled: %s %s silent %s seconds, %s processes; evidence %s\n' "$slug" "$version" "$silent" "$procs" "$shown" > "$dir/notice.txt"
   _watch_notice "$dir"
 }
 
