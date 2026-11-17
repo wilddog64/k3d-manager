@@ -126,3 +126,35 @@ upstream proof. Argon: `gemini-4-argon-medium` via agy, read-only. Fable: backgr
 **Pair 3 read:** like pair 1, same verdict and same main finding; each added different contract readers. Argon's one
 wrong claim was a testable shell-behaviour claim, caught by running it. Cost: Fable 85K tokens, 9 tool calls, about
 2 minutes; Argon one agy call (about 9 minutes wall clock).
+
+## Pair 4 — 2026-11-17, spec review: Hermes vault-sealed sensor + r7 gating (combined plan)
+
+Medium-risk spec review (Hermes repair gating, Slack card text, webhook diagnosis). Both got the plan, the two bug docs
+and the repo, blind to each other. Argon: `gemini-4-argon-medium` via agy, read-only. Fable: background agent,
+read-only.
+
+**Verdicts:** both CHANGES.
+
+- **Overlap, confirmed by both:** the existing r7 test (`test_repairs.py:330`) breaks once r7 needs `vault_seal`, and
+  the file was not in Files; the two r7 mutations could not turn test 1 red (both guards false at once) and nothing
+  caught `N <= 20`; existing `_run_cycle` tests (`test_hermes.py:287,311,333,385`, `test_app_health.py:164`) would call
+  a real `kubectl`; resolve clears `pending_repairs` and then `propose()` re-adds it, and the approve re-sample would
+  turn "precondition no longer holds" into "unknown action-id"; `approve_when` source undefined against
+  `test_approvals.py` dicts with no `key`; "no `secret` in argv" breaks on `-n secrets` and `clustersecretstore`;
+  `-k` filters need fixed test names.
+- **Fable unique, confirmed:** gate r7 on raw `data.pods[].sealed` (the debounced status is still healthy on the first
+  sealed cycle); the text fallback card also needs the Recommended line; N3 was false as written (Hermes already reads
+  a Secret at `bin/k3dm-hermes:180`); count-regex details; a lone seal posts nothing (two contributors needed);
+  production passes no `llm`; `pager.py` is a contract reader.
+- **Argon unique, confirmed:** `test_approvals.py:199` runs `git diff --quiet -- repairs.py` and fails in any
+  uncommitted worktree; the 7-poll unknown test pages "vault_seal check unknown 30+ min"; the `vault-initialized`
+  mutation survives test 2 on a realistic fixture; the guide's "five read-only sensors" row is already gone;
+  `_enrich` takes no `records`; Contract readers mislabelled `:1096` as deny; `analyze_env` returns non-JSON for
+  every call, so the new reads must fail open.
+- **Refuted:** none.
+
+**Pair 4 read:** the same verdict and the same main findings, with about half of each list unique and all of it real.
+Argon was stronger on tests that would break in the worker's tree; Fable was stronger on behaviour (debounce gap, card
+fallback, a false must_not). Cost: Fable about 130K tokens, 18 tool calls, about 4 minutes; Argon one agy call.
+After review the plan was split for the operator's Flash/Luna instruction: Hermes (Luna) and webhook Fix 5 (Flash,
+`docs/plans/webhook-analyze-vault-context.md`).
