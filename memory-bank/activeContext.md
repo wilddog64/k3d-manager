@@ -1,5 +1,6 @@
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-17 ~18:00Z: dirused M2a run 2: Portable 36/36. Review found colour never shows (GetType()==StreamWriter vs Console.Out = TextWriter+SyncTextWriter, probed SDK 11.0.100). Spec gained test 9 (pure ShouldColor, Console.Out positive control) and recorded the Complete-required deviation; Luna resume 3 (correction).
 - 2026-11-17: dirused M2a run 1 exited; production changes OK but tests/Dirused.Tests.Portable (CI's Linux suite) went 36/36 → 31/36 — footer line and JSON level, intended. Spec defect: Files table omitted the Portable project; amended, Luna resumed (resume 2, --reason correction).
 - 2026-11-17: idea row added to docs/ideas.md — graph each Claude /clear in Grafana (hook log already exists, no reader). Inbox, grooming 2026-11-22.
 - 2026-11-17 ~19:00Z: dirused M2a spec docs/plans/dirused-m2a-fullness-levels.md (/warn 85, /crit 90, [WARN]/[CRIT] tags + ConsoleColor, /summary footer, exit 4 over 3, JSON/CSV level) dispatched to Luna on new dirused branch m2a-fullness-levels (from main 3865f28). Still recorded under v1.44.2 until M1 lands. M2b (top 3 folders for red/yellow in /summary) and /html are next specs. WIP 3/3.

@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: dirused M2a resume 3 — console colour dead code fix + test 9.
 - 2026-11-17: dirused M2a resumed (Portable tests 5 red from intended output change; spec Files table amended).
 - 2026-11-17: idea — /clear metrics + Agent Activity panels (docs/ideas.md, inbox).
 - 2026-11-17 ~19:00Z: dirused M2a fullness levels dispatched (Luna). WIP 3/3.
