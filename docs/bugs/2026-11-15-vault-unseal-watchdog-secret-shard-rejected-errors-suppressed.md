@@ -5,7 +5,7 @@
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-17 (operator runs the one-time Secret repair on the M5; then stage 2 spec for v1.44.2)
+**Waiting on:** dispatch — since 2026-11-17 (stage 2 spec for v1.44.2; live Secret already repaired)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
@@ -207,3 +207,7 @@ No shard value was printed. Vault stayed sealed, as expected before stage 2.
 SHA-256 prefix (CR/LF stripped) of Keychain item `k3d-manager-vault-unseal` / `secrets/vault:shard1`: `4d9e743984dd`.
 Cluster Secret `secrets/vault-unseal` `shard-1`: `f1bffbb8cc7e`. They differ, and the Keychain value is not the empty-string hash (`e3b0c44298fc`), so a real shard was read.
 Together with E5 (`cipher: message authentication failed`): **the `vault-unseal` Secret holds a shard from an earlier Vault init; the Keychain shard is current.** The stale-Secret hypothesis is proven. Stage 2 is unblocked.
+
+## One-time Secret repair, 2026-11-17 (operator, M5, login Keychain unlocked)
+
+Operator ran a Claude-written script that read the Keychain shard, refused to write unless its fingerprint was `4d9e743984dd`, and patched `secrets/vault-unseal` `shard-1` over stdin (`jq -Rs` → `kubectl patch --patch-file /dev/stdin`; no shard in argv, history or output). Output: before `f1bffbb8cc7e`, `secret/vault-unseal patched`, after `4d9e743984dd`, OK. Claude confirmed `4d9e743984dd` read-only at 01:20:44Z and deleted the script from the M5. The watchdog's next Vault restart should now unseal on its own; stage 2 (v1.44.2) keeps the Secret in step on future Keychain restores.
