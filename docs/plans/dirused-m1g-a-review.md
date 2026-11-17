@@ -21,6 +21,14 @@ tests that cannot fail.
 1. Read `README.md`, `src/Dirused.Core/Scanner.cs`, `src/Dirused.Core/ScanRunner.cs` and `tests/Dirused.Tests/ScannerTests.cs`.
 2. `git log --oneline -3` and confirm HEAD is a242be0.
 
+## Files
+
+| File | Change |
+|---|---|
+| `src/Dirused.Core/Scanner.cs` | read only |
+| `tests/Dirused.Tests/ScannerTests.cs` | read only |
+| `README.md` | read only |
+
 ## What NOT to Do
 
 - Do NOT edit, commit, push or comment on the PR.
