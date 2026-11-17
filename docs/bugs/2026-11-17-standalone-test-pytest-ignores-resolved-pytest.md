@@ -35,4 +35,4 @@ evidence:
 interface: none
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-17 ("approved")
