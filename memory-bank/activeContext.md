@@ -1,5 +1,6 @@
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-17 ~19:25Z: dirused#14 CI green 4/4 on 6fb03b1, no open comments, Argon findings handled. Merge attempt refused by the auto-mode classifier — waiting on operator go to merge #14 and cut v0.0.5. dirused checkout back on main (3865f28).
 - 2026-11-17 ~19:15Z: dirused M2a-b LANDED 6fb03b1 on m2a-fullness-levels (verified: diff = spec Changes 1-4 + 2nd L1-L12 in PACKAGE-README:40; pwsh parse 0 errors; Invoke-Dirused merges stderr so L12 sees the message). Pushed; CI on 6fb03b1 running. Then merge #14; v0.0.5 release cut needs operator go. WIP 2/3.
 - 2026-11-17 ~19:00Z: Argon review of dirused#14: 3 findings. Verified: tools/live-check.ps1 F1/F2 accept only rc 0|3 (fail on exit 4) — real; Claude also found L3/L8 require rc 0 (fail on a 90%-full PC). Declined: renderers recompute level vs r.Level (unreachable, Program passes same thresholds); IsOutputRedirected order (speculative, no behaviour change). Spec docs/plans/dirused-m2a-b-live-check-exit4.md (L3/L8 add /warn 99 /crit 100; F1/F2 accept 4; new L11 crit tag+footer+exit 4, L12 warn>=crit) dispatched to Luna on m2a-fullness-levels. #14 merge waits on it. WIP 3/3.
 - 2026-11-17: dirused#14 CI green 4/4 on head 6f09162 (push + pull_request; windows runs tests 1-8). Merge waits on the Argon review.
