@@ -168,3 +168,9 @@ Output: scratchpad `e3/bench-m1e-out.txt` (session e25df53e). aad521e changes on
 M1–M4 and N1–N3 pass. Blocking: Windows CI red on a wrong assertion (RemoteTargetTests:142, top-level file rows only), fixed in aad521e.
 Taken: a FileId of 0 or all-ones is not deduplicated (new test); ERROR_FILE_NOT_FOUND on the first listing call means an empty share root (no test, no empty share available).
 Left (low): denied-directory wording now "Access is denied."; `\\?\` targets show prefixed paths in the listing branch; a mid-listing failure loses that folder's partial entries; Ctrl-C waits for the current listing; an error code other than 87/1/50 from a rejecting redirector is a scan error, not a fallback.
+
+## Blind Argon review (gemini-4-argon-medium, diff only, 2026-11-17) and vm-live
+
+Fixed in 881ea1a: listing-branch rows drop the `\\?\` prefix (also verifier finding 5); the loopback test's `/exact` half asserts the whole root total.
+Not changed: no dedup in fallback directories (M3 as specified); FileId alone as key could collide across server-side submounts on a NAS/Samba share (speculative, E4 is the check); cloud placeholders keep the existing no-dedup rule (spec C2); `DirectoryReader.Read` called directly with a relative path (callers pass full paths).
+vm-live on aad521e: 9/10. L7 (`C:\` with `/timeout 2s` expects TIMED OUT) completed in 1.2s; the M1d build also finishes local `C:\` in 1.2s on the warm VM (M1e total 18.19G, M1d 28.82G, both complete, no errors), so L7's target is too small once cached. Not an M1e regression; L7 needs a larger target or a smaller timeout (follow-up).
