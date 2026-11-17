@@ -23,13 +23,15 @@ A bare `dirused \\node` or drive root walks the whole drive and prints the 50 la
 
 ### C1. Options and parser (src/Dirused.Common/Options.cs, ArgParser.cs)
 - `Options` gains `int Deep = 1` and `bool Exact = false`.
-- `/deep <n>`: integer 1–32, else error `/deep requires an integer between 1 and 32`.
+- `/deep [n]`: the level is optional. `/deep` alone = 2 levels (operator, 2026-11-17: "/deep can have a default of 2 levels so we have some rough
+  idea"). When the next argument is all digits it is the level, 1–32, else error `/deep level must be an integer between 1 and 32`; any other
+  next argument is not consumed (a folder named only with digits is written `.\3`). No `/deep` at all = 1 level (the bare default).
 - `/exact`: flag.
 - `/summary` alone: unchanged (volume usage only, no walk) — the fleet-level overview.
 - `/summary` with `/deep` or `/exact`: `/deep` / `/exact` override it — the walk runs and the normal listing prints (it already starts with each
   volume line); no error, no warning (operator, 2026-11-17: "we still need summary for higher level overview but /deep and /exact can override it").
-- Help text (keep every line within 80 columns; `ShortUsageText` gains `[/deep N] [/exact]`):
-  `/deep <n>           Directory levels to list, 1-32 (default: 1)` and
+- Help text (keep every line within 80 columns; `ShortUsageText` gains `[/deep [N]] [/exact]`):
+  `/deep [n]           List n directory levels, 1-32 (/deep alone: 2)` and
   `/exact              On-disk sizes and hard-link dedup (slower)`.
 
 ### C2. Fast scan by default (src/Dirused.Core/Scanner.cs)
@@ -85,19 +87,20 @@ text output changes on purpose. Readers to update, by grep on main 784e1a6:
 Windows tests (`tests/Dirused.Tests`, real temp trees):
 1. Tree with `a\x\y\big.bin` (1 MB), `b\small.txt`, `root.txt`: default text lists `a`, `b`, `root.txt` only, `a` first, `a`'s size includes `big.bin`.
 2. Same tree, default scan: `PerFileCalls == 0`. With `/exact`: `PerFileCalls > 0` (positive control).
-3. `/deep 2` lists `a\x` too, never `a\x\y`; default output equals `/deep 1` output byte for byte.
+3. `/deep 2` lists `a\x` too, never `a\x\y`; `/deep` alone equals `/deep 2` byte for byte; no `/deep` equals `/deep 1` byte for byte.
 4. A hard-linked file: `/exact` counts it once; default counts each link (documents the trade).
 5. JSON default: `exact:false`, sizes in raw bytes, every path at depth 1; CSV header unchanged.
 
 Portable tests (`tests/Dirused.Tests.Portable`):
 6. `Format.Short` for every example in C3.
 7. Text row padding: sizes right-aligned in one column; redirected output pads; an over-wide console row uses two spaces.
-8. Parser: `/deep 0`, `/deep 33`, `/deep x` rejected; `/summary /deep 2` and `/summary /exact` parse, and their options say walk (Summary
+8. Parser: `/deep 0`, `/deep 33` rejected; `/deep` at the end of the line → level 2; `/deep C:\x` → level 2 with target `C:\x`; `/deep /json`
+   → level 2 and JSON; `/summary /deep 2` and `/summary /exact` parse, and their options say walk (Summary
    overridden); `/summary` alone still selects the volume-only path (control); help lines within 80 columns.
 9. Two targets plus `/deep 2` and no `/timeout` → the stderr line once; with `/timeout 5m` → no line; one target → no line (controls).
 10. `/exact` row with a compressed-file fixture (on-disk < logical by > 1 cluster) shows `(… on disk)`; a 27.2 KB / 28 KB row shows nothing extra.
 
-Mutations (each turns a test red): make `/summary` win over `/deep` (8); call `Remember()` in fast mode (2); drop the depth filter (1, 3); print `logical`/`on disk` labels (7); pad by
+Mutations (each turns a test red): make `/deep` alone mean 1 (3, 8); make `/summary` win over `/deep` (8); call `Remember()` in fast mode (2); drop the depth filter (1, 3); print `logical`/`on disk` labels (7); pad by
 the longest path across all targets instead of per target (7, if fixtures use two targets); skip the warning (9).
 
 Gates: `dotnet test` on the dirused CI (Windows and portable jobs), all green on the PR head.
@@ -111,7 +114,7 @@ must:
   - id: M2
     text: the default scan makes no per-file open or allocation call; /exact restores today's on-disk sizes and hard-link dedup
   - id: M3
-    text: /deep N lists entries down to N levels; the default equals /deep 1
+    text: /deep N lists entries down to N levels; /deep alone equals /deep 2; no /deep equals /deep 1
   - id: M4
     text: text rows are path first, size after, sizes in one right-aligned column in short units (27K, 1.2G); /exact adds "(S on disk)" only where it differs by more than one cluster
   - id: M5
