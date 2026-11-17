@@ -1,6 +1,6 @@
 # dirused `/all` adds the local machine's drives even when remote targets are given
 
-**Status:** OPEN — fix in wilddog64/dirused#10 (ef6c0d1), not yet on main; verified by Claude offline (red at 6a99c36, CI green at ef6c0d1) and on the dirused-dev VM (`docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`)
+**Status:** LANDED — fix ef6c0d1 merged in 784e1a6 (wilddog64/dirused#10, 2026-11-17T01:08Z), released in v0.0.2 (pre-release, win-x64 + win-arm64 zips, run 43993540322); was OPEN, fix in #10 not yet on main; verified by Claude offline (red at 6a99c36, CI green at ef6c0d1) and on the dirused-dev VM (`docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`)
 **Priority:** P3 (proposed; Argon classification pending) — extra rows for the machine running dirused mixed into a fleet report; nothing is missing; workaround: leave out `/all` when targets are listed
 **Introduced by:** wilddog64/dirused d86655b (M1b phase 0; `/all` = all fixed local drives in `TargetResolver`)
 **Should have been caught by:** spec

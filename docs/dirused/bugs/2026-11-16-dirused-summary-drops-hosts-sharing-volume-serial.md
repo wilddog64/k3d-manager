@@ -1,6 +1,6 @@
 # dirused `/summary` silently drops remote hosts whose volume has the same serial number as another host's
 
-**Status:** OPEN — fix in wilddog64/dirused#10 (ef6c0d1), not yet on main; verified by Claude offline (red at 6a99c36, CI green at ef6c0d1) and on the dirused-dev VM (`docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`)
+**Status:** LANDED — fix ef6c0d1 merged in 784e1a6 (wilddog64/dirused#10, 2026-11-17T01:08Z), released in v0.0.2 (pre-release, win-x64 + win-arm64 zips, run 43993540322); was OPEN, fix in #10 not yet on main; verified by Claude offline (red at 6a99c36, CI green at ef6c0d1) and on the dirused-dev VM (`docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`)
 **Priority:** P2 (proposed; Argon classification pending) — the summary leaves out hosts with no error and no warning, so the report looks complete when it is not; workaround: run without `/summary`, or one host per run
 **Introduced by:** wilddog64/dirused d302f65 (M1b phase 1b fleet runner: `/file`, `/summary`)
 **Should have been caught by:** offline test
