@@ -1,6 +1,6 @@
 # dirused M1e — hard links counted once, from the directory listing
 
-**Status:** LANDED — dirused 5d4b51b + aad521e (verifier fixes) on m1e-listing-file-ids, PR wilddog64/dirused#12 (2026-11-17); CI green; E3 done; Argon review pending; E4 after v0.0.3
+**Status:** MERGED — dirused 6c660229 (PR #12, 2026-11-17); released v0.0.3 (pre-release, win-x64 + win-arm64 zips); E4 office timing pending (operator)
 **Repo / branch:** wilddog64/dirused; `m1e-listing-file-ids` from `main` at 96e8d83 (M1d merged, PR #11)
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); out-of-band repo, no ideas-backlog step (operator, 2026-11-17). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Operator words (2026-11-17):** "go for 1" — merge M1d now, fix the hard-link overcount next in M1e.
