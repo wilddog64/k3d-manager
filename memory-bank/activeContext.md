@@ -333,3 +333,9 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - PR wilddog64/dirused#19 open (normal). Windows CI = evidence for H10/H11/H14. Blind Argon review dispatched: slug `dirused-m3-review` (spec docs/plans/dirused-m3-review.md).
 - Gotchas: verify evidence needs `verifier: claude` and `tests_from: acceptance` exactly.
 - Next: Argon result → adjudicate; Windows CI green; operator merges #18 then #19; CHANGELOG entry; tag v0.0.9; office live L15 + open C:\temp\output.html from a fleet run.
+
+### 2026-11-17 ~23:45Z — Argon review of dirused #19 adjudicated
+- 6 findings: fixed 1 (case-sensitive GroupBy → crash on \\srv1 + \\SRV1, H15 red pre-fix), 3 (/output swallowed a switch), 5 (H6 pre-sorted input; mutation sort-removed now red), 6 (H14 asserts no target resolved via recording INodeShares) in dirused 4d8bb1c (pushed). Portable 56/56; Windows tests build.
+- Not fixed (pre-existing console behaviour, out of M3 scope): 2 local C:\ + \\thismachine\c$ double count (VolumeKey host ""), 4 Format.Size current culture. Candidates for a later dirused fix.
+- Review row `dirused-m3-review` abandoned with reason; adjudication table posted on #19.
+- Waiting: Windows CI on 4d8bb1c; operator merges #18 → CHANGELOG entry on m3 → #19 → tag v0.0.9.
