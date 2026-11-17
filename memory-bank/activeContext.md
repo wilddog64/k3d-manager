@@ -4,7 +4,7 @@
   The 18 commits after 6fe58dcb are docs/memory-bank only (no code drift). The push-hook fix ran for real: the tag push went through cleanly.
 - E3 flake: workers already use LongRunning (ScanRunner.cs:139; Claude first misread this). Remaining hypothesis: CancelAfter's timer callback
   queues to a starved thread pool. Spec docs/plans/dirused-e3-timeout-cancel-without-thread-pool.md (red-first; stop if not reproducible), intent pending.
-- PR #162 opened (v1.44.1 release, f9248a48). Blind Argon diff review running (Copilot allowance exhausted). v1.45.0 multi-project-records intent APPROVED (operator 2026-11-17).
+- PR #162 opened (v1.44.1 release, f9248a48). Blind Argon diff review done: 7 findings, 3 refuted, 5 P3s captured (docs/issues/2026-11-17-argon-pr162-review-findings.md); no merge blocker. pgvector live E2 PASSED (91d11ef8). Live checks 1/10. v1.45.0 multi-project-records intent APPROVED (operator 2026-11-17).
 - Next: live checks one at a time (pgvector E2 first); /create-pr can open now (live smoke gates merge, not creation); intent review of multi-project-records.
 
 ## Handoff 2026-11-17 ~00:30Z — v1.44.1 verified offline; dirused M1c-A PR #10 awaits office check — START HERE
