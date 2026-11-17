@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 06:50Z: dirused #12 CI green on 881ea1a (windows + portable, push + pull_request), mergeable clean; enforce_admins DELETED on dirused main. Operator merges #12, then Claude re-enables enforce_admins and tags v0.0.3.
 - 2026-11-17 06:40Z: operator "go for it" — merge v1.44.1 without waiting for Hermes E3 (needs a real ci page; bug stays open). Pushed 7 docs commits (head 1c129251); scope check clean (every code/test/CI file named by a v1.44.1 spec). Waiting on CI for 1c129251, then enforce_admins DELETE.
 - 2026-11-17 06:25Z: dirused #12: blind Argon review — fixed \\?\ display + /exact loopback assertion (881ea1a); rest adjudicated in spec. vm-live 9/10: L7 timeout check too small on warm cache (M1d also 1.2s), follow-up. Waiting on CI for 881ea1a.
 - 2026-11-17 06:05Z: dirused PR #12 opened (M1e, head aad521e). E3: default 20.7s→13.5s, Windows 20G→12G; /exact 95s→39s. vm-live on aad521e ran; blind Argon review running.
