@@ -1,11 +1,11 @@
 # Bug: vault-sealed landings (fadf8438, bea02b84) — post-land Fable review findings
 
-**Status:** OPEN
+**Status:** LANDED — webhook W1–W6 in 59dd12e5; Hermes H1–H3, H5 in ebdd140a; guide H4 in 4ecee69c. Claude verified: pre-fix red 5/5 in each, all 10 spec mutations red, targeted suites green.
 **Priority:** P2 (proposed: the webhook sealed check fails open on any kubectl warning; the rest are P3 hygiene)
 **Introduced by:** fadf8438 (Hermes, Luna) and bea02b84 (webhook, Flash), both v1.44.2
 **Should have been caught by:** review
 **Introducing change reviewed:** no (the specs had Argon + Fable; the two diffs had no diff review before land)
-**Waiting on:** fix running — since 2026-11-17 (operator: "dispatch two small ones"; `docs/plans/webhook-vault-sealed-review-fixes.md`, `docs/plans/hermes-vault-sealed-review-fixes.md`; H4 by Claude)
+**Waiting on:** live check — since 2026-11-17 (needs `make hub-promote`; was: fix running (operator: "dispatch two small ones"; `docs/plans/webhook-vault-sealed-review-fixes.md`, `docs/plans/hermes-vault-sealed-review-fixes.md`; H4 by Claude))
 **Prior art:** `docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`, `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run) — the specs these landings implemented; none records these defects.
 **Filed:** 2026-11-17
 
