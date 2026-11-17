@@ -1,11 +1,12 @@
 # Bug: Vault tokens and a ServiceAccount JWT passed in `kubectl exec` argv (`test_eso`, `test_vault` login, `bin/get-ldap-password`)
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 2f8bd1ae on k3d-manager-v1.44.1, 2026-11-16 (Luna, after one spec correction; Claude verified: new tests red on pre-fix code 3/5 with both positive controls green, green on fix; mutants m1-m6 red; no token left in any sh -c string)
+**Status:** LIVE-VERIFIED — 2026-11-17, E5 by Claude on the hub (ledger live_verified 2f8bd1ae). Was: VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — 2f8bd1ae on k3d-manager-v1.44.1, 2026-11-16 (Luna, after one spec correction; Claude verified: new tests red on pre-fix code 3/5 with both positive controls green, green on fix; mutants m1-m6 red; no token left in any sh -c string)
+**Live evidence:** 2026-11-17 · run hub-test_eso-test_vault-0212Z · env hub/k3d-k3d-cluster · scenario stdin-token-forms-vault-1.20.1 · commit 6fe58dcb · proves E5
+**Fix commit:** 2f8bd1ae
 **Priority:** P2 (proposed: A02 security-rule violation; tokens visible in process lists on the host and in the pod, and under xtrace; dev/test paths, no known leak)
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-16 (E5: test_eso + test_vault against hub Vault 1.20.1, Claude or operator)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1; Claude's P2 kept over Argon P3 (breaks the CLAUDE.md secrets rule) — operator grooming 2026-11-15 ("Accept as shown")
 **Prior art:** exact-slug pass, no match; `find-similar-docs` not run (needs context k3d-k3d-cluster from the M4) — found by the Fable spec review of `2026-11-15-vault-pod-restart-invalidates-token-reviewer-jwt-eso-403.md`, which fixes the `test_vault` root-token sites only
@@ -178,3 +179,7 @@ Assert the fixtures first (stub is the one on PATH; tmp HOME) before the negativ
 
 **Intent approved:** operator, 2026-11-16
 **Approval note:** ("Approve all 9")
+
+## Live verification 2026-11-17 (Claude, operator go)
+
+E5 PASS on the M5 hub (checkout 6fe58dcb, contains 2f8bd1ae; Vault v1.20.1). `./scripts/k3d-manager test_eso` at 02:12:30Z: Vault kv put through the stdin token form, ClusterSecretStore and ExternalSecret created, sync condition met, `ESO test completed successfully`, rc 0. `test_vault` at 02:12:46Z: auth config written, temporary role created (only Vault's 1.21 audience warning), kv seeded, `vault-read` pod logged in with the ServiceAccount JWT over stdin, `Vault test succeeded`, rc 0. Read-only after-check: `auth/kubernetes/config` identical to the pre-test read (same host, 570-byte CA, issuer validation off), temporary role removed, no test namespaces or stores left, 9/9 ExternalSecrets Ready. Evidence: `<run>/live-evidence.txt`.
