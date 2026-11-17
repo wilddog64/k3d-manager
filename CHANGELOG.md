@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [1.44.1] - 2026-11-17
+
+Bug-fix release: the 12 bugs groomed into v1.44.1 on 2026-11-15, plus the CI split. Each fix was verified offline by Claude: its new tests fail on the pre-fix code and pass on the fix.
+
+### Fixed
+
+- **Security: Vault tokens and a ServiceAccount JWT off `kubectl exec` argv.** `test_eso`, the `test_vault` login and `bin/get-ldap-password` passed the root token, login token or SA JWT as command arguments, where they show up in `ps` and audit logs. They now go in on stdin or through the environment.
+- **Security: hub CronJobs pinned to `alpine/k8s:1.33.13` by digest.** Six hub CronJobs ran `alpine/k8s:1.31.4`, which carries 27 critical and 218 high CVEs.
+- **vectordb: pgvector pinned to `0.8.7-pg17` by digest** instead of the floating `pg17` tag, so a restart can no longer pull a different database build.
+- **Vault unseal watchdog** logs the return code and a filtered Vault error when Vault rejects a shard, instead of replaying the shard silently. The installer now requires `envsubst`.
+- **hub-promote containment** recognises squash-merged releases. `git cherry` cannot see squash merges, so the first promote of every release was refused. `BREAK_GLASS` is now separate from `SKIP_CHECK_RUNS`.
+- **hub-promote push hooks** no longer inherit `REF`, `BREAK_GLASS` or the make flags from the promote, which made the pre-push refusal tests fail during a real promote.
+- **repo-sync pushes to Pushgateway only from the hub host.** A dev machine running the sync left a stray `instance="m4-air"` group on the hub Pushgateway.
+- **Hermes "CI unknown" page** names the repo, workflow and cause, and one repo failing no longer hides another.
+- **Bugs dashboard release column** reads the `**Triage:**` and `**Release:**` lines before `**Branch:**`, so a triaged bug shows the release it was groomed into, not the one it was filed on.
+- **spec-intent gate** checks evidence items written in YAML flow style (`- E1: {…}`) and refuses items it cannot read, where before it skipped them.
+
+### Added
+
+- **Dispatch stall detector (stage A).** A1: a status probe, a `stalled` listing and an OrbStack guard. A2: a watcher with a launchd agent and install targets that records a `stall_detected` ledger event and sends one Slack notice per incident. This also closes the bug where a dispatch could stay `running` with a silent log and raise no alert.
+
+### Changed
+
+- **CI:** lint runs separately from tests, and BATS is sharded across 4 matrix jobs plus a `test-python` job.
+
 ## [1.44.0] - 2026-11-15
 
 ### Added
