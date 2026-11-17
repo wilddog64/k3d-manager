@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: multi-project M1 landed 6972d10a (per-project versions, ledger project, open --count); E5 live pending. P3 bug: stall-watch events lack project.
 - 2026-11-17: dirused M2b (top 3 folders for warn/crit) spec + dispatched to Luna; plan: v0.1.0 when satisfied. Luna M1 exited, verify pending.
 - 2026-11-17: dirused v0.0.5 published (2 zips + sha256); office live check pending.
 - 2026-11-17: dirused#14 merged (operator); v0.0.5 tag pushed, release building.
