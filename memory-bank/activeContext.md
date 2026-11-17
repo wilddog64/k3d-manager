@@ -319,3 +319,9 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - dirused had no changelog; release notes were `--generate-notes` (PR titles only). Added `CHANGELOG.md` (v0.0.1-v0.0.8, user-facing; v0.0.6 marked no-download) and changed `release.yml` to publish the tag's CHANGELOG section (falls back to generated notes with a warning). PR wilddog64/dirused#18 open, operator merges.
 - Existing releases v0.0.1-v0.0.5, v0.0.7, v0.0.8 notes replaced with their CHANGELOG sections via `gh release edit`.
 - `/html` confirmed not built: it is M3, spec not yet written (operator decisions recorded in the 2026-11-17 entries). Next: write M3 spec, dispatch to Luna; each future dirused PR adds its CHANGELOG section before tagging.
+
+### 2026-11-17 ~22:55Z — dirused M3 /html dispatched (Luna)
+- Operator redesign: `/html` adds an HTML report (console unchanged); `/output <path>` = destination (default `C:\temp\output.html`, overwritten); without `/html`, `/output` redirects text/JSON/CSV to the file; report shows a nodes table + volumes table with Host column ("make table to present multiple nodes").
+- Spec `docs/plans/dirused-m3-html-output.md` (d7f90700), low risk, Intent approved. Dispatched slug `dirused-m3-html-output`, branch `m3-html-output` (from main aa54c2b), version v0.0.9, Luna. Program.Run tests (H10/H11/H14) live in the Windows suite — verify on PR Windows CI; portable H1-H9, H12-H13 run locally.
+- Gotcha: `codex-dispatch start --spec` needs a repo-relative path; branch must exist on origin first.
+- WIP: 1 (this). Next: watch exit, verify, land, PR (add CHANGELOG section), tag v0.0.9.
