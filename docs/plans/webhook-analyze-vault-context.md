@@ -170,3 +170,5 @@ Hermes log (`~/Library/Logs/k3dm-hermes.log`) and Alertmanager (`127.0.0.1:19093
   hub webhook log has no `Vault is sealed right now` line.
 - After unseal, 4 of 9 ExternalSecrets stayed `SecretSyncedError` (last failure 15:25Z, refresh 15m), so eso stays degraded and
   the resolved message waits on ESO's retry.
+
+- **Resolved 15:46:15Z** (hub Hermes log line 3666): `{"kind": "resolved", "text": "Hermes correlated incident resolved."}` once eso read `20/20 synced; 9/9 synced`. No proposals were pending, so there was no Withdrawn list (the `test_resolved_without_pending_keeps_text` path). **E5 live-verified** (M1, M3; M5 held vacuously).

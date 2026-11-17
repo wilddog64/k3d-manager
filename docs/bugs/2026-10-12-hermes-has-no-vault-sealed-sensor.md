@@ -2,11 +2,12 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.44.2`
-**Status:** LANDED on `k3d-manager-v1.44.2` 2026-11-17 (fadf8438); verified offline by Claude
+**Status:** LIVE-VERIFIED 2026-11-17 — landed fadf8438 on `k3d-manager-v1.44.2`; E5 live-verified 2026-11-17 (Claude, read-only, hub Hermes log): incident 15:25:15Z led with "Root cause: Vault sealed", approvals [] (no r7); resolved 15:46:15Z "Hermes correlated incident resolved." after ESO 20/20 + 9/9 synced (no pending proposals, so no Withdrawn list)
+**Live evidence:** 2026-11-17 · run hermes-log-3666 · env hub · scenario watchdog-paused-vault-seal · commit 44e06edd · proves E4,E5
+**Fix commit:** fadf8438
 **Priority:** P2 — raised 2026-11-17 (operator): without it Hermes misreads a seal as many problems and offered the wrong repair (`2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Hermes status observability is degraded by not surfacing sealed Vault state on the dashboard, with a workaround of inspecting the `vault-sealed` pod label directly or observing downstream ExternalSecrets status); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** patch → v1.44.2 (P2), prerequisite of `2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` (operator, 2026-11-17: "go ahead"). Earlier: passed over, 1st — grooming 2026-11-12.
-**Waiting on:** live check — since 2026-11-17 (run 2 15:15Z with the watchdog paused: incident 15:25:15Z led with "Root cause: Vault sealed", no r7; resolved message pending ESO retry; webhook E2 still unexercised, no ArgoCDAppDegraded fired; see `docs/plans/hermes-vault-sealed.md`)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 

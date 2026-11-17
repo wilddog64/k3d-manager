@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-17 (run 2 15:15Z with the watchdog paused: incident 15:25:15Z led with "Root cause: Vault sealed", no r7; resolved message pending ESO retry; webhook E2 still unexercised, no ArgoCDAppDegraded fired; see `docs/plans/hermes-vault-sealed.md`)
+**Waiting on:** live check — since 2026-11-17 (Fix 1–4 met live: E5 live-verified 2026-11-17 (Claude, read-only, hub Hermes log): incident 15:25:15Z led with "Root cause: Vault sealed", approvals [] (no r7); resolved 15:46:15Z "Hermes correlated incident resolved." after ESO 20/20 + 9/9 synced (no pending proposals, so no Withdrawn list). Fix 5 webhook E2 still unexercised: no ArgoCDAppDegraded fired during either seal; review fixes in flight, docs/plans/webhook-vault-sealed-review-fixes.md)
 **Prior art:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, related root cause (no sealed-Vault signal), different symptom (wrong repair offered). That bug is the prerequisite for this one and ships first in the same release.
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
