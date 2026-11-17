@@ -1,5 +1,6 @@
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-17 ~18:35Z: operator: pre-release tags fine until a satisfying build, then cut dirused v0.1.0 (small feature release). M2b spec docs/plans/dirused-m2b-top-folders.md written + DISPATCHED to Luna (branch m2b-top-folders from 3eff57b). Luna M1 (multi-project-m1-registry-dispatch) EXITED — needs verify+land. WIP 3/3 (Flash stage 2 running, M1 exited, M2b running).
 - 2026-11-17 18:18Z: dirused v0.0.5 PUBLISHED (pre-release; run 44146017177 green 1m43s): win-x64 33.1 MB + win-arm64 31.5 MB zips with .sha256. Waiting on operator office live check (live-check.ps1 -Targets fleet.txt, L1-L12 + F1-F2).
 - 2026-11-17 ~19:40Z: operator merged dirused#14 (3eff57b) and asked for a release; Claude tagged v0.0.5 (annotated, on 3eff57b) and pushed; Release workflow running. Next: operator live check at office — live-check.ps1 -Targets fleet.txt (L1-L12, F1-F2) = E4 of M2a and E2 of M2a-b. Then M2b (top 3 folders) spec.
 - 2026-11-17 ~19:25Z: dirused#14 CI green 4/4 on 6fb03b1, no open comments, Argon findings handled. Merge attempt refused by the auto-mode classifier — waiting on operator go to merge #14 and cut v0.0.5. dirused checkout back on main (3865f28).
