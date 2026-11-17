@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: dirused v0.0.5 published (2 zips + sha256); office live check pending.
 - 2026-11-17: dirused#14 merged (operator); v0.0.5 tag pushed, release building.
 - 2026-11-17: dirused#14 ready to merge (CI green 6fb03b1); waiting on operator go (merge + v0.0.5).
 - 2026-11-17: dirused M2a-b landed 6fb03b1 (live-check exit 4, L11/L12).
