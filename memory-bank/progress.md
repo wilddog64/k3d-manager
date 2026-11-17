@@ -1,5 +1,6 @@
 - 2026-11-16 ~23:55Z: local CI gates on 127c7a3a all green: test-shard 1-4/4 rc 0, pytest 2137 passed, shellcheck/bash -n/yamllint/validate-manifests rc 0, lint-python (ruff 0.15.8, scratch venv) all checks passed. Next: operator hub-promote of release head (52 ahead of deploy/hub b5b931df) = push-hook E3, then live checks one at a time.
 - 2026-11-17: v1.44.1 promoted to hub (deploy/hub 6fe58dcb, tag hub-promote/20261117T001751Z); live checks next.
+- 2026-11-17: filed docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md (P2 proposed). Grooming 2026-11-22 agenda: pull v1.51.0 bug-count-query-translation forward (displace a not-started plan; operator "sounds good").
 - 2026-11-17: operator approved intents for Hermes r7 misfire spec (v1.44.2); Waiting on dispatch after vault-sealed sensor bug.
 - 2026-11-17 01:45Z: Hermes r7 misfire spec written (P2, v1.44.2) with vault-sealed sensor bug moved to v1.44.2 as prerequisite; operator denied r7-8d401b43; Claude-API Hermes writer → ideas row. Waiting: intent approval.
 - 2026-11-17 01:25Z: vault-unseal Secret repaired by operator (f1bffbb8 -> 4d9e7439); Vault restart (operator go) auto-unsealed by watchdog (rc=0, succeeded, 01:25:28Z). Stage 2 v1.44.2.

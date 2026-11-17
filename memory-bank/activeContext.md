@@ -53,6 +53,10 @@
   Silent-running bug closes with A2 (M8-M11). push-hook LANDED 4476316a (live E3 at next promote). stall-A2 LANDED c91b4409 (+machine-manifest fixes 25d349c3, 16e6014f). Open 0/3. All v1.44.1 bugs landed.
 - Next: verify push-hook, A2 → land; local CI shards; operator live checks one at a time; /create-pr.
 
+## Grooming 2026-11-22 agenda
+- Pull `docs/plans/v1.51.0-bug-count-query-translation.md` forward into the next open minor, displacing a not-started plan (operator 2026-11-17 "sounds good"); triage `docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md` with it.
+- Ideas rows 2026-11-16/17: Claude-API reviewer, Claude-API Hermes writer.
+
 ## 2026-11-16 ~13:30Z — v1.44.1: fix the 10 groomed bugs before the release PR (operator)
 
 - Correction: v1.44.1 holds 10 groomed bugs + the CI shard, not just the CI shard (docs/grooming/2026-11-15.md:54).
