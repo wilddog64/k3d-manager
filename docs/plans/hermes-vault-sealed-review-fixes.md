@@ -6,7 +6,7 @@
 **Covers:** H1, H2, H3, H5 in `docs/bugs/2026-11-17-vault-sealed-landed-review-findings.md` (follow-up to `docs/plans/hermes-vault-sealed.md`, fadf8438). H4 (guide) is Claude's.
 **Risk:** low (one label check, one r7 precondition clause, two message strings; no cluster writes)
 **Reviewed:** Claude only (low risk; findings already confirmed by a Fable diff review and re-read by Claude)
-**Agent:** Codex — ran on gpt-6.1-terra (config default; dispatched without `--model gpt-6-luna`)
+**Agent:** Luna (Codex)
 
 ## Problem
 
