@@ -1,6 +1,6 @@
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
-- Combined plan written: `docs/plans/hermes-vault-sealed.md` (stage A vault_seal sensor, stage B r7 gating/cards). spec_intent passes except the Intent line. **Waiting on:** operator intent approval for E1 (offline vault_seal tests) and E5 (dashboard row); then Argon + Fable blind spec review (medium risk), then dispatch.
+- Combined plan written: `docs/plans/hermes-vault-sealed.md` (stage A vault_seal sensor, stage B r7 gating/cards). spec_intent passes except the Intent line. Intent approved by operator 2026-11-17 (E1, E5); spec_intent OK. **Waiting on:** Argon + Fable blind spec review (medium risk), then dispatch.
 - Spec fixes found while checking against code: sensor debounce must be `max(0, threshold-1)` (`_debounced` is `count > threshold`); r7 adds `vault_seal` to `reads` + `_evidence` (digest coverage); sensor test 8 reworded (r7 now reads vault_seal). External proof: vault-helm v0.30.1 raft config has `service_registration "kubernetes"`; hub runs HA+raft.
 - Triage due (63 bug docs at operator decision) — announced.
 

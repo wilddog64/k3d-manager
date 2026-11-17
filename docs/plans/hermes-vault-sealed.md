@@ -100,4 +100,4 @@ evidence:
 interface: none
 ```
 
-**Intent approved:** pending — stage B intents (E2–E4, E6) were approved on the r7 bug doc on 2026-11-17; E1 and E5 are new
+**Intent approved:** operator, 2026-11-17

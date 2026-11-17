@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: operator approved intents E1/E5 on docs/plans/hermes-vault-sealed.md; spec_intent OK. Next: spec review, dispatch. Stale v1.44.0 review rows checked: no unique commits, clean worktrees (abandon awaits go).
 - 2026-11-17: v1.44.2 combined plan docs/plans/hermes-vault-sealed.md written (sensor + r7); 3 spec defects fixed in bug docs; Waiting on: intent approval E1/E5, then Argon+Fable spec review, then dispatch.
 - 2026-11-17 12:35Z: session handoff written to activeContext (v1.44.1 shipped, v1.44.2 scope, dirused E4 pending). Ready for /clear.
 - 2026-11-17 12:25Z: v1.44.1 promoted to hub (deploy/hub 666b27b7, tag hub-promote/20261117T121641Z, no break-glass). Containment E8 PASS -> bug LIVE-VERIFIED, ledger live_verified (63cf163e). v1.44.1 live checks complete except Hermes E3 (waits on a real ci page).
