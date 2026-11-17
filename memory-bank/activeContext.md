@@ -1,3 +1,36 @@
+## Handoff 2026-11-17 ~00:30Z — v1.44.1 verified offline; dirused M1c-A PR #10 awaits office check — START HERE
+
+**Objective:** finish v1.44.1 (live checks, then /create-pr) and close dirused M1c-A (operator office check, merge, tag).
+
+**Evidence:**
+- All 13 v1.44.1 fixes verified offline by Claude: each was red before the fix and green after. `verify` plus `offline_tested` marks are in the ledger; evidence is in `<run>/verify-evidence.txt` under `~/.local/share/k3d-manager/worktrees/v1.44.1/`. The CI-lint fix was recorded last (f20d1b2b).
+- dirused PR wilddog64/dirused#10 (branch `m1c-summary-all-bugs`, head ef6c0d1). Tests-only commit 6a99c36 was red on CI exactly on E1 (portable) and E3 (Windows); CI is green at ef6c0d1 (windows 26/26, portable 24/24).
+- Claude ran the live check on the dirused-dev VM and it passed: `docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`.
+- Package: release.yml workflow_dispatch run 43984077128 built the dirused-win-x64 and dirused-win-arm64 artifacts (they expire 2026-12-17).
+
+**Decisions:**
+- v1.45.0 plan 3 is now `multi-project-records` (DRAFT, intent pending); `service-password-tailnet-read` moved to backlog #1.
+- dirused M1c Part A intent was approved ("approve dirused"). Part B still waits on proofs P1 and P2.
+- wilddog64/dirused was made public (history scanned first); main protection was already on.
+- Ideas captured: Hermes triages GitHub issues with Slack approval (sanitize first, issue -> docs/bugs, dedup before the card); the Bugs dashboard shows stage, owner and next step.
+
+**Changed files (today):** docs/roadmap.md, docs/ideas.md, docs/plans/v1.45.0-multi-project-records.md, docs/plans/service-password-tailnet-read.md (renamed), docs/plans/dirused-m1c-*.md, docs/dirused/bugs/*, docs/dirused/evidence/, memory-bank/progress.md.
+
+**Open questions:**
+- dirused tag version: the operator said v0.1.2, but only v0.0.1 exists; Claude suggested v0.0.2. Ask after the office check.
+- The FleetRunnerTests.E3 flake recurred despite #9 (bug doc reopened): add a product grace floor, or diagnose first?
+
+**Verification status:** v1.44.1 is offline-verified for all fixes; live checks have not started (promote pending). dirused M1c-A is verified offline and on the VM; the fleet check is pending.
+
+**Next, in order:**
+1. Operator: office fleet check of the PR #10 package (`dirused /summary /file servers.list` shows all four hosts). If it passes, the operator merges #10, then Claude tags main (version per the open question) so release.yml publishes the pre-release; update the two dirused bug docs to LANDED / LIVE-VERIFIED.
+2. Operator promote of v1.44.1: make hub-promote REF=6fe58dcb, then make appsets-check, then make platform-ops. Then Claude confirms `make hub-promote-status`.
+3. Live checks one at a time: pgvector E2, alpine E2, stray guard E4 (delete the m4-air group first), unseal E0/E5, root-token E5, containment E4/E6, release-column E3, hermes E3, stall-A E8, push-hook E3.
+4. /create-pr for v1.44.1.
+5. Spec review of v1.45.0 `multi-project-records` (open questions are in the plan) and operator intent approval.
+6. dirused M1c A3 (`/summary /top N`, approved) dispatch; Part B after proofs P1 and P2.
+7. Decide the E3 flake fix; triage is due when captured bugs reach the threshold.
+
 ## 2026-11-16 ~21:00Z — v1.44.1 bug fixes: 10 of 12 landed
 
 - LANDED: hermes CI unknown page c3642f8f (Flash; 2 red pre-fix, 390/390). Stray host guard 3b0def6b + coordinator fixture 5b308552
