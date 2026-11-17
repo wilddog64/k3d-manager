@@ -1,6 +1,6 @@
 # dirused M1e — hard links counted once, from the directory listing
 
-**Status:** draft — waiting on intent approval
+**Status:** dispatched — Flash (agy), 2026-11-17
 **Repo / branch:** wilddog64/dirused; `m1e-listing-file-ids` from `main` at 96e8d83 (M1d merged, PR #11)
 **Tracked:** separately from k3d-manager releases (operator, 2026-11-15); out-of-band repo, no ideas-backlog step (operator, 2026-11-17). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Operator words (2026-11-17):** "go for 1" — merge M1d now, fix the hard-link overcount next in M1e.
@@ -149,3 +149,6 @@ evidence:
     intent: On your office servers the default is fast and its sizes add up to the drive's used space.
 interface: dirused command line (text, JSON, CSV output)
 ```
+
+**Intent approved:** operator, 2026-11-17
+**Approval words:** "approve intents"
