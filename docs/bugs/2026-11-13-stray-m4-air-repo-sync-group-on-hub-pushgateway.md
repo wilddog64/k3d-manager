@@ -1,7 +1,8 @@
 # Bug: a stray `instance="m4-air"` repo-sync group sits on the hub Pushgateway
 
-**Status:** VERIFIED — 2026-11-16, independent offline verifier (claude) passed, recorded in the dispatch ledger; live check pending. Was: LANDED — host guard 3b0def6b + fixture 5b308552 (2026-11-16); recurred 2026-11-14 from a pre-fix dispatch worktree (first fix 22ca679c, VERIFIED live 2026-11-14)
-**Waiting on:** live check — since 2026-11-16 (E4 after promote; operator deletes m4-air group, retire two stale review worktrees)
+**Status:** LIVE-VERIFIED — 2026-11-17, hub Pushgateway shows only instance=m5-air, advancing over two sync cycles after the m4-air group was deleted. Was: LANDED — host guard 3b0def6b + fixture 5b308552 (2026-11-16); recurred 2026-11-14 from a pre-fix dispatch worktree (first fix 22ca679c, VERIFIED live 2026-11-14)
+**Fix commit:** 3b0def6b
+**Live evidence:** 2026-11-17 · run claude-ssh-m5-pushgateway-3-samples-0043-0054Z · env hub/k3d-k3d-cluster-deploy-hub-6fe58dcb · scenario m4-air-group-deleted-then-two-repo-sync-cycles · commit 6fe58dcb · proves E4,E5
 **Branch:** k3d-manager-v1.44.1
 **Priority:** P2 (operator, 2026-11-14, after the recurrence; was P3)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Stray metric pushes from worker checkouts over the SSH forward trigger recurring false Prometheus alerts and pollute dashboard panels, though the hub's actual sync remains healthy and the stale Pushgateway group can be manually deleted as a workaround.)
@@ -374,3 +375,8 @@ so E11 and E12 went red. Its fixture now sets `K3DM_HUB_HOST` to this host. That
 and the land used `--allow-out-of-scope` because the scope check reads the spec snapshot taken at dispatch.
 Repo-sync suites on land: repo_sync, repo_sync_promote_backlog (21), repo_sync_launchd_env and hub_sync (16) all pass.
 Spec escape: **Should have been caught by:** spec (contract-reader grep covered `scripts/etc`, not `scripts/tests`).
+
+
+## Live check 2026-11-17 (Claude)
+
+Operator deleted the `instance="m4-air"` group at about 00:42Z (it had come back, 9 series). Read-only samples of the hub Pushgateway at 00:43:33Z, 00:49:03Z and 00:54:33Z show only `push_time_seconds{instance="m5-air",job="k3dm_repo_sync"}`, moving 1794875886 -> 1794876540 -> 1794876861. No m4-air group reappeared. Ledger `live_verified` mark at fix 3b0def6b. Still open housekeeping, not part of the fix: retire the two stale review worktrees.
