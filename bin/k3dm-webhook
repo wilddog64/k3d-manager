@@ -2051,6 +2051,10 @@ _status._post_slack_bot = _post_slack_bot
 _status._ARCH_CONTEXT = _ARCH_CONTEXT
 
 
+def _kubectl_json(out):
+    return json.loads("\n".join(line for line in out.splitlines() if not line.startswith("Warning: ")))
+
+
 def _vault_summary(vault_out, vault_timeout):
     """Summarise Vault pod status from kubectl JSON output.
 
@@ -2059,26 +2063,26 @@ def _vault_summary(vault_out, vault_timeout):
     if vault_timeout:
         return "Vault pods: state unavailable", False, []
     try:
-        data = json.loads(vault_out)
+        data = _kubectl_json(vault_out)
         items = data.get("items")
         if not isinstance(items, list) or not items:
             return "Vault pods: state unavailable", False, []
         pod_summaries = []
         sealed_pods = []
+        labelled_count = 0
         for item in items:
             metadata = item.get("metadata") if isinstance(item, dict) else None
             name = metadata.get("name") if isinstance(metadata, dict) else None
             labels = metadata.get("labels") if isinstance(metadata, dict) else None
-            if not name or not isinstance(labels, dict):
-                return "Vault pods: state unavailable", False, []
-            for key in ("vault-sealed", "vault-initialized", "vault-active"):
-                if key not in labels:
-                    return "Vault pods: state unavailable", False, []
+            if (not name or not isinstance(labels, dict)
+                    or any(labels.get(key) is None for key in
+                           ("vault-sealed", "vault-initialized", "vault-active"))):
+                pod_summaries.append(f"{name or '?'} state unavailable")
+                continue
+            labelled_count += 1
             s_val = labels["vault-sealed"]
             i_val = labels["vault-initialized"]
             a_val = labels["vault-active"]
-            if s_val is None or i_val is None or a_val is None:
-                return "Vault pods: state unavailable", False, []
             s_str = "true" if s_val is True else ("false" if s_val is False else str(s_val).lower())
             i_str = "true" if i_val is True else ("false" if i_val is False else str(i_val).lower())
             a_str = "true" if a_val is True else ("false" if a_val is False else str(a_val).lower())
@@ -2087,6 +2091,8 @@ def _vault_summary(vault_out, vault_timeout):
             pod_summaries.append(
                 f"{name} sealed={s_str} initialized={i_str} active={a_str}"
             )
+        if not labelled_count:
+            return "Vault pods: state unavailable", False, []
         line = f"Vault pods: {'; '.join(pod_summaries)}"
         return line, bool(sealed_pods), sealed_pods
     except Exception:
@@ -2101,7 +2107,7 @@ def _store_summary(store_out, store_timeout):
     if store_timeout:
         return "ClusterSecretStore vault-backend: state unavailable"
     try:
-        data = json.loads(store_out)
+        data = _kubectl_json(store_out)
         if isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
             items = data["items"]
             if not items:
@@ -2159,11 +2165,11 @@ def _run_analyze(job_id, alert_payload, response_url=""):
         vault_cmd = [
             "kubectl", "-n", "secrets", "get", "pods",
             "-l", "app.kubernetes.io/name=vault,component=server",
-            "-o", "json",
+            "-o", "json", "--request-timeout=10s",
         ]
         store_cmd = [
             "kubectl", "get", "clustersecretstore", "vault-backend",
-            "-o", "json",
+            "-o", "json", "--request-timeout=10s",
         ]
         vault_out, vault_timeout = _posix_spawn_capture(vault_cmd, timeout=15)
         store_out, store_timeout = _posix_spawn_capture(store_cmd, timeout=15)
@@ -2194,7 +2200,7 @@ def _run_analyze(job_id, alert_payload, response_url=""):
                 diag_parts = []
                 if argocd_app:
                     desc_out, desc_timeout = _posix_spawn_capture(
-                        ["kubectl", "describe", "application", argocd_app, "-n", "cicd"],
+                        ["kubectl", "describe", "application", "-n", "cicd", "--", argocd_app],
                         timeout=15,
                     )
                     if not desc_timeout and desc_out.strip():
@@ -2210,10 +2216,6 @@ def _run_analyze(job_id, alert_payload, response_url=""):
                     diag_parts.append(f"Non-running pods:\n{pods_out.strip()}")
 
                 diag_parts.append(f"Vault and ESO:\n{vault_line}\n{store_line}")
-
-                if not diag_parts:
-                    _log("No diagnostics gathered\n")
-                    continue
 
                 diagnostics = "\n\n".join(diag_parts)
                 prompt = (

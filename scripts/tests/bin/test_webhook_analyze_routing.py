@@ -390,11 +390,11 @@ def _assert_http_rejected(monkeypatch, path, body, token, expected_status):
 _VAULT_PODS_ARGV = [
     "kubectl", "-n", "secrets", "get", "pods",
     "-l", "app.kubernetes.io/name=vault,component=server",
-    "-o", "json",
+    "-o", "json", "--request-timeout=10s",
 ]
 _STORE_ARGV = [
     "kubectl", "get", "clustersecretstore", "vault-backend",
-    "-o", "json",
+    "-o", "json", "--request-timeout=10s",
 ]
 
 
@@ -518,3 +518,65 @@ def test_analyze_vault_unreadable_fails_open(monkeypatch, analyze_env, tmp_path)
 
     assert len(gemini_calls) == 1
     assert "Vault pods: state unavailable" in gemini_calls[0]
+
+
+def test_vault_summary_ignores_kubectl_warning_lines():
+    vault = _canned_vault_pods(sealed="true")
+    for output in ("Warning: v1 Foo is deprecated\n" + vault, vault + "\nWarning: v1 Foo is deprecated\n"):
+        line, sealed, names = wh._vault_summary(output, False)
+        assert sealed is True
+        assert names == ["vault-0"]
+        assert "vault-0 sealed=true" in line
+
+
+def test_store_summary_ignores_kubectl_warning_lines():
+    output = "Warning: v1 Foo is deprecated\n" + _canned_store()
+    assert wh._store_summary(output, False) == "ClusterSecretStore vault-backend: Ready=True (Valid)"
+
+
+def test_vault_summary_unlabelled_pod_does_not_mask_sealed():
+    data = json.loads(_canned_vault_pods(sealed="true"))
+    data["items"].append({"metadata": {"name": "vault-1"}})
+    line, sealed, names = wh._vault_summary(json.dumps(data), False)
+    assert sealed is True
+    assert names == ["vault-0"]
+    assert "vault-0 sealed=true" in line
+    assert "vault-1 state unavailable" in line
+
+
+def test_vault_summary_all_unlabelled_is_unavailable():
+    data = {"items": [{"metadata": {"name": "vault-0"}}, {"metadata": {"name": "vault-1"}}]}
+    assert wh._vault_summary(json.dumps(data), False) == ("Vault pods: state unavailable", False, [])
+
+
+def test_analyze_vault_sealed_runs_only_the_two_reads(monkeypatch, analyze_env, tmp_path):
+    recorded = []
+    gemini_calls = []
+    vault_cmd = _VAULT_PODS_ARGV
+    store_cmd = _STORE_ARGV
+
+    def stub_spawn(cmd, **kwargs):
+        recorded.append(list(cmd))
+        if cmd == vault_cmd:
+            return _canned_vault_pods(sealed="true"), False
+        return _canned_store(), False
+
+    monkeypatch.setattr(wh, "_posix_spawn_capture", stub_spawn)
+    monkeypatch.setattr(wh, "_call_gemini", lambda prompt: gemini_calls.append(prompt) or "analysis")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: "123")
+    _run(monkeypatch, tmp_path, [_alert(), _alert("HighCPU", "worker")])
+    assert recorded == [vault_cmd, store_cmd]
+    assert gemini_calls == []
+
+
+def test_analyze_describe_passes_double_dash(monkeypatch, analyze_env, tmp_path):
+    recorded = []
+
+    def stub_spawn(cmd, **kwargs):
+        recorded.append(list(cmd))
+        return "diagnostic output", False
+
+    monkeypatch.setattr(wh, "_posix_spawn_capture", stub_spawn)
+    _run(monkeypatch, tmp_path, [{"status": "firing", "labels": {"name": "app1"}}])
+    describes = [cmd for cmd in recorded if cmd[:3] == ["kubectl", "describe", "application"]]
+    assert describes == [["kubectl", "describe", "application", "-n", "cicd", "--", "app1"]]
