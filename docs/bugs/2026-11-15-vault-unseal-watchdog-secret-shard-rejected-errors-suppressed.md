@@ -177,3 +177,9 @@ Test notes for the worker: stub `vault operator unseal` to print, on stderr, exa
 
 **Intent approved:** operator, 2026-11-16
 **Approval note:** ("Approve all 9") — stage 1 only; E0 fingerprint deferred to live verify
+
+## Live check attempt 2026-11-17 (Claude): invalid, stage 1 was not deployed
+
+- 00:40:34Z Claude deleted `secrets/vault-0` (operator go). The 00:50:00Z watchdog job logged `vault sealed — replaying shard` then `unseal attempt complete (still sealed or unreachable)`; Vault 1.20.1 stayed sealed (`vault status`: Sealed true, 00:50:52Z). The shard was again not accepted (same symptom as the original report).
+- The deployed CronJob still runs the pre-fix line `vault operator unseal "$(cat "$SHARD_FILE")" >/dev/null 2>&1 || true`: `make hub-promote` / `platform-ops` do not reapply this CronJob; only `vault_install_unseal_watchdog` does. Claude's pre-restart check grepped for `rc=$?`, which matched the old status-probe loop, not the stage-1 `unseal rc=` line — a false positive.
+- Next: operator unseals with `hub_data_unseal_dr`; then, with a go, run `vault_install_unseal_watchdog` on the hub, confirm the CronJob contains `unseal rc=`, and redo E5. The rollout step belongs in this bug's deploy notes.
