@@ -11,17 +11,75 @@ source "${_dispatch_script_dir}/../scripts/lib/system.sh"
 _dispatch_worktree_root="${K3DM_WORKTREE_ROOT:-${HOME}/.local/share/k3d-manager/worktrees}"
 _dispatch_event_repo="k3d-manager"
 
+_dispatch_project_field() {
+  local wanted="$1" field="$2" file="${K3DM_PROJECTS_LIST:-$_dispatch_script_dir/../scripts/etc/projects.list}"
+  python3 - "$file" "$wanted" "$field" <<'PYPROJECT'
+import re, sys
+path, wanted, field = sys.argv[1:]
+indices={"name":0,"path":1,"repo":2,"scheme":3,"branch":4}
+if field not in indices: raise SystemExit(2)
+matches=[]
+try:
+    with open(path, encoding="utf-8") as f:
+        for n,line in enumerate(f,1):
+            line=line.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"): continue
+            parts=line.split("|")
+            if len(parts)!=5 or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}",parts[0]) or parts[3] not in ("branch","tag"):
+                print(f"malformed project registry line {n}",file=sys.stderr); raise SystemExit(2)
+            if parts[0]==wanted: matches.append(parts[indices[field]])
+except OSError as e:
+    print(f"could not read project registry: {e}",file=sys.stderr); raise SystemExit(2)
+if len(matches)==1: print(matches[0]); raise SystemExit(0)
+raise SystemExit(1)
+PYPROJECT
+}
+
+_dispatch_project_names() {
+  local file="${K3DM_PROJECTS_LIST:-$_dispatch_script_dir/../scripts/etc/projects.list}"
+  python3 - "$file" <<'PJNAMES'
+import re,sys
+try:
+    with open(sys.argv[1],encoding="utf-8") as f:
+        for n,line in enumerate(f,1):
+            line=line.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"): continue
+            fields=line.split("|")
+            if len(fields)!=5 or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}",fields[0]) or fields[3] not in ("branch","tag"):
+                print(f"malformed project registry line {n}",file=sys.stderr); raise SystemExit(2)
+            print(fields[0])
+except OSError as e:
+    print(f"could not read project registry: {e}",file=sys.stderr); raise SystemExit(2)
+PJNAMES
+}
+
+_dispatch_resolve_version() {
+  local slug="$1" found=() path version project
+  for path in "$_dispatch_worktree_root"/v*; do
+    [[ -d "$path" ]] || continue
+    version="${path##*/}"
+    [[ -f "$path/$slug.run/project" ]] || continue
+    project="$(<"$path/$slug.run/project")"
+    [[ "$project" == k3d-manager ]] && continue
+    found+=("$version")
+  done
+  if ((${#found[@]} > 1)); then _dispatch_error "slug $slug exists in several projects/versions; pass --version"; fi
+  if ((${#found[@]} == 1)); then printf '%s\n' "${found[0]}"; else local rel; rel="$(_dispatch_release_branch)"; printf '%s\n' "${rel#k3d-manager-}"; fi
+}
+
 _dispatch_ledger_event() {
   local event="$1" version="$2" slug="$3" json filter='.' arg_count event_repo="$_dispatch_event_repo"
   shift 3
   if [[ -s "$_dispatch_worktree_root/$version/$slug.run/repo-name" ]]; then
     event_repo="$(<"$_dispatch_worktree_root/$version/$slug.run/repo-name")"
   fi
+  local event_project
+  event_project="$(cat "$_dispatch_worktree_root/$version/$slug.run/project" 2>/dev/null || true)"
   if (($#)); then
     arg_count=$#; filter="${!arg_count}"; set -- "${@:1:arg_count-1}"
   fi
-  json="$(jq -nc --arg event "$event" --arg version "$version" --arg slug "$slug" \
-    --argjson ts "$(date +%s)" --arg repo "$event_repo" "$@" "{ts:\$ts,event:\$event,version:\$version,slug:\$slug,repo:\$repo} | ($filter)" 2>/dev/null)" || {
+  json="$(jq -nc --arg event "$event" --arg version "$version" --arg slug "$slug" --arg project "$event_project" \
+    --argjson ts "$(date +%s)" --arg repo "$event_repo" "$@" "{ts:\$ts,event:\$event,version:\$version,slug:\$slug,repo:\$repo} | if \$project != \"\" and \$project != \"k3d-manager\" then .project=\$project else . end | ($filter)" 2>/dev/null)" || {
     echo "[codex-dispatch] WARNING: could not build ledger event ${event} for ${slug}" >&2
     return 1
   }
@@ -293,14 +351,14 @@ _dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
 _dispatch_usage() {
   cat <<'EOF'
 Usage:
-  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--primary-coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
+  bin/k3dm-codex-dispatch start --spec PATH [--project NAME] [--version vX.Y.Z] [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--primary-coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch stalled [--live]
-  bin/k3dm-codex-dispatch open [--version vX.Y.Z]
-  bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope] [--allow-instruction-files]
-  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--model ID] [--coordinator VENDOR/MODEL]
-  bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
-  bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
+  bin/k3dm-codex-dispatch open [--version vX.Y.Z] [--project NAME] [--count]
+  bin/k3dm-codex-dispatch land --slug SLUG [--version vX.Y.Z] (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope] [--allow-instruction-files]
+  bin/k3dm-codex-dispatch resume --slug SLUG [--version vX.Y.Z] --prompt-file PATH --reason continue_prompt|clarification|correction|other [--model ID] [--coordinator VENDOR/MODEL]
+  bin/k3dm-codex-dispatch handoff --slug SLUG [--version vX.Y.Z] --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
+  bin/k3dm-codex-dispatch verify --slug SLUG [--version vX.Y.Z] --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
   bin/k3dm-codex-dispatch abandon --slug SLUG [--version V] [--reason TEXT] --yes
   bin/k3dm-codex-dispatch prune [--yes]
@@ -418,6 +476,10 @@ def append(event, version=None, slug=None, **fields):
     if slug and version:
         rp=Path(root)/version/(slug+'.run')/'repo-name'
         if rp.is_file(): obj['repo']=rp.read_text().strip()
+        pp=Path(root)/version/(slug+'.run')/'project'
+        if pp.is_file():
+            project=pp.read_text().strip()
+            if project and project!='k3d-manager': obj['project']=project
     ledger.parent.mkdir(parents=True,exist_ok=True)
     with ledger.open('a') as f: f.write(json.dumps(obj,separators=(',',':'))+'\n')
     if command!='gate-status':
@@ -622,11 +684,12 @@ PYVALIDATE
 }
 
 _dispatch_verify() {
-  local slug="" result="" tokens="" verifier="" evidence="" evidence_path="" evidence_sha256="" rel version tokens_set=0 run_dir count
+  local slug="" result="" tokens="" verifier="" evidence="" evidence_path="" evidence_sha256="" rel version tokens_set=0 run_dir count explicit_version=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --result) (($# >= 2)) || _dispatch_error "--result requires a value"; result="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; explicit_version="$2"; shift 2 ;;
       --tokens) (($# >= 2)) || _dispatch_error "--tokens requires a value"; tokens="$2"; tokens_set=1; shift 2 ;;
       --evidence) (($# >= 2)) || _dispatch_error "--evidence requires a value"; evidence="$2"; shift 2 ;;
       --verifier) (($# >= 2)) || _dispatch_error "--verifier requires a value"; verifier="$2"; shift 2 ;;
@@ -637,7 +700,7 @@ _dispatch_verify() {
   [[ "$result" == pass || "$result" == fail ]] || _dispatch_error "--result must be pass or fail"
   (( ! tokens_set )) || [[ "$tokens" =~ ^[0-9]+$ ]] || _dispatch_error "--tokens must be a non-negative integer"
   [[ -z "$verifier" || "$verifier" =~ ^[A-Za-z0-9._-]{1,80}$ ]] || _dispatch_error "invalid verifier name"
-  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
+  if [[ -n "$explicit_version" ]]; then version="$explicit_version"; [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version"; else version="$(_dispatch_resolve_version "$slug")"; fi
   jq -se --arg version "$version" --arg slug "$slug" \
     'any(.[]; .event == "land" and .version == $version and .slug == $slug)' \
     "$_dispatch_worktree_root/ledger.jsonl" >/dev/null 2>&1 || _dispatch_error "no landed task for $slug in $version"
@@ -690,14 +753,15 @@ _dispatch_intervention() {
   version="$(jq -sr --arg slug "$slug" '[.[] | select(.slug == $slug and (.event == "start" or .event == "resume"))] | last | .version // empty' "$ledger" 2>/dev/null)"
   [[ -n "$version" && -d "$_dispatch_worktree_root/$version/$slug.run" ]] || _dispatch_error "unknown task: $slug"
   event_repo="$(cat "$_dispatch_worktree_root/$version/$slug.run/repo-name" 2>/dev/null || echo k3d-manager)"
+  event_project="$(cat "$_dispatch_worktree_root/$version/$slug.run/project" 2>/dev/null || true)"
   ts="$(date +%s)"
   if ! jq -e 'select(.event == "intervention_coverage_start")' "$ledger" >/dev/null 2>&1; then
-    jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$event_repo" --argjson ts "$ts" \
-      '{ts:$ts,event:"intervention_coverage_start",version:$version,slug:$slug,repo:$repo}' >>"$ledger" \
+    jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$event_repo" --arg project "$event_project" --argjson ts "$ts" \
+      '{ts:$ts,event:"intervention_coverage_start",version:$version,slug:$slug,repo:$repo} | if $project != "" and $project != "k3d-manager" then .project=$project else . end' >>"$ledger" \
       || _dispatch_error "could not record intervention coverage"
   fi
-  jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$event_repo" --arg reason "$reason" --argjson ts "$ts" \
-    '{ts:$ts,event:"intervention",version:$version,slug:$slug,repo:$repo,reason:$reason}' >>"$ledger" \
+  jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$event_repo" --arg project "$event_project" --arg reason "$reason" --argjson ts "$ts" \
+    '{ts:$ts,event:"intervention",version:$version,slug:$slug,repo:$repo,reason:$reason} | if $project != "" and $project != "k3d-manager" then .project=$project else . end' >>"$ledger" \
     || _dispatch_error "could not record intervention"
   _dispatch_schedule_metrics
   echo "recorded $reason for $slug ($version)"
@@ -847,7 +911,7 @@ _dispatch_network_task_running() {
 }
 
 _dispatch_start() {
-  local spec="" slug="" parent="" role="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git coordinator="" coordinator_vendor="" coordinator_model="" coordinator_source=declared primary_coordinator="" primary_vendor=unknown primary_model=unknown primary_source="" primary_identity_json
+  local spec="" slug="" parent="" role="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git project="" explicit_version="" project_scheme="" project_path="" coordinator="" coordinator_vendor="" coordinator_model="" coordinator_source=declared primary_coordinator="" primary_vendor=unknown primary_model=unknown primary_source="" primary_identity_json
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
@@ -860,6 +924,8 @@ _dispatch_start() {
       --primary-coordinator) (($# >= 2)) || _dispatch_error "--primary-coordinator requires VENDOR/MODEL"; primary_coordinator="$2"; shift 2 ;;
       --primary-coordinator-source) (($# >= 2)) || _dispatch_error "--primary-coordinator-source requires declared or runtime-reported"; primary_source="$2"; shift 2 ;;
       --repo) (($# >= 2)) || _dispatch_error "--repo requires a path"; repo="$2"; shift 2 ;;
+      --project) (($# >= 2)) || _dispatch_error "--project requires a name"; project="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; explicit_version="$2"; shift 2 ;;
       --branch) (($# >= 2)) || _dispatch_error "--branch requires a name"; target="$2"; shift 2 ;;
       --network) network=1; shift ;;
       -h|--help) _dispatch_usage; return 0 ;;
@@ -867,6 +933,25 @@ _dispatch_start() {
     esac
   done
   [[ -n "$spec" ]] || _dispatch_error "start requires --spec PATH"
+  if [[ -n "$project" ]]; then
+    project_path="$(_dispatch_project_field "$project" path)" || { local known_projects; known_projects="$( _dispatch_project_names | paste -sd ' ,' -)"; _dispatch_error "unknown or invalid project '$project'; known projects: $known_projects"; }
+    project_scheme="$(_dispatch_project_field "$project" scheme)" || _dispatch_error "invalid project registry"
+    case "$project_path" in \~|\~/*) project_path="${HOME}${project_path#\~}" ;; .) project_path="$_dispatch_repo_root" ;; esac
+    if [[ "$project" == k3d-manager ]]; then
+      [[ -z "$explicit_version" ]] || _dispatch_error "--version requires a non-k3d-manager --project"
+      project=""
+    else
+      [[ -n "$target" ]] || _dispatch_error "--project requires --branch"
+      if [[ -n "$repo" ]]; then
+        local given_root registry_root
+        given_root="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null)" || _dispatch_error "--repo must be a git checkout"
+        registry_root="$(git -C "$project_path" rev-parse --show-toplevel 2>/dev/null)" || _dispatch_error "project path is not a git checkout"
+        [[ "$given_root" == "$registry_root" ]] || _dispatch_error "--repo differs from registry project path"
+      fi
+      repo="$project_path"
+    fi
+  elif [[ -n "$explicit_version" ]]; then _dispatch_error "--version requires a non-k3d-manager --project"; fi
+  [[ -z "$explicit_version" || "$explicit_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version: $explicit_version"
   if [[ -z "$coordinator" && -n "${K3DM_COORDINATOR:-}" ]]; then
     coordinator="$K3DM_COORDINATOR"
     coordinator_source="env"
@@ -917,6 +1002,14 @@ _dispatch_start() {
     fi
   fi
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
+  if [[ -n "$project" ]]; then
+    if [[ -n "$explicit_version" ]]; then version="$explicit_version"
+    elif [[ "$project_scheme" == tag ]]; then
+      local latest_tag
+      latest_tag="$(git -C "$task_repo" ls-remote --tags --refs origin 'v*' | awk -F/ '{print $NF}' | sort -V | tail -n 1)"
+      if [[ -n "$latest_tag" && "$latest_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((10#"${BASH_REMATCH[3]}" + 1))"; else version=v0.0.1; fi
+    else version="$(_dispatch_project_field "$project" branch)"; fi
+  fi
   [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
   local spec_intent_output spec_intent_rc
   if spec_intent_output="$(python3 "$_dispatch_script_dir/../scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
@@ -958,6 +1051,7 @@ _dispatch_start() {
   if (( network )); then
     : >"$run/network"
   fi
+  [[ -z "$project" ]] || printf '%s\n' "$project" >"$run/project"
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
   if [[ -n "$repo" ]]; then
@@ -1196,18 +1290,40 @@ _dispatch_status() {
     task_target="$(cat "$run/target" 2>/dev/null || printf '%s' "$rel")"
     task_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
     echo "repo: $task_repo"
+    if [[ -s "$run/project" && "$(<"$run/project")" != k3d-manager ]]; then echo "project: $(<"$run/project")"; fi
     git -C "$task" status --porcelain || true; git -C "$task" log --oneline "origin/$task_target..HEAD" || true
     if spec="$(_dispatch_task_spec "$task" "$run")"; then _dispatch_scope_verdict "$task" "$spec" "$task_target" 1 || true; else echo "scope: unknown (no recorded spec)"; fi
+  done
+  local version_dir project_name
+  for version_dir in "$_dispatch_worktree_root"/v*; do
+    [[ -d "$version_dir" ]] || continue
+    version="${version_dir##*/}"
+    for task in "$version_dir"/*; do
+      [[ -d "$task" && "$task" != *.run ]] || continue
+      slug="${task##*/}"; run="$task.run"
+      [[ -z "${1:-}" || "${1:-}" == "$slug" ]] || continue
+      [[ -s "$run/project" ]] || continue
+      project_name="$(<"$run/project")"; [[ "$project_name" != k3d-manager ]] || continue
+      [[ "$version" != "${rel#k3d-manager-}" ]] || continue
+      state=unknown
+      [[ ! -f "$run/landed" ]] || state=landed
+      [[ ! -f "$run/exit" ]] || { exit_code="$(head -n 1 "$run/exit")"; state="exited ($exit_code)"; }
+      echo "task: $slug"; echo "state: $state"; [[ -f "$run/network" ]] && echo "network: yes" || true
+      task_target="$(cat "$run/target" 2>/dev/null || true)"; task_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
+      echo "repo: $task_repo"; echo "project: $project_name"
+      git -C "$task" status --porcelain || true
+    done
   done
 }
 
 _dispatch_land() {
-  local slug="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
+  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
   local -a superseding=()
   local _landing_parts=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; explicit_version="$2"; shift 2 ;;
       --superseding) (($# >= 2)) || _dispatch_error "--superseding requires a slug"; superseding+=("$2"); shift 2 ;;
       --test) (($# >= 2)) || _dispatch_error "--test requires a command"; test_set=1; test_cmd="$2"; shift 2 ;;
       --no-test) no_test=1; shift ;;
@@ -1231,7 +1347,7 @@ _dispatch_land() {
     ;;
   esac
   (( test_set + no_test == 1 )) || _dispatch_error "land requires exactly one of --test CMD or --no-test"
-  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
+  rel="$(_dispatch_release_branch)"; if [[ -n "$explicit_version" ]]; then version="$explicit_version"; [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version"; else version="$(_dispatch_resolve_version "$slug")"; fi; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
   repo_path="$(cat "$run/repo" 2>/dev/null || printf '%s' "$_dispatch_repo_root")"
   target="$(cat "$run/target" 2>/dev/null || printf '%s' "$rel")"
@@ -1406,11 +1522,12 @@ _dispatch_land() {
 }
 
 _dispatch_handoff() {
-  local slug="" acting="" reason=unknown provenance=declared version vendor model
+  local slug="" acting="" reason=unknown provenance=declared version vendor model explicit_version=""
   local _acting_parts=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires SLUG"; slug="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires value"; explicit_version="$2"; shift 2 ;;
       --acting-coordinator) (($# >= 2)) || _dispatch_error "--acting-coordinator requires VENDOR/MODEL"; acting="$2"; shift 2 ;;
       --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
       --provenance) (($# >= 2)) || _dispatch_error "--provenance requires a value"; provenance="$2"; shift 2 ;;
@@ -1422,7 +1539,7 @@ _dispatch_handoff() {
   case "$provenance" in declared|runtime-reported) ;; *) _dispatch_error "invalid handoff provenance" ;; esac
   _acting_parts="$(_dispatch_identity_parts "$acting")" || _dispatch_error "invalid acting coordinator"
   vendor="${_acting_parts%%$'\n'*}"; model="${_acting_parts#*$'\n'}"
-  version="$(_dispatch_release_branch)"; version="${version#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
+  version="${explicit_version:-$(_dispatch_resolve_version "$slug")}"; [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version"; _dispatch_task_paths "$version" "$slug"
   [[ -f "$_dispatch_run_dir/spec" ]] || _dispatch_error "no dispatched task '$slug' for $version"
   _dispatch_event_repo="$(cat "$_dispatch_run_dir/repo-name" 2>/dev/null || echo k3d-manager)"
   _dispatch_ledger_event handoff "$version" "$slug" --arg vendor "$vendor" --arg model "$model" --arg source "$provenance" --arg reason "$reason" \
@@ -1438,16 +1555,18 @@ _dispatch_release_land_lock() {
 }
 
 _dispatch_open() {
-  local version="" ledger="$_dispatch_worktree_root/ledger.jsonl"
+  local version="" project_filter="" count=0 ledger="$_dispatch_worktree_root/ledger.jsonl"
   while (($#)); do
     case "$1" in
       --version) (($# >= 2)) || _dispatch_error "--version requires a value"; version="$2"; shift 2 ;;
+      --project) (($# >= 2)) || _dispatch_error "--project requires a name"; project_filter="$2"; shift 2 ;;
+      --count) count=1; shift ;;
       *) _dispatch_error "unknown open option: $1" ;;
     esac
   done
   [[ -z "$version" || "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version"
-  [[ -f "$ledger" ]] || return 0
-  python3 - "$ledger" "$version" <<'PYOPEN'
+  [[ -f "$ledger" ]] || { [[ "$count" -eq 0 ]] || printf "all 0/%s\n" "${K3DM_DISPATCH_WIP_GLOBAL:-6}"; return 0; }
+  python3 - "$ledger" "$version" "$project_filter" "$count" "${K3DM_DISPATCH_WIP_GLOBAL:-6}" <<'PYOPEN'
 import json, sys, time
 from collections import defaultdict
 
@@ -1461,24 +1580,37 @@ with open(sys.argv[1]) as ledger:
         if isinstance(event, dict) and event.get("version") and event.get("slug"):
             tasks[(event["version"], event["slug"])].append(event)
 found = False
+counts=defaultdict(int)
 for (version, slug), events in sorted(tasks.items()):
     if sys.argv[2] and version != sys.argv[2]:
         continue
     starts = [e for e in events if e.get("event") == "start"]
     if not starts or any(e.get("event") in ("land", "abandon") for e in events):
         continue
+    project = next((e.get("project") for e in events if e.get("project")), "k3d-manager")
+    if sys.argv[3] and project != sys.argv[3]: continue
+    role = starts[0].get("role", "")
     age = max(0, int((time.time() - starts[0].get("ts", 0)) // 86400))
-    print(f"{version} {slug} {age}d {events[-1].get('event', 'unknown')}")
+    if sys.argv[4] == "1":
+        if role != "review": counts[project] += 1
+        continue
+    suffix = f" [{project}]" if project != "k3d-manager" else ""
+    print(f"{version} {slug} {age}d {events[-1].get('event', 'unknown')}{suffix}")
     found = True
-sys.exit(1 if found else 0)
+if sys.argv[4] == "1":
+    ceiling=int(sys.argv[5])
+    for project in sorted(counts): print(f"{project} {counts[project]}/3")
+    print(f"all {sum(counts.values())}/{ceiling}")
+sys.exit(0 if sys.argv[4] == "1" or not found else 1)
 PYOPEN
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" reason="" rel version task run session_id n network_slug agent model="" coordinator="" coordinator_vendor="" coordinator_model="" coordinator_source=declared model_source recorded_model recorded_source
+  local slug="" explicit_version="" prompt_file="" reason="" rel version task run session_id n network_slug agent model="" coordinator="" coordinator_vendor="" coordinator_model="" coordinator_source=declared model_source recorded_model recorded_source
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; explicit_version="$2"; shift 2 ;;
       --prompt-file) (($# >= 2)) || _dispatch_error "--prompt-file requires a path"; prompt_file="$2"; shift 2 ;;
       --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
       --model) (($# >= 2)) || _dispatch_error "--model requires a value"; model="$2"; shift 2 ;;
@@ -1500,7 +1632,7 @@ _dispatch_resume() {
   fi
   [[ -n "$prompt_file" ]] || _dispatch_error "resume requires --prompt-file PATH"
   [[ -s "$prompt_file" ]] || _dispatch_error "prompt file is missing or empty: $prompt_file"
-  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
+  rel="$(_dispatch_release_branch)"; if [[ -n "$explicit_version" ]]; then version="$explicit_version"; [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version"; else version="$(_dispatch_resolve_version "$slug")"; fi; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
   _dispatch_event_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
   [[ ! -f "$run/landed" ]] || _dispatch_error "task has landed: $slug"
@@ -1618,8 +1750,7 @@ _dispatch_abandon() {
   done
   [[ -n "$slug" ]] || _dispatch_error "abandon requires --slug SLUG"
   if [[ -z "$version" ]]; then
-    rel="$(_dispatch_release_branch)"
-    version="${rel#k3d-manager-}"
+    version="$(_dispatch_resolve_version "$slug")"
   else
     [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version: $version"
   fi
