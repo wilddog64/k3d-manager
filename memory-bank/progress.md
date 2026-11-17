@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17: Argon blind review of dirused#14 dispatched.
 - 2026-11-17: dirused M2a landed 90ce085, PR dirused#14 open; CI + Argon review pending.
 - 2026-11-17: dirused M2a resume 3 — console colour dead code fix + test 9.
 - 2026-11-17: dirused M2a resumed (Portable tests 5 red from intended output change; spec Files table amended).

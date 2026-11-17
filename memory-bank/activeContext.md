@@ -1,5 +1,6 @@
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-17 ~18:25Z: blind Argon review of dirused#14 dispatched (docs/plans/dirused-m2a-review.md, slug dirused-m2a-review, linked --role review to dirused-m2a-fullness-levels; not counted in WIP).
 - 2026-11-17 ~18:20Z: dirused M2a LANDED as 90ce085 on m2a-fullness-levels (land --allow-out-of-scope: 3 Portable test files added to spec Files after runs 1-2, tools/PACKAGE-README.txt per Contract readers). Portable 37/37; mutation GetType gate → test 9 red (verified by Claude). PR wilddog64/dirused#14 (normal). Next: CI (windows job runs tests 1-8), Argon blind review, live E4 by operator at office. dirused checkout now on m2a-fullness-levels. WIP 2/3.
 - 2026-11-17 ~18:00Z: dirused M2a run 2: Portable 36/36. Review found colour never shows (GetType()==StreamWriter vs Console.Out = TextWriter+SyncTextWriter, probed SDK 11.0.100). Spec gained test 9 (pure ShouldColor, Console.Out positive control) and recorded the Complete-required deviation; Luna resume 3 (correction).
 - 2026-11-17: dirused M2a run 1 exited; production changes OK but tests/Dirused.Tests.Portable (CI's Linux suite) went 36/36 → 31/36 — footer line and JSON level, intended. Spec defect: Files table omitted the Portable project; amended, Luna resumed (resume 2, --reason correction).
