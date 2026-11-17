@@ -2298,6 +2298,7 @@ data:
                 {
                   "refId": "A",
                   "expr": "sum by (status) (k3dm_dispatch_stall_diagnoses{window=\"$window\"})",
+                  "legendFormat": "{{status}}",
                   "instant": true
                 }
               ],
@@ -2399,6 +2400,7 @@ data:
                 {
                   "refId": "A",
                   "expr": "sum by (decision) (k3dm_dispatch_stall_decisions{window=\"$window\"})",
+                  "legendFormat": "{{decision}}",
                   "instant": true
                 }
               ],
@@ -2406,7 +2408,56 @@ data:
                 "defaults": {
                   "unit": "none"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "approved"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Approved"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "denied"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Denied"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "expired"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Expired (no answer)"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "precondition_failed"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Refused (state changed)"
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "displayMode": "basic",
@@ -2492,6 +2543,7 @@ data:
                 {
                   "refId": "A",
                   "expr": "sum by (outcome) (k3dm_dispatch_stall_outcomes{window=\"$window\"})",
+                  "legendFormat": "{{outcome}}",
                   "instant": true
                 }
               ],
@@ -2499,7 +2551,56 @@ data:
                 "defaults": {
                   "unit": "none"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "landed"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Landed"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "pending"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Still running"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "stalled_again"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Stalled again"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "abandoned"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Abandoned"
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "displayMode": "basic",
@@ -2593,7 +2694,92 @@ data:
                 "defaults": {
                   "unit": "m"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Task"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 230
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Stall ID"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 190
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Reason"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Silent for"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 90
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Diagnosis"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 95
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Decision"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 95
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Outcome"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 95
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "showHeader": true,
@@ -2615,13 +2801,13 @@ data:
                       "__name__": true
                     },
                     "renameByName": {
-                      "slug": "slug",
-                      "stall": "stall",
-                      "reason": "reason",
-                      "Value": "silent minutes",
-                      "diagnosis": "diagnosis",
-                      "decision": "decision",
-                      "outcome": "outcome"
+                      "slug": "Task",
+                      "stall": "Stall ID",
+                      "reason": "Reason",
+                      "Value": "Silent for",
+                      "diagnosis": "Diagnosis",
+                      "decision": "Decision",
+                      "outcome": "Outcome"
                     },
                     "indexByName": {
                       "slug": 0,

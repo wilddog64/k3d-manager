@@ -14,6 +14,10 @@
 - **A resolved Hermes incident names each withdrawn proposal** and says nothing needs approving, so the old buttons are no longer left looking actionable.
 - **Alert diagnoses check Vault first.** The webhook's ArgoCD alert analysis reads the Vault seal labels and the `vault-backend` ClusterSecretStore once per job. When Vault is sealed it says so and skips Gemini; otherwise Gemini sees both summaries. Before, it blamed app configuration and probes during a Vault seal.
 
+### Changed
+
+- **Stall recovery dashboard reads in plain words.** Operator decisions and After resume show names like "Refused (state changed)" and "Stalled again" instead of `{decision="precondition_failed"}`, and the Incidents table has titled, fixed-width columns so the task name is no longer cut off.
+
 ## [1.44.1] - 2026-11-17
 
 Bug-fix release: the 12 bugs groomed into v1.44.1 on 2026-11-15, plus the CI split. Each fix was verified offline by Claude: its new tests fail on the pre-fix code and pass on the fix.
