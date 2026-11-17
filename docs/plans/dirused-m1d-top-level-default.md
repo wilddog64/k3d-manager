@@ -177,3 +177,11 @@ interface: dirused command line (text, JSON, CSV output)
 
 **Intent approved:** operator, 2026-11-17
 **Approval words:** "approve intents and you can dispatch to the agents you pick"
+
+## E3 result (2026-11-17)
+
+dirused-dev VM BENTO (Windows 11 ARM64, VirtualBox), `dirused \\localhost\c$`, warm-up then alternating runs:
+v0.0.2 95.8s / 94.8s (103 lines); PR build 8f81d0a 20.0s / 20.3s (15 lines), 4.7x faster. `make vm-live` 10/10 on 8f81d0a.
+Accuracy cost seen: the default counts every hard link, so `C:\Windows` shows 20G against 11.9G logical with `/exact`
+(WinSxS hard links), and the top-level rows add up to more than the volume's 20G used. Operator decision pending on a
+mitigation before merge. E4 waits for the v0.0.3 release build (operator, 2026-11-17).

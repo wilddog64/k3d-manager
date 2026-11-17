@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 04:20Z: dirused E3 done: v0.0.2 ~95s vs PR 8f81d0a ~20s on \\localhost\c$ (4.7x); live-check 10/10. Finding: default double-counts hard links (C:\Windows 20G vs 11.9G exact); operator decision on mitigation before merge. E4 after v0.0.3 release build.
 - 2026-11-17 04:15Z: ideas row added: move public cloudflared into the hostinger cluster + Cloudflare cache rules (travel latency; overlaps v1.45.0 plan 4, v1.48.0 Tailscale); for grooming 2026-11-22. dirused E3 timing running on the VM; live-check 10/10 on 8f81d0a.
 - 2026-11-17 04:05Z: dirused#11 CI green on 8f81d0a (portable + windows, push + PR runs); remaining: E3 vm-live timing (needs operator go), E4 operator office timing, then operator merges.
 - 2026-11-17 03:55Z: dirused M1d verifier: all M/N PASS (M6, N3 parser-level only); fixed its sort finding (text rows sorted on-disk but showed logical) in dirused 8f81d0a with a red-on-old test; CI rerunning; E3/E4 pending.
