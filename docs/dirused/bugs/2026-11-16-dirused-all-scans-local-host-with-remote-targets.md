@@ -1,11 +1,11 @@
 # dirused `/all` adds the local machine's drives even when remote targets are given
 
-**Status:** OPEN — captured, not triaged
+**Status:** OPEN — fix in wilddog64/dirused#10 (ef6c0d1), not yet on main; verified by Claude offline (red at 6a99c36, CI green at ef6c0d1) and on the dirused-dev VM (`docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`)
 **Priority:** P3 (proposed; Argon classification pending) — extra rows for the machine running dirused mixed into a fleet report; nothing is missing; workaround: leave out `/all` when targets are listed
 **Introduced by:** wilddog64/dirused d86655b (M1b phase 0; `/all` = all fixed local drives in `TargetResolver`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-16
+**Waiting on:** live check — since 2026-11-16 (operator, from the office, 2026-11-17: `dirused /summary /file servers.list` shows all four hosts)
 **Prior art:** `docs/dirused/bugs/` exact-slug glob, no match; `make find-similar-docs` not run (vector store context `k3d-k3d-cluster` missing) — none above threshold
 **Filed:** 2026-11-16 (operator report)
 

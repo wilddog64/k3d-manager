@@ -1,11 +1,11 @@
 # dirused `/summary` silently drops remote hosts whose volume has the same serial number as another host's
 
-**Status:** OPEN — captured, not triaged
+**Status:** OPEN — fix in wilddog64/dirused#10 (ef6c0d1), not yet on main; verified by Claude offline (red at 6a99c36, CI green at ef6c0d1) and on the dirused-dev VM (`docs/dirused/evidence/2026-11-16-m1c-a-live-vm.txt`)
 **Priority:** P2 (proposed; Argon classification pending) — the summary leaves out hosts with no error and no warning, so the report looks complete when it is not; workaround: run without `/summary`, or one host per run
 **Introduced by:** wilddog64/dirused d302f65 (M1b phase 1b fleet runner: `/file`, `/summary`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-16
+**Waiting on:** live check — since 2026-11-16 (operator, from the office, 2026-11-17: `dirused /summary /file servers.list` shows all four hosts)
 **Prior art:** `docs/dirused/bugs/` exact-slug glob, no match; `make find-similar-docs` not run (vector store context `k3d-k3d-cluster` missing) — none above threshold
 **Filed:** 2026-11-16 (operator report, screenshot)
 
