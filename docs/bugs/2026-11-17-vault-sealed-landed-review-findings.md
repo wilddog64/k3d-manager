@@ -5,7 +5,7 @@
 **Introduced by:** fadf8438 (Hermes, Luna) and bea02b84 (webhook, Flash), both v1.44.2
 **Should have been caught by:** review
 **Introducing change reviewed:** no (the specs had Argon + Fable; the two diffs had no diff review before land)
-**Waiting on:** operator decision — since 2026-11-17 (fix in v1.44.2 before the release PR, or carry)
+**Waiting on:** fix running — since 2026-11-17 (operator: "dispatch two small ones"; `docs/plans/webhook-vault-sealed-review-fixes.md`, `docs/plans/hermes-vault-sealed-review-fixes.md`; H4 by Claude)
 **Prior art:** `docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`, `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run) — the specs these landings implemented; none records these defects.
 **Filed:** 2026-11-17
 
