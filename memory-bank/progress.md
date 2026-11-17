@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-17 12:25Z: v1.44.1 promoted to hub (deploy/hub 666b27b7, tag hub-promote/20261117T121641Z, no break-glass). Containment E8 PASS -> bug LIVE-VERIFIED, ledger live_verified (63cf163e). v1.44.1 live checks complete except Hermes E3 (waits on a real ci page).
 - 2026-11-17 12:20Z: v1.44.1 MERGED 666b27b7 (PR #162); enforce_admins restored; tag v1.44.1 + GitHub release (latest); next branch k3d-manager-v1.44.2 from 666b27b7 (4 unmerged memory-bank commits carried). Task branches: 0. MEMORY.md 8.3 KB, CLAUDE.md 10.5 KB (under budget, no compression). Retro being written (Sonnet). Next: operator promote REF=666b27b7 for containment E8; 2 stale v1.44.0 review rows await abandon go.
 - 2026-11-17 07:10Z: dirused #12 MERGED 6c660229; enforce_admins re-enabled; v0.0.3 tagged + released (run 44080730448, pre-release, x64 33.1MB + arm64 31.5MB zips with sha256). E4 office timing next (operator). k3d-manager #162 MERGED by operator; /post-merge next.
 - 2026-11-17 06:55Z: v1.44.1 #162 CI green on 1c129251 (19/19); enforce_admins DELETED on k3d-manager main. Operator merges #162, then /post-merge (re-enable, tag, promote with containment E8, MEMORY prune).
