@@ -5,10 +5,11 @@
 **Introduced by:** unknown (the `vault-unseal` Secret was created 2026-10-30T20:52:23Z, around the M5 hub cut-over)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-17 (E0 confirmed the Secret is stale; choose: one-time Secret repair now, and stage 2 in v1.44.1 or v1.44.2)
+**Waiting on:** live check — since 2026-11-17 (operator runs the one-time Secret repair on the M5; then stage 2 spec for v1.44.2)
 **Branch:** k3d-manager-v1.44.1
 **Triage:** patch → v1.44.1 (P2, flagged: Vault stays sealed until a manual unseal; read-only investigation first) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (bug; operator, 2026-11-15: "let's get those two done at v1.44.1" — out of the v1.44.0 cut)
+**Stage 2 release:** v1.44.2 (operator, 2026-11-17: "go for what you suggested" — stage 1 ships in v1.44.1; one-time Secret repair from the Keychain now, operator-run)
 **Prior art:** `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (exact-slug pass; `find-similar-docs` printed nothing) — read, different root cause (that bug is the boot-time retry; its fix ran correctly here)
 **Severity:** high when it bites — every Vault restart on the hub (OrbStack update, node reboot) leaves Vault sealed, ESO refreshes fail, and nothing unseals it automatically
 
