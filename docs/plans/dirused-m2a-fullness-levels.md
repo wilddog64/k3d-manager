@@ -58,6 +58,7 @@ a new exit code when a volume is red; top 3 folders only for red/yellow volumes 
 | `README.md` | Change 8 |
 | `tests/Dirused.Tests/FullnessTests.cs` | new: tests 1-8 |
 | `tests/Dirused.Tests/SummaryTests.cs`, `tests/Dirused.Tests/OutputCompatTests.cs` | update only assertions the new CSV column or tag breaks; say which in the report |
+| `tests/Dirused.Tests.Portable/FullnessColorTests.cs` | (added 2026-11-17 after run 2) new: test 9 |
 | `tests/Dirused.Tests.Portable/RendererTests.cs`, `tests/Dirused.Tests.Portable/FleetRunnerTests.cs` | (added 2026-11-17 after run 1) same rule: update only the assertions the footer line, `level` JSON field or CSV column break. This project is what CI runs on Linux (`ci.yml:13`, `release.yml:19`) and must stay 36/36 |
 
 ## Contract readers
@@ -88,9 +89,15 @@ Renderer tests build `ScanResult`s with chosen `PercentUsed`; Program tests use 
 8. `Test_CritWinsOverIncomplete` — a crit target plus an unreachable target (`\\nonexistent-host-dirused\share`, already used in
    existing tests if present; otherwise a missing local path) → exit 4; without the crit thresholds → exit 3.
 
+9. `Test_ShouldColorOnlyForRealUnredirectedConsole` (Portable project) — pure `Fullness.ShouldColor(TextWriter output, bool color, bool redirected, string? noColor)`:
+   `(Console.Out, true, false, null)` → true (positive control: proves the real console qualifies; `Console.Out` is `TextWriter+SyncTextWriter`, not `StreamWriter` — probed 2026-11-17, macOS, .NET SDK 11.0.100, net10.0);
+   `(new StringWriter(), true, false, null)`, `(Console.Out, false, false, null)`, `(Console.Out, true, true, null)`, `(Console.Out, true, false, "1")` → false.
+
+**Level needs a complete target (accepted deviation, run 1):** `Fullness.For` returns null unless `result.Complete && Volume.TotalBytes > 0`, matching `/summary`, which already lists incomplete targets as failures; so exit 4 never fires on a target the footer does not count.
+
 Pre-fix red: all of 1-8 fail or do not compile on 3865f28 (new API). Mutations (apply by hand, run, revert; each must turn the
 named test red): `>` instead of `>=` for crit (1); tag Ok lines too (2); emit ANSI escapes instead of ConsoleColor (4);
-return 3 before checking crit (8); drop the warn<crit check (5).
+return 3 before checking crit (8); drop the warn<crit check (5); require `output.GetType() == typeof(StreamWriter)` in `ShouldColor` (9).
 
 ## What NOT to Do
 
