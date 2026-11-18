@@ -1,7 +1,7 @@
 # dirused M5: `/largest`, the largest cleanup-candidate files (logs, dumps, backups, temp)
 
 **Filed:** 2026-11-18
-**Status:** LANDED — PR wilddog64/dirused#28 merged 9d8735f; released v0.0.15 (pre-release, 2 zips + sha256) 2026-11-18. Awaiting operator E2
+**Status:** LIVE-VERIFIED (E2, HTML fleet path) — v0.0.15/0.0.16; operator work laptop 2026-11-18: `/largest` HTML on \\us03p02ffm01\d$ listed '20 of 32 matches, 134.3 GB', top row a 116.7 GB tomcat85-stderr log with dates and grouped header (operator screenshot). Text `dirused C:\ /largest` not separately shown. PR #28 merged 9d8735f
 **Repo / branch:** wilddog64/dirused / `m5-largest` (from main 594eff6)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low-medium (read-only: the scanner collects one more bounded list; no file is deleted or opened; default output unchanged without the switch)
