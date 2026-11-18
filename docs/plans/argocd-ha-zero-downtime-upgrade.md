@@ -1,9 +1,9 @@
-# v1.45.0 — ArgoCD HA: CVE upgrades without ArgoCD downtime, rehearsed in the dev hub
+# ArgoCD HA: CVE upgrades without ArgoCD downtime, rehearsed in the dev hub
 
-**Status:** PLANNED — operator dispatch go 2026-11-07; dispatch when `k3d-manager-v1.45.0` is cut
+**Status:** PLANNED — backlog since 2026-11-18 (was v1.45.0 plan 1; displaced by `remote-promote-approval`, operator); operator dispatch go 2026-11-07 applies when it is groomed into a release
 **Priority:** P2 (an ArgoCD CVE patch today restarts single-replica pods, so the ArgoCD UI, API and sync go down during the rollout)
 **Approval:** operator 2026-11-07: "by doing this, do we have room to support argocd no downtime upgrade (for cve patch)"; "go ahead"; 2026-11-08, A4 added: "go ahead to add retirement to v1.45.0, and I will delete /argocd-upgrade command now"
-**Release:** v1.45.0 (branch `k3d-manager-v1.45.0`)
+**Release:** backlog (was v1.45.0 plan 1 until 2026-11-18)
 **Depends on:** [`v1.44.0-dev-hub-vcluster`](v1.44.0-dev-hub-vcluster.md) (D3 rehearsal target) and its operator prerequisite P0 (OrbStack 24 GB).
 **Supersedes (ArgoCD part only):** [`v1.28.0-platform-zero-downtime-rollouts`](v1.28.0-platform-zero-downtime-rollouts.md), parked until the hub left the M4 Air. The M5 is that hardware. The rest of the v1.28.0 tier (Istio, Grafana, Loki, ESO, exporters) stays queued.
 
