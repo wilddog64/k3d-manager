@@ -32,7 +32,13 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    verify recorded). CHANGE.md 5492724 pushed; PR #89 title/body updated. E2 PASSED: run 44301926748 attempts 1-3
    green on ubuntu-26.04 incl. collision + lock tests. Blind reviews DISPATCHED (brief
    docs/plans/release-lib-foundation-pr89-v0.5.7-review.md): lf-v057-review-argon (agy gemini-4-argon-medium) and
-   lf-v057-review-astra (codex gpt-6.2-astra — first Astra trial, operator 2026-11-18). Compare findings, then merge gates.
+   lf-v057-review-astra (codex gpt-6.2-astra — first Astra trial, operator 2026-11-18). Both exited 0, worktrees clean.
+   Argon: 2 low (old dir-lock stale = accepted in spec; RETURN-only trap = pre-existing). Astra: 7 (28,355 tokens); only
+   one NEW to this diff and reproduced: noclobber accepts an existing symlink->/dev/null (two claims rc 0; old mkdir rc 1),
+   needs a planted link in a user-owned dir — low. Rest pre-existing (shared --out cleanup, RETURN trap, 255-byte key loop,
+   dot-prefixed keys skipped by *.item glob — latent, Makefile items are scripts/tests/ paths, mkdir w/o --, peak==2 test).
+   Fable blind review on the same brief RUNNING (operator: compare Astra 6.2 vs Fable). Then scope check + merge.
+   P3 filed: docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md (waiting on Astra rates).
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.

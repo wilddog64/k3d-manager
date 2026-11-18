@@ -125,3 +125,4 @@
 - 2026-11-18: run_parallel #157 root cause = uutils mkdir 0.10.0 on ubuntu-26.04 runners (not exclusive under race). Spec lib-foundation-v0.5.7-exclusive-lock-claims dispatched to Luna (noclobber claims for _run_parallel_worker + _foundation_vcluster_lock).
 - 2026-11-18: lf-v057-exclusive-lock-claims LANDED lib-foundation a561b16 + CHANGE.md 5492724, pushed to release/v0.5.7 (PR #89); verify pass recorded; CI E2 pending.
 - 2026-11-18: PR #89 CI E2 passed (run 44301926748, 3/3 attempts green on ubuntu-26.04). Argon review next.
+- [ ] P3 dispatch-metrics: gpt-6.2-astra/-sol not allowlisted or priced (docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md) — waiting on operator for Astra rates
