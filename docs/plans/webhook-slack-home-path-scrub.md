@@ -146,7 +146,7 @@ evidence:
   - id: E1
     proves: [M1, M2, M3, N1, N2]
     kind: offline
-    command: pytest scripts/tests/bin/test_redact.py scripts/tests/bin/test_make_job_output.py -k "tildify or sanitized"
+    command: pytest scripts/tests/bin/test_redact.py scripts/tests/bin/test_make_job_output.py -k "tildify or sanitized or tildifies"
     intent: When a cluster or make job fails, the Slack message shows ~/ for your home folder and hides passwords, instead of printing your username and full path.
 interface:
   - "scripts/lib/webhook/redact.py: tildify_home(text) -> text"
