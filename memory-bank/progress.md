@@ -131,3 +131,4 @@
 - [ ] P3 lib-foundation file locks: no signal cleanup / stale recovery / non-regular lock path (grooming)
 - 2026-11-18: medium/high-risk spec review pair switched to Fable + Astra (operator go; Argon stays low-risk/diff); rules.md, verification-and-review.md, trial pair 6 logged (8042333f).
 - 2026-11-18: plan table cleanup: travel bundle Status -> LANDED (ddd9329e, d14b5d9e); M1 plan renamed v1.44.2- (shipped there); Astra bug spec to lose its v1.45.0- prefix after land.
+- 2026-11-18: Astra metrics (Luna run 2) exited 0; Claude verified: post-fix 3 pass, pre-fix 1+3 red/2 green, extra mutation (drop gpt-6.2-sol) red, file 223 pass. Fable blind diff review running (Pair 7 data point); land after it.
