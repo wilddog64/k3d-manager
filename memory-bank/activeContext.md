@@ -30,7 +30,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md; DISPATCHED to Luna, slug lf-v057-exclusive-lock-claims
    (base 884e3aa). LANDED a561b16 (Claude-verified: pre-fix red, mutations, ubuntu:26.04 full suite no regression;
    verify recorded). CHANGE.md 5492724 pushed; PR #89 title/body updated. E2 PASSED: run 44301926748 attempts 1-3
-   green on ubuntu-26.04 incl. collision + lock tests. NEXT: Argon blind review of PR #89, then merge gates.
+   green on ubuntu-26.04 incl. collision + lock tests. Blind reviews DISPATCHED (brief
+   docs/plans/release-lib-foundation-pr89-v0.5.7-review.md): lf-v057-review-argon (agy gemini-4-argon-medium) and
+   lf-v057-review-astra (codex gpt-6.2-astra — first Astra trial, operator 2026-11-18). Compare findings, then merge gates.
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.
