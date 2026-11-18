@@ -217,6 +217,67 @@ def test_plan_operator_go_is_own_label_and_real_blockers_remain(metrics, tmp_pat
     assert all("needs your dispatch" not in row for row in rows.values())
 
 
+def test_plan_spec_stage_blocks_draft_and_planned(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    root = tmp_path / "scratch-repo"
+    (root / "docs/plans").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.58.0", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"], check=True)
+    (root / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(root), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-qm", "seed"], check=True)
+    docs = {
+        "docs/plans/v1.58.0-draft.md": "# Draft\n**Status:** DRAFT — written\n",
+        "docs/plans/v1.58.0-planned.md": "# Planned\n**Status:** PLANNED — not started\n",
+        "docs/plans/v1.58.0-plan.md": "# Plan\n**Status:** PLAN — not started\n",
+        "docs/plans/v1.58.0-draft-gated.md": "# Draft gated\n**Status:** DRAFT\n**Dispatch:** needed\n",
+        "docs/plans/v1.58.0-proposed.md": "# Proposed\n**Status:** PROPOSED\n",
+        "docs/plans/v1.58.0-spec-written.md": "# Written\n**Status:** SPEC WRITTEN — not implemented\n",
+        "docs/plans/v1.58.0-planned-dispatched.md": "# Dispatched\n**Status:** PLANNED\n",
+    }
+    ledger = root / "ledger.jsonl"
+    ledger.write_text(json.dumps({"ts": 1, "event": "start", "version": "v1.58.0",
+                                  "slug": "planned-worker",
+                                  "spec": "docs/plans/v1.58.0-planned-dispatched.md"}) + "\n")
+    assert ledger.resolve() != Path("~/.local/share/k3d-manager/worktrees/ledger.jsonl").expanduser().resolve()
+    output = metrics._plan_metrics(root, texts=docs, ledger=ledger)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'blocked_by="spec not reviewed"' in rows["v1.58.0-draft"]
+    assert 'blocked_by="spec not written"' in rows["v1.58.0-planned"]
+    assert 'blocked_by="spec not written"' in rows["v1.58.0-plan"]
+    assert 'dispatch_approval="n/a"' in rows["v1.58.0-draft"]
+    assert 'dispatch_approval="n/a"' in rows["v1.58.0-planned"]
+    assert 'dispatch_approval="needed"' in rows["v1.58.0-draft-gated"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-proposed"]
+    assert 'dispatch_approval="unknown"' in rows["v1.58.0-proposed"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-spec-written"]
+    assert 'blocked_by="dispatched"' in rows["v1.58.0-planned-dispatched"]
+    assert all('execution="proposed"' in row for row in rows.values())
+
+
+def test_plan_intent_no_needs_approval_without_filed_date(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.58.0", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
+    (tmp_path / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
+    docs = {
+        "docs/plans/v1.58.0-no.md": "# No\n**Status:** PROPOSED\n**Intent approved:** no — needs operator\n",
+        "docs/plans/v1.58.0-yes.md": "# Yes\n**Status:** PROPOSED\n**Intent approved:** operator, 2026-11-18\n",
+        "docs/plans/v1.58.0-neither.md": "# Neither\n**Status:** PROPOSED\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'intents need approval' in rows["v1.58.0-no"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-yes"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-neither"]
+
+
 @pytest.mark.parametrize("exit_code", [None, 0, 1])
 def test_plan_blocked_by_dispatch_intent_and_file_wait(metrics, tmp_path, exit_code):
     root = tmp_path / "scratch-repo"
@@ -1805,8 +1866,8 @@ def test_missing_dispatch_header_reads_as_a_pending_decision_only_before_dispatc
     subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
     docs = {
-        "docs/plans/v1.54.0-waiting.md": "# Waiting\n**Status:** PLANNED\n**Approval:** approved\n",
-        "docs/plans/v1.54.0-gated.md": "# Gated\n**Status:** PLANNED\n**Dispatch:** needed\n",
+        "docs/plans/v1.54.0-waiting.md": "# Waiting\n**Status:** PROPOSED\n**Approval:** approved\n",
+        "docs/plans/v1.54.0-gated.md": "# Gated\n**Status:** PROPOSED\n**Dispatch:** needed\n",
         "docs/plans/v1.54.0-landed.md": "# Landed\n**Status:** LANDED\n**Approval:** approved\n",
         "docs/plans/v1.54.0-dropped.md": "# Dropped\n**Status:** DROPPED\n",
         "docs/plans/v1.54.0-superseded.md": "# Superseded\n**Status:** SUPERSEDED\n",

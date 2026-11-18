@@ -382,6 +382,10 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
         plan = Path(path).stem
         status = _status_value(text)
         execution, verification = _plan_state(status)
+        spec_stage = re.match(r"^(DRAFT|PLANNED|PLAN)(?:\b|\s|—|–|-|:)",
+                              (status or "").strip(), re.IGNORECASE)
+        spec_blocker = ("spec not reviewed" if spec_stage and spec_stage.group(1).upper() == "DRAFT"
+                        else "spec not written" if spec_stage else "")
         heading = _HEADING_RE.search(text)
         title = heading.group(1) if heading else match.group(4).replace("-", " ")
         title = re.sub(r"^v\d+\.\d+\.\d+\s*[—–:-]\s*", "", title, flags=re.IGNORECASE)
@@ -411,7 +415,9 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
                            dependencies=dependencies, files=files, declared_wave=declared_wave,
                            wave_note=wave_note, dispatch=_plan_dispatch(text),
                            intent_ok=_plan_intent_approved(text),
-                           intent_required=bool(filed and filed.group(1) >= "2026-11-08")))
+                           intent_required=bool((filed and filed.group(1) >= "2026-11-08") or
+                                                re.search(r"(?mi)^\*\*Intent approved:\*\*\s*no\b", text)),
+                           spec_blocker=spec_blocker))
         counts[(release, order_label, execution, verification)] += 1
     by_stem = {p["plan"]: p for p in parsed}
     for p in parsed:
@@ -499,6 +505,8 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
         blockers = []
         dispatchable = p["execution"] in ("proposed", "ready")
         if dispatchable:
+            if p["spec_blocker"]:
+                blockers.append(p["spec_blocker"])
             if p["release"] not in branch_cut:
                 branch_cut[p["release"]] = _plan_has_branch(root, p["release"])
             if not branch_cut[p["release"]]:
@@ -530,6 +538,8 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
         else:
             blocked = "ready on your go"
         dispatch = p["dispatch"]
+        if dispatchable and p["spec_blocker"] and dispatch == "unknown":
+            dispatch = "n/a"
         if not dispatchable:
             if p["execution"] == "implemented" and dispatch == "unknown":
                 dispatch = "approved"
