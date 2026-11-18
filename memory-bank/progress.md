@@ -1,6 +1,8 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: test-all metrics (P2) spec dispatched to Flash; child C abandoned (prerequisite captures missing, API key item absent); travel bundle exited, verification pending.
+
 - 2026-11-18: travel bundle: Luna stopped on spec/code conflict; N1 scoped, P2 bug filed (show-service-passwords untrapped temp files), Luna resumed.
 - 2026-11-18: travel bundle (v1.45.0 plan 2) intent approved and dispatched to Luna.
 - 2026-11-18: v1.45.0 = remote-promote-approval, travel bundle, multi-project records, SSH console, stall recovery; ArgoCD HA to backlog (6a034e89). Travel bundle spec dispatch-ready pending operator intent approval (ac6583f0).
