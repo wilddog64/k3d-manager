@@ -1,7 +1,7 @@
 # dirused M3b — `/html` report: green OK level and a visible bar for small usage
 
 **Filed:** 2026-11-18
-**Status:** ready for dispatch (after intent approval)
+**Status:** DISPATCHED 2026-11-18 to Luna
 **Repo / branch:** wilddog64/dirused / `m3b-html-ok-colour` (from main cbf37ac)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low (HTML report styling only; console, JSON and CSV output unchanged)
@@ -91,4 +91,5 @@ interface:
   - "/html report Level column: OK (green), WARN (yellow), CRIT (red)"
 ```
 
-**Intent approved:** pending (operator)
+**Intent approved:** operator, 2026-11-18
+**Intent approval note:** "Approve, dispatch" (E1/E2 as written)
