@@ -5,7 +5,8 @@
 **Introduced by:** wilddog64/dirused 97a47fc (M1b phase 1b, merged in febe79d)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Claude verification)
-**Live evidence:** 2026-11-16 · run operator-make-vm-live-tmux-work-1.1 · env dirused-dev-vm · scenario live-check-L1-L10 (10/10 pass, build 02:36:18Z) · commit 1926d2e · proves E4
+**Live evidence:** 2026-11-16 · run operator-make-vm-live-tmux-work-1.1 · env dirused-dev-vm · scenario live-check-L1-L10 · commit 1926d2e · proves E4
+**Live evidence note:** 10/10 pass, build 02:36:18Z (line normalized 2026-11-18 so `_LIVE_EVIDENCE_RE` parses it; content unchanged)
 **Fix commit:** 588f0c2 (merged as 25671fb, wilddog64/dirused PR #8)
 **Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Luna (`gpt-6-luna`, Codex) implements; spec with Acceptance next
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` was unavailable (vector store context `k3d-k3d-cluster` missing).

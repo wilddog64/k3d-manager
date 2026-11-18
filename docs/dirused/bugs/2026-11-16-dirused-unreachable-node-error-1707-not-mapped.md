@@ -5,7 +5,8 @@
 **Introduced by:** wilddog64/dirused ab27363 (M1b phase 1a `\\node` expansion; merged in 245bedd)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Claude verification)
-**Live evidence:** 2026-11-16 · run operator-make-vm-live-tmux-work-1.1 · env dirused-dev-vm · scenario live-check-L1-L10 (10/10 pass, build 02:36:18Z) · commit 1926d2e · proves L2
+**Live evidence:** 2026-11-16 · run operator-make-vm-live-tmux-work-1.1 · env dirused-dev-vm · scenario live-check-L1-L10 · commit 1926d2e · proves fix
+**Live evidence note:** 10/10 pass, build 02:36:18Z; the run proves live check L2 (line normalized 2026-11-18 so `_LIVE_EVIDENCE_RE` parses it; content unchanged)
 **Fix commit:** 562de4a + 82442a0 (merged as 1926d2e, wilddog64/dirused PR #7)
 **Approved:** operator 2026-11-16 ("approve two P3 bugs and can dispatch to Flash and Luna after /clear"); operator clarified one bug per agent: Flash (`gemini-3.8-flash-medium`, agy) implements; spec with Acceptance next
 **Prior art:** `docs/bugs/2026-11-16-dirused-unreachable-host-error-64-not-mapped.md` (exact-slug neighbour; `make find-similar-docs` unavailable, vector store context `k3d-k3d-cluster` missing) — read, different code path: that fix mapped share-path codes 51/64 from the volume probe; this code comes from `NetShareEnum` while expanding a bare node.

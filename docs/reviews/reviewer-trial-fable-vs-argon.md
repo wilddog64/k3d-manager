@@ -209,3 +209,21 @@ two P3s (`docs/bugs/2026-11-18-lib-foundation-*`).
 read widest, but inflated severity and did not state its limits; Argon found nothing new. Operator verdict: "Fable is still
 the best of among three but Astra is also worth a try for second eye. Google's Gemini 4 is the weakest one." Medium/high-risk
 spec review switched to Fable + Astra (operator go 2026-11-18). Low-risk specs and routine diff review stay on Argon.
+
+## Pair 7 — 2026-11-18, spec review: multi-project M2 bug metrics, Argon and Fable, blind
+
+Operator picked Argon + Fable for this one. Same brief, same spec (`docs/plans/v1.45.0-multi-project-m2-bug-metrics.md` at
+`cb192a0a`). Fable: Agent subagent, 135,091 tokens, 336 s, 12 findings. Argon: agy `gemini-4-argon-medium`, 7 findings (first
+run lost to an agy flag-order error, re-run). Both "ready with changes".
+
+| Reviewer | Findings | Real, unique | Real, shared | Refuted / not adopted |
+|---|---|---|---|---|
+| Argon | 7 | 2 (fetch misses late tags, reproduced; empty `local path` → k3d-manager root) | 4 | 1 design choice (call site inside `publish_bug_metrics`) |
+| Fable | 12 | 7 (120 s Hermes kill, entry point/interface, must_not reds need mutants, verified/live_verified gap, `evidence_check=` reuse, branch label, naming) | 4 | 0 |
+
+Shared: FETCH_HEAD mtime advances on a failed fetch (both reproduced), legacy open-history counts k3d-manager docs, shared
+fixture must blank `K3DM_PROJECTS_LIST`, two dirused live-evidence lines unparseable.
+
+**Pair 7 read:** Fable again broader and better at testability and process gaps; Argon's two unique finds were both real
+and one (missing `--tags`) also exposed a pre-existing P3 in the lib-foundation pass. Argon's proofs were concrete
+reproducers this time. Argon worth keeping as the cheap second eye on specs.
