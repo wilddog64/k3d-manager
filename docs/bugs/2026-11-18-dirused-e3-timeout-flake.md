@@ -27,3 +27,7 @@ is dropped. Test-only timing margin (production timeouts are much longer), not a
 
 - Test only: give E3 a longer timeout (e.g. 3 s, grace 2 s) so scheduling jitter cannot exceed the grace.
 - Leave as is and re-run on recurrence.
+
+## Recurrence log
+
+- 2026-11-18: re-run of the failed job (run 44402076535, attempt 2) passed; flake confirmed non-deterministic.
