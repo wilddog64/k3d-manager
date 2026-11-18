@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured, not triaged
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-18 (two test-only fixes proposed upstream; #157 not reproduced)
+**Waiting on:** fix running — since 2026-11-18 (`docs/plans/lib-foundation-v0.5.7-run-parallel-test-flakes.md`, Luna, lib-foundation `release/v0.5.7`) (two test-only fixes proposed upstream; #157 not reproduced)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
