@@ -134,3 +134,4 @@
 - 2026-11-18: Astra metrics (Luna run 2) exited 0; Claude verified: post-fix 3 pass, pre-fix 1+3 red/2 green, extra mutation (drop gpt-6.2-sol) red, file 223 pass. Fable blind diff review running (Pair 7 data point); land after it.
 - 2026-11-18: Astra metrics LANDED 34502bfe, verify pass recorded; Fable blind review no defects (Astra cost still $0: only run is 6.2, unpriced). Spec renamed (no version prefix). E2 live waits on operator hub-promote.
 - 2026-11-18: Astra live: tokens_by_model gpt-6.2-astra on hub Pushgateway (manual make dispatch-metrics; 38 earlier push timeouts). No hub-promote needed. E2 defect: identity rows only for landed tasks; review child abandoned -> no row.
+- 2026-11-18: P2 captured docs/bugs/2026-11-18-dispatch-metrics-push-times-out-silently.md (5s timeout on 3.3MB PUT, Python spawn bypasses single-flight lock, no stale alert); operator decision on Hermes scope (Claude rec: fix now, stale trigger into plan 5).
