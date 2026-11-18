@@ -122,3 +122,4 @@
 - 2026-11-16 ~13:30Z: v1.44.1 scope corrected: grooming 2026-11-15 put 10 bugs in v1.44.1 besides the CI shard (dev-machine test-all metrics later carried to v1.45.0; silent-running rides stall-A). Operator: fix all 10 before the release PR, split Flash/Luna, Claude verifies, operator live-verifies one at a time. pgvector pin dispatched to Flash; Sonnet drafting specs for alpine CVEs, hermes-ci, root-token argv, unseal watchdog, spec-intent flow, containment respec, stall-A Acceptance. Stray m4-air needs operator second-guard decision. Release PR NOT opened.
 
 - [ ] lib-foundation v0.5.7 run_parallel.bats test flakes — LANDED 7027b38 2026-11-18; release PR #89 open; then v0.5.7 release PR + subtree pull
+- 2026-11-18: run_parallel #157 root cause = uutils mkdir 0.10.0 on ubuntu-26.04 runners (not exclusive under race). Spec lib-foundation-v0.5.7-exclusive-lock-claims dispatched to Luna (noclobber claims for _run_parallel_worker + _foundation_vcluster_lock).

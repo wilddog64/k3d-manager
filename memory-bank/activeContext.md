@@ -26,7 +26,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    a_b (corrects the 'never claimed' reading). Runner xargs is findutils 4.10.0 (local images 4.9.0). Fable told; waiting.
    ROOT CAUSE (Fable, Claude-verified): runner is ubuntu-26.04, mkdir = uutils 0.10.0; concurrent mkdir of one path both
    exit 0 (136/500 vs GNU 0/500) -> lock not exclusive. Library bug. Proposed fix: noclobber file lock + stub-mkdir test;
-   _foundation_vcluster_lock same pattern. Awaiting operator go on fix scope.
+   _foundation_vcluster_lock same pattern. Operator go (incl. vCluster lock) -> spec
+   docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md; DISPATCHED to Luna, slug lf-v057-exclusive-lock-claims
+   (base 884e3aa). After land: verify, push, update CHANGE.md (no longer test-only), 3 green CI runs on PR #89 (E2).
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.

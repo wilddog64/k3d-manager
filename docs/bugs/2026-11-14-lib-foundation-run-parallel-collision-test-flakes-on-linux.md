@@ -2,7 +2,7 @@
 
 **Status:** LANDED — lib-foundation `7027b38` on `release/v0.5.7` (test-only: timing flake fixed; collision test now names the missing file — #157 root cause still unknown)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-18 (root cause found: uutils mkdir on ubuntu-26.04 is not exclusive; library fix scope)
+**Waiting on:** fix running — since 2026-11-18 (Luna, `docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md`)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
