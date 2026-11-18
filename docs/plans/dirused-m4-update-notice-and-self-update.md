@@ -1,7 +1,7 @@
 # dirused M4 — new-release notice and `/update` self-update
 
 **Filed:** 2026-11-18
-**Status:** LANDED c918ff6 (PR #26); review-fix amendment below dispatched to Luna 2026-11-18
+**Status:** LANDED c918ff6 + 5c2a984 (PR #26); Windows CI test fixes (amendment 2) dispatched to Luna 2026-11-18
 **Repo / branch:** wilddog64/dirused / `m4-update-notice` (from main after PR #25 merges)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** medium (first network call; replaces its own executable)
@@ -211,6 +211,26 @@ Tests (all red on c918ff6; paste the failing lines):
 - **W3_BareWordsAreScanTargets (Windows):** `Program.RunWithReleaseSource(["update"], ...)` and `(["version"], ...)`
   never call the fake source's download and never print `dirused 0.0.`; `(["/version"], ...)` still prints it
   (positive control).
+
+## Amendment 2: Windows CI test fixes (Claude, 2026-11-18)
+
+PR #26 Windows CI on 5c2a984 (run 44362590748), test-only failures:
+
+1. **W3** (`UpdateWiringTests.cs:45`): `Assert.NotEqual(0, rc)` failed, `rc` was 0 on the runner. The exit code of scanning
+   a relative, missing folder is not what W3 proves. Fix: remove the exit-code assertion and replace it with a positive
+   check that the word was handled as a scan target. Read `Program.RunCore` and `ArgParser.Parse` to see what a bare
+   target produces (for example the target name in output or error, or a `/json` run whose document names the
+   target) and assert that. Keep the existing no-version-print and zero `FindCalls`/`DownloadCalls` assertions and the
+   `/version` positive control.
+2. **U14** (`UpdateTests.cs:90`), flaky: the writer loop calls `UpdateState.Write` while readers hold the file open; on
+   Windows `File.Move(temp, path, true)` throws `UnauthorizedAccessException` (`UpdateState.cs:16`). Production writes
+   go through `UpdateCheck.TryWrite`, which swallows this. Fix the test, not `UpdateState`: the writer loop catches
+   `IOException` and `UnauthorizedAccessException` per write (as `TryWrite` does) and counts successes; assert at least
+   one write succeeded, no reader threw, and a final `UpdateState.Read` after the loop returns a state without throwing.
+   No `.tmp-*` files are left in scratch after the loop.
+
+Change only `tests/Dirused.Tests/UpdateWiringTests.cs` and `tests/Dirused.Tests.Portable/UpdateTests.cs`. Gate: the full
+portable suite passes and `dotnet build tests/Dirused.Tests` succeeds; Windows CI on the PR is the final gate.
 
 ## Acceptance
 
