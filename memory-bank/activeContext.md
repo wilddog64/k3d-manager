@@ -65,6 +65,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-18: dirused PR #26 MERGED 568a829 (operator). Tagged v0.0.11 → release workflow green, pre-release with win-x64/arm64 zips + .sha256. E2 next: operator installs v0.0.11 on work laptop, then Claude tags v0.0.12 (N+1) so the notice and /update can be proven live. Also: plan-dashboard-draft-status dispatched to Luna (P3 promoted by operator; spec in the bug doc). WIP 1/3.
 - 2026-11-18: dirused-m4-w3-findcalls LANDED 0ea4c54 (superseding all 3 prior M4 slugs). PR #26 CI ALL GREEN on head 0ea4c54 (portable + windows, both push and PR runs). Ready for operator merge. After merge: tag release N (next v0.0.x), then N+1 for live E2 on the work laptop. WIP 0/3.
 - 2026-11-18: dirused-m4-windows-ci LANDED cf1c637 (land needed --superseding for BOTH prior slugs). Windows CI on cf1c637: U14 passes; W3 fails FindCalls 0 vs 1 — the /json scan correctly runs the update check; Claude's amendment 2 wrongly kept that assert. Amendment 3 dispatched as dirused-m4-w3-findcalls (drop the assert). WIP 1/3.
 - 2026-11-18: PR #26 Windows CI red on 5c2a984 (run 44362590748): W3 asserted rc!=0 for bare 'update' target (rc 0 on runner; checks that matter passed); U14 flaky (File.Move overwrite while readers open -> UnauthorizedAccessException; prod TryWrite swallows). Test-only amendment 2 dispatched as dirused-m4-windows-ci (Luna). WIP 1/3.
