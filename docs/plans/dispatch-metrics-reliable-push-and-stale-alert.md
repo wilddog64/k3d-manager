@@ -133,6 +133,7 @@ The Hermes diagnose-and-approve flow for stale metrics is **out of scope**: it i
 - `docs/howto/codex-dispatch.md`
 - `CHANGELOG.md`
 - `scripts/tests/bin/codex_dispatch_ledger.bats` (amended 2026-11-18 after verification: its `s1_snapshot` must wait for, or exclude, `metrics.lock`/`metrics.log` now that ledger appends start the scheduler)
+- `scripts/tests/bin/codex_dispatch_helpers.bash` (amended 2026-11-18 at land: `s1_snapshot` lives here at :106-107, so the snapshot exclusion for `metrics.lock`/`metrics.log`/`metrics.pending` lands here; the scope check reads the start-time spec, so landed with `--allow-out-of-scope`)
 - `scripts/tests/plugins/agent_dispatch_dashboard.bats` (amended 2026-11-18: add panel 9 to the exclusion set at :68-72; item 7 changes panel 9's description, a reader of the dashboard contract missed by the spec)
 
 ## Out of scope
