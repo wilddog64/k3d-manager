@@ -1,6 +1,8 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: travel bundle + test-all metrics both verified; travel landing, test-all queued. run_parallel repro loop under load running.
+
 - 2026-11-18: test-all metrics (P2) spec dispatched to Flash; child C abandoned (prerequisite captures missing, API key item absent); travel bundle exited, verification pending.
 
 - 2026-11-18: travel bundle: Luna stopped on spec/code conflict; N1 scoped, P2 bug filed (show-service-passwords untrapped temp files), Luna resumed.
