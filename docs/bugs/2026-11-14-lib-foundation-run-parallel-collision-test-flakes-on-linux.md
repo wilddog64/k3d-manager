@@ -2,7 +2,7 @@
 
 **Status:** LANDED — lib-foundation `7027b38` on `release/v0.5.7` (test-only: timing flake fixed; collision test now names the missing file — #157 root cause still unknown)
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-18 (PR #89 CI caught the original failure; next diagnostic or library fix)
+**Waiting on:** investigation — since 2026-11-18 (two workers both claimed key a_b on the runner; Fable investigating)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
@@ -76,3 +76,14 @@ GNU xargs 4.9.0) did not reproduce it (0/30 both ways).
 
 Open question: did the last worker run late (xargs returned before it), or never start? Next diagnostic: on failure,
 wait and list the out directory again, print `$RP_LOG` (which items the job saw) and the shell's signal masks.
+
+## CI evidence 2026-11-18, second run (diagnostic `884e3aa`, run 44298944446) — corrects the section above
+
+Both colliding items ran: the job log shows `<a_b>` and `<a b>`. The out directory still held one lock, `.a_b.lock`, and
+one set of `a_b.*` files (`a_b.item` = `a_b`; summary lists only `PASS a_b`); no `.a_b-2.lock`, also after a 2 s wait;
+no workers still running. Both workers therefore ended with key `a_b`: both `mkdir .a_b.lock` claims succeeded, or the
+lock vanished between them. The previous section's "the last item's worker never claimed" was wrong — two successful
+claims on one path also leave one directory.
+
+Runner facts: GNU findutils xargs **4.10.0** (local repro images had 4.9.0), nproc 4, SigIgn 0x1004 (SIGQUIT, SIGPIPE),
+SIGCHLD not ignored. No `mkdir` override in `scripts/lib`. Fable investigating (read-only).
