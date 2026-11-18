@@ -41,8 +41,10 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    Astra found (Fable rated it low, also covered :875); 1 new but not reproduced (test sort locale: C, C.UTF-8,
    en_US.UTF-8 same order on macOS and ubuntu:26.04); 3 pre-existing (unbounded claim loop: long key or missing --out
    spins forever, reproduced; no INT/TERM trap; old dir lock blocks after upgrade). Verdict: nothing blocks v0.5.7.
-   Scope check passed (3 spec files + CHANGE.md). PR #89 MERGED by operator 2026-11-18 -> main 15d5001. NEXT: tag v0.5.7
-   + GH release (post-merge), then k3d-manager subtree pull. Older findings captured as two P3s (grooming):
+   Scope check passed (3 spec files + CHANGE.md). PR #89 MERGED by operator 2026-11-18 -> main 15d5001. RELEASED: tag v0.5.7
+   (annotated, peels to 15d5001) + GH release Latest; release/v0.5.8 created at 15d5001; main unprotected (404). NEXT:
+   k3d-manager subtree pull of v0.5.7. Astra metrics spec docs/plans/v1.45.0-dispatch-metrics-astra-allowlist-and-price.md
+   written — waiting on intent approval. Older findings captured as two P3s (grooming):
    2026-11-18-lib-foundation-run-parallel-claim-loop-unbounded-and-key-edge-cases.md,
    2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md. Astra metrics P3 approved for dispatch
    ("yes for that"); gpt-6-astra $10/$1/$50 (third-party), gpt-6.2-astra unpublished -> allowlist only, unpriced.
