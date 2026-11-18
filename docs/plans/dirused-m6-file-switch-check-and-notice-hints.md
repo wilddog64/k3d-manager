@@ -145,3 +145,8 @@ Operator: "basically show each run until updated or give /noupdatecheck to stop 
 
 **Intent approved:** operator, 2026-11-18
 **Intent approval note:** Amendment 2 approved by operator answer "basically show each run until updated or give /noupdatecheck to stop it" (2026-11-18). Original: "go ahead" (approving Claude's proposal in chat: /file-followed-by-switch error, plus Clink-style stop-checking and release-notes lines)
+
+## Verification (Claude, 2026-11-18)
+
+- Blind Argon diff review of PR #29: NONE.
+- Red on 9d8735f: A1, U2, U18, U19, U20. U21 is a regression guard (passes on old code too, as expected).
