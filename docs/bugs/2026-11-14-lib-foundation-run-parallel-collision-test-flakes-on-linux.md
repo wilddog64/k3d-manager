@@ -2,7 +2,7 @@
 
 **Status:** LANDED — lib-foundation `7027b38` on `release/v0.5.7` (test-only: timing flake fixed; collision test now names the missing file — #157 root cause still unknown)
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-18 (Linux CI on the lib-foundation v0.5.7 release PR, then subtree pull into k3d-manager)
+**Waiting on:** operator decision — since 2026-11-18 (PR #89 CI caught the original failure; next diagnostic or library fix)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
@@ -61,3 +61,18 @@ assertion should accept `[0-9]+s`, as the SLOWEST and TOTAL lines already do.
 
 **Next step:** fix upstream in lib-foundation, both test-only. (1) Test 4 accepts `[0-9]+s` for the fail-item line.
 (2) The #157 loop assertion fails per key and dumps the out directory listing, so the next CI red says which case it was.
+
+## CI evidence 2026-11-18 (new assertion, lib-foundation PR #89, run 44237174229)
+
+The per-key assertion caught it on its first CI run: `missing: a_b-2.log`. The out directory held **five** claim locks
+(`.a_b.lock`, `.sleep_{a,b,c,d}.lock`) and five `.item` files; `a_b.item` = `a b`. The sixth item `a_b` (the last one)
+left no lock and no files, yet `xargs` exited 0 (the summary printed). Two workers would leave two locks in any order,
+so "two workers won one lock" is ruled out: the last item's worker never reached its `mkdir` claim before `xargs`
+returned.
+
+Frequency: test 157 failed in 4 of the last 9 CI runs (43429853156, 43429856059, 43598270591, 44237174229), always with
+`a_b-2` (the last item) missing; 0/850 locally. Local check: running bats with `SIGCHLD` set to `SIG_IGN` (ubuntu 24.04,
+GNU xargs 4.9.0) did not reproduce it (0/30 both ways).
+
+Open question: did the last worker run late (xargs returned before it), or never start? Next diagnostic: on failure,
+wait and list the out directory again, print `$RP_LOG` (which items the job saw) and the shell's signal masks.
