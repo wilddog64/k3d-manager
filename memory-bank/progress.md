@@ -1,6 +1,8 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: run_parallel: #157 unreproduced (850 runs); second flake found (whole-second timing in test 4); upstream test fixes await operator decision.
+
 - 2026-11-18: travel bundle LANDED (d14b5d9e) and test-all metrics LANDED (64a8de5c); live checks pending. Anthropic key copied to M4. P3 land PID-reuse bug filed, dispatching to Luna.
 
 - 2026-11-18: travel bundle + test-all metrics both verified; travel landing, test-all queued. run_parallel repro loop under load running.
