@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: dirused M4 review fixes landed 5c2a984, PR #26 updated; CI rerun.
 - 2026-11-18: dirused M4 review fixes dispatched to Luna (Argon on PR #26: 3 accepted, 1 rejected).
 - 2026-11-18: dirused M4 landed c918ff6, PR #26 open. P3 plan-dashboard bug captured.
 - 2026-11-18: run_parallel: #157 unreproduced (850 runs); second flake found (whole-second timing in test 4); upstream test fixes await operator decision.
