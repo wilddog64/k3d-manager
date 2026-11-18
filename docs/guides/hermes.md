@@ -205,6 +205,8 @@ flap does not trip it). Sensors are read-only except that the Slack config senso
    Kubernetes and ArgoCD cannot see because they poll only the probe groups. It is disabled by
    default and files debounced deltas into `docs/bugs/` through the same path as e2e and status
    triage.
+8. **`vault_seal`** — reads only Vault pod labels to report whether Vault is sealed. It has no
+   repair because unsealing belongs to the in-cluster watchdog, not Hermes.
 
 ### `data_layer` unknown — evidence → cause
 
@@ -272,6 +274,20 @@ multi-signal** degradation: at least two *distinct* degraded sensors within the 
 - **one** resolved note when the incident clears.
 
 Unknowns never count toward the two-signal threshold. Single-sensor flaps stay silent.
+
+### What the Slack cards say
+
+- **Root cause: Vault sealed** — when `vault_seal` is degraded, the incident text starts
+  `Root cause: Vault sealed (sealed: <pods>).`, names the other contributing sensors whose failures follow from it
+  (for example `ESO failures listed below follow from it.`), and says the unseal watchdog retries every 5 minutes, so
+  there is nothing to approve unless Vault is still sealed after 15 minutes. No LLM is called for this incident, and r7
+  (signing restore) is never proposed while Vault is sealed or its seal state is unknown. A seal alone opens no incident:
+  like any sensor, `vault_seal` needs a second degraded sensor (usually `eso`, which can take several minutes to degrade).
+- **Recommended** — every repair card, with or without buttons, carries
+  `Recommended: Approve — <when>. If you do nothing: <what>.` Read it before pressing anything.
+- **Withdrawn** — when an incident resolves while proposals are still pending, the resolved note reads
+  `Hermes incident resolved at HH:MMZ without a repair` (or `after repair <ids>`), lists each withdrawn proposal, and
+  says nothing needs approving; buttons on the old cards are refused.
 
 An LLM is called **only when an incident trips**, to phrase the summary — never for sensing. The
 default provider is **`gemini`** (a non-Claude agent); Claude is verify-only and **never authors** a

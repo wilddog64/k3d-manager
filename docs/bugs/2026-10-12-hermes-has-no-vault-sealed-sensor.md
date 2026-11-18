@@ -2,11 +2,12 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.44.2`
-**Status:** OPEN
+**Status:** LIVE-VERIFIED 2026-11-17 — landed fadf8438 on `k3d-manager-v1.44.2`; E5 live-verified 2026-11-17 (Claude, read-only, hub Hermes log): incident 15:25:15Z led with "Root cause: Vault sealed", approvals [] (no r7); resolved 15:46:15Z "Hermes correlated incident resolved." after ESO 20/20 + 9/9 synced (no pending proposals, so no Withdrawn list)
+**Live evidence:** 2026-11-17 · run hermes-log-3666 · env hub · scenario watchdog-paused-vault-seal · commit 44e06edd · proves E4,E5
+**Fix commit:** fadf8438
 **Priority:** P2 — raised 2026-11-17 (operator): without it Hermes misreads a seal as many problems and offered the wrong repair (`2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Hermes status observability is degraded by not surfacing sealed Vault state on the dashboard, with a workaround of inspecting the `vault-sealed` pod label directly or observing downstream ExternalSecrets status); Claude proposed P3. Higher stands until the operator decides.
 **Triage:** patch → v1.44.2 (P2), prerequisite of `2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md` (operator, 2026-11-17: "go ahead"). Earlier: passed over, 1st — grooming 2026-11-12.
-**Waiting on:** dispatch — since 2026-11-17 (ships before the r7 fix; needs an Acceptance block and intent approval)
 **Approval:** explicit 2026-10-12 "let's get those two to v1.46.0" (operator, to "should I file them, and for v1.43.2 or v1.44?")
 **Severity:** low
 
@@ -22,18 +23,35 @@ visible signal would have been ExternalSecrets going stale, which points away fr
 carries the service-registration labels `vault-sealed`, `vault-initialized` and `vault-active`
 (read on 2026-10-12: `vault-sealed=false`, `vault-initialized=true`, `vault-active=true`).
 
+## External behaviour proof
+
+The labels come from Vault's Kubernetes service registration, not from this repo:
+- Upstream `hashicorp/vault-helm` at tag `v0.30.1` (the pin, `scripts/plugins/vault.sh:9`), read
+  2026-11-17 via `gh api`: `values.yaml:930` puts `service_registration "kubernetes" {}` in the
+  `server.ha.raft.config` default; `templates/server-statefulset.yaml:39-41` sets pod labels
+  `app.kubernetes.io/name: vault` and `component: server`.
+- The hub deploys `server.ha.enabled: true` with `raft.enabled: true`
+  (`scripts/plugins/vault.sh:938-943`) in namespace `secrets` (`VAULT_NS_DEFAULT`, line 7), so that
+  default applies.
+- Live read on the hub, 2026-10-12: `vault-sealed=false`, `vault-initialized=true`,
+  `vault-active=true` on `vault-0`. The M4 has no `k3d-k3d-cluster` context (checked 2026-11-17);
+  live evidence E5 in `docs/plans/hermes-vault-sealed.md` re-proves it on the hub.
+
 ## Fix
 
 1. `scripts/lib/hermes/sensors.py`: new `vault_seal(run, state, context=None, threshold=2)`, shaped
    like `hostnet_drift`.
    - Context: `context or os.environ.get("K3DM_HERMES_JOB_CONTEXT", "k3d-k3d-cluster")`.
-   - Read: `kubectl --context <ctx> -n secrets get pods -l app.kubernetes.io/name=vault,component=server -o json`.
+   - Read, with exactly this argv: `["kubectl", "--context", <ctx>, "-n", "secrets", "get", "pods", "-l",
+     "app.kubernetes.io/name=vault,component=server", "-o", "json", "--request-timeout=10s"]`.
      Use each pod's `metadata.labels` only. Never exec into a pod, never call the Vault API and never
      read a Secret.
    - No pods, or any pod missing the `vault-sealed` label → `unknown`,
      `vault seal state unavailable`.
-   - Any pod with `vault-sealed=true`, debounced with `_debounced("vault_seal", …)` → `degraded`,
-     evidence `sealed: <pod names>` (at most 3).
+   - Any pod with `vault-sealed=true`, debounced exactly like `hostnet_drift`
+     (`_debounced("vault_seal", True, max(0, threshold - 1), state)`; `_debounced` returns
+     `count > threshold`, so with the default `threshold=2` the second sealed cycle is the first
+     `degraded` one) → `degraded`, evidence `sealed: <pod names>` (at most 3).
    - Otherwise `healthy`, evidence `unsealed: <n> pod(s)`.
    - `data`: `{"pods": [{"name", "sealed", "initialized", "active"}]}` with the label values as
      booleans (`None` when a label is absent).
@@ -44,8 +62,8 @@ carries the service-registration labels `vault-sealed`, `vault-initialized` and 
    hold an unseal shard. Unsealing stays with the in-cluster watchdog
    (`docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md`).
 4. `docs/guides/hermes.md`: add `vault_seal` to the numbered sensor list, stating it is read-only,
-   reads pod labels, and has no repair, and why. Fix the stale "The five read-only sensors" row in
-   the component table to say the sensor list below.
+   reads pod labels, and has no repair, and why. (The component table row was already corrected; do
+   not touch it.)
 
 ## Files
 
@@ -54,29 +72,48 @@ carries the service-registration labels `vault-sealed`, `vault-initialized` and 
 | `scripts/lib/hermes/sensors.py` | `vault_seal` |
 | `bin/k3dm-hermes` | import + sensor list |
 | `scripts/tests/hermes/test_hermes.py` | tests below |
-| `docs/guides/hermes.md` | sensor entry + table row |
-| `CHANGELOG.md` | `[Unreleased]` → `### Added` |
+| `docs/guides/hermes.md` | sensor entry |
+| `scripts/tests/hermes/test_app_health.py` | stub `vault_seal` in the `_run_cycle` test (line 164) |
+
+`CHANGELOG.md` is written by Claude at land (shared with the webhook dispatch).
+
+Existing `_run_cycle` tests stub every sensor by name. Add `"vault_seal"` to the stub loops at
+`scripts/tests/hermes/test_hermes.py:287, 311, 333, 385` and `scripts/tests/hermes/test_app_health.py:164`;
+without it `test_unknown_status_poll_never_pages_or_files_and_preserves_open_groups` (`test_hermes.py:561`)
+calls a real `kubectl`, gets `unknown` seven times, and `pager.health_events` pages "vault_seal check
+unknown 30+ min".
 
 ## Tests
 
 `scripts/tests/hermes/test_hermes.py`, with a stub `run` returning canned pod JSON. No test may call
-a real `kubectl`.
+a real `kubectl`. Every pod fixture carries all three labels (`vault-sealed`, `vault-initialized`,
+`vault-active`) unless the test says otherwise. Use these test names exactly (the Acceptance `-k`
+filters select on them):
 
-1. One pod, `vault-sealed=false` → `healthy`, evidence `unsealed: 1 pod(s)`.
-2. One pod, `vault-sealed=true`, two cycles with the same `state` → first `healthy`, second
-   `degraded` with `sealed: vault-0`.
-3. Empty item list → `unknown`.
-4. Pod with no `vault-sealed` label → `unknown`.
-5. `run` returns code 1 → `unknown`.
-6. The command the stub receives contains `get` and `pods` and does not contain `exec`, `secret` or
-   `unseal`.
-7. `data["pods"][0]["sealed"]` is a bool.
-8. `repairs.py` has no rule that names `vault_seal` (assert by reading the repair table).
+1. `test_vault_seal_unsealed_is_healthy`: one pod, `vault-sealed=false`, `vault-initialized=true`,
+   `vault-active=true` → `healthy`, evidence `unsealed: 1 pod(s)`.
+2. `test_vault_seal_sealed_degrades_on_second_cycle`: one pod `vault-0`, `vault-sealed=true`,
+   `vault-initialized=true`, two cycles with the same `state` → first `healthy`, second `degraded` with
+   `sealed: vault-0`.
+3. `test_vault_seal_no_pods_is_unknown`: empty item list → `unknown`.
+4. `test_vault_seal_missing_label_is_unknown`: pod with `vault-initialized` and `vault-active` but no
+   `vault-sealed` → `unknown`.
+5. `test_vault_seal_kubectl_error_is_unknown`: `run` returns code 1 → `unknown`.
+6. `test_vault_seal_argv_is_read_only`: the argv the stub receives equals the exact list in Fix 1
+   (compare the whole list; no substring checks, since `-n secrets` contains "secret").
+7. `test_vault_seal_data_is_boolean`: test 1's fixture → `data["pods"][0] == {"name": "vault-0",
+   "sealed": False, "initialized": True, "active": True}`.
+8. `test_vault_seal_no_repair_can_unseal`: for every `REPAIRS` entry,
+   `inspect.getsource(entry["build_command"])` contains neither `unseal` nor `vault operator`, and the
+   only entry whose `reads` includes `vault_seal` is r7, where it can only block the repair.
+9. `test_vault_seal_run_cycle_includes_record`: with every sensor stubbed, `k3dm_hermes._run_cycle`
+   returns a record whose `sensor` is `vault_seal`.
 
 Mutations (each must turn a test red): treat a missing label as healthy (test 4); drop the debounce
-(test 2); read `vault-initialized` instead of `vault-sealed` (test 2).
+(test 2); read `vault-initialized` instead of `vault-sealed` (test 1 and test 7); drop the sensor from
+`_run_cycle` (test 9).
 
-Gates: `pytest scripts/tests/hermes/test_hermes.py`, `make test-pytest`.
+Gates: `pytest scripts/tests/hermes`, `make test-pytest`.
 
 ## Proof it works
 

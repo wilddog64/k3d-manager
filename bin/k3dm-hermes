@@ -28,7 +28,7 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             HERMES_USER_AGENT,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
-                            app_health, data_layer, hostnet_drift, node_pressure, reachability,
+                            app_health, data_layer, hostnet_drift, vault_seal, node_pressure, reachability,
                             stale_acg_registration, superseded_jobs,
                             status_checks, token_expiry_advisory, values_branch, vectordb,
                             slack_app_config, slack_relay_reachable)
@@ -216,7 +216,8 @@ def _alert_delivery_run(command, _additions):
     return result.returncode, result.stdout
 
 
-def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path=None):
+def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path=None,
+               withdraw_on_resolve=False):
     """Sample the Phase 1 sensors and propose, but never execute, repairs."""
     webhook = _keychain_secret(WEBHOOK_SERVICE)
     argo_token = _keychain_secret(ARGOCD_SERVICE)
@@ -240,6 +241,7 @@ def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path
         node_pressure(_probe_run, state),
         data_layer(webhook_fetch, state, token=webhook),
         hostnet_drift(_probe_run, state),
+        vault_seal(_probe_run, state),
         superseded_jobs(_probe_run, state),
         kine(_datastore_run, state),
         vectordb(_vectordb_run, state),
@@ -271,9 +273,22 @@ def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path
     if event and event["kind"] in ("incident", "escalation"):
         state["incident_nonce"] = secrets.token_hex(8)
     if event and event["kind"] == "resolved":
+        attempted = list(state.get("repairs_attempted_this_incident", []))
         state["repairs_attempted_this_incident"] = []
         state.pop("incident_nonce", None)
-    proposals = repairs.propose(records, state)
+    withdrawn = []
+    if event and event["kind"] == "resolved" and withdraw_on_resolve:
+        withdrawn = [item for item in state.get("pending_repairs", {}).values()
+                     if not repairs._expired(item)]
+        state["pending_repairs"] = {}
+        proposals = []
+        if withdrawn:
+            names = ", ".join(f"{item['action_id']} ({item['name']})" for item in withdrawn)
+            tail = "after repair " + ", ".join(attempted) if attempted else "without a repair"
+            event["text"] = (f"Hermes incident resolved at {timestamp()[11:16]}Z {tail}. "
+                             f"Withdrawn: {names}. Nothing to approve; old buttons are refused.")
+    else:
+        proposals = repairs.propose(records, state)
     automatic = repairs.auto_remediate_kine(
         records, state, _repair_runner,
         enabled=os.environ.get("K3DM_HERMES_AUTO_KINE_GUARD") == "1")
@@ -281,7 +296,8 @@ def _run_cycle(state, status_runner=None, may_rotate=False, now=None, state_path
         event = event or {"kind": "incident", "sensors": ["kine"], "text": "Hermes Kine guard"}
         event["text"] += "\nAutomatic Kine guard: " + automatic["outcome"]
     if event and event["kind"] in ("incident", "escalation") and proposals:
-        lines = [f"Approve with: bin/k3dm-hermes approve {item['action_id']} ({item['command']})"
+        lines = [f"Approve with: bin/k3dm-hermes approve {item['action_id']} ({item['command']})\n"
+                 f"Recommended: Approve — {item['approve_when']}. If you do nothing: {item['if_ignored']}."
                  for item in proposals]
         event["text"] += "\nPending allowlisted repairs:\n" + "\n".join(lines)
         event["proposals"] = proposals
@@ -972,7 +988,7 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     due = _status_due(state, now)
     previous_rotation = state.get("slack_config", {}).get("rotated_at")
     records, event = _run_cycle(state, status_runner if due else None, may_rotate=True,
-                                 now=now, state_path=state_path)
+                                 now=now, state_path=state_path, withdraw_on_resolve=True)
     if state.get("slack_config", {}).get("rotated_at") != previous_rotation:
         _save_state(state_path, state)
     if due:

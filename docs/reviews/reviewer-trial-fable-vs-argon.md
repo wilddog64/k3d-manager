@@ -126,3 +126,66 @@ upstream proof. Argon: `gemini-4-argon-medium` via agy, read-only. Fable: backgr
 **Pair 3 read:** like pair 1, same verdict and same main finding; each added different contract readers. Argon's one
 wrong claim was a testable shell-behaviour claim, caught by running it. Cost: Fable 85K tokens, 9 tool calls, about
 2 minutes; Argon one agy call (about 9 minutes wall clock).
+
+## Pair 4 — 2026-11-17, spec review: Hermes vault-sealed sensor + r7 gating (combined plan)
+
+Medium-risk spec review (Hermes repair gating, Slack card text, webhook diagnosis). Both got the plan, the two bug docs
+and the repo, blind to each other. Argon: `gemini-4-argon-medium` via agy, read-only. Fable: background agent,
+read-only.
+
+**Verdicts:** both CHANGES.
+
+- **Overlap, confirmed by both:** the existing r7 test (`test_repairs.py:330`) breaks once r7 needs `vault_seal`, and
+  the file was not in Files; the two r7 mutations could not turn test 1 red (both guards false at once) and nothing
+  caught `N <= 20`; existing `_run_cycle` tests (`test_hermes.py:287,311,333,385`, `test_app_health.py:164`) would call
+  a real `kubectl`; resolve clears `pending_repairs` and then `propose()` re-adds it, and the approve re-sample would
+  turn "precondition no longer holds" into "unknown action-id"; `approve_when` source undefined against
+  `test_approvals.py` dicts with no `key`; "no `secret` in argv" breaks on `-n secrets` and `clustersecretstore`;
+  `-k` filters need fixed test names.
+- **Fable unique, confirmed:** gate r7 on raw `data.pods[].sealed` (the debounced status is still healthy on the first
+  sealed cycle); the text fallback card also needs the Recommended line; N3 was false as written (Hermes already reads
+  a Secret at `bin/k3dm-hermes:180`); count-regex details; a lone seal posts nothing (two contributors needed);
+  production passes no `llm`; `pager.py` is a contract reader.
+- **Argon unique, confirmed:** `test_approvals.py:199` runs `git diff --quiet -- repairs.py` and fails in any
+  uncommitted worktree; the 7-poll unknown test pages "vault_seal check unknown 30+ min"; the `vault-initialized`
+  mutation survives test 2 on a realistic fixture; the guide's "five read-only sensors" row is already gone;
+  `_enrich` takes no `records`; Contract readers mislabelled `:1096` as deny; `analyze_env` returns non-JSON for
+  every call, so the new reads must fail open.
+- **Refuted:** none.
+
+**Pair 4 read:** the same verdict and the same main findings, with about half of each list unique and all of it real.
+Argon was stronger on tests that would break in the worker's tree; Fable was stronger on behaviour (debounce gap, card
+fallback, a false must_not). Cost: Fable about 130K tokens, 18 tool calls, about 4 minutes; Argon one agy call.
+After review the plan was split for the operator's Flash/Luna instruction: Hermes (Luna) and webhook Fix 5 (Flash,
+`docs/plans/webhook-analyze-vault-context.md`).
+
+## Post-land diff reviews — 2026-11-17, Fable only (no Argon pair)
+
+The two vault-sealed landings went in without a diff review. With Fable quota spare (operator, 2026-11-17), each diff got a
+blind Fable review after land; Claude re-read every finding against the code.
+
+- webhook bea02b84: about 67K tokens. 2 medium (stderr merged into the JSON capture fails the sealed check open; tests record
+  argv but never assert it) and 4 minor, all confirmed; 0 refuted.
+- Hermes fadf8438: about 97K tokens. 3 correctness (odd label value reads unsealed; r7 precondition vacuous on empty pods;
+  resolved-text timestamp and fixed "without a repair") and 1 doc gap, confirmed; lower test-hygiene items not adjudicated.
+- Filed as `docs/bugs/2026-11-17-vault-sealed-landed-review-findings.md`.
+
+**Read:** a diff review found a real fail-open (W1) that two blind spec reviews could not see, since it lives in an existing
+helper the spec told the worker to reuse. Evidence for keeping a diff review on medium-risk landings.
+
+## Pair 5 — 2026-11-18, release diff review: PR #163 (v1.44.2), Argon then Fable, both blind
+
+Same diff (`main...k3d-manager-v1.44.2`, code only). Argon: one agy run, 9 findings. Fable: three parallel area reviews
+(hub_data, dispatch, webhook/Hermes), about 321K tokens total (91K + 120K + 111K), most findings checked by running probes.
+
+- **Argon:** 9 findings. 8 confirmed (1 medium: shards under xtrace, fixed in PR; 7 low), 1 duplicate of an open bug, 0 refuted.
+- **Fable:** about 25 findings. All checked items confirmed, 0 refuted, 1 not a finding (bash 3.2 on a bash-4 script), 3 by design.
+  Unique medium: recovery exits silently on a missing `vault-unseal` (fixed in PR; the tests were vacuous because the stub
+  returned where `_kubectl` exits), Hermes approve re-propose voids digest/expiry, r7 two-cluster parsing, klog lines.
+  Unique low/latent: project dir above the release, non-semver tag, root token in `jq` argv (pre-existing).
+- **Overlap:** dispatch stall scan, slug collision, `scheme=branch`, status `unknown`, resample withdraw, unlabelled pod (6).
+  Fable confirmed the xtrace fix as clean.
+
+**Pair 5 read:** Argon found the one secret-exposure bug; Fable found the one functional break in the DR path that Argon and
+CI both missed, plus more behaviour defects, at about 6% of the Fable weekly allowance. Fable's edge again came from running
+probes (real `_kubectl`, scratch dispatch roots) instead of reading. Supports Argon-first plus Fable on high-risk release diffs.

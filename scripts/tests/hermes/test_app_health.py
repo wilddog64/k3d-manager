@@ -161,7 +161,7 @@ def test_run_cycle_webhook_fetch_pins_hostinger_provider(monkeypatch):
     monkeypatch.setattr(k3dm_hermes, "_http_json",
                         lambda url, _headers: urls.append(url) or {"services": []})
     for name in ("eso", "argocd", "values_branch", "reachability", "node_pressure",
-                 "hostnet_drift", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
+                 "hostnet_drift", "vault_seal", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
         monkeypatch.setattr(k3dm_hermes, name, lambda *_args, **_kwargs: {
             "sensor": "stub", "status": "healthy", "evidence": "stub", "data": {}
         })

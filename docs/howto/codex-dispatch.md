@@ -245,6 +245,24 @@ test command, and fast-forwards the target. It prints the push command; it never
 The Agent Dispatch ledger and Per spec table identify the work repository by its origin repository
 name.
 
+### Registered projects (`--project`)
+
+A repo that has its own releases is listed in `scripts/etc/projects.list`, one line per project:
+`name|local path|github repo|release scheme|default branch`. The scheme is `branch` (k3d-manager: the
+version comes from the release branch) or `tag` (for example dirused: the latest `v*` tag plus one patch).
+
+```bash
+bin/k3dm-codex-dispatch start --spec docs/plans/<file>.md --project dirused --branch <target-branch>
+bin/k3dm-codex-dispatch open --project dirused --count
+```
+
+`--project` needs `--branch`; the repository path comes from the registry, and a `--repo` that names a
+different checkout is refused. `--version vX.Y.Z` overrides the computed version and is allowed only for a
+non-k3d-manager project. Ledger events for these tasks carry `project`; verify, land, handoff, resume and
+abandon find the task's version from the ledger. `status` lists project tasks, and `open` tags each row with
+its project, filters with `--project` and prints only the number with `--count`. `--project k3d-manager`,
+or no `--project`, behaves as before.
+
 Dispatch start events snapshot spec complexity from the spec as it exists at dispatch: entries in
 `## Files` and the `must`, `must_not`, and `evidence` item counts in `## Acceptance`, including live
 evidence. Land events record the landed commit and the rebased task diff's changed-file count and

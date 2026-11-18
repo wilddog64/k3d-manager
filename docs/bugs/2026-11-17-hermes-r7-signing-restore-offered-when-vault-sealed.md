@@ -1,11 +1,11 @@
 # Bug: Hermes offers the cosign signing-restore repair (r7) when every ExternalSecret fails because Vault is sealed
 
-**Status:** OPEN
+**Status:** LANDED on `k3d-manager-v1.44.2` 2026-11-17 (fadf8438 Fix 1–4, bea02b84 Fix 5); verified offline by Claude
 **Priority:** P2 — raised from P3 (operator, 2026-11-17: "go ahead"). The operator approves repairs from Slack while away; a card that recommends nothing, and offers the wrong repair during an upstream outage, cannot be judged from a phone.
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-17 (after the vault-sealed sensor bug lands)
+**Waiting on:** live check — since 2026-11-17 (Fix 1–4 met live: E5 live-verified 2026-11-17 (Claude, read-only, hub Hermes log): incident 15:25:15Z led with "Root cause: Vault sealed", approvals [] (no r7); resolved 15:46:15Z "Hermes correlated incident resolved." after ESO 20/20 + 9/9 synced (no pending proposals, so no Withdrawn list). Fix 5 webhook E2 still unexercised: no ArgoCDAppDegraded fired during either seal; review fixes in flight, docs/plans/webhook-vault-sealed-review-fixes.md)
 **Prior art:** `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, related root cause (no sealed-Vault signal), different symptom (wrong repair offered). That bug is the prerequisite for this one and ships first in the same release.
 **Filed:** 2026-11-17
 **Branch:** `k3d-manager-v1.44.2`
@@ -31,65 +31,111 @@ What already works and must stay: `repairs.approve()` (`repairs.py:363`) re-chec
 
 ## Fix
 
-Deterministic rules decide; an LLM never decides whether to approve.
+Deterministic rules decide; an LLM never decides whether to approve. Fix 1–4 are the Hermes dispatch
+(`docs/plans/hermes-vault-sealed.md`); Fix 5 is a separate dispatch on the webhook
+(`docs/plans/webhook-analyze-vault-context.md`).
 
 1. **r7 precondition** (`scripts/lib/hermes/repairs.py`, `_r7_precondition`). Keep the existing conditions and add:
-   - the `vault_seal` record is `healthy` (degraded or unknown or missing → not offered);
-   - the `N/M not synced` count parsed from the `eso` evidence has `N <= 2`; evidence that does not parse → not offered.
+   - the `vault_seal` record is present, its status is `healthy`, and every entry in its `data["pods"]` has
+     `sealed is False`. The raw label check closes the first sealed cycle, when the debounced status is
+     still `healthy`. Degraded, unknown or missing → not offered.
+   - the eso evidence starts with `N/M not synced` (`re.match(r"(\d+)/(\d+) not synced", evidence)`, the
+     leading count only; evidence is truncated at 200 characters and lists names after the colon) and
+     `N <= 2`. Evidence that does not match → not offered.
    Because `approve()` re-runs the precondition, the same rule refuses an approval if Vault seals between proposal and tap.
-2. **Root cause first** (`scripts/lib/hermes/correlator.py`, `_template` and `_enrich`). When the `vault_seal` record is degraded, the incident text starts with
+   Add `vault_seal` to r7's `reads` tuple (`repairs.py:291`) and to r7's entry in `_evidence` (`repairs.py:320`), so the proposal evidence shows Vault's state and the approval digest (`_records_digest`) changes if Vault seals after the proposal.
+2. **Root cause first** (`scripts/lib/hermes/correlator.py`, `_template` and `_enrich`). When the current cycle's `vault_seal` record is `degraded`, the incident text starts with
    `Root cause: Vault sealed (<evidence>). ESO and ArgoCD failures listed below follow from it. The unseal watchdog retries every 5 minutes; nothing to approve unless Vault is still sealed after 15 minutes.`
    followed by the existing per-sensor details, and `_enrich` does not call the LLM for that event.
-3. **Recommendation on every card** (`scripts/lib/hermes/repairs.py` registry, `scripts/lib/hermes/approvals.py` `interactive_blocks`). Each `REPAIRS` entry gains two fixed strings: `approve_when` (the evidence that makes Approve right, e.g. r7: "only the cosign key is missing and Vault is unsealed") and `if_ignored` (e.g. r7: "image signature checks keep failing; it will not clear on its own"). Every proposal is offered only when its precondition holds, so the card line is
-   `Recommended: Approve — <approve_when>. If you do nothing: <if_ignored>.`
-   Fill both strings for r1–r10 from each precondition; a test asserts none is empty.
-4. **Resolution names what it withdrew** (`bin/k3dm-hermes` resolved branch near line 273). When the incident resolves with entries in `pending_repairs`, the resolved message becomes
-   `Hermes incident resolved at <HH:MMZ> without a repair. Withdrawn: <action_id> (<name>), … Nothing to approve; old buttons are refused.`
-   and `pending_repairs` is cleared. With nothing pending the message stays as today.
-5. **Alert diagnosis sees Vault and ESO** (`bin/k3dm-webhook`, `_run_analyze`). Before the LLM call, read the Vault pod labels (`kubectl -n secrets get pods -l app.kubernetes.io/name=vault,component=server -o json`, labels only, the same read as the `vault_seal` sensor; never exec, never the Vault API, never a Secret) and the ClusterSecretStore Ready condition. If any Vault pod has `vault-sealed=true`, skip the LLM and post
-   `Likely cause: Vault is sealed; this alert follows from it. Check Vault first, not <app>.`
-   Otherwise append both reads to the diagnostics the LLM receives.
+   Both must use the same predicate on the current `records` (one private helper), not `event["sensors"]`, which spans the correlation window. `_enrich(self, event, state, llm, today)` does not take `records` today: pass the boolean from `process()`.
+   Known limit, no change: an incident needs two degraded contributors, so a lone seal posts nothing until ESO or ArgoCD also degrades. Production `_run_cycle` passes no `llm` to `process()`, so the LLM rule is defensive; test it with a stub.
+3. **Recommendation on every card** (`scripts/lib/hermes/repairs.py` registry, `propose()`, `scripts/lib/hermes/approvals.py` `interactive_blocks`, `bin/k3dm-hermes` text fallback). Each `REPAIRS` entry gains two fixed strings: `approve_when` (the evidence that makes Approve right, e.g. r7: "only the cosign key is missing and Vault is unsealed") and `if_ignored` (e.g. r7: "image signature checks keep failing; it will not clear on its own"). Fill both for r1–r10 from each precondition.
+   - `propose()` copies both strings into each proposal dict.
+   - `interactive_blocks` renders `Recommended: Approve — <approve_when>. If you do nothing: <if_ignored>.` for a proposal that has both keys, and renders the block as today when either is absent (`test_approvals.py:75` and `:101` pass dicts without them and must stay green unchanged).
+   - The text card built in `_run_cycle` (`bin/k3dm-hermes:282-284`, "Approve with: …") adds the same Recommended line under each proposal, so a card posted without buttons carries it too.
+4. **Resolution names what it withdrew** (`bin/k3dm-hermes`, `_run_cycle` resolved branch, lines 273-276).
+   - `_run_cycle` gains keyword `withdraw_on_resolve=False`; `_poll` (`bin/k3dm-hermes:974`) passes `True`. The approval re-samples in `_drain_approvals` (`:317`) and the CLI `approve` (`:1097`) keep the default, so `approve()` still sees the proposal and refuses with its real reason.
+   - With `withdraw_on_resolve=True` and a `resolved` event: collect the entries in `pending_repairs` that are not expired (`repairs._expired`), clear `pending_repairs`, skip `repairs.propose()` for that cycle, and, when anything was collected, make the message
+     `Hermes incident resolved at <HH:MMZ> without a repair. Withdrawn: <action_id> (<name>), … Nothing to approve; old buttons are refused.`
+     When nothing was collected the message stays as today.
+   - Known limit, no change: if the resolve happens inside an approval re-sample, the message is not posted (as today); the nonce is already dropped, so old buttons are refused.
+5. **Alert diagnosis sees Vault and ESO** (`bin/k3dm-webhook`, `_run_analyze`). Specified in `docs/plans/webhook-analyze-vault-context.md`.
 
 Out of scope: a Claude API provider for these messages is a feature, so it goes to `docs/ideas.md` (row 2026-11-17), not this patch. Note there that `correlator.py:55` skips enrichment when `provider == "claude"` today.
 
 ## Files
 
+Hermes dispatch:
+
 | File | Change |
 |---|---|
-| `scripts/lib/hermes/repairs.py` | r7 precondition; `approve_when` / `if_ignored` on r1–r10 |
+| `scripts/lib/hermes/repairs.py` | r7 precondition, `reads`, `_evidence`; `approve_when` / `if_ignored` on r1–r10; copied by `propose()` |
 | `scripts/lib/hermes/approvals.py` | Recommended line in `interactive_blocks` |
 | `scripts/lib/hermes/correlator.py` | root-cause line; no LLM while Vault sealed |
-| `bin/k3dm-hermes` | resolved message lists withdrawn proposals; clears `pending_repairs` |
-| `bin/k3dm-webhook` | `_run_analyze` Vault/ESO context and sealed short-circuit |
-| `scripts/tests/hermes/test_hermes.py` | tests 1–7 |
-| `scripts/tests/bin/test_webhook_analyze_routing.py` | tests 8–9 |
+| `bin/k3dm-hermes` | Recommended line on the text card; `withdraw_on_resolve` |
+| `scripts/tests/hermes/test_hermes.py` | root-cause and resolved tests |
+| `scripts/tests/hermes/test_repairs.py` | r7 tests; existing r7 test gains a healthy `vault_seal` record |
+| `scripts/tests/hermes/test_approvals.py` | recommended tests; obsolete `git diff` assertion removed |
 | `docs/guides/hermes.md` | card format: root cause, Recommended line, resolved message |
-| `CHANGELOG.md` | `[Unreleased]` → `### Fixed` |
+
+Two existing tests break without these edits:
+- `test_repairs.py:330` `test_r7_requires_cosign_evidence_for_two_cycles` has no `vault_seal` record: add `record("vault_seal", "healthy", "unsealed: 1 pod(s)")` with `data={"pods": [{"name": "vault-0", "sealed": False, "initialized": True, "active": True}]}` (extend the `record` helper if it takes no `data`).
+- `test_approvals.py:198-199` runs `git diff --quiet -- scripts/lib/hermes/repairs.py`, a v1.33.0 scope guard that fails whenever `repairs.py` is edited and not committed. Delete those two lines and put `# agent-audit: allow assert-removed v1.33.0 scope guard against editing repairs.py; this fix edits repairs.py by design` above the test.
+
+`CHANGELOG.md` is written by Claude at land.
 
 ## Contract readers
 
-`REPAIRS` gains two keys; readers by grep (2026-11-17): `scripts/lib/hermes/repairs.py:333,370,417`, `bin/k3dm-hermes:1101` — all read existing keys by name and ignore extra ones. `pending_repairs` is cleared on resolve; readers: `repairs.py:330,365,368,423`, `bin/k3dm-hermes:312` (drain: an empty map already yields "dropped: stale or unknown approval"), `:1071` (prints the map), `:1096` (deny). Writers: `repairs.py:330` (propose) and the new resolve branch. The Slack button value `<action_id>|<nonce>` is unchanged, so the relay's interactive handler is not a reader of anything new.
+`REPAIRS` gains two keys; readers by grep (2026-11-17): `scripts/lib/hermes/repairs.py:333,370,417`, `bin/k3dm-hermes:1101` — all read existing keys by name and ignore extra ones. Proposal dicts gain the same two keys; readers: `approvals.py` `interactive_blocks` (uses them), `bin/k3dm-hermes:282-284` (uses them), `:1071` (prints the map). `pending_repairs` is cleared on resolve; readers: `repairs.py:330,365,368,423`, `bin/k3dm-hermes:312` (drain: an empty map already yields "dropped: stale or unknown approval"), `:1071` (prints the map), `:1096` (CLI approve). Writers: `repairs.py:330` (propose) and the new resolve branch. The new `vault_seal` record is read by `scripts/lib/hermes/pager.py:79-82` (`health_events`): 30+ minutes of `unknown` pages "vault_seal check unknown", like every other sensor; intended. The Slack button value `<action_id>|<nonce>` is unchanged, so the relay's interactive handler is not a reader of anything new.
 
 ## Tests
 
-`scripts/tests/hermes/test_hermes.py` with canned records; no test calls real `kubectl` or Slack.
+Canned records only; no test calls real `kubectl` or Slack. Use these names exactly (the Acceptance `-k` filters select on them). A `vault_seal` "healthy" record below always carries `data` with one pod, `sealed: False`; "degraded" carries `sealed: True`.
 
-1. Records from 2026-11-17 01:09Z (eso degraded, `19/20 not synced: cosign-public-key, …`, `vault_seal` degraded), two cycles → `propose()` returns no r7.
-2. Same eso evidence but `1/20 not synced: cosign-public-key`, `vault_seal` healthy, two cycles → r7 proposed (positive control for test 1).
-3. Test 2's records, then `approve()` with `vault_seal` degraded → `refused: precondition no longer holds`.
-4. `vault_seal` missing from records → no r7.
-5. Incident text with `vault_seal` degraded starts with `Root cause: Vault sealed`, and a stub LLM records zero calls; with `vault_seal` healthy and another incident, the stub is called once (positive control).
-6. Every `REPAIRS` entry has non-empty `approve_when` and `if_ignored`; `interactive_blocks` output contains `Recommended: Approve` for each proposal.
-7. Resolve with one pending proposal → message contains its action id and `Nothing to approve`; `pending_repairs` is empty afterwards. Resolve with none → message equals today's text.
+`scripts/tests/hermes/test_repairs.py` (each `propose()` case runs two cycles with eso degraded):
 
-`scripts/tests/bin/test_webhook_analyze_routing.py`, with the existing `_posix_spawn_capture` stub:
+1. `test_r7_not_offered_for_seal_capture`: eso `19/20 not synced: cosign-public-key, ghcr-pull-secret, ghcr-pull-secret`, `vault_seal` degraded (the 2026-11-17 01:09Z records) → no r7.
+2. `test_r7_not_offered_when_many_fail_vault_healthy`: same eso evidence, `vault_seal` healthy → no r7.
+3. `test_r7_not_offered_when_vault_degraded_one_failing`: eso `1/20 not synced: cosign-public-key`, `vault_seal` degraded → no r7.
+4. `test_r7_not_offered_when_vault_seal_missing`: eso `1/20 not synced: cosign-public-key`, no `vault_seal` record → no r7.
+5. `test_r7_not_offered_on_unparseable_evidence`: eso `cosign-public-key not synced`, `vault_seal` healthy → no r7.
+6. `test_r7_not_offered_on_first_sealed_cycle`: eso `1/20 not synced: cosign-public-key`, `vault_seal` status `healthy` but `data` pod `sealed: True` → no r7.
+7. `test_r7_offered_when_only_cosign_fails`: eso `1/20 not synced: cosign-public-key`, `vault_seal` healthy → r7 proposed, its evidence mentions `vault_seal` (positive control for 1–6).
+8. `test_r7_approve_refused_when_vault_seals`: test 7's proposal, then `approve()` with `vault_seal` degraded → `refused: precondition no longer holds` (stub the git revision as the existing approve tests do).
 
-8. Vault pod JSON with `vault-sealed=true` → posted message contains `Vault is sealed` and `_call_gemini` is never called; the stub saw no `exec` and no `secret` in any argv.
-9. `vault-sealed=false` → `_call_gemini` is called once and its prompt contains the Vault and ClusterSecretStore reads (positive control).
+17. `test_r7_digest_covers_vault_seal`: changing only the `vault_seal` record changes `repairs._records_digest(records, repairs.REPAIRS["r7"]["reads"])`.
 
-Mutations (each must turn a test red): drop the `vault_seal` check from r7 (test 1); raise the count limit to `N <= 20` (test 1); let `_enrich` run while sealed (test 5); keep `pending_repairs` on resolve (test 7); call Gemini when sealed (test 8).
+`scripts/tests/hermes/test_hermes.py`:
 
-Gates: `pytest scripts/tests/hermes/test_hermes.py scripts/tests/bin/test_webhook_analyze_routing.py`, `make test-pytest`.
+9. `test_root_cause_vault_sealed_leads_and_skips_llm`: `Correlator.process` with `vault_seal` degraded plus eso and argocd degraded → text starts with `Root cause: Vault sealed`, and a stub `llm` records zero calls.
+10. `test_root_cause_absent_when_vault_healthy`: `vault_seal` healthy, eso and argocd degraded → text does not contain `Root cause`, and the stub `llm` is called once (positive control).
+11. `test_resolved_lists_withdrawn_and_clears`: `_run_cycle(..., withdraw_on_resolve=True)` with a stubbed correlator returning `resolved` and one non-expired pending proposal → message contains its action id and `Nothing to approve`, `pending_repairs == {}`, and `repairs.propose` was not called.
+12. `test_resolved_without_pending_keeps_text`: same with nothing pending → message equals today's text.
+13. `test_resolved_keeps_pending_on_approval_resample`: same as 11 with the default `withdraw_on_resolve` → `pending_repairs` still holds the proposal.
+14. `test_recommended_line_on_text_card`: an incident with one proposal → the event text contains `Recommended: Approve — ` and `If you do nothing: `.
+
+`scripts/tests/hermes/test_approvals.py`:
+
+15. `test_recommended_every_repair_has_strings`: every `REPAIRS` entry has non-empty `approve_when` and `if_ignored`.
+16. `test_recommended_line_in_interactive_blocks`: proposals from `propose()` (test 7's records) → each proposal's section in `interactive_blocks` contains `Recommended: Approve — <its approve_when>`; a proposal dict without the keys renders without the line.
+
+Mutations (each must turn the named test red):
+
+| Mutation | Test |
+|---|---|
+| drop the `vault_seal` status check from r7 | 3 |
+| raise the count limit to `N <= 20` | 2 |
+| treat unparseable evidence as `N = 0` | 5 |
+| treat a missing `vault_seal` as healthy | 4 |
+| drop the raw `sealed` check | 6 |
+| drop `vault_seal` from r7's `reads` | 17 |
+| let `_enrich` run while sealed | 9 |
+| keep `pending_repairs` on resolve | 11 |
+| clear `pending_repairs` on an approval re-sample | 13 |
+| drop the Recommended line from the text card | 14 |
+| leave `approve_when` empty on any repair | 15 |
+
+Gates: `pytest scripts/tests/hermes`, `make test-pytest`.
 
 ## Acceptance
 
@@ -114,12 +160,12 @@ evidence:
   - id: E1
     proves: [M1, N1]
     kind: offline
-    command: pytest scripts/tests/hermes/test_hermes.py -k "r7"
+    command: pytest scripts/tests/hermes/test_repairs.py -k "r7"
     intent: During a Vault outage Hermes no longer offers the cosign repair, and still offers it when only the cosign key is broken.
   - id: E2
     proves: [M2, M3, M4]
     kind: offline
-    command: pytest scripts/tests/hermes/test_hermes.py -k "root_cause or recommended or resolved"
+    command: pytest scripts/tests/hermes -k "root_cause or recommended or resolved"
     intent: From a phone, each Slack card says what is wrong, whether to press Approve, and when it is safe to ignore.
   - id: E3
     proves: [M5, N2]

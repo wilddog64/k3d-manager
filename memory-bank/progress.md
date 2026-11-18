@@ -1,6 +1,60 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: v1.44.2 release PR #163 open. Argon review done: #1 (shards under xtrace) fixed 8eeaaeb8 with test S2-6; 7 P3s captured (7f3a196a); #7 duplicate. Fable 3-way review: missing vault-unseal exit fixed 3609a2ad; 8 more P3s (e82bad63). CI pending on new head.
+- 2026-11-18: v1.44.2 Hermes H1-H3 live on hub (vault_seal healthy at 00:06:18Z, post-pull); webhook W1-W6 + watchdog stage 2 wait on real events.
+- 2026-11-17: dirused v0.0.7 published (M2b top folders + release test fix); office live check pending.
+- 2026-11-17: dirused M2b-fix landed 622fab5, PR #16 open, Argon review running; v0.0.7 after merge.
+- 2026-11-17: dirused v0.0.6 release build failed (order-dependent test); fix dispatched to Luna, ships as v0.0.7.
+- 2026-11-17: dirused #15 merged 13bd6c4, v0.0.6 tagged; Argon 2 low findings -> M2c.
+- 2026-11-17: dirused M2b landed 46d22df, PR #15 open, Argon review running. M1 E5 live-observed. P3 bug: open --count ignores link-set review role.
+- 2026-11-17: multi-project M1 landed 6972d10a (per-project versions, ledger project, open --count); E5 live pending. P3 bug: stall-watch events lack project.
+- 2026-11-17: dirused M2b (top 3 folders for warn/crit) spec + dispatched to Luna; plan: v0.1.0 when satisfied. Luna M1 exited, verify pending.
+- 2026-11-17: dirused v0.0.5 published (2 zips + sha256); office live check pending.
+- 2026-11-17: dirused#14 merged (operator); v0.0.5 tag pushed, release building.
+- 2026-11-17: dirused#14 ready to merge (CI green 6fb03b1); waiting on operator go (merge + v0.0.5).
+- 2026-11-17: dirused M2a-b landed 6fb03b1 (live-check exit 4, L11/L12).
+- 2026-11-17: Argon review of dirused#14 → 1 real finding (live-check exit 4); M2a-b dispatched to Luna.
+- 2026-11-17: dirused#14 CI green 4/4 (6f09162).
+- 2026-11-17: dirused#14 windows CI 1 red (footer assertion) → fixed 6f09162, CI re-running.
+- 2026-11-17: Argon blind review of dirused#14 dispatched.
+- 2026-11-17: dirused M2a landed 90ce085, PR dirused#14 open; CI + Argon review pending.
+- 2026-11-17: dirused M2a resume 3 — console colour dead code fix + test 9.
+- 2026-11-17: dirused M2a resumed (Portable tests 5 red from intended output change; spec Files table amended).
+- 2026-11-17: idea — /clear metrics + Agent Activity panels (docs/ideas.md, inbox).
+- 2026-11-17 ~19:00Z: dirused M2a fullness levels dispatched (Luna). WIP 3/3.
+- 2026-11-17 ~18:45Z: stall-watch Slack notice shows ~/ (d2a72d35); P3 bug filed for other Slack senders.
+- 2026-11-17 ~18:30Z: dispatched stage 2 (Flash) and OOB M1 (Luna, resumed once after a no-change exit). WIP 2/3.
+- 2026-11-17 16:56Z: dirused PR #13 merged (3865f28, CI 4/4 on 83b9ca0); v0.0.4 tagged, Release run 44130794197 green, pre-release with win-x64 + win-arm64 zips and sha256. Waiting on operator office tests (B2 probe, E4 /timeout stop line, /file servers.list SVI system only).
+- 2026-11-17 16:55Z: dirused M1h-b verified on VM (7/7; pre-fix 4 red; dir-row/depth/unextended/any-exception mutants each red; full 45/47 known VM reds; portable 36/36) and landed 83b9ca0 on #13. CSV reflection test kept (no stopped-scan seam via Program.Run). Next: CI green on 83b9ca0 -> merge #13 -> tag v0.0.4 (release.yml on v* tag) -> operator office tests.
+- 2026-11-17 16:50Z: Argon delta review of #13 (a242be0..ae4b253): 5 findings, all verified by Claude (SVI 0 B dir row; SVI as target exits 0; \\?\ root mismatch; non-denied-error test gap; CSV test via reflection). Spec dirused-m1h-b-review-fixes dispatched to Luna. CI on ae4b253 green 4/4. v0.0.4 waits on M1h-b.
+- 2026-11-17 16:40Z: dirused M1h verified on VM (targeted 4/4; any-depth + no-Win32 mutants red; renderer mutant red locally; .NET UNC parent check confirmed) and landed ae4b253 on m1g branch, pushed to #13. Gap: any-exception mutant survives (no test that a non-denied error on SVI stays INCOMPLETE). Argon delta review (a242be0..ae4b253) dispatched; then merge #13, tag v0.0.4.
+- 2026-11-17 16:30Z: dirused A2 verified by Claude on VM (pre-fix red 2, 3 mutants red, targeted 5/5 green; full suite only the 2 known VM-only reds) and landed 7aa3fee on m1g branch, pushed to PR #13. M1h dispatched to Luna (gpt-6-luna confirmed) on m1g branch. Next: verify M1h on VM, land, Argon delta review of A2+M1h, merge #13, tag v0.0.4. Operator saw the 07:25 PST card = E5 test; it shows H5 (names ArgoCD), fixed in ebdd140a, live after promote.
+- 2026-11-17 ~17:20Z: operator "go dispatch M1h": spec docs/plans/dirused-m1h-system-folder-not-counted.md (denied System Volume Information at volume root → systemOnly, scan stays complete). Queued behind A2 (both touch Scanner.cs, one dispatch per file); dispatch onto m1g branch when A2 lands, ships in v0.0.4 with #13.
+- 2026-11-17 ~17:00Z: vault-sealed review fixes LANDED: webhook W1-W6 59dd12e5, Hermes H1-H3,H5 ebdd140a, guide H4 4ecee69c (Claude: pre-fix red 5/5 each, all 10 mutations red); findings doc LANDED, Waiting on live check (needs operator `make hub-promote` once CI green). Argon review of dirused#13 found 5, Claude verified all: stop line missing when cancel hits an empty/last folder or last file (high/medium), /csv stderr drops the path (low), tests lack Complete=false; spec docs/plans/dirused-m1g-a2-stop-line-gaps.md dispatched to Luna (--model gpt-6-luna). v0.0.4 waits on A2.
+- 2026-11-17 16:05Z: hermes-vault-sealed E5 LIVE-VERIFIED (resolved 15:46:15Z after ESO recovered; no Withdrawn list since none pending). Sensor bug → LIVE-VERIFIED; r7 bug still waits on webhook E2 (never fired).
+- 2026-11-17 ~16:00Z: operator chose fix-now for vault-sealed review findings ("dispatch two small ones"): specs webhook-vault-sealed-review-fixes (W1-W6) + hermes-vault-sealed-review-fixes (H1-H3,H5) dispatched to Codex (6169c3a1) — ran on gpt-6.1-terra, not Luna: started without --model (so did M1g Part A); left running; H4 guide by Claude. dirused v0.0.4 requested by operator (needs Argon review of #13, merge, tag); System Volume Information label idea (M1h) proposed, not yet filed.
+- 2026-11-17 15:40Z: dirused M1g Part A verified by Claude on the VM (E1 green, pre-fix + 3 mutants red, live /timeout 2s names folder); committed a242be0, PR wilddog64/dirused#13 (CI 4/4 green on a242be0, incl. Windows; merge waits on blind Argon review). Part B still held on office probe B2.
+- 2026-11-17 15:25Z: E5 run 2: Root cause card + no r7 met; resolved pending ESO; E2 unexercised. Filed vault-sealed post-land review findings (P2 proposed).
+- 2026-11-17 ~15:35Z: dirused M1g spec written; Part A dispatched to Luna (dirused repo, branch m1g-timeout-folder-parallel-walk); Part B held on office probe.
+- 2026-11-17 15:01Z: Vault restart for E5/E2: auto-unseal OK again; E5/E2 not observable on a sub-5-min seal (debounce + alert for: 5m); waiting on operator decision.
+- 2026-11-17: promote 44e06edd (hub-promote, appsets-check, platform-ops all ran); hermes-vault-sealed E4 LIVE-VERIFIED (vault_seal healthy, unsealed: 1 pod(s)).
+- 2026-11-17: operator decided Q4 baseline = hang-to-noticed times from past hang bug docs; first point 2026-11-14 silent dispatch ~13 h. Recorded in the stall-metrics bug doc.
+- 2026-11-17: stall dashboard labels made plain-word + Incidents column widths (tests green, pushed). Filed P3 docs/bugs/2026-11-17-dispatch-stall-metrics-cannot-answer-effectiveness-questions.md (precision / recovery / false recovery / attention saved; stages B+C unbuilt, carry v1.45.0 — fold Q2/Q3 fields into stage B spec before dispatch). Waiting on: operator decision (Q4 baseline). CI green on bcddea35; promote next.
+- 2026-11-17: operator go to promote. CI lint red on f1b243f0 (ruff F401: shutil/subprocess unused after the test_approvals.py guard removal; land gate runs tests, not lint) -> fixed 7b7dd65a, ruff 0.15.8 whole-tree green locally. Promote waits on CI for 7b7dd65a.
+- 2026-11-17: LANDED fadf8438 (hermes-vault-sealed, Luna) and bea02b84 (webhook-analyze-vault-context, Flash), Claude-verified (pre-fix red, mutations, suites green); pushed. CHANGELOG [Unreleased] + bug/plan Status LANDED, Waiting on: live check. Next: promote, live E4.
+- 2026-11-17: hub checkout -> k3d-manager-v1.44.2 and 3 failed acg-expiry-check Jobs deleted (operator go). hermes-vault-sealed review adjudicated and split into Luna (hermes) + Flash (webhook-analyze-vault-context) plans.
+- 2026-11-17 ~12:45Z: 3 hub alert emails diagnosed live (read-only, pane work:1.0): 1 new P3 bug (promote-waiting on squash-merged branch), 2 Recurrence sections. Go pending: hub checkout -> v1.44.2, delete 3 failed acg-expiry-check Jobs.
+- 2026-11-17: abandoned v1.44.0 deploy-hub-batch-review + test-hygiene-batch-review (operator go); worktrees and task branches removed; open dispatch list empty (WIP 0/3).
+- 2026-11-17: operator approved intents E1/E5 on docs/plans/hermes-vault-sealed.md; spec_intent OK. Next: spec review, dispatch. Stale v1.44.0 review rows checked: no unique commits, clean worktrees (abandon awaits go).
+- 2026-11-17: v1.44.2 combined plan docs/plans/hermes-vault-sealed.md written (sensor + r7); 3 spec defects fixed in bug docs; Waiting on: intent approval E1/E5, then Argon+Fable spec review, then dispatch.
+- 2026-11-17 12:35Z: session handoff written to activeContext (v1.44.1 shipped, v1.44.2 scope, dirused E4 pending). Ready for /clear.
+- 2026-11-17 12:25Z: v1.44.1 promoted to hub (deploy/hub 666b27b7, tag hub-promote/20261117T121641Z, no break-glass). Containment E8 PASS -> bug LIVE-VERIFIED, ledger live_verified (63cf163e). v1.44.1 live checks complete except Hermes E3 (waits on a real ci page).
+- 2026-11-17 12:20Z: v1.44.1 MERGED 666b27b7 (PR #162); enforce_admins restored; tag v1.44.1 + GitHub release (latest); next branch k3d-manager-v1.44.2 from 666b27b7 (4 unmerged memory-bank commits carried). Task branches: 0. MEMORY.md 8.3 KB, CLAUDE.md 10.5 KB (under budget, no compression). Retro being written (Sonnet). Next: operator promote REF=666b27b7 for containment E8; 2 stale v1.44.0 review rows await abandon go.
+- 2026-11-17 07:10Z: dirused #12 MERGED 6c660229; enforce_admins re-enabled; v0.0.3 tagged + released (run 44080730448, pre-release, x64 33.1MB + arm64 31.5MB zips with sha256). E4 office timing next (operator). k3d-manager #162 MERGED by operator; /post-merge next.
+- 2026-11-17 06:55Z: v1.44.1 #162 CI green on 1c129251 (19/19); enforce_admins DELETED on k3d-manager main. Operator merges #162, then /post-merge (re-enable, tag, promote with containment E8, MEMORY prune).
+- 2026-11-17 06:50Z: dirused #12 CI green on 881ea1a (windows + portable, push + pull_request), mergeable clean; enforce_admins DELETED on dirused main. Operator merges #12, then Claude re-enables enforce_admins and tags v0.0.3.
+- 2026-11-17 06:40Z: operator "go for it" — merge v1.44.1 without waiting for Hermes E3 (needs a real ci page; bug stays open). Pushed 7 docs commits (head 1c129251); scope check clean (every code/test/CI file named by a v1.44.1 spec). Waiting on CI for 1c129251, then enforce_admins DELETE.
 - 2026-11-17 06:25Z: dirused #12: blind Argon review — fixed \\?\ display + /exact loopback assertion (881ea1a); rest adjudicated in spec. vm-live 9/10: L7 timeout check too small on warm cache (M1d also 1.2s), follow-up. Waiting on CI for 881ea1a.
 - 2026-11-17 06:05Z: dirused PR #12 opened (M1e, head aad521e). E3: default 20.7s→13.5s, Windows 20G→12G; /exact 95s→39s. vm-live on aad521e ran; blind Argon review running.
 - 2026-11-17 05:45Z: dirused M1e verifier (Opus): code meets M1-M4/N1-N3, but Windows CI red on test defect (RemoteTargetTests:142, top-level file rows only). Claude fixed in aad521e + hardening (FileId 0/MaxValue not deduped, ERROR_FILE_NOT_FOUND on first listing = empty share root) + Test_MissingFileIdIsNotDeduplicated. CI aad521e green (windows 35/35, portable 35/35). E3 VM bench running.

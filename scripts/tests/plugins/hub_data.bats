@@ -912,9 +912,152 @@ STUB
   [ "$(grep -c cache "$CALL_LOG")" -eq 1 ]; [ "$(cat "$TEST_ROOT/run/unseal_keys_cache")" = cached ]
 }
 
-@test "recover B4-18: Vault re-point order is config, shards, vault-root, root" {
-  source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { printf 'config\n' >> "$CALL_LOG"; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { printf 'shards\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { printf 'root\n' >> "$CALL_LOG"; }; _kubectl() { cat >/dev/null; printf 'vault-root\n' >> "$CALL_LOG"; }
-  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; mapfile -t order < "$CALL_LOG"; [ "${order[*]}" = 'config shards vault-root root' ]
+@test "recover B4-18: Vault re-point order is config, shards, vault-unseal, vault-root, root" {
+  source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { printf 'config\n' >> "$CALL_LOG"; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { printf 'shards\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { printf 'root\n' >> "$CALL_LOG"; }
+  _kubectl() {
+    cat >/dev/null
+    if [[ "$*" == *"replace"* || "$*" == *"create"* ]]; then
+      printf 'vault-unseal\n' >> "$CALL_LOG"
+    elif [[ "$*" == *"apply"* ]]; then
+      printf 'vault-root\n' >> "$CALL_LOG"
+    fi
+  }
+  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; mapfile -t order < "$CALL_LOG"; [ "${order[*]}" = 'config shards vault-unseal vault-root root' ]
+}
+
+_setup_s2_repoint_env() {
+  source_plugin
+  _hub_data_generate_root() { printf ROOT; }
+  _vault_exec_stream() { :; }
+  _secret_load_data() {
+    case "$2" in
+      *:count) printf 2 ;;
+      *:shard1) printf 'SHARD-A' ;;
+      *:shard2) printf 'SHARD-B' ;;
+      *) printf 'SHARD' ;;
+    esac
+  }
+  _vault_dr_shard_valid() { return 0; }
+  _vault_cache_unseal_keys() { :; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    local soft=0
+    [[ "$1" == --no-exit ]] && soft=1
+    if [[ "$*" == *"get secret vault-unseal"* ]]; then
+      [[ "${KUBECTL_SECRET_EXISTS:-1}" == 1 ]] && return 0
+      (( soft )) && return 1
+      printf 'fatal kubectl exit\n' >&2; exit 1
+    elif [[ "$*" == *"replace -f -"* || "$*" == *"create -f -"* ]]; then
+      if [[ "${KUBECTL_WRITE_FAIL:-0}" == 1 ]]; then
+        cat >/dev/null
+        (( soft )) && return 1
+        printf 'fatal kubectl exit\n' >&2; exit 1
+      fi
+      cat > "$TEST_ROOT/unseal-payload.json"
+      return 0
+    elif [[ "$*" == *"apply -f -"* ]]; then
+      cat > "$TEST_ROOT/root-payload.json"
+      return 0
+    fi
+    cat >/dev/null
+    return 0
+  }
+}
+
+@test "recover S2-1: hub repoint rewrites vault-unseal from the restored shards" {
+  _setup_s2_repoint_env
+  run _hub_data_repoint_vault ctx
+  [ "$status" -eq 0 ]
+  [ -s "$CALL_LOG" ]
+  grep -q 'get secret vault-unseal' "$CALL_LOG"
+  [ -f "$TEST_ROOT/unseal-payload.json" ]
+  [ "$(jq -r '.metadata.name' "$TEST_ROOT/unseal-payload.json")" = "vault-unseal" ]
+  [ "$(grep -c 'replace -f -' "$CALL_LOG")" -eq 1 ]
+  [ "$(grep -c 'create -f -' "$CALL_LOG" || true)" -eq 0 ]
+  [ "$(jq -r '.metadata.namespace' "$TEST_ROOT/unseal-payload.json")" = "secrets" ]
+  [ "$(jq -r '.stringData["shard-1"]' "$TEST_ROOT/unseal-payload.json")" = "SHARD-A" ]
+  [ "$(jq -r '.stringData["shard-2"]' "$TEST_ROOT/unseal-payload.json")" = "SHARD-B" ]
+  [ "$(jq -r '.stringData["key-shares"]' "$TEST_ROOT/unseal-payload.json")" = "2" ]
+  [ "$(jq -r '.stringData["key-threshold"]' "$TEST_ROOT/unseal-payload.json")" = "2" ]
+  [ "$(jq -r '.stringData | keys | map(select(startswith("shard-"))) | length' "$TEST_ROOT/unseal-payload.json")" -eq 2 ]
+}
+
+@test "recover S2-2: creates vault-unseal when it does not exist" {
+  _setup_s2_repoint_env
+  KUBECTL_SECRET_EXISTS=0 run --separate-stderr _hub_data_repoint_vault ctx
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"fatal kubectl exit"* ]]
+  [ -s "$CALL_LOG" ]
+  grep -q 'get secret vault-unseal' "$CALL_LOG"
+  [ -f "$TEST_ROOT/unseal-payload.json" ]
+  [ "$(jq -r '.metadata.name' "$TEST_ROOT/unseal-payload.json")" = "vault-unseal" ]
+  [ "$(grep -c 'create -f -' "$CALL_LOG")" -eq 1 ]
+  [ "$(grep -c 'replace -f -' "$CALL_LOG" || true)" -eq 0 ]
+  [ "$(jq -r '.metadata.namespace' "$TEST_ROOT/unseal-payload.json")" = "secrets" ]
+  [ "$(jq -r '.stringData["shard-1"]' "$TEST_ROOT/unseal-payload.json")" = "SHARD-A" ]
+  [ "$(jq -r '.stringData["shard-2"]' "$TEST_ROOT/unseal-payload.json")" = "SHARD-B" ]
+  [ "$(jq -r '.stringData["key-shares"]' "$TEST_ROOT/unseal-payload.json")" = "2" ]
+  [ "$(jq -r '.stringData["key-threshold"]' "$TEST_ROOT/unseal-payload.json")" = "2" ]
+  [ "$(jq -r '.stringData | keys | map(select(startswith("shard-"))) | length' "$TEST_ROOT/unseal-payload.json")" -eq 2 ]
+}
+
+@test "recover S2-3: no shard value in any kubectl argv or stderr" {
+  _setup_s2_repoint_env
+  run --separate-stderr _hub_data_repoint_vault ctx
+  [ "$status" -eq 0 ]
+  local repoint_stderr="$stderr"
+  [ -s "$CALL_LOG" ]
+  grep -q 'get secret vault-unseal' "$CALL_LOG"
+  [ -f "$TEST_ROOT/unseal-payload.json" ]
+  run grep -E "SHARD-A|SHARD-B" "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  run grep -E "SHARD-A|SHARD-B" <<<"$repoint_stderr"
+  [ "$status" -eq 1 ]
+  run grep -q -- '--from-literal' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  [[ "$repoint_stderr" == *"vault-unseal Secret rewritten"* ]]
+  [[ "$repoint_stderr" == *"2 shard(s)"* ]]
+  grep -q 'SHARD-A' "$TEST_ROOT/unseal-payload.json"
+}
+
+@test "recover S2-4: drill target never writes vault-unseal" {
+  _setup_s2_repoint_env
+  mkdir -p "$TEST_ROOT/run"
+  run _hub_data_repoint_vault k3d-dr-drill "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_ROOT/run/unseal_keys_cache")" = "skipped" ]
+  run grep -E 'replace -f -|create -f -' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  : > "$CALL_LOG"
+  K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 run _hub_data_repoint_vault other-ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_ROOT/run/unseal_keys_cache")" = "skipped" ]
+  run grep -E 'replace -f -|create -f -' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover S2-5: a failed Secret write fails the step" {
+  _setup_s2_repoint_env
+  KUBECTL_WRITE_FAIL=1 run --separate-stderr _hub_data_repoint_vault ctx
+  [ "$status" -ne 0 ]
+  [[ "$stderr" != *"fatal kubectl exit"* ]]
+  [ ! -f "$TEST_ROOT/root-payload.json" ]
+  run grep -q 'apply -f -' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover S2-6: no shard or root token in xtrace output" {
+  _setup_s2_repoint_env
+  source <(sed -n '/^function _no_trace() {/,/^}/p' "$PWD/scripts/lib/foundation/scripts/lib/system.sh")
+  declare -f _no_trace | grep -q 'set +x'
+  local rc=0 trace="$TEST_ROOT/xtrace.log"
+  ( BASH_XTRACEFD=9; set -x; _hub_data_repoint_vault ctx ) 9>"$trace" 2>/dev/null || rc=$?
+  [ "$rc" -eq 0 ]
+  grep -q '_hub_data_repoint_vault ctx' "$trace"
+  [ -f "$TEST_ROOT/unseal-payload.json" ]
+  run grep -E 'SHARD-A|SHARD-B|\bROOT\b' "$trace"
+  [ "$status" -eq 1 ]
 }
 
 make_recovery_recipe_fixture() {
@@ -1263,7 +1406,7 @@ STUB
   grep -q SENTINELVALUE "$TEST_ROOT/identity-seen"
   run grep -q SENTINELVALUE "$CALL_LOG"
   [ "$status" -eq 1 ]
-  run grep -q keychain "$CALL_LOG"
+  run grep -qx keychain "$CALL_LOG"
   [ "$status" -eq 1 ]
 }
 

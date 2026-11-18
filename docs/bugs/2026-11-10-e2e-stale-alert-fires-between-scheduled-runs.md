@@ -70,3 +70,9 @@ interface:
 
 - Change only the rule file, its promtool test and any route test. Show E1's 4-day case red against today's rule, then
   green. Paste command, rc and proving lines. Leave changes uncommitted; Claude reviews and lands.
+
+## Recurrence — 2026-11-17
+
+`E2EVerificationStale` for `product-catalog/vcluster` emailed at 10:39Z Tuesday (alert start 10:34Z, read live on the
+hub Alertmanager 2026-11-17 ~12:45Z). Saturday 02:00 PST (10:00Z) plus 3 days plus `for: 30m` gives exactly that
+time, so it is the Saturday-to-Wednesday gap again. It should clear after the Wednesday 02:00 run passes.

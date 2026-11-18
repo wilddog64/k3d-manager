@@ -63,7 +63,7 @@ baseline_json = json.loads("\n".join(line[4:] for line in baseline_text.split(" 
 assert next(item for item in baseline_json["panels"] if item["id"] == 105)["type"] == "bargauge"
 old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
-assert set(new) == set(old) | {123,124}
+assert set(new) == set(old) | {123,124} | set(range(125,134))
 assert new[123]["title"] == "Unreported coordinator share"
 for panel_id in old.keys() - {105, 12, 103}:
     assert old[panel_id] == new[panel_id], panel_id
@@ -88,8 +88,9 @@ fixture=json.loads("\n".join(x[4:] for x in fixture_path.read_text().split("  ag
 original=next(p for p in fixture["panels"] if p["id"]==103)
 for field in ("gridPos","fieldConfig","options"): assert old[field]==original[field],field
 row=panels[124]
-assert row["title"] == "Stall recovery" and row["collapsed"] is True
-children={p["title"]:p for p in row["panels"]}
+assert row["title"] == "Stall recovery" and row["collapsed"] is False and row["panels"] == []
+assert d["panels"][-10] is row
+children={p["title"]:p for p in d["panels"][-9:]}
 expected={"Hangs detected":"sum(k3dm_dispatch_stall_incidents{window=\"$window\"}) or vector(0)",
 "Median silence before detection":"max(k3dm_dispatch_stall_silent_seconds_median{window=\"$window\"} / 60) or vector(0)",
 "Diagnoses by result":"sum by (status) (k3dm_dispatch_stall_diagnoses{window=\"$window\"})",
@@ -368,7 +369,7 @@ new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels
 all_ids=[p["id"] for d in new for p in d["panels"]]
 all_ids += [p["id"] for d in new for row in d["panels"] if row.get("type")=="row" for p in row.get("panels",[])]
 assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106,123,124}|set(range(42,49))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106,123,124}|set(range(42,49))|set(range(125,134))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,116,117,118,119,120,121,122}
 assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
@@ -387,7 +388,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124):
+    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -867,7 +868,7 @@ props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for
 for field in ["Worker model","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
     opts=props[field]["mappings"][0]["options"]
     assert opts=={"unknown":{"text":"not recorded"}}
-assert len(d["panels"])==37
+assert len(d["panels"])==46
 print("ok")
 PY
   [ "$status" -eq 0 ]

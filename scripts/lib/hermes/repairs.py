@@ -194,8 +194,15 @@ def _r6_command(_records):
 
 def _r7_precondition(records, history, _state):
     eso = _rec(records, "eso") or {}
+    vault = _rec(records, "vault_seal")
+    vault_status = vault.get("status") if vault else "healthy"
+    match = re.match(r"(\d+)/(\d+) not synced", eso.get("evidence", ""))
+    pods = (vault or {}).get("data", {}).get("pods", [])
     return (_status(records, "eso") == "degraded" and
+            bool(match) and int(match.group(1)) <= 2 and
             "cosign-public-key" in eso.get("evidence", "").lower() and
+            vault is not None and vault_status == "healthy" and
+            bool(pods) and all(pod.get("sealed") is False for pod in pods) and
             _sustained(history, lambda cycle: "eso" in cycle, 2))
 
 
@@ -288,7 +295,7 @@ REPAIRS = {
            "needs_scope": "local docker socket"},
     "r7": {"key": "r7", "name": "Restore cosign signing key and ESO grant",
            "precondition": _r7_precondition, "build_command": _r7_command, "cwd": ROOT,
-           "reads": ("eso",),
+           "reads": ("eso", "vault_seal"),
            "blast_radius": "Vault secret/cosign/signing, cosign-verify policy, ESO role grant, one ExternalSecret resync",
            "reversible": True, "needs_scope": "macOS Keychain (k3d-manager-signing), local hub kubeconfig"},
     "r8": {"key": "r8", "name": "Recycle drifted host-network DaemonSet pods",
@@ -308,6 +315,22 @@ REPAIRS = {
             "reversible": False, "needs_scope": "local hub kubeconfig"},
 }
 
+_RECOMMENDATIONS = {
+    "r1": ("the webhook is unavailable while its health checks are unknown", "webhook-backed health checks remain unavailable"),
+    "r2": ("one failed public service has a healthy substrate", "the service remains unreachable"),
+    "r3": ("the edge probe is down across two cycles", "public endpoints remain unreachable"),
+    "r4": ("the named CI run timed out, was cancelled, or is stuck", "the failed CI run remains unresolved"),
+    "r5": ("stale ACG registration is driving a large Kine database", "Kine pressure may continue to grow"),
+    "r6": ("Kine compaction is stalled and restarting the hub is acceptable", "Kine compaction remains stalled"),
+    "r7": ("only the cosign key is missing and Vault is unsealed", "image signature checks keep failing; it will not clear on its own"),
+    "r8": ("a DaemonSet pod is using a stale host network IP", "pods continue using stale host network IPs"),
+    "r9": ("the live ApplicationSets are stale against deploy/hub", "the hub continues running stale ApplicationSets"),
+    "r10": ("failed Jobs are superseded by the current CronJob template", "the superseded failed Jobs remain visible"),
+}
+for _repair_key, (_approve_when, _if_ignored) in _RECOMMENDATIONS.items():
+    REPAIRS[_repair_key]["approve_when"] = _approve_when
+    REPAIRS[_repair_key]["if_ignored"] = _if_ignored
+
 
 def _update_r1_debounce(records, state):
     debounce = state.setdefault("repair_debounce", {})
@@ -317,7 +340,7 @@ def _update_r1_debounce(records, state):
 def _evidence(records, key):
     relevant = {"r1": ("eso", "data_layer"), "r2": ("reachability", "node_pressure", "data_layer"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
-                "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",),
+                "r6": ("kine",), "r7": ("eso", "vault_seal"), "r8": ("hostnet_drift",),
                 "r9": ("values_branch",), "r10": ("superseded_jobs",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
@@ -339,6 +362,7 @@ def propose(records, state):
         action_id = f"{key}-" + hashlib.sha1((key + command).encode()).hexdigest()[:8]
         proposal = {"action_id": action_id, "key": key, "name": repair["name"],
                     "command": command, "blast_radius": repair["blast_radius"],
+                    "approve_when": repair["approve_when"], "if_ignored": repair["if_ignored"],
                     "proposed_at": proposed_at,
                     "expires_at": (_parse_utc(proposed_at) + PROPOSAL_TTL).isoformat().replace("+00:00", "Z"),
                     "records_digest": _records_digest(records, repair["reads"]),

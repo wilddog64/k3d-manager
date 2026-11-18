@@ -2051,6 +2051,92 @@ _status._post_slack_bot = _post_slack_bot
 _status._ARCH_CONTEXT = _ARCH_CONTEXT
 
 
+def _kubectl_json(out):
+    return json.loads("\n".join(line for line in out.splitlines() if not line.startswith("Warning: ")))
+
+
+def _vault_summary(vault_out, vault_timeout):
+    """Summarise Vault pod status from kubectl JSON output.
+
+    Returns (summary_line, is_sealed_bool, sealed_pod_names_list).
+    """
+    if vault_timeout:
+        return "Vault pods: state unavailable", False, []
+    try:
+        data = _kubectl_json(vault_out)
+        items = data.get("items")
+        if not isinstance(items, list) or not items:
+            return "Vault pods: state unavailable", False, []
+        pod_summaries = []
+        sealed_pods = []
+        labelled_count = 0
+        for item in items:
+            metadata = item.get("metadata") if isinstance(item, dict) else None
+            name = metadata.get("name") if isinstance(metadata, dict) else None
+            labels = metadata.get("labels") if isinstance(metadata, dict) else None
+            if (not name or not isinstance(labels, dict)
+                    or any(labels.get(key) is None for key in
+                           ("vault-sealed", "vault-initialized", "vault-active"))):
+                pod_summaries.append(f"{name or '?'} state unavailable")
+                continue
+            labelled_count += 1
+            s_val = labels["vault-sealed"]
+            i_val = labels["vault-initialized"]
+            a_val = labels["vault-active"]
+            s_str = "true" if s_val is True else ("false" if s_val is False else str(s_val).lower())
+            i_str = "true" if i_val is True else ("false" if i_val is False else str(i_val).lower())
+            a_str = "true" if a_val is True else ("false" if a_val is False else str(a_val).lower())
+            if s_str == "true":
+                sealed_pods.append(name)
+            pod_summaries.append(
+                f"{name} sealed={s_str} initialized={i_str} active={a_str}"
+            )
+        if not labelled_count:
+            return "Vault pods: state unavailable", False, []
+        line = f"Vault pods: {'; '.join(pod_summaries)}"
+        return line, bool(sealed_pods), sealed_pods
+    except Exception:
+        return "Vault pods: state unavailable", False, []
+
+
+def _store_summary(store_out, store_timeout):
+    """Summarise ClusterSecretStore status from kubectl JSON output.
+
+    Returns summary_line.
+    """
+    if store_timeout:
+        return "ClusterSecretStore vault-backend: state unavailable"
+    try:
+        data = _kubectl_json(store_out)
+        if isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
+            items = data["items"]
+            if not items:
+                return "ClusterSecretStore vault-backend: state unavailable"
+            item = items[0]
+        elif isinstance(data, dict):
+            item = data
+        else:
+            return "ClusterSecretStore vault-backend: state unavailable"
+        status = item.get("status") if isinstance(item, dict) else None
+        conditions = status.get("conditions") if isinstance(status, dict) else None
+        if not isinstance(conditions, list):
+            return "ClusterSecretStore vault-backend: state unavailable"
+        ready_cond = None
+        for cond in conditions:
+            if isinstance(cond, dict) and cond.get("type") == "Ready":
+                ready_cond = cond
+                break
+        if not ready_cond:
+            return "ClusterSecretStore vault-backend: state unavailable"
+        ready_status = ready_cond.get("status")
+        reason = ready_cond.get("reason")
+        if ready_status is None or reason is None:
+            return "ClusterSecretStore vault-backend: state unavailable"
+        return f"ClusterSecretStore vault-backend: Ready={ready_status} ({reason})"
+    except Exception:
+        return "ClusterSecretStore vault-backend: state unavailable"
+
+
 def _run_analyze(job_id, alert_payload, response_url=""):
     """Gather kubectl diagnostics for firing alerts; call Claude; post to Slack."""
     job_dir = JOB_DIR / job_id
@@ -2075,6 +2161,22 @@ def _run_analyze(job_id, alert_payload, response_url=""):
 
         analyzed = firing[:ANALYZE_MAX_ALERTS]
         skipped = firing[ANALYZE_MAX_ALERTS:]
+
+        vault_cmd = [
+            "kubectl", "-n", "secrets", "get", "pods",
+            "-l", "app.kubernetes.io/name=vault,component=server",
+            "-o", "json", "--request-timeout=10s",
+        ]
+        store_cmd = [
+            "kubectl", "get", "clustersecretstore", "vault-backend",
+            "-o", "json", "--request-timeout=10s",
+        ]
+        vault_out, vault_timeout = _posix_spawn_capture(vault_cmd, timeout=15)
+        store_out, store_timeout = _posix_spawn_capture(store_cmd, timeout=15)
+
+        vault_line, vault_sealed, sealed_pods = _vault_summary(vault_out, vault_timeout)
+        store_line = _store_summary(store_out, store_timeout)
+
         for alert in analyzed:
             labels = alert.get("labels", {})
             argocd_app = labels.get("name", "")
@@ -2087,37 +2189,43 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             alert_name = labels.get("alertname", "unknown")
             _log(f"=== {alert_name}: {display_name} ===\n")
 
-            diag_parts = []
-            if argocd_app:
-                desc_out, desc_timeout = _posix_spawn_capture(
-                    ["kubectl", "describe", "application", argocd_app, "-n", "cicd"],
+            if vault_sealed:
+                sealed_names = ", ".join(sealed_pods)
+                analysis = (
+                    f"Vault is sealed right now ({sealed_names}). This alert likely follows from it; "
+                    f"check Vault first, not {display_name}."
+                )
+                _log(analysis + "\n")
+            else:
+                diag_parts = []
+                if argocd_app:
+                    desc_out, desc_timeout = _posix_spawn_capture(
+                        ["kubectl", "describe", "application", "-n", "cicd", "--", argocd_app],
+                        timeout=15,
+                    )
+                    if not desc_timeout and desc_out.strip():
+                        diag_parts.append(f"ArgoCD Application:\n{desc_out[-3000:]}")
+
+                pods_out, pods_timeout = _posix_spawn_capture(
+                    ["kubectl", "get", "pods", "-A",
+                     "--field-selector=status.phase!=Running",
+                     "--no-headers"],
                     timeout=15,
                 )
-                if not desc_timeout and desc_out.strip():
-                    diag_parts.append(f"ArgoCD Application:\n{desc_out[-3000:]}")
+                if not pods_timeout and pods_out.strip():
+                    diag_parts.append(f"Non-running pods:\n{pods_out.strip()}")
 
-            pods_out, pods_timeout = _posix_spawn_capture(
-                ["kubectl", "get", "pods", "-A",
-                 "--field-selector=status.phase!=Running",
-                 "--no-headers"],
-                timeout=15,
-            )
-            if not pods_timeout and pods_out.strip():
-                diag_parts.append(f"Non-running pods:\n{pods_out.strip()}")
+                diag_parts.append(f"Vault and ESO:\n{vault_line}\n{store_line}")
 
-            if not diag_parts:
-                _log("No diagnostics gathered\n")
-                continue
-
-            diagnostics = "\n\n".join(diag_parts)
-            prompt = (
-                f"You are a Kubernetes operations expert. Analyze this alert and give a "
-                f"concise diagnosis (2-3 sentences) and the single most likely fix.\n\n"
-                f"Alert: {fence('alert diagnostics', alert_name + ' on app ' + display_name)}\n\n"
-                f"Diagnostics:\n{fence('alert diagnostics', diagnostics)}"
-            )
-            analysis = filter_suggestion(_call_gemini(prompt))
-            _log(analysis + "\n")
+                diagnostics = "\n\n".join(diag_parts)
+                prompt = (
+                    f"You are a Kubernetes operations expert. Analyze this alert and give a "
+                    f"concise diagnosis (2-3 sentences) and the single most likely fix.\n\n"
+                    f"Alert: {fence('alert diagnostics', alert_name + ' on app ' + display_name)}\n\n"
+                    f"Diagnostics:\n{fence('alert diagnostics', diagnostics)}"
+                )
+                analysis = filter_suggestion(_call_gemini(prompt))
+                _log(analysis + "\n")
 
             message = f"🔍 *{alert_name}* — `{display_name}`\n{analysis}"
             route = "none"

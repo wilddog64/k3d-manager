@@ -1215,7 +1215,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 0 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed label_values and sort 8 replaced by query_result(sort_desc) and sort 0, bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 100  # agent-audit: allow assert-removed includes unreported coordinator share target
+    assert sum("$window" in expr for expr in expressions) == 108  # agent-audit: allow assert-removed includes unreported coordinator share target; +8 stall recovery panels now top level (row expanded)
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1600,8 +1600,7 @@ def test_stall_dashboard_promql_aggregates_versions_before_zero_fallback(tmp_pat
     except RuntimeError:
         pytest.skip("promtool is not installed; skipping stall dashboard PromQL rule test")
 
-    row = next(panel for panel in load_dispatch_dashboard()["panels"] if panel.get("title") == "Stall recovery")
-    panels = {panel["id"]: panel for panel in row["panels"]}
+    panels = {panel["id"]: panel for panel in load_dispatch_dashboard()["panels"]}
     panel_ids = (125, 126, 127, 128, 129, 130, 131, 132)
     expressions = {panel_id: panels[panel_id]["targets"][0]["expr"].replace("$window", "7d")
                    for panel_id in panel_ids}

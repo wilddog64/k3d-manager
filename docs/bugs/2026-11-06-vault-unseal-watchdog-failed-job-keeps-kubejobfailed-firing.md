@@ -45,3 +45,12 @@ interface:
   - "namespace: secrets"
   - "CronJob: vault-unseal-watchdog"
 ```
+
+## Recurrence — 2026-11-17, `platform-ops/acg-expiry-check`
+
+Same pattern on another CronJob. Read live on the hub, 2026-11-17 ~12:45Z: `KubeJobFailed` (3 alerts) for
+`acg-expiry-check-29907180`, `-29907210` and `-29907240`, all `BackoffLimitExceeded` from 2026-11-11 21:26–22:26Z.
+The CronJob has `failedJobsHistoryLimit: 3` (`scripts/etc/argocd/platform-ops/acg-expiry-cronjob.yaml:12`) and its
+last success was 2026-11-17T12:30:03Z, so the three failures can only age out after three new ones. Pod logs were
+empty. The watchdog fix (`ttlSecondsAfterFinished`) was scoped to one CronJob; this suggests a TTL on every
+platform-ops CronJob instead. Immediate clear: deleting the three Jobs (operator go).

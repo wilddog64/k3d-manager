@@ -328,11 +328,88 @@ def test_kine_auto_guard_never_runs_r10():
 
 
 def test_r7_requires_cosign_evidence_for_two_cycles():
-    records = [record("eso", "degraded", "1/8 not synced: cosign-public-key")]
+    records = [record("eso", "degraded", "1/8 not synced: cosign-public-key"),
+               record("vault_seal", "healthy", "unsealed: 1 pod(s)",
+                      {"pods": [{"name": "vault-0", "sealed": False,
+                                 "initialized": True, "active": True}]})]
     proposals = repairs.propose(records, state([["eso"], ["eso"]]))
     proposal = next(item for item in proposals if item["key"] == "r7")
     assert proposal["command"] == "make signing-restore"
     assert repairs.REPAIRS["r7"]["reversible"] is True
+
+
+def _r7_case(evidence, vault_status="healthy", sealed=False, include_vault=True):
+    records = [record("eso", "degraded", evidence)]
+    if include_vault:
+        records.append(record("vault_seal", vault_status, "sealed: vault-0" if sealed else "unsealed",
+                              {"pods": [{"name": "vault-0", "sealed": sealed,
+                                         "initialized": True, "active": True}]}))
+    return records
+
+
+def _propose_r7(records):
+    return repairs.propose(records, state([["eso"], ["eso"]]))
+
+
+def test_r7_not_offered_for_seal_capture():
+    records = _r7_case("19/20 not synced: cosign-public-key, ghcr-pull-secret, ghcr-pull-secret",
+                       "degraded", True)
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_not_offered_when_many_fail_vault_healthy():
+    records = _r7_case("19/20 not synced: cosign-public-key, ghcr-pull-secret, ghcr-pull-secret")
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_not_offered_when_vault_degraded_one_failing():
+    records = _r7_case("1/20 not synced: cosign-public-key", "degraded", False)
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_not_offered_when_vault_seal_missing():
+    records = _r7_case("1/20 not synced: cosign-public-key", include_vault=False)
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_not_offered_on_unparseable_evidence():
+    records = _r7_case("cosign-public-key not synced")
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_not_offered_on_first_sealed_cycle():
+    records = _r7_case("1/20 not synced: cosign-public-key", sealed=True)
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_offered_when_only_cosign_fails():
+    records = _r7_case("1/20 not synced: cosign-public-key")
+    proposal = next(item for item in _propose_r7(records) if item["key"] == "r7")
+    assert "unsealed" in proposal["evidence"]
+
+
+def test_r7_not_offered_when_vault_seal_has_no_pods():
+    records = _r7_case("1/20 not synced: cosign-public-key")
+    vault = next(item for item in records if item["sensor"] == "vault_seal")
+    vault["data"] = {"pods": []}
+    assert not any(item["key"] == "r7" for item in _propose_r7(records))
+
+
+def test_r7_approve_refused_when_vault_seals(monkeypatch):
+    records = _r7_case("1/20 not synced: cosign-public-key")
+    current = state([["eso"], ["eso"]])
+    proposal = next(item for item in repairs.propose(records, current) if item["key"] == "r7")
+    monkeypatch.setattr(repairs, "_git_revision", lambda *_: proposal["hermes_revision"])
+    now_sealed = _r7_case("1/20 not synced: cosign-public-key", "degraded", True)
+    result = repairs.approve(proposal["action_id"], current, now_sealed, lambda *_: (0, ""))
+    assert result["outcome"] == "refused: precondition no longer holds"
+
+
+def test_r7_digest_covers_vault_seal():
+    healthy = _r7_case("1/20 not synced: cosign-public-key")
+    sealed = _r7_case("1/20 not synced: cosign-public-key", "healthy", True)
+    assert repairs._records_digest(healthy, repairs.REPAIRS["r7"]["reads"]) != \
+        repairs._records_digest(sealed, repairs.REPAIRS["r7"]["reads"])
 
 
 def test_r7_does_not_fire_for_one_cycle_or_other_eso_evidence():
