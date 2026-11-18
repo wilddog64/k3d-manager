@@ -346,5 +346,73 @@ Tests:
 
 **Amendment 2 intent approved:** operator, 2026-11-18 ("1 GB (Recommended)", "/minsize <size>").
 
+## Amendment 3 (Claude, 2026-11-18, after resume 2: Claude review + blind Fable diff review; Claude adjudicated)
+
+Verified in the worktree before adopting: the root is opened through the file `Open` (DELETE, share 0); `ScanResult.Target` is
+`target.Display` (`RemoteScan.cs:15`) while file paths come from `Path.GetFullPath` (`Scanner.cs:39`); `+` patterns set
+`largestExplicit` (`ArgParser.cs:193`) and merge with the defaults; the scanner skips reparse points (`Scanner.cs:128`), so WP5
+can never list the outside file. None of these deletes a protected file; 1-2 make `/confirm` delete nothing in practice.
+
+**Files added to scope:** `src/Dirused.Common/ScanResult.cs`, `src/Dirused.Core/Scanner.cs` (item 2 only), and
+`tests/Dirused.Tests.Portable/FleetRunnerTests.cs` (accepted in resume 2). Land records `--allow-out-of-scope` for these.
+
+1. **Root open (blocker).** Add `string? ResolveRoot(string path, out string? error)` to `IPurgeFileSystem`. Real impl:
+   `CreateFileW` with access `FILE_READ_ATTRIBUTES` only, share `READ|WRITE|DELETE`, `FILE_FLAG_BACKUP_SEMANTICS` (follow a
+   junction root), then `GetFinalPathNameByHandleW`; never `MarkDelete`. When it returns null, every listed file of that target
+   that would otherwise be opened gets `failed: cannot open target: {error}` (counted failed, exit 3). Dry run does not call it.
+   **WP7:** with a `FileSystemWatcher` running on the scratch dir (it holds a shared directory handle) and the process working
+   directory set to it (restore in `finally`), `/confirm` deletes `big.log`. Red on resume-2 code (paste it, Windows CI on a
+   scratch branch is acceptable — say which run).
+2. **Containment root = scanned full path.** `ScanResult` gains `[JsonIgnore] public string? ScanRoot { get; init; }`, set in
+   `Scanner.Scan` to the full path it scanned (`full`, `Scanner.cs:39`). `Purge` uses `ScanRoot ?? Target` for rule 1 and
+   `ResolveRoot`. `RemoteScan`'s `with { Target = ... }` keeps `ScanRoot`. JSON unchanged. Tests: rule 1 with `Target` `"."`,
+   `"D:"`, `"//h/s"` and a `ScanRoot` set → eligible; `ScanRoot` null and `Target` `"."` → `skipped: outside target`.
+3. **No `GetFullPath` in `Open`/`ResolveRoot`.** Build the `\\?\` form exactly as `Scanner.Extended` (`Scanner.cs:196`):
+   prefixing only; a non-absolute path (fails `IsStrictlyUnder`'s absolute test) → `failed: path is not absolute`.
+4. **`+` patterns refused with `/purge`.** After rule 4: any pattern argument item starting with `+` →
+   `"/purge needs the full pattern list; '+' adds to the default list, e.g. write /largest *.log;*.zip"`. P1: `+*.zip` refused,
+   `*.log;*.zip` accepted.
+5. **Log before the delete commits.** Order on the locked handle: checks → `MarkDelete()` → write the log line (status
+   `deleted`) → dispose. If the log write throws: `UnmarkDelete()` (`FileDispositionInfo` false) before dispose, status
+   `failed: log write failed`, file kept, then stop as before. `PurgeOpen` gains `UnmarkDelete()`. P8: the file whose log line
+   fails is NOT deleted (fake records Mark then Unmark) and later files are `not attempted: log write failed`.
+6. **Confirm the delete.** After dispose, `fs.Open(path)` again (or a `Exists` probe on the extended path): not found →
+   `deleted`; still present → `failed: delete pending (another process has the file open)`, and the log gets a second line with
+   that status. A `FILE_ATTRIBUTE_READONLY` file → `skipped: read-only` (checked on the handle before `MarkDelete`; attribute
+   0x1). P5 adds read-only; P6 adds delete-pending via the fake.
+7. **WP5 rewritten** to exercise the real final-path check: pass `fs` = a decorator over `RealPurgeFileSystem` that, on the
+   first file `Open`, renames the scanned subfolder away and creates a junction with the same name to an `outside` folder holding
+   a file with the same name, size and last-write time; assert `skipped: outside target` and the outside file still exists.
+   Positive control: without the swap the inside file is deleted. Skip with a reason if junction creation fails.
+8. **UNC test WP8:** WP1's confirm run against `\\localhost\{drive}$\...` of the scratch dir (skip with reason if the admin
+   share is unreachable); asserts `big.log` deleted and the log line.
+9. **WP1/WP3 strengthened:** WP1 asserts every status the spec lists (`b.log [skipped: modified within 1 day(s)]`, which are
+   `[would delete]`), files present after the dry run, log line names `big.log` and ends `deleted`; exit codes compared to a
+   no-`/purge` baseline run on the same dir. WP3 uses an `fs` decorator that counts calls and asserts zero `Open`/`ResolveRoot`
+   calls and that stdout has no report (nothing scanned).
+10. **P9 and P1 completed:** P9 HTML `<th>Purge</th>`, `class="purge"`, group `colspan="5"`, `would free`/`freed` headings; JSON
+    `purgeStatus` only when set; CSV equal field counts with purge and the header from the flag (item 16); no-purge text, HTML
+    (with a fixed `Generated` line removed before comparing), JSON and CSV equal fixed strings for one fixed input (N5). P1 adds
+    `/purge 3651`, `/purge /confirm 7`, `/summary /csv /largest *.log /purge`, `/output C:\temp\dirused-purge.log /purge /confirm`,
+    `/confirm` help lines and the "Purge examples" block exactly.
+11. **P/Invoke:** `FileDispositionInfo.DeleteFile` as `[MarshalAs(UnmanagedType.U1)]`, size 1; remove unused `FileTime`; treat
+    `len >= capacity` as failure; wrap everything after `CreateFileW` in try/dispose so an exception never leaks the handle.
+12. `IsStrictlyUnder`: a root with zero segments → false.
+13. A listed file whose path equals the purge log path (ordinal ignore-case) → `skipped: purge log`.
+14. Log fields: replace `\t`, `\r`, `\n` in path and status with a space.
+15. `/summary /csv` rule uses the effective summary value (as the renderer chooses), not the raw flag.
+16. CSV purge column chosen by a flag passed from `Program` (`/purge` given), not inferred from results; keep `Format.Row`
+    (revert the inlining) and append the field.
+17. `ShortUsageText`: wrap so every line is ≤ 80 columns (fourth line `               [/largest <patterns> [/purge [days] [/minsize <size>] [/confirm]]]`
+    with the third line ending before `/largest`); restore the 80-column test without the exemption.
+18. `GetFinalPathNameByHandleW`: if flags 0 fails for the root, use `FILE_NAME_OPENED` (0x8) for the root **and** all files of
+    that target, so both sides use the same form.
+- **Mutation proofs to add/redo:** (h) root opened via file `Open` again → WP7 red; (i) log after dispose (item 5 reverted) → P8
+  red; (j) WP5 decorator with handle final-path check removed → WP5 red. Windows-only reds may be shown from Windows CI on a
+  scratch branch `m8-purge-mut-*` (name the run); delete those branches after.
+- **Acceptance:** must_not N2 gains "a file is deleted without a log line (P8, mutation (i))"; new N7: "`/confirm` on a target
+  whose root another process has open deletes nothing (WP7, mutation (h))".
+- Not adopted: none. Item 4 narrows operator-visible behaviour within "when /largest specific"; operator told in chat.
+
 **Intent approved:** operator, 2026-11-18
 **Intent approval note:** answers to Claude's questions: listed files only (refuse '*'), skip modified < 24 h with /purge N days, permanent delete with failures reported, report + C:\temp\dirused-purge.log; plus "make clear help message for how /purge work". Rev 2 narrows (explicit patterns required); operator told in chat.
