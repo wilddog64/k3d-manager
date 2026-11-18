@@ -1,4 +1,4 @@
-# dispatch-metrics: Astra 6.2 runs show as model `unknown` and cost $0
+# dispatch-metrics: Astra 6.2 runs show as model `other` and cost $0
 
 **Status:** OPEN — captured 2026-11-18 while dispatching the first Astra review (lib-foundation PR #89)
 **Priority:** P3 — reporting only; tokens and run time are still exported
@@ -16,8 +16,8 @@ The operator is trialling Astra (OpenAI, run through codex) for spec and bug rev
 with Argon and Fable. Dispatch `lf-v057-review-astra` (2026-11-18) recorded `agent: codex`, `model: gpt-6.2-astra`,
 `model_source: explicit` in the ledger. On the Agent Dispatch dashboard:
 
-- **Model identity** shows `unknown`: `MODEL_IDENTITY_ALLOWLIST` (`bin/k3dm-dispatch-metrics:41-47`) lists `gpt-6-astra`
-  but not `gpt-6.2-astra` (nor `gpt-6.2-sol`); `:1865` maps any name not on the list to `unknown`.
+- **Model identity** shows `other` (corrected 2026-11-18; first filed as `unknown`): `MODEL_IDENTITY_ALLOWLIST` (`bin/k3dm-dispatch-metrics:41-47`) lists `gpt-6-astra`
+  but not `gpt-6.2-astra` (nor `gpt-6.2-sol`); `:1865-1866` map any valid name not on the list to `other`.
 - **Cost** is $0: `scripts/etc/agent/codex-model-prices.json` prices only `gpt-5.6-luna`, `gpt-6-luna`, `gpt-6.1-sol`,
   `gpt-6.1-terra` among OpenAI models; `_render_cost` (`bin/k3dm-dispatch-metrics:~2057`) gives an unpriced model 0.
 
