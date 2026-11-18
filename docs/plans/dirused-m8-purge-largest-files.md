@@ -1,8 +1,8 @@
 # dirused M8: `/purge` deletes the files `/largest` lists (dry run unless `/confirm`)
 
 **Filed:** 2026-11-18
-**Status:** DRAFT, rev 2 after blind Fable + Astra review (dispatch after M7 `dirused-m7-check-highlight` lands: shares `HtmlRenderer.cs`, `ArgParser.cs` help, README, CHANGELOG)
-**Repo / branch:** wilddog64/dirused / `m8-purge` (from main after M7 merges)
+**Status:** DISPATCHED 2026-11-18 (rev 2 after blind Fable + Astra review), branch m8-purge from M7 merge 19e66d0
+**Repo / branch:** wilddog64/dirused / `m8-purge` (from main 19e66d0, M7 merge)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** high (first feature that deletes files, on production admin shares where deletes bypass the Recycle Bin)
 **Implementer:** Luna (Codex). **Verifier:** Claude. Live check by the operator on the work laptop.
