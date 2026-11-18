@@ -65,6 +65,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-18: dirused PR #27 MERGED 594eff6 (operator); v0.0.13 released (release workflow green, 4 assets). Next: operator `dirused /update` to 0.0.13, then Claude tags v0.0.14 for M4b E2.
 - 2026-11-18: dirused-m4b-notice-once LANDED 442c259; PR #27 open, CI green (portable+windows incl. W4-W6), blind Argon: none. Claude found a known limitation (slow lookup on bare run cut off at exit → notice delayed up to 24 h), recorded in the plan, not blocking. Awaiting operator merge → v0.0.13, then v0.0.14 for E2. WIP 0/3.
 - 2026-11-18: dirused M4b spec written (docs/plans/dirused-m4b-update-notice-on-bare-run-once-per-version.md; intent approved 'go with your suggestion'); dispatched as dirused-m4b-notice-once on branch m4b-notice-once from 568a829. W4-W6 are Windows-only: gate is Windows CI on the PR. Then release N (v0.0.13), operator installs, Claude tags v0.0.14 for E2. WIP 1/3.
 - 2026-11-18: plan-dashboard-draft-status LANDED 72b9b031 (Claude added N3 asserts; E1 green, real-tree output correct); live E2 waits on hub promote. dirused M4 E2: operator screenshots `dirused /update` → 'updated dirused 0.0.11 -> 0.0.12', `/version` → 0.0.12 (win-x64). Notice not seen live. Operator idea: also check + notify on bare `dirused`, once per new version — Claude proposing M4b. WIP 0/3.
