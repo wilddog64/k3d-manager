@@ -1,11 +1,12 @@
 # Plan dashboard shows "ready on your go" for plans whose spec is still a draft
 
-**Status:** LANDED 72b9b031 (2026-11-18); E2 live check pending the next hub promote
+**Status:** LIVE-VERIFIED — fix 72b9b031 (2026-11-18); E2 PASS on the hub after promote ebac0d8c
+**Live evidence:** 2026-11-18 · run pushgateway-k3dm-plan-docs-1795045426 · env hub · scenario v1.45.0-plans-panel-after-promote · commit ebac0d8c · proves E2
+**Fix commit:** 72b9b031
 **Priority:** P3
 **Introduced by:** unknown
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-18
 **Triage:** operator, 2026-11-18, promoted out of the P3 batch ("go with 1, and dispatch to Luna"); fix on `k3d-manager-v1.45.0`
 **Prior art:** none (`make find-similar-docs` unavailable: vector store context `k3d-k3d-cluster` missing; exact-slug glob found nothing) — not run
 
@@ -140,3 +141,5 @@ interface:
 ## Verification (Claude, 2026-11-18)
 
 E1: pytest 146 passed; both new tests red with the fix stashed; `grafana_dashboard_bugs.bats` 48/48. Claude added the two `dispatch_approval="n/a"` asserts (N3) that Luna's tests omitted. Producer run on the real v1.45.0 tree: plan 5 `spec not written; intents need approval`, plans 1 and 4 `spec not reviewed`, all `dispatch_approval="n/a"`. E2 pending hub promote.
+
+E2 live (Claude, 2026-11-18 23:44Z, hub m5-air, deploy/hub ebac0d8c, Pushgateway push 23:43:46Z after checkout sync 23:40:24Z): k3dm_plan_info v1.45.0 rows: remote-promote-approval and web-console-ssh-behind-cloudflare-access `blocked_by="spec not reviewed"`, dispatch-stall-recovery `blocked_by="spec not written; intents need approval"`, all three `dispatch_approval="n/a"`; no row says "ready on your go". The push at 23:36:45Z, before the promote, still had the old values. PASS.

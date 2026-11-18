@@ -514,4 +514,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-18: dirused PR #31 blind Argon diff review: NONE. Ready for operator merge; then tag v0.0.18 and operator live E2.
 - 2026-11-18: dirused PR #31 MERGED (fa3a07c) by operator; v0.0.18 tagged + released (pre-release, 2 zips + 2 sha256). M8 live E2 next (operator). k3d-manager CI green on ebac0d8c (7/7) -> operator promote REF=ebac0d8c.
 - 2026-11-18: operator running hub-promote REF=ebac0d8c + appsets-check + platform-ops. dirused M8 live E2: operator tests 2026-11-19 in the office (scratch folder, then ffm01 dry run; also answers M9 proof 1).
+- 2026-11-18 23:45Z: hub promote ebac0d8c done (operator). Live: plans-panel fix 72b9b031 E2 PASS -> LIVE-VERIFIED; dispatch-metrics 795e101e E6 PASS (DispatchMetricsStale inactive). Still waiting: M2 E6 (operator go to clone dirused on hub), travel bundle E2/E3 (P2 decision), dispatch-metrics E5 (install go on M4), M4 Anthropic key copy (reminder sent; record when it reports ok).
 

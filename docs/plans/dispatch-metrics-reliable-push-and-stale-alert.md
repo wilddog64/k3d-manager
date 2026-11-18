@@ -1,6 +1,6 @@
 # Dispatch metrics: single-flight push, retries, periodic re-push, and a stale alert
 
-**Status:** OPEN — spec written 2026-11-18; revised the same day after Fable + Astra blind review (see Review)
+**Status:** LANDED — `795e101e` (2026-11-18, Flash); E6 live PASS 2026-11-18 (hub ebac0d8c); E5 waits on operator go for `make install-dispatch-metrics` on the M4
 **Bug:** `docs/bugs/2026-11-18-dispatch-metrics-push-times-out-silently.md` (P2)
 **Branch:** `k3d-manager-v1.45.0` (bug fix, not a v1.45.0 plan; no version prefix)
 **Risk:** medium (dispatch tooling, a new launchd agent, a hub alert rule)
@@ -272,3 +272,5 @@ added the M4-reachable gate from the hub disk probe.
 **Approval words and scope:** "go ahead with your recommendation and dispatch to Flash if there is a slot for it"
 (operator, 2026-11-18), after Claude proposed parts 1-3 (reliable push, 15-minute re-push, stale alert) as the P2 fix
 with the Hermes flow moved to plan 5.
+
+E6 live (Claude, 2026-11-18 23:4xZ, hub m5-air, deploy/hub ebac0d8c after operator hub-promote + appsets-check + platform-ops): in-cluster Prometheus `/api/v1/rules` (read-only `kubectl exec ... wget`) lists `DispatchMetricsStale` in group `dispatch.alerts`, state `inactive`, health `ok`. PASS. E5 (install on the M4) still waits on the operator go.
