@@ -1,5 +1,6 @@
 """Scrub credential-shaped values from untrusted command output."""
 
+import os
 import re
 
 
@@ -21,6 +22,21 @@ _GITHUB_RE = re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]+")
 _ENV_HEADER_RE = re.compile(r"^(\s*)Environment:")
 _ENV_ENTRY_RE = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_.-]*)(:\s*)(.*)$")
 _SENSITIVE_ENV_NAME_RE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key|credential|dsn|_url$)")
+
+
+def tildify_home(text):
+    """Replace standalone references to the current home directory with ``~``."""
+    if not isinstance(text, str) or not text:
+        return text
+    home = os.environ.get("HOME", "")
+    if home.endswith("/"):
+        home = home[:-1]
+    if not home or home == "/":
+        return text
+    pattern = re.compile(
+        r"(?<![A-Za-z0-9_./-])" + re.escape(home) + r"(?=/|$|[^A-Za-z0-9_.-])"
+    )
+    return pattern.sub("~", text)
 
 
 def scrub_credentials(text):

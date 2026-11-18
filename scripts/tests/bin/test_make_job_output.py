@@ -3,6 +3,7 @@
 docs/bugs/2026-09-28-make-jobs-never-write-output-file.md
 """
 
+import os
 import sys
 import threading
 from pathlib import Path
@@ -96,3 +97,59 @@ def test_make_job_exports_its_junit_report_path(job, monkeypatch):
     monkeypatch.setattr(lifecycle.os, "waitpid", lambda *_a: (4242, 0))
     lifecycle._run_make_target(job.name, ["test-pytest"], 60, "cloud-bridge")
     assert seen["env"]["K3DM_JUNIT_XML"] == str(job / "junit.xml")
+
+
+def test_cluster_output_excerpt_tildifies_traceback(job, monkeypatch):
+    monkeypatch.setenv("HOME", "/Users/k3dm-fake-home")
+    assert os.environ["HOME"] == "/Users/k3dm-fake-home"
+    output_path = job / "output"
+    output_path.write_text(
+        'Traceback (most recent call last):\n'
+        '  File "/Users/k3dm-fake-home/src/k3d-manager/scripts/lib/webhook/lifecycle.py", '
+        'line 415, in _run_cluster\n'
+    )
+    excerpt = lifecycle._cluster_output_excerpt(output_path, lambda text: text)
+    assert 'File "~/src/k3d-manager/' in excerpt
+    assert "/Users/k3dm-fake-home" not in excerpt
+
+
+def test_make_job_result_post_is_sanitized(job, monkeypatch):
+    monkeypatch.setenv("HOME", "/Users/k3dm-fake-home")
+    assert os.environ["HOME"] == "/Users/k3dm-fake-home"
+    texts = []
+    monkeypatch.setattr(lifecycle, "_notify_job", lambda _job, text: texts.append(text))
+    output = "/Users/k3dm-fake-home/src/x: error\npassword=hunter2\n"
+    _run(job, monkeypatch, 2, output)
+    posted = texts[-1]
+    assert "~/src/x: error" in posted
+    assert "***REDACTED***" in posted
+    assert "/Users/k3dm-fake-home" not in posted
+    assert "hunter2" not in posted
+    assert (job / "make.log").read_text() == output
+
+
+def test_make_job_progress_post_is_sanitized(job, monkeypatch):
+    monkeypatch.setenv("HOME", "/Users/k3dm-fake-home")
+    assert os.environ["HOME"] == "/Users/k3dm-fake-home"
+    callbacks = []
+    texts = []
+
+    class FakeTimer:
+        def __init__(self, _interval, callback):
+            callbacks.append(callback)
+
+        def start(self):
+            pass
+
+        def cancel(self):
+            pass
+
+    monkeypatch.setattr(lifecycle.threading, "Timer", FakeTimer)
+    monkeypatch.setattr(lifecycle, "_notify_job", lambda _job, text: texts.append(text))
+    _run(job, monkeypatch, 2, "/Users/k3dm-fake-home/src/x: error\npassword=hunter2\n")
+    callbacks[0]()
+    posted = texts[-1]
+    assert "~/src/x: error" in posted
+    assert "***REDACTED***" in posted
+    assert "/Users/k3dm-fake-home" not in posted
+    assert "hunter2" not in posted
