@@ -28,6 +28,19 @@
 Add `age` to the apt install line in `.github/actions/setup/action.yml`. Do not skip the tests when `age` is missing:
 a skip would turn a missing tool into a silent pass.
 
+## Amendment after the first run (Claude, 2026-11-18)
+
+The runner also lacks `rg` (ripgrep). Last green run 44231803359, shard `test (2)`:
+`rg -l --fixed-strings /opt/homebrew/bin/python3 ... exited with code 127, indicating 'Command not found'`
+(`scripts/tests/bin/launchd_plist_path.bats:61`, which passes vacuously there because it asserts `status -ne 0`).
+`password_bundle.bats:71,78,107` call `rg` too, so installing `age` alone leaves CI red, and the new test's own `rg`
+call would fail on CI. Proof (Claude, M4, 2026-11-18, Docker 29.10.0, `ubuntu:24.04` linux/amd64):
+`apt-get install -y ripgrep age` gives `ripgrep 14.1.0-1`, `/usr/bin/rg`, `echo two | rg -q two` exits 0.
+
+Fix extended: install `ripgrep` alongside `age`; the new test checks both packages (any BATS suite calling `rg`
+needs `ripgrep`, any calling `age`/`age-keygen` needs `age`), and uses `grep`, not `rg`, for its own search so it
+runs on a runner without either.
+
 ## Files
 
 - `.github/actions/setup/action.yml`
@@ -38,10 +51,10 @@ a skip would turn a missing tool into a silent pass.
 ```yaml
 must:
   - id: M1
-    text: the CI setup action installs the apt package age, so password_bundle.bats runs all 8 tests on the CI runner
+    text: the CI setup action installs the apt packages age and ripgrep, so password_bundle.bats runs all 8 tests on the CI runner
 must_not:
   - id: N1
-    text: the CI setup action omits age while a BATS suite calls age or age-keygen — red today
+    text: the CI setup action omits age while a BATS suite calls age or age-keygen, or omits ripgrep while one calls rg — red today
   - id: N2
     text: password_bundle.bats skips or passes vacuously when age is absent
 evidence:
