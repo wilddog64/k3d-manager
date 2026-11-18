@@ -137,7 +137,7 @@
 - 2026-11-18: P2 captured docs/bugs/2026-11-18-dispatch-metrics-push-times-out-silently.md (5s timeout on 3.3MB PUT, Python spawn bypasses single-flight lock, no stale alert); operator decision on Hermes scope (Claude rec: fix now, stale trigger into plan 5).
 - 2026-11-18: spec docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md (058468fb) for the P2 push bug, operator option (a); plan 5 gained part 5 stale-metrics trigger. Fable + Astra blind spec review running; then dispatch to Flash (agy gemini-3.8-flash-medium), WIP 0/3.
 - 2026-11-18: push-reliability spec revised after Fable + Astra blind review (both: no ## Files, wrong manager path, unrefreshed lock; all majors accepted); PUT measured 1.2s so cause is contention; alert gated on M4 reachable. Dispatching to Flash.
-- [ ] v1.45.0 plan 3 M2 (multi-project bug metrics): spec reviewed + revised 2026-11-18; waits on intent approval, then Luna
+- [ ] v1.45.0 plan 3 M2 (multi-project bug metrics): DISPATCHED to Luna 2026-11-18 (c87bb03e)
 - [ ] v1.45.0 plan 1 remote-promote-approval: intent approved 2026-11-18 (TOTP, cloud channel first); spec review next
 - [ ] v1.45.0 plan 5 dispatch-stall-recovery: spec to write, Argon + Fable review, then operator review
 - [ ] v1.45.0 plan 4 web-console: intent approved 2026-11-18 (6h, idle TOTP tmux lock); spec review next
