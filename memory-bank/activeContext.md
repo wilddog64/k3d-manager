@@ -29,8 +29,8 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    _foundation_vcluster_lock same pattern. Operator go (incl. vCluster lock) -> spec
    docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md; DISPATCHED to Luna, slug lf-v057-exclusive-lock-claims
    (base 884e3aa). LANDED a561b16 (Claude-verified: pre-fix red, mutations, ubuntu:26.04 full suite no regression;
-   verify recorded). CHANGE.md 5492724 pushed; PR #89 title/body updated. NEXT: E2 = 3 green bats CI runs (watcher
-   re-running), then Argon review of PR #89 + merge gates.
+   verify recorded). CHANGE.md 5492724 pushed; PR #89 title/body updated. E2 PASSED: run 44301926748 attempts 1-3
+   green on ubuntu-26.04 incl. collision + lock tests. NEXT: Argon blind review of PR #89, then merge gates.
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.

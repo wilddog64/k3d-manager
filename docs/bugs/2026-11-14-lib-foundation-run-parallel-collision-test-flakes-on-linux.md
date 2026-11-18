@@ -2,7 +2,7 @@
 
 **Status:** LANDED — lib-foundation `a561b16` on `release/v0.5.7` (noclobber lock claims for `_run_parallel_worker` and `_foundation_vcluster_lock`; root cause uutils `mkdir` on ubuntu-26.04); test fixes `7027b38`
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-18 (PR #89 CI, three green bats runs on ubuntu-26.04)
+**Waiting on:** operator decision — since 2026-11-18 (CI E2 passed; PR #89 needs Argon review and merge)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
@@ -103,3 +103,8 @@ Claude's check in Docker `ubuntu:26.04`, 2026-11-18: concurrent `mkdir` of one p
 
 This is a library bug on Ubuntu 26.04 (any colliding keys running concurrently lose a result), not only a test flake.
 `_foundation_vcluster_lock` (`scripts/lib/system.sh:2172`) uses the same `mkdir` lock pattern.
+
+## CI verification 2026-11-18 (E2)
+
+PR #89 run 44301926748 on `5492724` (fix `a561b16`), attempts 1-3: all check-runs green (bats, shellcheck, acg); each
+bats job on `Image: ubuntu-26.04` shows `ok` for the collision test and the three stub-`mkdir` lock tests.
