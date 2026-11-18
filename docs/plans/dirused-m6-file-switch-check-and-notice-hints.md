@@ -118,5 +118,30 @@ interface:
 3. U20 splits on `\r\n` or `\n` after `TrimEnd`, asserts 3 exact lines (Windows-safe).
 4. Contract readers add `UpdateWiringTests.cs:81,96`.
 
+## Amendment 2 (operator, 2026-11-18, after dispatch): notice on every run until updated
+
+Operator: "basically show each run until updated or give /noupdatecheck to stop it". This reverses the M4b once-per-version rule.
+
+- **`UpdateCheck.cs` `PrintNotice`:** remove the `state.NoticedVersion == latestVersion` early return and stop writing
+  `NoticedUtc`/`NoticedVersion` (no `TryWrite` in `PrintNotice`). Keep both fields in `UpdateState.cs` untouched so old state
+  files still read. The notice prints whenever cached `Latest` is newer than the running version: on every scan, bare run and
+  `/help`, including runs inside the 24 h lookup throttle (they use the cached `Latest`, `UpdateCheck.cs:19-23`). It stops by
+  itself after `/update` (version no longer older). Opt-outs unchanged.
+- **Tests that asserted silence on a repeat (now assert the notice again):** `UpdateTests.cs` U2 (rename
+  `U2_NoticeIsStderrOnlyAndRepeatsUntilUpdated`; same 0.0.11 after 24 h prints again, `FindCalls == 2`; plus a run 1 h later
+  with `FindCalls` unchanged still prints, from cache), U18 (rename `U18_NoticeRepeatsAcrossRestart`; second checker prints
+  again), U19 (old state file reads and announces), U20 (second check on the same state prints the three lines again);
+  `tests/Dirused.Tests/UpdateWiringTests.cs` W4 (second bare run prints the usage **and** the notice again).
+- **New U21 `NoticeStopsOnceUpToDate`:** state `Latest = 0.0.11`, running version 0.0.11: no notice (positive control:
+  running version 0.0.10 on the same state prints it).
+- **README.md:137 / CHANGELOG:** "prints a short notice ... to stderr on each run while a newer version exists; stop it with
+  `/noupdatecheck` or `DIRUSED_NO_UPDATE_CHECK=1`." CHANGELOG adds "The update notice now repeats on each run until you
+  update (was once per version)."
+- **Files added:** `tests/Dirused.Tests/UpdateWiringTests.cs` (land with `--allow-out-of-scope`, recorded: the dispatch-time
+  snapshot predates this amendment).
+- **Acceptance change:** M2 becomes "... on stderr on every run while a newer version exists"; new must_not N4: "the same
+  version is announced only once (red on 9d8735f: U2/U18/W4 repeat asserts)"; new must_not N5: "a notice appears when the
+  running version equals Latest (U21)".
+
 **Intent approved:** operator, 2026-11-18
-**Intent approval note:** "go ahead" (approving Claude's proposal in chat: /file-followed-by-switch error, plus Clink-style stop-checking and release-notes lines)
+**Intent approval note:** Amendment 2 approved by operator answer "basically show each run until updated or give /noupdatecheck to stop it" (2026-11-18). Original: "go ahead" (approving Claude's proposal in chat: /file-followed-by-switch error, plus Clink-style stop-checking and release-notes lines)
