@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: PR #26 Windows CI red (test-only: W3, flaky U14); fix dispatched to Luna.
 - 2026-11-18: dirused M4 review fixes landed 5c2a984, PR #26 updated; CI rerun.
 - 2026-11-18: dirused M4 review fixes dispatched to Luna (Argon on PR #26: 3 accepted, 1 rejected).
 - 2026-11-18: dirused M4 landed c918ff6, PR #26 open. P3 plan-dashboard bug captured.
