@@ -295,5 +295,56 @@ interface:
 - Not adopted: Astra 1's file-ID identity (the scanner does not record IDs; size + time + exclusive lock + final path is the
   chosen identity check).
 
+## Amendment 2 (operator, 2026-11-18, after dispatch): size threshold `/minsize`, default 1 GB
+
+Operator, looking at the v0.0.17 HTML report (116.7 GB red, 9.8 GB and 7.2 GB amber, 621.8 MB plain): "when we purge,
+probably only want to purge the largest or we can specify threshold ... said purge file that is large than 100MB or 999MB
+for example. we should be able to override this threshold". Answers: default **1 GB**; syntax **`/minsize <size>`**.
+
+- **`Options`:** add `long PurgeMinBytes = 1L << 30` (after `Confirm`).
+- **`ArgParser`:** `case "minsize"`: the next argument must match `^[0-9]+(KB|MB|GB|TB)$` (ordinal ignore-case, units 1024-based
+  like `Format.Size`; no bare numbers), value 1 or more and not overflowing `long`, else
+  `Error: "/minsize needs a size like 100MB or 2GB"`. After the loop, before rule 1: `/minsize` without `/purge` →
+  `"/minsize requires /purge"`. (A missing argument, or a following switch, gives the same `needs a size` error.)
+- **Engine:** `Purge.Apply(..., int days, long minBytes, bool confirm, ...)`. New rule between rule 3 and rule 4 (scan-time
+  size, no file opened): `file.LogicalBytes < minBytes` → `skipped: smaller than {Format.Size(minBytes)}`. A file of exactly
+  `minBytes` is eligible. The handle size check (rule 6, `changed since scan`) is unchanged.
+- **Help text:** the `/purge` entry becomes
+  ```
+    /purge [days]       Delete the files /largest lists that were last
+                        modified more than [days] days ago (default: 1)
+                        and are at least /minsize big (default: 1GB).
+                        Needs /largest with file patterns. Without /confirm
+                        this is a dry run: nothing is deleted, the report
+                        shows what would be.
+    /minsize <size>     With /purge: smallest file to delete, e.g. 100MB,
+                        999MB, 2GB (default: 1GB)
+  ```
+  (`/confirm` entry unchanged.) Examples: the second becomes `dirused D:\ /largest *.log /purge /confirm` /
+  `Delete the listed .log files of 1GB or more not modified in the last day`; add
+  `dirused D:\ /largest *.log /purge /minsize 100MB` / `Dry run: also include listed .log files from 100MB`. The closing
+  paragraph's first sentence becomes "Purge only deletes files in the /largest list. It skips files smaller than /minsize,
+  files modified within [days], ...". `ShortUsageText` third line: `[/largest <patterns> [/purge [days] [/minsize <size>] [/confirm]]]`.
+- **README / CHANGELOG:** `/minsize` and the 1 GB default in the `/purge` section and the CHANGELOG line ("... older than days
+  (default 1) and at least `/minsize` (default 1GB) ...").
+- **Interface additions:** `"/minsize needs a size like 100MB or 2GB"`, `"/minsize requires /purge"`,
+  `"skipped: smaller than SIZE"`.
+
+Tests:
+- **P1:** `/purge` alone → `PurgeMinBytes == 1L << 30`; `/minsize 100MB` → `100L << 20`; `999mb`, `2GB`, `1KB` accepted;
+  `/minsize` errors for `100`, `1.5GB`, `0MB`, `-1GB`, `9999999999TB`, missing value, followed by `/confirm`; `/minsize 1GB`
+  without `/purge` → `/minsize requires /purge`. `UsageText` contains the new lines exactly.
+- **P3 (dry run) adds:** with `minBytes = 1L << 30`, files of `(1L << 30) - 1` → `skipped: smaller than 1.0 GB` and exactly
+  `1L << 30` → `would delete` (both old); same run with `minBytes = 100L << 20`: the `(1L << 30) - 1` file → `would delete`.
+- **P4 (confirm):** the small old file is not `MarkDelete`d and not logged; the big old file is (control in the same run).
+- **Windows WP1-WP5:** their files are KB-sized, so every WP run passes `/minsize 1KB`. **WP6:** `[dir, "/largest", "*.log",
+  "/purge", "/confirm"]` with no `/minsize` on WP1-style files → nothing deleted, each listed old file
+  `[skipped: smaller than 1.0 GB]` (default applied end to end); the same run with `/minsize 1KB` deletes (positive control).
+- **Mutation (g):** size rule removed → P3/P4/WP6 red; paste it.
+- **Acceptance:** M2 gains "and at least /minsize (default 1GB)"; new must_not **N6**: "a listed old file smaller than
+  /minsize is deleted or marked would delete (P3, P4, WP6) — mutation (g)".
+
+**Amendment 2 intent approved:** operator, 2026-11-18 ("1 GB (Recommended)", "/minsize <size>").
+
 **Intent approved:** operator, 2026-11-18
 **Intent approval note:** answers to Claude's questions: listed files only (refuse '*'), skip modified < 24 h with /purge N days, permanent delete with failures reported, report + C:\temp\dirused-purge.log; plus "make clear help message for how /purge work". Rev 2 narrows (explicit patterns required); operator told in chat.
