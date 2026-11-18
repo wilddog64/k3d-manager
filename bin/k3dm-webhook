@@ -1816,10 +1816,13 @@ def _publish_test_metrics(job_id, log_path, exit_code, run_duration):
         "--target", "test-all", "--exit-code", str(exit_code),
         "--run-duration", str(run_duration),
     ]
+    env = dict(os.environ)
+    if PUSHGATEWAY_URL:
+        env["K3DM_PUSHGATEWAY_URL"] = PUSHGATEWAY_URL
     rc, output, timed_out = _spawn_capture_text(
-        command, cwd=repo_root, env=dict(os.environ), timeout=60,
+        command, cwd=repo_root, env=env, timeout=60,
     )
-    if timed_out or rc != 0 or "metrics push skipped" in output:
+    if timed_out or rc != 0 or "metrics push skipped" in output or "metrics not published" in output:
         _LOG.warning("job=%s test-all metrics publication was not confirmed", job_id)
         _notify_job(job_id, "⚠️ test-all completed, but Grafana metrics publication was not confirmed")
     else:

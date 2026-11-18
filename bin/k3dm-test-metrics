@@ -282,6 +282,9 @@ def main(argv=None):
         expected_stages = [stage.strip() for stage in args.expected_stages.split(",") if stage.strip()]
     now = int(time.time())
     print(f"[k3dm-test-metrics] {parsed['total']} cases, {parsed['failed']} failed")
+    if not os.environ.get("K3DM_PUSHGATEWAY_URL", "").strip():
+        print("[k3dm-test-metrics] metrics not published (K3DM_PUSHGATEWAY_URL unset)")
+        return 0
     push_metrics(
         build_payload(
             parsed, args.target, args.exit_code, now=now,
