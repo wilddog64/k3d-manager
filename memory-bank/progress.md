@@ -1,6 +1,8 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: dirused M8 /purge spec DRAFT; Fable + Astra review running.
+- 2026-11-18: dirused M7 dispatched to Luna; M5 live-verified.
 - 2026-11-18: dirused v0.0.16 released (M6 merged 8ccf307).
 - 2026-11-18: dirused M6 landed 485fd50; PR dirused#29 green.
 - 2026-11-18: dirused M6 dispatched to Luna.

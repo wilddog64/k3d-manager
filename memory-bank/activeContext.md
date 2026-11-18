@@ -65,6 +65,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-18: dirused M5 LIVE-VERIFIED (operator screenshot: ffm01 D$ /largest HTML, 116.7 GB tomcat85-stderr log). Operator saw no notice after /update 0.0.16 (24 h throttle).
+- 2026-11-18: dirused M7 (lookup every 15 min + always on /help; HTML largest rows red >=10 GB / amber >=1 GB with size bar) spec docs/plans/dirused-m7-check-every-15-min-and-largest-highlight.md, Argon Amendment 1, DISPATCHED to Luna slug dirused-m7-check-highlight, branch m7-check-highlight from 8ccf307. WIP 1/3.
+- 2026-11-18: dirused M8 /purge (deletes /largest-listed files older than N days, default 1; dry run unless /confirm; refuses '*'; log C:\temp\dirused-purge.log; clear /help text per operator) spec DRAFT docs/plans/dirused-m8-purge-largest-files.md, HIGH risk: blind Fable + Astra spec review running. Dispatch only after M7 lands (same files).
 - 2026-11-18: dirused M6 merged 8ccf307, v0.0.16 released. Open operator E2s: M5 /largest (v0.0.15+) and M6 step 1 (/file error) now; M6 step 2 (three-line repeating notice) needs v0.0.17.
 - 2026-11-18: dirused M6 + Amendment 2 (notice every run until updated, operator) LANDED 485fd50; PR dirused#29 green, awaiting merge -> v0.0.16. WIP 0/3.
 - 2026-11-18: dirused M6 (/file followed by a switch errors; Clink-style notice adds stop-checking + release-notes lines) spec docs/plans/dirused-m6-file-switch-check-and-notice-hints.md, intent approved (operator "go ahead"), Argon findings folded (Amendment 1), DISPATCHED to Luna slug dirused-m6-file-notice, branch m6-file-notice from 9d8735f. WIP 1/3. Next: verify (A1, U20 red on 9d8735f), land, PR, v0.0.16.
