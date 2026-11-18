@@ -511,4 +511,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
   - dirused M9 DRAFT (stop Tomcat service for locked files): proof owed on ffm01 (is stderr.2026-11-03 held AND older than cutoff; hprof held?; sc qc). Operator decisions recorded in the plan.
   - Pending operator: show-service-passwords P2 decision; make install-dispatch-metrics go on the M4; M6 /file live check.
 - 2026-11-18: dirused PR #31 CI GREEN on b5f96a6 (push + pull_request, windows + portable). WP1 cause: report lists files twice, and status is two spaces before '['; Claude fixed the test (d28b810, b5f96a6). Blind Argon diff review running (scratchpad argon-pr31.txt).
+- 2026-11-18: dirused PR #31 blind Argon diff review: NONE. Ready for operator merge; then tag v0.0.18 and operator live E2.
 
