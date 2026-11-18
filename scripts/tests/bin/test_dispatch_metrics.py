@@ -2535,6 +2535,32 @@ def test_model_identity_exports_worker_and_coordinator_from_latest_start():
     assert 'vendor="anthropic",model="claude-opus-5-5",source="runtime",status="runtime_reported"' in coordinator[0]
 
 
+def test_model_identity_names_astra_62_and_sol_62():
+    for model in ("gpt-6.2-astra", "gpt-6.2-sol"):
+        output = dispatch_metrics.render([
+            event(1, "start", "astra", agent="codex", model=model,
+                  worker_identity={"vendor": "openai", "model": model, "source": "explicit", "status": "selected"}),
+            event(2, "codex_exit", "astra", tokens=10),
+            event(3, "land", "astra"),
+        ], 0, 100)
+        worker = _identity_lines(output, "worker")
+        assert len(worker) == 1
+        assert f'model="{model}"' in worker[0]
+
+
+def test_model_identity_still_other_for_unlisted_gpt_model():
+    model = "gpt-6.9-nonexistent"
+    output = dispatch_metrics.render([
+        event(1, "start", "astra", agent="codex", model=model,
+              worker_identity={"vendor": "openai", "model": model, "source": "explicit", "status": "selected"}),
+        event(2, "codex_exit", "astra", tokens=10),
+        event(3, "land", "astra"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1
+    assert 'model="other"' in worker[0]
+
+
 def test_repeated_handoffs_preserve_claude_primary_and_human_landing_stays_review_pending(tmp_path):
     spec = tmp_path / "docs/plans/v9.9.9-demo.md"
     spec.parent.mkdir(parents=True)
@@ -3884,6 +3910,14 @@ def test_claude_cost_prices_fable_at_published_rates_and_preserves_opus():
     assert cost_opus == pytest.approx(0.079)
     assert cost_fable is not None
     assert cost_fable == pytest.approx(0.19625)
+
+
+def test_codex_cost_prices_gpt_6_astra_from_the_real_price_file():
+    price_file = dispatch_metrics._repo_root() / "scripts/etc/agent/codex-model-prices.json"
+    codex_models, _, _, _ = dispatch_metrics._prices(price_file)
+    usage = {"model": "gpt-6-astra", "input": 10_000, "cached_input": 4_000, "output": 1_000}
+    assert dispatch_metrics._cost(usage, codex_models) == pytest.approx(0.114)
+    assert dispatch_metrics._cost({**usage, "model": "gpt-6.2-astra"}, codex_models) is None
 
 
 def test_claude_cost_prices_fable_52_and_preserves_fable_51():
