@@ -65,7 +65,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
-- 2026-11-18: dirused M7 MERGED #30 19e66d0, tagged v0.0.17 (release workflow running). M8 /purge DISPATCHED slug dirused-m8-purge, branch m8-purge from 19e66d0 (WIP 1/3). Operator E2 pending: /help notice on v0.0.16->v0.0.17, red row for 116.7 GB log; M6 /file error.
+- 2026-11-18: dirused M7 MERGED #30 19e66d0, released v0.0.17 (pre-release, 2 zips + 2 sha256). M8 /purge DISPATCHED slug dirused-m8-purge, branch m8-purge from 19e66d0 (WIP 1/3). Operator E2 pending: /help notice on v0.0.16->v0.0.17, red row for 116.7 GB log; M6 /file error.
 - 2026-11-18: (earlier) dirused M7 LANDED dbec6a7 (red proof by Claude: U2/U22/U23/L8 red on 8ccf307); PR dirused#30 open; Argon diff review NONE; CI: pull_request run green, push run windows red on pre-existing E3 timing flake (docs/bugs/2026-11-18-dirused-e3-timeout-flake.md, P3), failed job re-run GREEN; all 4 check-runs on dbec6a7 pass. Waiting on operator merge of #30. WIP 0/3. Next: operator merges #30 -> v0.0.17, then dispatch M8 /purge rev 2 from new main.
 - 2026-11-18: dirused M5 LIVE-VERIFIED (operator screenshot: ffm01 D$ /largest HTML, 116.7 GB tomcat85-stderr log). Operator saw no notice after /update 0.0.16 (24 h throttle).
 - 2026-11-18: dirused M7 (lookup every 15 min + always on /help; HTML largest rows red >=10 GB / amber >=1 GB with size bar) spec docs/plans/dirused-m7-check-every-15-min-and-largest-highlight.md, Argon Amendment 1, DISPATCHED to Luna slug dirused-m7-check-highlight, branch m7-check-highlight from 8ccf307. WIP 1/3.
