@@ -1,7 +1,7 @@
 # dirused M4b: update notice on a bare run and `/help`, once per new version
 
 **Filed:** 2026-11-18
-**Status:** LANDED — PR #27 merged 594eff6, released v0.0.13 (2026-11-18); E2 pending: operator installs v0.0.13, Claude tags v0.0.14
+**Status:** LIVE-VERIFIED (M1) — PR #27 merged 594eff6; v0.0.13 → bare `dirused` printed usage then 'dirused 0.0.14 is available (you have 0.0.13). Run: dirused /update' on the first run, operator work laptop 2026-11-18; then /update → 0.0.14. M3 (second run quiet) offline only (U2, U18): operator updated instead of a second bare run
 **Repo / branch:** wilddog64/dirused / `m4b-notice-once` (from main 568a829)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low (stderr notice timing and state only; scan output, exit codes and `/update` unchanged)
