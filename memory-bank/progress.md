@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: dirused M5 /largest dispatched to Luna.
 - 2026-11-18: dirused M5 /largest spec DRAFT; Argon review running.
 - 2026-11-18: dirused M4b live-verified (notice on bare run); v0.0.14 current.
 - 2026-11-18: dirused M4b merged, v0.0.13 released.

@@ -65,6 +65,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-18: dirused M5 /largest: Argon findings (parse ambiguity, formatter, summary completeness, fallback placeholder, filetime throw, HTML grouping, heap tie-break) folded in as Amendment 1; INTENT APPROVED (operator "cool, go dispatch this"); DISPATCHED to Luna, slug dirused-m5-largest, branch m5-largest (from 594eff6). WIP 1/3. Next: verify (L1-L7, red proof), land, PR. Also open: operator's fleet /html report showed only local C:\ with timestamp identical to the 11:11:48 report: stale file; asked for console output of `dirused /file server-list /all /summary /html` (suspect file name has no .txt).
 - 2026-11-18: dirused M5 `/largest` spec written docs/plans/dirused-m5-largest-cleanup-candidates.md (operator answers: one list per target, replace/+add patterns, /summary warn+crit only, /largestcount default 20). Blind Argon review running; then intent approval, then Luna dispatch on branch m5-largest from 594eff6.
 - 2026-11-18: dirused M4b E2: operator screenshot — bare `dirused` on 0.0.13 printed usage then the 0.0.14 notice first try (lookup < 1 s on work network; known limitation not hit); /update → 0.0.14. Second-run quiet not observed live (offline U2/U18 only). dirused M4 + M4b complete; v0.0.14 is current.
 - 2026-11-18: dirused PR #27 MERGED 594eff6 (operator); v0.0.13 released (release workflow green, 4 assets). Next: operator `dirused /update` to 0.0.13, then Claude tags v0.0.14 for M4b E2.
