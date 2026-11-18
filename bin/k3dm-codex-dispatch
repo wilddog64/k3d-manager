@@ -1317,7 +1317,7 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
+  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
   local -a superseding=()
   local _landing_parts=""
   while (($#)); do
@@ -1354,8 +1354,9 @@ _dispatch_land() {
   [[ -n "$target" ]] || target="$rel"
   _dispatch_event_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
   [[ ! -f "$run/violation" ]] || _dispatch_error "VIOLATION: agent committed"
-  [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
-  [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
+  if [[ ! -f "$run/exit" ]] && _dispatch_worker_matches_start "$run"; then
+    _dispatch_error "Codex is still running"
+  fi
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   base="$(<"$run/base")"

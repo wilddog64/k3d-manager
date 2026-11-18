@@ -113,6 +113,57 @@ GIT
   printf 'dirty\n' >>"$FIXTURE/a.txt"; run dispatch land --slug one --no-test; [ "$status" -eq 2 ]
 }
 
+@test "codex dispatch: land accepts a finished run whose PID was reused" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  sleep 30 & sleeper=$!
+  printf '%s\n' "$sleeper" >"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/pid"
+  printf 'pid=%s\nprocess_start=not-the-worker\n' "$sleeper" >"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
+  kill -0 "$sleeper"
+  run dispatch land --slug one --no-test
+  kill "$sleeper"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Codex is still running"* ]]
+}
+
+@test "codex dispatch: land accepts a dead worker whose PID identity is stale" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  sleep 30 & sleeper=$!
+  printf '%s\n' "$sleeper" >"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/pid"
+  printf 'pid=%s\nprocess_start=not-the-worker\n' "$sleeper" >"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
+  rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit"
+  kill -0 "$sleeper"
+  run dispatch land --slug one --no-test
+  kill "$sleeper"
+  [ "$status" -eq 0 ]
+}
+
+@test "codex dispatch: land refuses while the worker is still running" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  export STUB_SLEEP=5
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  run dispatch land --slug one --no-test
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Codex is still running"* ]]
+  sleep 5
+}
+
 @test "codex dispatch: land fast-forwards without pushing" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
