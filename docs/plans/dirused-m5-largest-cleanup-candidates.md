@@ -1,7 +1,7 @@
 # dirused M5: `/largest`, the largest cleanup-candidate files (logs, dumps, backups, temp)
 
 **Filed:** 2026-11-18
-**Status:** DRAFT — operator design answers 2026-11-18; waits on spec review (Argon blind) and intent approval
+**Status:** DISPATCHED 2026-11-18 to Luna (after blind Argon review, findings folded in: see Amendment 1)
 **Repo / branch:** wilddog64/dirused / `m5-largest` (from main 594eff6)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low-medium (read-only: the scanner collects one more bounded list; no file is deleted or opened; default output unchanged without the switch)
@@ -49,19 +49,26 @@ File-name match only, case-insensitive, Windows wildcard rules via
 min-heap, `PriorityQueue`; ties by path, ordinal ignore-case) and counts `Matches` and `MatchedBytes` over **all** matches.
 Memory stays bounded by `count` on a drive with millions of files.
 
-Pattern list rules (`ParsePatterns`): items split on `;` or `,`, trimmed, empty items dropped.
+Pattern list rules (`ParsePatterns`): items split on `;` or `,`, trimmed; a leading `+` is noted and stripped; then
+empty items are dropped (so `"+"` or `"+*.log;+"` leaves no empty pattern).
 - No argument: `DefaultPatterns`.
 - All items start with `+`: `DefaultPatterns` plus those items (with `+` removed), duplicates dropped.
 - No item starts with `+`: exactly those items. `*` alone means any file.
 - A mix of `+` and plain items: error `/largest: use + items to add to the defaults, or a plain list to replace them`.
 - An item containing `\`, `/` or `:`, or nothing left after dropping empties: error `/largest patterns match file names only, e.g. "*.log;*.bak"`.
 
+Collector ordering: final list is `LogicalBytes` descending, then `Path` ascending (OrdinalIgnoreCase). The heap's
+eviction order is the exact reverse (smallest bytes first; on equal bytes, the path that sorts **last** is evicted
+first), so with `count = 1` and two equal 10 MB files `C:\a.log`, `C:\z.log` the result is `C:\a.log`.
+
 ### Switches (`src/Dirused.Common/ArgParser.cs`, `Options.cs`)
 
 - `Options` gains `IReadOnlyList<string>? Largest = null` (null = off) and `int LargestCount = 20`.
-- `/largest [patterns]`: the next argument is taken as the pattern list only if it contains `*` or `?` or starts with `+`;
-  otherwise `/largest` alone (defaults) and the next argument is parsed as usual (a target or switch). So
-  `dirused /largest C:\` and `dirused C:\ /largest` both use the defaults.
+- `/largest [patterns]`: the next argument is taken as the pattern list only if it is not a switch and contains `*`,
+  `?`, `;` or `,`, or starts with `+`; otherwise `/largest` alone (defaults) and the next argument is parsed as usual
+  (a target or switch). So `dirused /largest C:\` and `dirused C:\ /largest` both use the defaults. A single exact
+  name is written with a trailing `;` (`/largest "catalina.out;"`), and a relative folder whose name starts with `+`
+  is written `.\+name`; README says both.
 - `/largestcount <n>`: 1-1000, error `/largestcount requires an integer from 1 to 1000`; without `/largest`, error
   `/largestcount requires /largest`.
 - Usage text, after the `/exact` line:
@@ -72,37 +79,49 @@ Pattern list rules (`ParsePatterns`): items split on `;` or `,`, trimmed, empty 
 ### Scanner (`src/Dirused.Core/Scanner.cs`, `DirectoryReader.cs`, `Targets/RemoteScan.cs`)
 
 - `DirEntry` gains `DateTime LastWriteUtc`: read `LastWriteTime` from `FILE_ID_BOTH_DIR_INFO` at offset 24
-  (`DateTime.FromFileTimeUtc(Marshal.ReadInt64(current, 24))`). The fallback path uses `FileInfo.LastWriteTimeUtc`.
+  as `DateTime? LastWriteUtc`: `null` when the raw value is `<= 0` or `> DateTime.MaxValue.ToFileTimeUtc()` (NAS and
+  FAT shares can return such values; `DateTime.FromFileTimeUtc` would throw `ArgumentOutOfRangeException`, which
+  `IsScanError` does not catch, and abort the target). The fallback path uses `FileInfo.LastWriteTimeUtc` (same guard).
+  A null date renders `-` in text and HTML and `null` in JSON.
 - `Scan(target, deep, exact, ct)` gains an optional `LargestCollector? largest = null`. In both file branches of `Walk`
   (`:100-112`, `:136-160`), at **every** depth (not limited by `/deep`), call `largest?.Offer(path, name, countedLength,
   lastWriteUtc)` when `countedLength > 0` and the file is not a placeholder (cloud placeholders, attribute bits already
-  tested at `:139`, free no local disk). Hard-link duplicates already count 0 and so are skipped.
+  tested at `:139`, free no local disk). The fallback branch (`:100-112`) does not compute that flag today: compute the
+  same placeholder test from `entry.Attributes` there, used only for the `Offer` decision (its size counting stays as
+  is). Hard-link duplicates already count 0 and so are skipped.
 - `ScanResult` gains `LargestFiles? Largest { get; init; }` (record `LargestFiles(IReadOnlyList<string> Patterns, long
-  Matches, long MatchedBytes, List<LargestFile> Files)`, `LargestFile(string Path, long LogicalBytes, DateTime
-  LastWriteUtc)`), with `[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]` so JSON without `/largest` is
+  Matches, long MatchedBytes, List<LargestFile> Files, bool Complete)`, `LargestFile(string Path, long LogicalBytes,
+  DateTime? LastWriteUtc)`; `Complete` is the walk's own completeness), with `[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]` so JSON without `/largest` is
   byte-for-byte unchanged. An incomplete scan keeps what it collected (`Complete` already says incomplete).
-- `RemoteScan.Scan` passes the collector through; `Program.cs` creates one collector per target scan when
+- `RemoteScan.Scan` passes the collector through (the `ProbeSummary` overload at `Program.cs:73` runs no walk and gets
+  no collector; under `/summary` only the `TopFolders.Attach` scan at `:83` collects). `ArgParser.cs` builds `Options`
+  at two sites (`:152` and `:170`); both pass the new fields. `Program.cs` creates one collector per target scan when
   `options.Largest != null` (a fresh collector per scan, never shared across parallel scans).
 
 ### `/summary` (`src/Dirused.Common/TopFolders.cs`, `Program.cs:83`)
 
 When `/largest` is on, the top-folder scan of each warn/crit volume also collects candidates, and `Attach` copies
-`Largest` onto that volume's result. OK volumes get none. `/summary` without `/largest` is unchanged.
+`Largest` (with `Complete` from that walk) onto that volume's result; the volume's own `Complete` stays as today
+(`TopFoldersNote` precedent, `TopFolders.cs:29`). OK volumes get none. `/summary` without `/largest` is unchanged.
 Without `/summary`, a normal scan collects for every target.
 
 ### Output (`src/Dirused.Common/Renderers/`)
 
 - **Text** (`TextRenderer`, and `SummaryRenderer` under the top folders lines): after a target's rows,
   `Largest candidate files (20 of 1,284 matches, 61.2 GB):` then one line per file:
-  `  18.4 GB  2026-10-02  C:\app\dumps\java_pid4412.hprof` (size right-aligned as today, date `yyyy-MM-dd` local time).
-  No match: `Largest candidate files: none matched`. Incomplete scan: append ` (scan incomplete)` to the header.
+  `  18.4 GB  2026-10-02  C:\app\dumps\java_pid4412.hprof` (date `yyyy-MM-dd` local time). Sizes use the same formatter
+  as the rows around them: `Format.Short` in `TextRenderer` (`18G`, matching its entry rows), `Format.Size` in
+  `SummaryRenderer` (`18.4 GB`); the header total uses the same one. No match: `Largest candidate files: none matched`.
+  When `Largest.Complete` is false, append ` (scan incomplete)` to the header.
 - **JSON:** `largest` object per target as above (camelCase: `patterns`, `matches`, `matchedBytes`, `files[]` with
   `path`, `logicalBytes`, `lastWriteUtc` ISO 8601). Summary JSON keeps `largest` on warn/crit volumes.
 - **CSV (non-summary):** header unchanged; after each target's rows, rows `largest,<target>,<path>,<logical_bytes>,<logical_bytes>`
   (on-disk column repeats logical; dates are not in CSV). Summary CSV unchanged (it lists no folders today either).
 - **HTML:** a `<h2>Largest candidate files</h2>` table after the volumes (summary) or entries (normal) section, columns
-  Host, Size, Modified, Path, grouped by target in result order, with the count line above each group's rows. Values
-  HTML-escaped with the existing `E(...)` helper. Omitted entirely when `/largest` is off.
+  Host, Size, Modified, Path (`Format.Size`). Rows come from the deduplicated `volumes` list (summary, from
+  `SummaryRenderer.Prepare`) or from `results` (normal), **only those with `Largest != null`**, in that order; each
+  group starts with `<tr class="group"><th colspan="4">{host} {target}: K of M matches, S{ (scan incomplete)}</th></tr>`.
+  Values HTML-escaped with the existing `E(...)` helper. Omitted entirely when no result has `Largest`.
 
 ### Docs
 
@@ -118,19 +137,27 @@ Portable (`tests/Dirused.Tests.Portable/LargestTests.cs`, new):
   `db.bak`, `~$report.docx`, `setup.exe.crdownload`, `MEMORY.DMP` (upper case) match; `core.dll`, `logo.png`, `backup.zip`,
   `notes.txt`, `catalog.json` do not (positive and negative controls in one test).
 - **L2_ParseOverrideForms:** no argument → defaults; `"*.hprof;*.dmp"` → exactly 2; `"+*.trc2,+*.out2"` → defaults + 2;
-  `*` → matches `anything.xyz`; mixed `"+*.a;*.b"` → the mix error; `"logs\*.log"` and `";;"` → the file-names-only error.
-- **L3_CollectorKeepsTopKAndCountsAll:** offer 1,000 files with random sizes, 300 matching, count 20 → exactly the 20
+  `*` → matches `anything.xyz`; `"catalina.out;"` → exactly `catalina.out`; `"+"` and `"+*.log;+"` → no empty pattern
+  (the first is the file-names-only error, the second is defaults + `*.log`); mixed `"+*.a;*.b"` → the mix error;
+  `"logs\*.log"` and `";;"` → the file-names-only error.
+- **L3b_CollectorTieBreak:** `count = 1`, offer `C:\z.log` then `C:\a.log`, both 10 MB → `C:\a.log`; offered in the
+  other order → still `C:\a.log` (red for a comparator that evicts the lower path).
+- **L3_CollectorKeepsTopKAndCountsAll:** `new Random(42)`, offer 1,000 files with random sizes, 300 matching, count 20 → exactly the 20
   largest matching in descending order (checked against a LINQ sort of the same input); `Matches == 300`; `MatchedBytes`
   equals the sum of all 300.
 - **L4_ArgParserLargestSwitches:** `["/largest", "C:\\"]` → defaults, target `C:\`; `["C:\\", "/largest", "*.bak"]` →
-  `["*.bak"]`; `["/largestcount", "5", "C:\\"]` → `/largestcount requires /largest`; `/largestcount 0` and `1001` → range
+  `["*.bak"]`; `["C:\\", "/largest", "catalina.out;"]` → `["catalina.out"]`, targets only `C:\`; `["/largest", "/json", "C:\\"]`
+  → defaults and JSON; `["/largestcount", "5", "C:\\"]` → `/largestcount requires /largest`; `/largestcount 0` and `1001` → range
   error; no `/largest` → `Options.Largest == null` (positive control: the existing default-options test still passes).
 - **L5_RenderersOmitLargestWhenOff:** text, JSON, CSV and HTML output of the existing renderer fixtures is unchanged
   (compare to the output with `Largest == null`, and assert `"largest"` and `Largest candidate files` absent).
 - **L6_RenderersShowLargest:** a result with 2 files and `Matches = 1284` renders the text header
   `Largest candidate files (2 of 1,284 matches,` and both paths; JSON has `"matchedBytes"` and `"lastWriteUtc"`; CSV has
-  `largest,` rows; HTML has `<h2>Largest candidate files</h2>` and escapes a path containing `&`; zero matches renders
-  `none matched`.
+  `largest,` rows; HTML has `<h2>Largest candidate files</h2>`, a `<tr class="group">` row, and escapes a path
+  containing `&`; zero matches renders `none matched`; `Complete = false` renders `(scan incomplete)`; a null date
+  renders `-`; text size uses `Format.Short` and summary text uses `Format.Size` (assert each formatter's output).
+- **L6b_HtmlSummaryOnlyWarnCritGroups:** summary HTML with a warn volume (with `Largest`) and an OK volume (null) has
+  exactly one group row, naming the warn volume.
 - **L7_SummaryAttachesOnlyToWarnCrit:** extend `TopFoldersTests`: with a collector-bearing scan fake, a warn volume and a
   crit volume get `Largest`, the OK volume gets null.
 
@@ -139,6 +166,8 @@ Windows (`tests/Dirused.Tests/ScannerTests.cs`, existing fixture style with a te
   scan with `deep = 1` and default patterns → `Largest.Files` is `heap.hprof`, then `x.log`; `big.iso` absent (not a
   pattern); `Directories` still lists only depth 1 (positive control that `/deep` is unchanged).
 - **W2_LargestLastWriteDate:** set `heap.hprof` LastWriteTimeUtc to 2025-03-11; the collected entry carries that date.
+  Unit-test the raw filetime guard (a static helper, e.g. `DirectoryReader.ToUtcOrNull(long)`): `0`, `-1` and
+  `long.MaxValue` → null, a valid value → its date.
 - **W3_ScanWithoutLargestUnchanged:** the same tree without a collector → `Largest == null` and `Directories`/`Files`
   identical to a run before this change (assert the existing ScannerTests still pass untouched).
 
@@ -174,6 +203,15 @@ W1 from Windows CI on the PR.
 - Do not keep every matching file in memory; only the bounded top `count`.
 - Do not match on full paths or folders, and do not follow reparse points (unchanged walk rules).
 - Do not update `memory-bank/`, create a PR, or skip hooks.
+
+## Amendment 1 (Claude, after blind Argon review, 2026-11-18)
+
+Folded into the sections above: (1) the optional argument also accepts `;`/`,` lists, exact names by trailing `;`,
+`+` folders by `.\`; (2) each renderer keeps its own size formatter; (3) `LargestFiles.Complete` carries the walk's
+completeness, since `/summary` keeps the volume `Complete`; (4) the fallback branch computes the placeholder test, and
+invalid raw filetimes become null instead of throwing; (5) `+` is stripped before empties are dropped; (6) HTML groups
+only results with `Largest`, from the deduplicated list under `/summary`; (7) `ProbeSummary` gets no collector, both
+`Options` sites updated; (8) heap tie-break defined, with a seeded L3 and a tie test L3b.
 
 ## Acceptance
 
@@ -214,4 +252,5 @@ interface:
   - "text: Largest candidate files (K of M matches, S):  <size>  <yyyy-MM-dd>  <path>"
 ```
 
-**Intent approved:** no
+**Intent approved:** operator, 2026-11-18
+**Intent approval note:** "cool, go dispatch this" (after the spec, its E1/E2 intents and the Argon findings summary were shown)
