@@ -1,7 +1,7 @@
 # dirused M6: `/file` rejects a switch as its path; update notice gains opt-out and release-notes lines
 
 **Filed:** 2026-11-18
-**Status:** DISPATCHED 2026-11-18 to Luna (after blind Argon review: Amendment 1)
+**Status:** LANDED 485fd50 on `m6-file-notice` (Claude verified 2026-11-18: 95/95 portable, Windows build 0 warnings, red on 9d8735f: A1, U2, U18, U19, U20; --allow-out-of-scope for UpdateWiringTests.cs per Amendment 2). PR wilddog64/dirused#29 open, CI green (portable + windows), awaiting operator merge, then v0.0.16
 **Repo / branch:** wilddog64/dirused / `m6-file-notice` (from main 9d8735f)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low (one parser error message; two extra stderr lines after the existing notice line)
