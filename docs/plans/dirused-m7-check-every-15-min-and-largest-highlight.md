@@ -1,7 +1,7 @@
 # dirused M7: update lookup every 15 minutes and always on `/help`; highlight the largest files in HTML
 
 **Filed:** 2026-11-18
-**Status:** MERGED PR wilddog64/dirused#30 (19e66d0), tagged v0.0.17 2026-11-18; awaiting operator E2. Verified: portable 98/98; red on 8ccf307 (tests applied, only the `force` parameter stubbed): U2, U22, U23, L8 fail; U23 does not compile unstubbed. W7 via Windows CI.
+**Status:** LIVE-VERIFIED (E2 highlight part: operator screenshot 2026-11-18 on v0.0.17: 116.7 GB row red with full bar, 9.8 GB and 7.2 GB amber, dates on one line). Merged PR wilddog64/dirused#30 (19e66d0), v0.0.17. Notice part of E2 waits for v0.0.18.
 **Repo / branch:** wilddog64/dirused / `m7-check-highlight` (from main 8ccf307)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low (lookup timing and HTML styling only; scan results, exit codes and text/JSON/CSV output unchanged)
