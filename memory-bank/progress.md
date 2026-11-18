@@ -140,3 +140,4 @@
 - [ ] v1.45.0 plan 3 M2 (multi-project bug metrics): spec written 2026-11-18, under Argon + Fable review; dispatch to Luna after intent approval
 - [ ] v1.45.0 plan 1 remote-promote-approval: intent approved 2026-11-18 (TOTP, cloud channel first); spec review next
 - [ ] v1.45.0 plan 5 dispatch-stall-recovery: spec to write, Argon + Fable review, then operator review
+- [ ] v1.45.0 plan 4 web-console: intent approved 2026-11-18 (6h, idle TOTP tmux lock); spec review next
