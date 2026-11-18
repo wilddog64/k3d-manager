@@ -390,3 +390,6 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
   (test-only: `[0-9]+s` in the summary test; per-key/per-ext collision assertion with dir dump). New lib-foundation branch
   `release/v0.5.7` from main f8025a2. Dispatched to Luna, slug `lib-foundation-v0.5.7-run-parallel-test-flakes`
   (cross-repo specs live in k3d-manager; `--version` is refused with `--repo`). WIP 2/3.
+
+- 2026-11-18: land PID-reuse P3 VERIFIED and landed, `ca27c8bf` (Luna). Diff = spec; pre-fix tests 1-2 red, 3 green;
+  guard-forced-false mutation turns 3 red; land+resume bats and shellcheck green. Pushed; `make hub-sync` not run. WIP 1/3.

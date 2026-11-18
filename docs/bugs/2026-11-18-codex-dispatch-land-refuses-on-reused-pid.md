@@ -1,11 +1,10 @@
 # Bug: `codex-dispatch land` refuses with "Codex is still running" when the OS reused the worker's PID
 
-**Status:** OPEN — captured 2026-11-18
+**Status:** VERIFIED — `ca27c8bf` (2026-11-18; offline E1 by Claude: tests 1-2 red pre-fix, 3 red with guard forced false; land+resume suites and shellcheck green)
 **Priority:** P3 (land is refused with a misleading error; workaround: move `<slug>.run/pid` aside)
 **Introduced by:** pre-existing (the `status`/`resume` PID-reuse fix in `2de716d8` did not cover `land`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-18
 **Prior art:** `docs/bugs/2026-10-20-codex-dispatch-background-process-lost-no-terminal-status.md` (grep match on "PID reuse", `find-similar-docs` not run: the vector store is on the hub) — read, different code path: that fix added `_dispatch_worker_matches_start` for `status` and `resume`; `land` was not changed
 **Found by:** Claude, landing `test-all-metrics-explicit-pushgateway` on the M4, 2026-11-18
 
