@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing (codex added `gpt-6.2-astra` and `gpt-6.2-sol`; the allowlist and price file were never updated)
 **Should have been caught by:** none
 **Introducing change reviewed:** no
-**Waiting on:** dispatch — since 2026-11-18 (operator: "yes for that"; gpt-6.2-astra rate still unpublished, see Rates)
+**Waiting on:** fix running — since 2026-11-18 (Luna, slug dispatch-metrics-astra-price; spec docs/plans/v1.45.0-dispatch-metrics-astra-allowlist-and-price.md)
 **Prior art:** `docs/bugs/2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero.md` (exact-slug review) — read, different root cause (Claude price); `docs/bugs/2026-11-16-dispatch-metrics-xhigh-tier-runs-unpriced.md` — read, different root cause (tier suffix not stripped). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18
 **Approval:** operator, 2026-11-18: "go ahead to file P3 bug" (after Claude reported the two gaps below)

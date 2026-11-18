@@ -44,7 +44,8 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    Scope check passed (3 spec files + CHANGE.md). PR #89 MERGED by operator 2026-11-18 -> main 15d5001. RELEASED: tag v0.5.7
    (annotated, peels to 15d5001) + GH release Latest; release/v0.5.8 created at 15d5001; main unprotected (404). NEXT:
    k3d-manager subtree pull of v0.5.7. Astra metrics spec docs/plans/v1.45.0-dispatch-metrics-astra-allowlist-and-price.md
-   written — waiting on intent approval. Older findings captured as two P3s (grooming):
+   intent approved 2026-11-18; DISPATCHED to Luna (gpt-6-luna) slug dispatch-metrics-astra-price.
+   Review rows lf-v057-review-argon/-astra abandoned (operator go 2026-11-18). Older findings captured as two P3s (grooming):
    2026-11-18-lib-foundation-run-parallel-claim-loop-unbounded-and-key-edge-cases.md,
    2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md. Astra metrics P3 approved for dispatch
    ("yes for that"); gpt-6-astra $10/$1/$50 (third-party), gpt-6.2-astra unpublished -> allowlist only, unpriced.
