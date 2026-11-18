@@ -1,8 +1,8 @@
 # Bug: `make test-all` on a dev machine overwrites the nightly offline-suite metrics
 
-**Status:** OPEN — captured 2026-11-14 by Claude (alert investigation)
+**Status:** LANDED — `64a8de5c` (Flash, v1.45.0; plan `docs/plans/test-all-metrics-explicit-pushgateway.md`); captured 2026-11-14 by Claude (alert investigation)
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** dispatch — since 2026-11-14
+**Waiting on:** live check — since 2026-11-18 (E2 on the M4 by Claude; E3 after promote: operator re-runs `make install-test-metrics` on the hub)
 **Triage:** carry → v1.45.0, batched with install-test-metrics (same files) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (operator approved Claude's recommendation, 2026-11-14)
 **Introduced by:** unknown
