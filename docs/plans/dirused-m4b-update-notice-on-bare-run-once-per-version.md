@@ -1,7 +1,7 @@
 # dirused M4b: update notice on a bare run and `/help`, once per new version
 
 **Filed:** 2026-11-18
-**Status:** DISPATCHED 2026-11-18 to Luna
+**Status:** LANDED 442c259 (PR #27, CI green, blind Argon review: no findings); awaiting operator merge, then v0.0.13 / v0.0.14 for E2
 **Repo / branch:** wilddog64/dirused / `m4b-notice-once` (from main 568a829)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low (stderr notice timing and state only; scan output, exit codes and `/update` unchanged)
@@ -92,6 +92,14 @@ if they cannot run locally).
 - Do not change the notice wording, the 1 s grace, the daily lookup throttle, `/update`, `/version`, scan output or exit codes.
 - Do not check on usage errors other than the bare run, or print anything to stdout.
 - Do not update `memory-bank/`, create a PR, or skip hooks.
+
+## Known limitation (Claude, at verify, 2026-11-18)
+
+`UpdateCheck.CheckAsync` writes `AttemptedUtc` before the lookup. On a bare run the process exits after the 1 s grace; if
+the lookup is slower than that, it is cut off, `Latest` is never stored, and the daily throttle skips lookups for 24 h.
+The notice then appears on the first scan or bare run after that day, not "the next run" as first stated. Pre-existing
+in M4 (scans hit it rarely because they take longer). Not blocking; fix if E2 shows it (e.g. write `AttemptedUtc` only
+after the lookup finishes, or retry within the day when `Latest` is missing).
 
 ## Acceptance
 
