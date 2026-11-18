@@ -1,3 +1,34 @@
+## Handoff 2026-11-18 — v1.45.0: 2 lands + P3 verified; lib-foundation v0.5.7 PR #89 open — START HERE
+
+**Objective done this session:** land the travel bundle and test-all; copy the Anthropic key to the M4; fix the land
+PID-reuse P3; run_parallel investigation and its test-only fixes upstream.
+
+**Evidence / state (all pushed; k3d-manager `k3d-manager-v1.45.0` head after this commit):**
+- Travel bundle LANDED `ddd9329e..d14b5d9e`; test-all metrics LANDED `64a8de5c` — both await live checks (below).
+- Land PID-reuse P3 VERIFIED `ca27c8bf` (`docs/bugs/2026-11-18-codex-dispatch-land-refuses-on-reused-pid.md`): pre-fix
+  tests 1-2 red, guard-forced-false turns 3 red; land+resume bats + shellcheck green. Offline-only fix, no live check.
+- run_parallel: lib-foundation `7027b38` on `release/v0.5.7` (test-only; Claude reproduced date-shim and worker-mutation
+  proofs). **Release PR wilddog64/lib-foundation#89 OPEN** (normal PR; CHANGE.md v0.5.7 `## [v0.5.7] — 2026-11-18`).
+  Bug doc LANDED, Waiting on: live check (Linux CI on #89). #157 root cause still unknown.
+- `k3dm-anthropic-api-key` present on m4-air (pulled from m5-air.local via `bin/k3dm-machine-secrets pull --repo`).
+- Dispatch WIP 0/3.
+
+**Decisions:** cross-repo specs live in k3d-manager `docs/plans/` (dispatch reads specs from its own repo; `--version`
+is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes (hub change needs operator go).
+
+**Next, in order:**
+1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
+   2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
+   (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.
+2. Child C (`dispatch-stall-c-diagnose`): take captures E1-E4 on the M4 (key now present; claude is 2.1.327 — update
+   fixture names/version), commit fixtures, re-dispatch to Luna; then child B.
+3. Live checks: test-all E2 on the M4 (Claude: `make test-all` prints "metrics not published", Pushgateway group
+   timestamp unchanged); E3 after promote (operator re-runs `make install-test-metrics` on the hub). Travel bundle E2/E3
+   by operator; its install waits on the P2 show-service-passwords temp-file bug (operator decision).
+4. Grooming Sunday 2026-11-22 (agenda section below).
+
+**Open questions for operator:** promote timing for v1.45.0 live checks; decision on the show-service-passwords P2.
+
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
 - 2026-11-18: run_parallel investigation done: #157 (missing a_b result) NOT reproduced in 850 runs (aarch64 bats 1.10; 1-CPU loaded; amd64 emulated bats 1.13 full file). Found second flake: test 4 asserts `FAIL fail-item 0s`, but worker timing is whole-second `date +%s` diff (system.sh:878-882) -> 10/150 under emulation. Bug doc updated, Waiting on: operator decision (two test-only upstream fixes: accept [0-9]+s; per-key #157 assertion + dump). Luna dispatch codex-dispatch-land-pid-reuse running (watcher bahzjb5s1).
@@ -385,16 +416,3 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-18 ~00:20Z: /create-pr: v1.44.2 release PR #163 OPEN (normal, base main). CHANGELOG promoted to [1.44.2] with 5 missing entries (watchdog stage 2, W/H review fixes, stall-watch ~/, multi-project M1, Stall row); README/releases rows; docs: codex-dispatch howto --project, ai-analysis-fallback Vault-first (2a7ac38c). Copilot capped -> blind Argon review dispatched as v1442-pr163-review (spec docs/plans/release-pr163-v1.44.2-review.md, f360f67e; renamed from v1.44.2-* because test_release_milestones_drift treats v*-named plans as milestones). Open PR #158 (dependabot) left alone. Next: Argon findings + CI green -> enforce_admins off -> operator merge.
 - 2026-11-18 ~00:08Z: post-pull Hermes check DONE: hub pane work:1.0 shows a record sampled 00:06:18Z (after the 00:00Z fast-forward) with vault_seal healthy "unsealed: 1 pod(s)", so Hermes is running the new code (H1-H3) and the sensor is live. Hub checkout ⇣3 (memory-bank only). Still open: webhook W1-W6 live evidence (needs a real alert), watchdog stage 2 (needs a real restore), Stall row 2e050c6d (next promote), v1.44.2 release PR + Argon review.
 - dirused v0.0.10 released (tag cbf37ac, #22+#23 merged): pre-release, 2 zips + .sha256, notes from [v0.0.10]. .sha256 CRLF fix still pending → M4 spec. Office live check L1-L15 still open.
-
-- 2026-11-18: run_parallel test fixes approved ("go ahead"). Spec `docs/plans/lib-foundation-v0.5.7-run-parallel-test-flakes.md`
-  (test-only: `[0-9]+s` in the summary test; per-key/per-ext collision assertion with dir dump). New lib-foundation branch
-  `release/v0.5.7` from main f8025a2. Dispatched to Luna, slug `lib-foundation-v0.5.7-run-parallel-test-flakes`
-  (cross-repo specs live in k3d-manager; `--version` is refused with `--repo`). WIP 2/3.
-
-- 2026-11-18: land PID-reuse P3 VERIFIED and landed, `ca27c8bf` (Luna). Diff = spec; pre-fix tests 1-2 red, 3 green;
-  guard-forced-false mutation turns 3 red; land+resume bats and shellcheck green. Pushed; `make hub-sync` not run. WIP 1/3.
-
-- 2026-11-18: run_parallel test fix LANDED in lib-foundation `7027b38` (`release/v0.5.7`, pushed; Luna). Claude reproduced
-  P1 (date shim: old red, new green), P2a/P2b (skip .item a_b-2 / .log sleep_a: old green, new red naming the file) on
-  scratch copies; both tests green on the unmodified lib. Remaining: v0.5.7 release PR (Argon review while Copilot capped),
-  Linux CI, subtree pull into k3d-manager. #157 root cause still unknown; the new assertion will name it next time. WIP 0/3.
