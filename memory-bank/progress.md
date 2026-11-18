@@ -1,7 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
-- 2026-11-18: v1.44.2 release PR #163 open. Argon review done: #1 (shards under xtrace) fixed 8eeaaeb8 with test S2-6; 7 P3s captured (7f3a196a); #7 duplicate. Fable 3-way review: missing vault-unseal exit fixed 3609a2ad; 8 more P3s (e82bad63). CI pending on new head.
+- 2026-11-18: v1.44.2 release PR #163 open. Argon review done: #1 (shards under xtrace) fixed 8eeaaeb8 with test S2-6; 7 P3s captured (7f3a196a); #7 duplicate. Fable 3-way review: missing vault-unseal exit fixed 3609a2ad; 8 more P3s (e82bad63). CI green on 73384cff (19/19); enforce_admins off, awaiting operator merge.
 - 2026-11-18: v1.44.2 Hermes H1-H3 live on hub (vault_seal healthy at 00:06:18Z, post-pull); webhook W1-W6 + watchdog stage 2 wait on real events.
 - 2026-11-17: dirused v0.0.7 published (M2b top folders + release test fix); office live check pending.
 - 2026-11-17: dirused M2b-fix landed 622fab5, PR #16 open, Argon review running; v0.0.7 after merge.
