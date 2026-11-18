@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing (codex added `gpt-6.2-astra` and `gpt-6.2-sol`; the allowlist and price file were never updated)
 **Should have been caught by:** none
 **Introducing change reviewed:** no
-**Waiting on:** operator decision — since 2026-11-18 (Astra 6.2 rates and source; dispatch timing)
+**Waiting on:** dispatch — since 2026-11-18 (operator: "yes for that"; gpt-6.2-astra rate still unpublished, see Rates)
 **Prior art:** `docs/bugs/2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero.md` (exact-slug review) — read, different root cause (Claude price); `docs/bugs/2026-11-16-dispatch-metrics-xhigh-tier-runs-unpriced.md` — read, different root cause (tier suffix not stripped). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18
 **Approval:** operator, 2026-11-18: "go ahead to file P3 bug" (after Claude reported the two gaps below)
@@ -34,3 +34,15 @@ The trial's question is whether Astra's cost is worth its findings, so the cost 
 
 The ledger keeps the 2026-11-18 Astra run's tokens, so its cost appears once the fix is live on the hub
 (`make hub-promote`).
+
+## Rates (Claude, web search 2026-11-18)
+
+- `gpt-6-astra`: $10.00 input / $1.00 cached input / $50.00 output per 1M tokens (standard, <=272K input), per
+  third-party trackers (eesel.ai, codersera.com, anotherwrapper.com); not confirmed on openai.com/api/pricing.
+- `gpt-6.2-astra`: no published rate found. The operator heard it is cheaper than Fable; unconfirmed.
+- For comparison, `claude-fable-5-2` in this file: $8.00 input / $0.20 cache read / $40.00 output.
+- The 2026-11-18 Astra review (`lf-v057-review-astra`): 253,880 input (226,816 cached), 1,291 output. At `gpt-6-astra`
+  rates that is about $0.56.
+
+Spec decision: price `gpt-6-astra` from the trackers above (as `gpt-6-luna` was), and leave `gpt-6.2-astra` allowlisted
+but unpriced until a rate is published or the operator supplies one. Do not price 6.2 with the 6.0 rate.

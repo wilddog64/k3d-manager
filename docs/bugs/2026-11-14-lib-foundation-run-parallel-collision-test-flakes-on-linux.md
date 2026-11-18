@@ -1,8 +1,8 @@
 # lib-foundation `run_parallel.bats` #157 (sanitized-collision test) flakes on Linux CI
 
-**Status:** LANDED — lib-foundation `a561b16` on `release/v0.5.7` (noclobber lock claims for `_run_parallel_worker` and `_foundation_vcluster_lock`; root cause uutils `mkdir` on ubuntu-26.04); test fixes `7027b38`
+**Status:** VERIFIED — lib-foundation `a561b16`, merged to main `15d5001` (PR #89, 2026-11-18; CI 3/3 green on ubuntu-26.04) (noclobber lock claims for `_run_parallel_worker` and `_foundation_vcluster_lock`; root cause uutils `mkdir` on ubuntu-26.04); test fixes `7027b38`
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-18 (CI E2 passed; PR #89 needs Argon review and merge)
+**Waiting on:** scheduled run — since 2026-11-18 (v0.5.7 tag, then k3d-manager subtree pull)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
