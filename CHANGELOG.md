@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Bug metrics for registered projects.** The scanner publishes each project's bug inventory, verification and open history from its clone or legacy k3d-manager docs, with fetch and scan freshness metrics.
 - **Encrypted travel password bundle.** Enrolled laptops can decrypt service passwords delivered through a shared folder; the hub republishes on changes and alerts when publishing is stale.
 
 ## [1.44.2] - 2026-11-17

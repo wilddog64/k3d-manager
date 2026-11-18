@@ -208,6 +208,10 @@ Bug Tracking defaults to **Auto (current)**: the **Release** row (Release, Bugs 
 
 In the Bugs table, **Fix commit** comes from the bug doc's **Fix commit:** header when present, otherwise from the commit that marked the bug fixed. **Fixed in** continues to show the release where its status changed.
 
+## Registered project bug metrics
+
+The scanner reads projects from `scripts/etc/projects.list`. A project with `docs/bugs/` at its default branch is read from its clone; otherwise it reads the legacy `docs/<project>/bugs/` directory from the scanned k3d-manager ref. In-repo bugs use the project's release tags. Legacy bugs have release `unassigned`; their `verified_sha` points to the k3d-manager proof commit, while `fix_sha` points to a commit in the project clone. Each project's `k3dm_project_clone_fetch_timestamp_seconds` records the last successful fetch, and `k3dm_project_bug_scan_timestamp_seconds` records the last completed scan. If a project is removed from the registry, manually delete its Pushgateway groups for `k3dm-bug-docs`, `k3dm-bug-open`, `k3dm-bug-open-history`, and `k3dm-bug-releases` with its `instance` label.
+
 ## Release plans
 
 The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Dispatch:**`, `**Release:**`, `**Depends on:**`, `**Wave:**`, and `**Component:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:

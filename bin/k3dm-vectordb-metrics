@@ -143,13 +143,14 @@ def publish(payload):
     return False
 
 
-def _bug_texts(root, ref=None, repo="k3d-manager"):
+def _bug_texts(root, ref=None, repo="k3d-manager", bugs_dir="docs/bugs"):
     root = Path(root)
     if ref:
         listing = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", ref,
-                                  "docs/bugs"], capture_output=True, text=True, check=True)
+                                  bugs_dir], capture_output=True, text=True, check=True)
         paths = [p for p in listing.stdout.splitlines()
-                 if p.startswith("docs/bugs/") and "/" not in p[len("docs/bugs/"):]]
+                 if p.startswith(bugs_dir + "/") and "/" not in p[len(bugs_dir) + 1:]
+                 and (bugs_dir == "docs/bugs" or p.endswith(".md"))]
         request = "".join(f"{ref}:{p}\n" for p in paths).encode()
         blob = subprocess.run(["git", "-C", str(root), "cat-file", "--batch"], input=request,
                               capture_output=True, check=True, timeout=60).stdout
@@ -165,7 +166,7 @@ def _bug_texts(root, ref=None, repo="k3d-manager"):
             texts[p] = blob[start:start + size].decode("utf-8")
             offset = start + size + 1
     else:
-        paths = sorted(p.relative_to(root).as_posix() for p in (root / "docs/bugs").glob("*.md"))
+        paths = sorted(p.relative_to(root).as_posix() for p in (root / bugs_dir).glob("*.md"))
         texts = {p: (root / p).read_text(encoding="utf-8") for p in paths}
     return texts
 
@@ -184,7 +185,7 @@ def _bug_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     return "\n".join(lines) + "\n"
 
 
-def _bug_open_history(root, ref=None, days=30, repo="k3d-manager", now=None):
+def _bug_open_history(root, ref=None, days=30, repo="k3d-manager", now=None, bugs_dir="docs/bugs"):
     root = Path(root)
     target_ref = ref or "HEAD"
     now_dt = now or datetime.now(timezone.utc)
@@ -209,7 +210,7 @@ def _bug_open_history(root, ref=None, days=30, repo="k3d-manager", now=None):
 
     commit_counts = {}
     for commit in set(date_commits.values()):
-        texts = _bug_texts(root, commit, repo=repo)
+        texts = _bug_texts(root, commit, repo=repo, bugs_dir=bugs_dir)
         counts = {priority: 0 for priority in PRIORITIES}
         for text in texts.values():
             priority, state = doc_meta(text)
@@ -656,9 +657,10 @@ def _verification_times(root, ref, texts):
 
 
 def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_in=None,
-                        repo="k3d-manager", verification_times=None, evidence_check=None):
+                        repo="k3d-manager", verification_times=None, evidence_check=None,
+                        k3dm_release_gates=True, branch_override=None):
     root = Path(root)
-    branch = _scan_branch(root, ref)
+    branch = branch_override or _scan_branch(root, ref)
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -703,7 +705,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         fixed_item = (fixed_in or {}).get(path) or {}
         fix_commit = doc_fix_commit(text) or fixed_item.get("commit")
         if status == "fixed" and (verification == "live" or doc_is_investigation(text)):
-            if not _release_at_least(release, (1, 43, 4)):
+            if k3dm_release_gates and not _release_at_least(release, (1, 43, 4)):
                 live_evidence = "n/a"
             elif investigation:
                 live_evidence = "ok"
@@ -727,12 +729,12 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         if status == "fixed":
             verified = "true" if verification in ("verified", "live") else "false"
             live_verified = "true" if verification == "live" else "false"
-            if not _release_at_least(release, (1, 43, 2)):
+            if k3dm_release_gates and not _release_at_least(release, (1, 43, 2)):
                 verified = "n/a"
                 live_verified = "n/a"
             if verification == "live" and live_evidence in ("missing", "stale"):
                 value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days if filed else -1
-            elif not _release_at_least(release, (1, 43, 2)) or verification == "live":
+            elif k3dm_release_gates and (not _release_at_least(release, (1, 43, 2)) or verification == "live"):
                 value = -2
             elif filed:
                 value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
@@ -1125,6 +1127,106 @@ def _publish_lib_foundation_bugs():
         print(f"lib-foundation release metrics skipped (non-fatal): {exc}", file=sys.stderr)
 
 
+def _project_registry(path):
+    projects = []
+    seen = set()
+    try:
+        lines = Path(path).expanduser().read_text(encoding="utf-8").splitlines()
+        for number, line in enumerate(lines, 1):
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            fields = line.split("|")
+            if (len(fields) != 5 or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", fields[0])
+                    or fields[0] in seen or not fields[1]
+                    or fields[3] not in ("branch", "tag")
+                    or not re.fullmatch(r"[A-Za-z0-9._/-]{1,100}", fields[4])
+                    or fields[4].startswith("-")):
+                raise ValueError(f"malformed project registry line {number}")
+            seen.add(fields[0])
+            projects.append((fields[0], fields[1], fields[2], fields[3], fields[4]))
+    except (OSError, UnicodeError, ValueError) as exc:
+        print(f"project bug metrics registry skipped: {exc}", file=sys.stderr)
+        return None
+    return projects
+
+
+def _tree_has_dir(root, ref, path):
+    result = subprocess.run(["git", "-C", str(root), "ls-tree", "-d", ref, path],
+                            capture_output=True, text=True, check=False, timeout=15)
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def _publish_registry_project(docs_root, ref, project):
+    name, configured_path, _github, _scheme, branch = project
+    clone = Path(configured_path).expanduser()
+    if not clone.is_absolute():
+        clone = Path(docs_root) / clone
+    valid = subprocess.run(["git", "-C", str(clone), "rev-parse", "--git-dir"],
+                           capture_output=True, text=True, check=False, timeout=10)
+    if valid.returncode:
+        print(f"project {name} bug metrics skipped (missing clone): {clone}", file=sys.stderr)
+        return
+    fetched_at = None
+    try:
+        fetched = subprocess.run(["git", "-C", str(clone), "fetch", "--quiet", "--tags",
+                                  "origin", branch], capture_output=True, text=True,
+                                 timeout=15, check=False)
+        if fetched.returncode == 0:
+            fetched_at = time.time()
+        else:
+            print(f"project {name} bug fetch failed; using existing origin/{branch}", file=sys.stderr)
+    except Exception as exc:
+        print(f"project {name} bug fetch failed; using existing origin/{branch}: {exc}", file=sys.stderr)
+    code_ref = f"origin/{branch}"
+    if _tree_has_dir(clone, code_ref, "docs/bugs"):
+        root, docs_ref, bugs_dir, in_repo = clone, code_ref, "docs/bugs", True
+        if _tree_has_dir(docs_root, ref or "HEAD", f"docs/{name}/bugs"):
+            print(f"project {name} has in-repo docs; ignoring legacy docs/{name}/bugs", file=sys.stderr)
+    elif _tree_has_dir(docs_root, ref or "HEAD", f"docs/{name}/bugs") or (
+            ref is None and (Path(docs_root) / "docs" / name / "bugs").is_dir()):
+        root, docs_ref, bugs_dir, in_repo = Path(docs_root), ref, f"docs/{name}/bugs", False
+    else:
+        print(f"project {name} bug metrics skipped (no bug docs at scanned ref)", file=sys.stderr)
+        return
+    texts = _bug_texts(root, docs_ref, repo=name, bugs_dir=bugs_dir)
+    payload = _bug_metrics(root, docs_ref, texts=texts, repo=name)
+    tally = fixed_in = None
+    if in_repo:
+        counted = _tally(ROOT, code_ref, full=True, repo=name, repo_dir=clone)
+        tally, fixed_in = counted["releases"], counted.get("fixed_in", {})
+    verification_times = _verification_times(root, docs_ref, texts)
+    open_payload = _bug_status_metrics(
+        root, docs_ref, tally=tally, texts=texts, fixed_in=fixed_in, repo=name,
+        verification_times=verification_times,
+        evidence_check=lambda fix, evidence: _evidence_contains_fix(clone, fix, evidence),
+        k3dm_release_gates=False, branch_override=branch if in_repo else None)
+    history = _bug_open_history(root, docs_ref, repo=name, bugs_dir=bugs_dir)
+    payload += f'k3dm_project_bug_scan_timestamp_seconds{{repo="{name}"}} {time.time()}\n'
+    if fetched_at is not None:
+        payload += f'k3dm_project_clone_fetch_timestamp_seconds{{repo="{name}"}} {fetched_at}\n'
+    _push_bug_group("k3dm-bug-docs", payload, instance=name)
+    _push_bug_group("k3dm-bug-open-history", history, method="PUT", instance=name)
+    _push_bug_group("k3dm-bug-open", open_payload, method="PUT", instance=name)
+    if in_repo:
+        _push_bug_group("k3dm-bug-releases",
+                        _release_metrics(root, docs_ref, tally=tally, fixed_in=fixed_in, repo=name),
+                        instance=name)
+
+
+def _publish_registry_bugs(docs_root, ref=None):
+    configured = os.environ.get("K3DM_PROJECTS_LIST", str(ROOT / "scripts/etc/projects.list"))
+    projects = _project_registry(configured)
+    if projects is None:
+        return
+    for project in projects:
+        if project[0] in ("k3d-manager", "lib-foundation"):
+            continue
+        try:
+            _publish_registry_project(docs_root, ref, project)
+        except Exception as exc:
+            print(f"project {project[0]} bug metrics skipped: {exc}", file=sys.stderr)
+
+
 def _push_bug_group(job, payload, method="POST", instance=None):
     base = _pushgateway_url()
     healthy_url = f"{base}/-/healthy"
@@ -1150,6 +1252,7 @@ def _push_bug_group(job, payload, method="POST", instance=None):
 def main():
     publish(_status())
     publish_bug_metrics(ROOT, os.environ.get("K3DM_INDEX_REF"))
+    _publish_registry_bugs(ROOT, os.environ.get("K3DM_INDEX_REF"))
     return 0
 
 
