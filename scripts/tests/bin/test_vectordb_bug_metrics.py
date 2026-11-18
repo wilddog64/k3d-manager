@@ -2124,7 +2124,6 @@ def _verification_docs():
 
 
 def test_project_verified_values(metrics, monkeypatch, tmp_path):
-    now = datetime(2026, 11, 18, tzinfo=timezone.utc)
     expected = {"verified": ('verified="true"', 'live_verified="false"'),
                 "live": ('verified="true"', 'live_verified="true"'),
                 "landed": ('verified="false"', 'live_verified="false"')}
