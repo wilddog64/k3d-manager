@@ -178,10 +178,16 @@ W1 from Windows CI on the PR.
 
 - `src/Dirused.Common/Largest.cs` (new)
 - `src/Dirused.Common/ArgParser.cs`, `src/Dirused.Common/Options.cs`, `src/Dirused.Common/ScanResult.cs`, `src/Dirused.Common/TopFolders.cs`
-- `src/Dirused.Common/Renderers/TextRenderer.cs`, `SummaryRenderer.cs`, `JsonRenderer.cs`, `CsvRenderer.cs`, `HtmlRenderer.cs`
+- `src/Dirused.Common/Renderers/TextRenderer.cs`
+- `src/Dirused.Common/Renderers/SummaryRenderer.cs`
+- `src/Dirused.Common/Renderers/JsonRenderer.cs`
+- `src/Dirused.Common/Renderers/CsvRenderer.cs`
+- `src/Dirused.Common/Renderers/HtmlRenderer.cs`
 - `src/Dirused.Core/Scanner.cs`, `src/Dirused.Core/DirectoryReader.cs`, `src/Dirused.Core/Targets/RemoteScan.cs`
 - `src/Dirused.Cli/Program.cs`
-- `tests/Dirused.Tests.Portable/LargestTests.cs` (new), `TopFoldersTests.cs`, `tests/Dirused.Tests/ScannerTests.cs`
+- `tests/Dirused.Tests.Portable/LargestTests.cs` (new)
+- `tests/Dirused.Tests.Portable/TopFoldersTests.cs`
+- `tests/Dirused.Tests/ScannerTests.cs`
 - `README.md`, `CHANGELOG.md`
 
 ## Contract readers
