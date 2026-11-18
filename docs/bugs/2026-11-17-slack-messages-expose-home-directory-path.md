@@ -1,11 +1,12 @@
 # Slack messages expose the operator's home directory path
 
-**Status:** OPEN — stall-watch notice fixed (shows `~/`); audit 2026-11-18 found one more leak: webhook cluster-job tracebacks (see Audit)
+**Status:** LANDED — stall-watch notice fixed (d2a72d35); webhook cluster excerpts and both make-job posts now show `~/` and scrub secrets (`ce4c06fa`, Luna); not yet live on the hub
 **Priority:** P3
 **Introduced by:** pre-existing (stall-watch notice since the dispatch stall detector, v1.44.1)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-18 (operator: "go ahead to open a P3 then dispatch to Luna"; `docs/plans/webhook-slack-home-path-scrub.md`)
+**Waiting on:** live check — since 2026-11-18 (needs promote of `ce4c06fa` + webhook restart, then a failed job's Slack post shows `~/`)
+**Fix commit:** `ce4c06fa`
 **Prior art:** not run (vector store unreachable: context `k3d-k3d-cluster` does not exist; exact-slug glob found none)
 
 ## Report
@@ -53,3 +54,10 @@ Hermes card text (home paths only used internally; `{exc}` strings go to stderr/
 **Fix direction (not decided):** one `_tildify_home()` in `scripts/lib/webhook/redact.py`, applied inside
 `_sanitize_cluster_output` and to the `make` tails at `:171`/`:205` (which should also go through the sanitizer for secrets).
 Test: a traceback line with the real `$HOME` in `output` -> posted excerpt has `~/`, positive control that a non-home path is kept.
+
+## Fix landed (2026-11-18)
+
+`ce4c06fa` (spec `docs/plans/webhook-slack-home-path-scrub.md`, Luna gpt-6-luna). Claude verified: diff matches the
+four Fix items; 38/38 in the two suites; in a scratch worktree with the old lib, tests 1–5 all red (test 3 run by
+name: the spec's E1 `-k` missed it, fixed in `a13d173c`); mutations re-run by Claude: `:205` unsanitized → test 4 red,
+no lookbehind → test 2 red. Land gate (4 webhook suites) green. Live: after promote + webhook restart.
