@@ -4066,3 +4066,266 @@ def test_dispatch_dashboard_has_unreported_coordinator_share_stat():
     panel = next(panel for panel in dashboard["panels"] if panel.get("title") == "Unreported coordinator share")
     assert panel["type"] == "stat"
     assert panel["targets"][0]["expr"] == 'k3dm_dispatch_coordinator_unreported_share{window="$window"}'
+
+
+def test_push_timeout_defaults_and_env_overrides(tmp_path, monkeypatch):
+    scratch_home = tmp_path / "home"
+    scratch_wt = tmp_path / "worktrees"
+    scratch_home.mkdir(parents=True)
+    scratch_wt.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(scratch_home))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(scratch_wt))
+    assert os.environ["HOME"] == str(scratch_home)
+    assert os.environ["K3DM_WORKTREE_ROOT"] == str(scratch_wt)
+
+    prices_file = tmp_path / "prices.json"
+    prices_file.write_text("{}")
+    (scratch_wt / "ledger.jsonl").write_text("")
+
+    shipper_calls = []
+    real_run = subprocess.run
+
+    def fake_run(cmd, *a, **kw):
+        if any("k3dm-dispatch-logs" in str(arg) for arg in (cmd if isinstance(cmd, (list, tuple)) else [cmd])):
+            shipper_calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    sleep_calls = []
+    monkeypatch.setattr(time, "sleep", lambda s: sleep_calls.append(s))
+
+    captured_timeouts = []
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def fake_urlopen(req, timeout=None):
+        captured_timeouts.append(timeout)
+        return DummyResponse()
+
+    monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", fake_urlopen)
+
+    argv = [
+        "--codex-home", str(tmp_path / "codex"),
+        "--claude-projects", str(tmp_path / "claude-projects"),
+        "--claude-cache", str(tmp_path / "claude-cache.json"),
+        "--prices", str(prices_file),
+    ]
+
+    # No env set -> must be 30 (N3: red today, currently 5)
+    monkeypatch.delenv("K3DM_DISPATCH_PUSH_TIMEOUT", raising=False)
+    monkeypatch.delenv("K3DM_DISPATCH_PUSH_ATTEMPTS", raising=False)
+    monkeypatch.delenv("K3DM_DISPATCH_PUSH_BACKOFF", raising=False)
+    captured_timeouts.clear()
+    assert dispatch_metrics.main(argv) == 0
+    assert captured_timeouts == [30]
+
+    # Valid override
+    monkeypatch.setenv("K3DM_DISPATCH_PUSH_TIMEOUT", "7")
+    captured_timeouts.clear()
+    assert dispatch_metrics.main(argv) == 0
+    assert captured_timeouts == [7]
+
+    # Invalid / out of range timeout values fall back to 30
+    for invalid in ["abc", "0", "-1", "inf", "500", "NaN"]:
+        monkeypatch.setenv("K3DM_DISPATCH_PUSH_TIMEOUT", invalid)
+        captured_timeouts.clear()
+        assert dispatch_metrics.main(argv) == 0
+        assert captured_timeouts == [30]
+
+
+def test_push_retries_and_stubs(tmp_path, monkeypatch, capsys):
+    import http.server
+    import threading
+
+    scratch_home = tmp_path / "home"
+    scratch_wt = tmp_path / "worktrees"
+    scratch_home.mkdir(parents=True)
+    scratch_wt.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(scratch_home))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(scratch_wt))
+    assert os.environ["HOME"] == str(scratch_home)
+    assert os.environ["K3DM_WORKTREE_ROOT"] == str(scratch_wt)
+
+    prices_file = tmp_path / "prices.json"
+    prices_file.write_text("{}")
+    (scratch_wt / "ledger.jsonl").write_text("")
+
+    shipper_calls = []
+    real_run = subprocess.run
+
+    def fake_run(cmd, *a, **kw):
+        if any("k3dm-dispatch-logs" in str(arg) for arg in (cmd if isinstance(cmd, (list, tuple)) else [cmd])):
+            shipper_calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    sleep_calls = []
+    monkeypatch.setattr(time, "sleep", lambda s: sleep_calls.append(s))
+
+    requests_received = []
+    status_sequence = []
+
+    class StubHandler(http.server.BaseHTTPRequestHandler):
+        def do_PUT(self):
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            requests_received.append((self.path, body))
+            code = status_sequence.pop(0) if status_sequence else 200
+            self.send_response(code)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), StubHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    argv = [
+        "--codex-home", str(tmp_path / "codex"),
+        "--claude-projects", str(tmp_path / "claude-projects"),
+        "--claude-cache", str(tmp_path / "claude-cache.json"),
+        "--prices", str(prices_file),
+    ]
+
+    try:
+        monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", f"http://127.0.0.1:{server.server_port}")
+
+        # Case 1 (N2): stub fails once (e.g. 503) then 200 -> exit 0, shipper called once, one failure line
+        status_sequence[:] = [503, 200]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 0
+        assert len(requests_received) == 2
+        assert len(shipper_calls) == 1
+        assert sleep_calls == [5]  # backoff * 1
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 1
+        # M4 check: UTC ISO timestamp, attempt 1/3, HTTP 503
+        assert "(attempt 1/3): HTTP 503" in lines[0]
+        assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z dispatch metrics push failed \(attempt 1/3\): HTTP 503", lines[0])
+
+        # Case 2: all attempts failing -> exit 1, exactly 3 requests, sleeps [5, 10], shipper not called
+        status_sequence[:] = [500, 500, 500]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 1
+        assert len(requests_received) == 3
+        assert len(shipper_calls) == 0
+        assert sleep_calls == [5, 10]
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 3
+        assert "(attempt 1/3): HTTP 500" in lines[0]
+        assert "(attempt 2/3): HTTP 500" in lines[1]
+        assert "(attempt 3/3): HTTP 500" in lines[2]
+
+        # Case 3: HTTP 404 (4xx) -> exactly 1 request, exit 1, shipper not called
+        status_sequence[:] = [404]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 1
+        assert len(requests_received) == 1
+        assert len(shipper_calls) == 0
+        assert sleep_calls == []
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 1
+        assert "(attempt 1/3): HTTP 404" in lines[0]
+
+        # Case 4: env fallbacks for attempts and backoff
+        # attempts: 0, 9, x -> 3
+        for invalid_att in ["0", "9", "x"]:
+            monkeypatch.setenv("K3DM_DISPATCH_PUSH_ATTEMPTS", invalid_att)
+            status_sequence[:] = [500, 500, 500]
+            requests_received.clear()
+            sleep_calls.clear()
+            assert dispatch_metrics.main(argv) == 1
+            assert len(requests_received) == 3
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_ATTEMPTS", raising=False)
+
+        # backoff: -1, 99 -> 5
+        for invalid_bo in ["-1", "99"]:
+            monkeypatch.setenv("K3DM_DISPATCH_PUSH_BACKOFF", invalid_bo)
+            status_sequence[:] = [500, 500, 500]
+            requests_received.clear()
+            sleep_calls.clear()
+            assert dispatch_metrics.main(argv) == 1
+            assert sleep_calls == [5, 10]
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_BACKOFF", raising=False)
+
+        # Positive tests that valid ATTEMPTS and BACKOFF overrides are honoured
+        monkeypatch.setenv("K3DM_DISPATCH_PUSH_ATTEMPTS", "2")
+        monkeypatch.setenv("K3DM_DISPATCH_PUSH_BACKOFF", "3")
+        status_sequence[:] = [500, 500]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 1
+        assert len(requests_received) == 2
+        assert sleep_calls == [3]  # backoff (3) * attempt (1)
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 2
+        assert "(attempt 1/2): HTTP 500" in lines[0]
+        assert "(attempt 2/2): HTTP 500" in lines[1]
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_ATTEMPTS", raising=False)
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_BACKOFF", raising=False)
+
+        # Case 5: urlopen raises ConnectionResetError / URLError -> retries, logs exception text
+        real_urlopen = dispatch_metrics.urllib.request.urlopen
+        conn_err_attempts = [0]
+
+        def flaky_urlopen(req, timeout=None):
+            conn_err_attempts[0] += 1
+            if conn_err_attempts[0] == 1:
+                raise dispatch_metrics.urllib.error.URLError(ConnectionResetError(104, "Connection reset by peer"))
+            return real_urlopen(req, timeout=timeout)
+
+        monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", flaky_urlopen)
+        status_sequence[:] = [200]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 0
+        assert conn_err_attempts[0] == 2
+        assert len(requests_received) == 1
+        assert len(shipper_calls) == 1
+        assert sleep_calls == [5]
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 1
+        assert "(attempt 1/3):" in lines[0]
+        assert "Connection reset by peer" in lines[0]
+        monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", real_urlopen)
+
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()

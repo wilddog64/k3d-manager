@@ -7,6 +7,10 @@
 - **Bug metrics for registered projects.** The scanner publishes each project's bug inventory, verification and open history from its clone or legacy k3d-manager docs, with fetch and scan freshness metrics.
 - **Encrypted travel password bundle.** Enrolled laptops can decrypt service passwords delivered through a shared folder; the hub republishes on changes and alerts when publishing is stale.
 
+### Fixed
+
+- **Dispatch metrics single-flight push, retries, and stale alert.** Ledger-event pushes route through the single-flight scheduler (`bin/k3dm-codex-dispatch schedule-metrics`), `bin/k3dm-dispatch-metrics` retries failed pushes with backoff up to 30s timeout, a 15-minute LaunchAgent (`com.k3d-manager.dispatch-metrics`) re-pushes metrics periodically, and `DispatchMetricsStale` alerts when metrics have not reached the hub for over 90 minutes while the M4 is reachable.
+
 ## [1.44.2] - 2026-11-17
 
 ### Added

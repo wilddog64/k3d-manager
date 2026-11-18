@@ -58,6 +58,10 @@ The collapsed **Stall recovery** row records hangs detected by the dispatch watc
 
 Each land attempt retains its own `land-test.<N>.log`; `land-test.log` points to the latest attempt. Refused test runs show the test count and first failure in the Result label, with a link to that attempt’s log. Older events continue to use `land-test.log`.
 
+## Dispatch metrics background agent and staleness alert
+
+Dispatch metrics are gathered and pushed to the hub Pushgateway after dispatch ledger events and periodically every 15 minutes by the `com.k3d-manager.dispatch-metrics` LaunchAgent (installed via `make install-dispatch-metrics` and removed via `make uninstall-dispatch-metrics`). Synchronous manual pushes can be triggered using `make dispatch-metrics`. When metrics have not reached the hub for over 90 minutes while the M4 machine is reachable, the `DispatchMetricsStale` alert fires (`dispatch.alerts` group in platform-ops Prometheus rules).
+
 ## Verification ladder
 
 The **Verification ladder** table counts tasks at each rung by status; click a column heading to

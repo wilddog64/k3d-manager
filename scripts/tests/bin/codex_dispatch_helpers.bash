@@ -103,8 +103,8 @@ AGY
 dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" "$@"); }
 
 s1_snapshot() {
-  find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -print | sort
-  find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -type f -exec shasum -a 256 {} \; | sort
+  find "$K3DM_WORKTREE_ROOT" "$FIXTURE" \( -name "metrics.lock" -o -name "metrics.log" -o -name "metrics.pending" \) -prune -o -print | sort
+  find "$K3DM_WORKTREE_ROOT" "$FIXTURE" \( -name "metrics.lock" -o -name "metrics.log" -o -name "metrics.pending" \) -prune -o -type f -exec shasum -a 256 {} \; | sort
 }
 
 s1_refused_unchanged() {

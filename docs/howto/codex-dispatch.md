@@ -155,7 +155,7 @@ Worktree caveats:
 ## Metrics
 
 The dispatcher appends lifecycle events to the shared `K3DM_WORKTREE_ROOT/ledger.jsonl` and
-publishes them to the hub Pushgateway with `make dispatch-metrics`. The exporter keeps 1d, 7d,
+publishes them to the hub Pushgateway with `make dispatch-metrics`. Subcommand `bin/k3dm-codex-dispatch schedule-metrics` runs the single-flight scheduler `_dispatch_schedule_metrics`, coordinating background exporter invocations via `metrics.lock` and `metrics.pending` with automatic lock freshness refresh. It is invoked automatically after Python-path ledger events and periodically every 15 minutes by the `com.k3d-manager.dispatch-metrics` LaunchAgent. The exporter keeps 1d, 7d,
 and 30d windows for the `k3dm Agent Dispatch` dashboard:
 
 - Fleet throughput is landed tasks per day.

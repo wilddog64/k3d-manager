@@ -111,21 +111,50 @@ _dispatch_schedule_metrics() {
   (
     # shellcheck disable=SC2329 # invoked indirectly by the EXIT trap
     _dispatch_metrics_cleanup() {
+      if [[ -n "${refresher_pid:-}" ]]; then
+        kill "$refresher_pid" 2>/dev/null || true
+        wait "$refresher_pid" 2>/dev/null || true
+        refresher_pid=""
+      fi
       if (( owns_lock )); then rmdir "$lock" 2>/dev/null || true; fi
     }
     owns_lock=1
+    refresher_pid=""
     trap _dispatch_metrics_cleanup EXIT
     trap 'exit 1' HUP INT TERM
+    local refresh_interval="${K3DM_DISPATCH_METRICS_LOCK_REFRESH:-60}"
+    if [[ ! "$refresh_interval" =~ ^[1-9][0-9]*$ ]]; then
+      printf '%s invalid K3DM_DISPATCH_METRICS_LOCK_REFRESH %s, falling back to 60\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$refresh_interval" >>"$_dispatch_worktree_root/metrics.log"
+      refresh_interval=60
+    fi
     while :; do
       rm -f "$pending"
+      (
+        sleep_pid=""
+        trap 'if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT HUP
+        while :; do
+          sleep "$refresh_interval" &
+          sleep_pid=$!
+          wait "$sleep_pid" 2>/dev/null || { if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi; exit 0; }
+          sleep_pid=""
+          touch "$lock" 2>/dev/null || exit 0
+        done
+      ) &
+      refresher_pid=$!
       "${K3DM_DISPATCH_METRICS_BIN:-$_dispatch_script_dir/k3dm-dispatch-metrics}" >>"$_dispatch_worktree_root/metrics.log" 2>&1 || true
+      if [[ -n "$refresher_pid" ]]; then
+        kill "$refresher_pid" 2>/dev/null || true
+        wait "$refresher_pid" 2>/dev/null || true
+        refresher_pid=""
+      fi
       [[ -e "$pending" ]] && continue
       rmdir "$lock" 2>/dev/null || break
       owns_lock=0
       if [[ -e "$pending" ]] && mkdir "$lock" 2>/dev/null; then owns_lock=1; continue; fi
       break
     done
-  ) &
+  ) </dev/null >>"$_dispatch_worktree_root/metrics.log" 2>&1 &
 }
 
 _dispatch_log() {
@@ -370,13 +399,14 @@ Usage:
   bin/k3dm-codex-dispatch gate-coverage-start
   bin/k3dm-codex-dispatch link --slug S [--version V] --parent P --role build|review|verify
   bin/k3dm-codex-dispatch combine [--version V] --parent P --parts a,b --conflicts N --result pass|fail --evidence FILE --by NAME
+  bin/k3dm-codex-dispatch schedule-metrics
 EOF
 }
 
 # S1 gate commands share one deterministic, line-order ledger reader. Keeping
 # this in the dispatcher avoids creating a second state file or dependency.
 _dispatch_s1() {
-  python3 - "$_dispatch_worktree_root" "$_dispatch_repo_root" "$@" <<'PY'
+  K3DM_DISPATCH_SELF="$_dispatch_script_dir/k3dm-codex-dispatch" python3 - "$_dispatch_worktree_root" "$_dispatch_repo_root" "$@" <<'PY'
 import hashlib, json, os, re, subprocess, sys, time
 from pathlib import Path
 
@@ -483,7 +513,7 @@ def append(event, version=None, slug=None, **fields):
     ledger.parent.mkdir(parents=True,exist_ok=True)
     with ledger.open('a') as f: f.write(json.dumps(obj,separators=(',',':'))+'\n')
     if command!='gate-status':
-        subprocess.Popen([os.environ.get('K3DM_DISPATCH_METRICS_BIN',str(Path(manager)/'bin/k3dm-dispatch-metrics'))],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+        subprocess.Popen([os.environ['K3DM_DISPATCH_SELF'],'schedule-metrics'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
 def current_version(rows):
     branch=subprocess.run(['git','-C',manager,'symbolic-ref','--quiet','--short','HEAD'],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL).stdout.strip()
     m=re.fullmatch(r'k3d-manager-(v?\d+\.\d+\.\d+)',branch)
@@ -1854,6 +1884,7 @@ main() {
     prune) shift; _dispatch_prune "$@" ;;
     usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;
     release-merged) shift; _dispatch_release_merged "$@" ;;
+    schedule-metrics) shift; (($# == 0)) || _dispatch_error "schedule-metrics accepts no options"; _dispatch_schedule_metrics; exit 0 ;;
     gate-status|mark|gate-record|gate-coverage-start|link|combine) cmd="$1"; shift; _dispatch_s1 "$cmd" "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;

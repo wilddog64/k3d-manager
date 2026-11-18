@@ -37,5 +37,7 @@ browser.hostinger-frontend-http|user LaunchAgent managed by cluster-up
 browser.sandbox-frontend-http|user LaunchAgent managed by cluster-up
 install-dispatch-stall-watch|operator-run: make install-dispatch-stall-watch on the machine that runs dispatches; detect-and-tell only (docs/bugs/2026-11-14-dispatch-stall-a-detector.md, live E8)
 dispatch-stall-watch|operator-run LaunchAgent on the machine that runs dispatches, loaded by make install-dispatch-stall-watch (live E8)
+install-dispatch-metrics|operator-run: make install-dispatch-metrics on the machine that runs dispatches; 15-minute dispatch-metrics re-push (docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md, live E5)
+dispatch-metrics|operator-run LaunchAgent on the machine that runs dispatches, loaded by make install-dispatch-metrics (live E5)
 install-password-bundle|not installed by setup: the operator runs make password-bundle-install on the hub, after docs/bugs/2026-11-18-show-service-passwords-argocd-temp-files-no-trap.md is fixed (v1.45.0 plan 2)
 password-bundle|not installed by setup until docs/bugs/2026-11-18-show-service-passwords-argocd-temp-files-no-trap.md is fixed; then the operator runs make password-bundle-install on the hub

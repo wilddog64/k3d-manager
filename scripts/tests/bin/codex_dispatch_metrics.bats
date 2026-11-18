@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2016,SC2030,SC2031
 
 bats_require_minimum_version 1.5.0
 load codex_dispatch_helpers
@@ -139,3 +140,70 @@ load codex_dispatch_helpers
   [ -n "$(jq -r -s '.[-1].evidence_sha256' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" ]
 }
 
+@test "codex dispatch: positive control stub detects concurrent runs" {
+  "$K3DM_DISPATCH_METRICS_BIN" &
+  local pid1=$!
+  "$K3DM_DISPATCH_METRICS_BIN" &
+  local pid2=$!
+  wait "$pid1" "$pid2"
+  [ -e "$METRICS_OVERLAP" ]
+}
+
+@test "codex dispatch: burst of Python ledger appends does not overlap metrics exporter runs" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/task.run"
+  printf '%s\n' "$FIXTURE" >"$K3DM_WORKTREE_ROOT/v9.9.9/task.run/repo"
+  cat >"$K3DM_WORKTREE_ROOT/ledger.jsonl" <<'EOF'
+{"ts":1,"event":"start","version":"v9.9.9","slug":"task","run":1}
+EOF
+  rm -f "$METRICS_STARTS" "$METRICS_OVERLAP"
+  for i in {1..5}; do
+    dispatch link --slug task --parent "p$i" --role build &
+  done
+  wait
+  [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl" | tr -d ' ')" -eq 6 ]
+  for _ in {1..50}; do
+    [[ -d "$K3DM_WORKTREE_ROOT/metrics.lock" || -s "$METRICS_STARTS" ]] && break
+    sleep 0.05
+  done
+  for _ in {1..100}; do
+    [[ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" && -s "$METRICS_STARTS" ]] && break
+    sleep 0.1
+  done
+  [ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]
+  [ -s "$METRICS_STARTS" ]
+  [ ! -e "$METRICS_OVERLAP" ]
+}
+
+@test "codex dispatch: live owner refreshes lock mtime and prevents takeover" {
+  local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
+  sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"
+  # shellcheck source=/dev/null
+  source "$source_file"
+  export K3DM_DISPATCH_METRICS_LOCK_REFRESH=1
+  cat >"$K3DM_DISPATCH_METRICS_BIN" <<'METRICS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'start\n' >>"$METRICS_STARTS"
+mkdir "$METRICS_ACTIVE" 2>/dev/null || : >"$METRICS_OVERLAP"
+sleep 3
+rmdir "$METRICS_ACTIVE" 2>/dev/null || true
+METRICS
+  chmod +x "$K3DM_DISPATCH_METRICS_BIN"
+  _dispatch_schedule_metrics
+  for _ in {1..50}; do
+    [[ -d "$K3DM_WORKTREE_ROOT/metrics.lock" && -s "$METRICS_STARTS" ]] && break
+    sleep 0.05
+  done
+  [ -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]
+  touch -t 202001010000 "$K3DM_WORKTREE_ROOT/metrics.lock"
+  sleep 1.5
+  [ -z "$(find "$K3DM_WORKTREE_ROOT/metrics.lock" -maxdepth 0 -mmin +10 -print -quit 2>/dev/null)" ]
+  _dispatch_schedule_metrics
+  # Second call does not take over the lock while first is running (no second concurrent start)
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
+  for _ in {1..50}; do
+    [[ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]] && break
+    sleep 0.1
+  done
+  [ ! -e "$METRICS_OVERLAP" ]
+}
