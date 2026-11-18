@@ -5,7 +5,7 @@
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-18 (scope of the Hermes diagnose-and-approve part; see Open question)
+**Waiting on:** fix running — since 2026-11-18 (spec `docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md`, Flash)
 **Prior art:** `docs/bugs/2026-10-05-nightly-test-metrics-push-failure-is-silent.md` (exact-slug review) — read, same class (silent push failure, fixed there with a staleness alert), different producer; `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md` — read, different root cause (tunnel auth; this tunnel has been up since 2026-11-15). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18
 **Approval:** operator, 2026-11-18: "should we either push metrics automtically from m4 to m5 ..." then the P2 call above
@@ -52,3 +52,13 @@ The operator asked for Hermes to examine a stale-metrics alert and send an appro
 
 Options: (a) ship 1-3 as the P2 fix now, and add "stale dispatch metrics" as a second trigger in plan 5's spec; (b) one
 larger change covering both (would need to displace a plan). Claude recommends (a).
+
+## Decision and measurement (2026-11-18)
+
+- Operator chose (a): parts 1-3 here, spec `docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md`; the Hermes flow is
+  part 5 of `docs/plans/v1.45.0-dispatch-stall-recovery.md`.
+- Measured (Claude, M4 -> hub tunnel, 13:28 UTC): render 45.3 s; three uncontended PUTs of the 3,316,618-byte body took
+  1.21 / 1.18 / 1.29 s. The 5 s timeouts are therefore contention, not body size, which supports the lock-bypass
+  hypothesis.
+- Deferred to grooming (pre-existing, found in spec review by Astra): two callers can race to take over the same dead
+  `metrics.lock`, and release (`rmdir`) is not owner-specific, so a former owner can remove its successor's lock. P3.
