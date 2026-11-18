@@ -1,7 +1,7 @@
 # dirused M5: `/largest`, the largest cleanup-candidate files (logs, dumps, backups, temp)
 
 **Filed:** 2026-11-18
-**Status:** DISPATCHED 2026-11-18 to Luna (after blind Argon review, findings folded in: see Amendment 1)
+**Status:** LANDED 2dc1aee on `m5-largest` (Claude verified 2026-11-18: 92/92 portable, Windows CI green incl. W1-W3; landed with --allow-out-of-scope because the dispatch-time spec snapshot listed 4 in-scope files by bare name); PR wilddog64/dirused#28 open, awaiting operator merge, then v0.0.15 and operator E2
 **Repo / branch:** wilddog64/dirused / `m5-largest` (from main 594eff6)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low-medium (read-only: the scanner collects one more bounded list; no file is deleted or opened; default output unchanged without the switch)
@@ -260,3 +260,9 @@ interface:
 
 **Intent approved:** operator, 2026-11-18
 **Intent approval note:** "cool, go dispatch this" (after the spec, its E1/E2 intents and the Argon findings summary were shown)
+
+## Verification (Claude, 2026-11-18)
+
+- Red proof: every new test uses types that do not exist on 594eff6 (`Largest`, `LargestCollector`, `ScanResult.Largest`), so the suite cannot compile there.
+- Blind Argon diff review: 4 findings, all spec-intended, no change: (1) a repeated `/largest` is last-wins like `/warn`; (2) an exact name needs a trailing `;`;
+  (3) `/summary` attaches only to warn/crit, and summary CSV is unchanged (operator choice); (4) CSV `largest` rows repeat logical bytes in the on-disk column, as specified (possible later refinement).
