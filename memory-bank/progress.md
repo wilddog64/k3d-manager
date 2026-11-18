@@ -129,3 +129,4 @@
 - [x] lib-foundation PR #89 (v0.5.7 exclusive lock claims) merged 2026-11-18 -> 15d5001; tagged v0.5.7 + GH release; next branch release/v0.5.8
 - [ ] P3 run_parallel claim loop unbounded + key edge cases (grooming)
 - [ ] P3 lib-foundation file locks: no signal cleanup / stale recovery / non-regular lock path (grooming)
+- 2026-11-18: medium/high-risk spec review pair switched to Fable + Astra (operator go; Argon stays low-risk/diff); rules.md, verification-and-review.md, trial pair 6 logged (8042333f).
