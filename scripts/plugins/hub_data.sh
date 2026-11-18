@@ -864,7 +864,7 @@ function _hub_data_repoint_vault_untraced() {
   else
     _vault_cache_unseal_keys "$ns" "$release" "${shards[@]}" || return 1
     verb="create"
-    if _kubectl --context "$context" -n "$ns" get secret vault-unseal </dev/null >/dev/null 2>&1; then
+    if _kubectl --no-exit --quiet --context "$context" -n "$ns" get secret vault-unseal </dev/null >/dev/null 2>&1; then
       verb="replace"
     fi
     printf '%s\n' "${shards[@]}" | jq -Rn --arg n "$count" '
@@ -878,7 +878,7 @@ function _hub_data_repoint_vault_untraced() {
           {"key-shares": $n, "key-threshold": $n} +
           ([range(0; $s | length)] | map({("shard-" + ((. + 1) | tostring)): $s[.]}) | add)
         )
-      }' | _no_trace _kubectl --context "$context" "$verb" -f - || return 1
+      }' | _no_trace _kubectl --no-exit --context "$context" "$verb" -f - || return 1
     printf '[hub-recover] vault-unseal Secret rewritten from restored shards (%s shard(s))\n' "$count" >&2
     [[ -z "$dir" ]] || printf '%s\n' cached > "$dir/unseal_keys_cache"
   fi

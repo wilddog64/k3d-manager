@@ -942,12 +942,17 @@ _setup_s2_repoint_env() {
   _hub_recovery_sync_vault_root_token() { :; }
   _kubectl() {
     printf '%s\n' "$*" >> "$CALL_LOG"
+    local soft=0
+    [[ "$1" == --no-exit ]] && soft=1
     if [[ "$*" == *"get secret vault-unseal"* ]]; then
-      [[ "${KUBECTL_SECRET_EXISTS:-1}" == 1 ]] && return 0 || return 1
+      [[ "${KUBECTL_SECRET_EXISTS:-1}" == 1 ]] && return 0
+      (( soft )) && return 1
+      printf 'fatal kubectl exit\n' >&2; exit 1
     elif [[ "$*" == *"replace -f -"* || "$*" == *"create -f -"* ]]; then
       if [[ "${KUBECTL_WRITE_FAIL:-0}" == 1 ]]; then
         cat >/dev/null
-        return 1
+        (( soft )) && return 1
+        printf 'fatal kubectl exit\n' >&2; exit 1
       fi
       cat > "$TEST_ROOT/unseal-payload.json"
       return 0
@@ -980,8 +985,9 @@ _setup_s2_repoint_env() {
 
 @test "recover S2-2: creates vault-unseal when it does not exist" {
   _setup_s2_repoint_env
-  KUBECTL_SECRET_EXISTS=0 run _hub_data_repoint_vault ctx
+  KUBECTL_SECRET_EXISTS=0 run --separate-stderr _hub_data_repoint_vault ctx
   [ "$status" -eq 0 ]
+  [[ "$stderr" != *"fatal kubectl exit"* ]]
   [ -s "$CALL_LOG" ]
   grep -q 'get secret vault-unseal' "$CALL_LOG"
   [ -f "$TEST_ROOT/unseal-payload.json" ]
@@ -1033,8 +1039,9 @@ _setup_s2_repoint_env() {
 
 @test "recover S2-5: a failed Secret write fails the step" {
   _setup_s2_repoint_env
-  KUBECTL_WRITE_FAIL=1 run _hub_data_repoint_vault ctx
+  KUBECTL_WRITE_FAIL=1 run --separate-stderr _hub_data_repoint_vault ctx
   [ "$status" -ne 0 ]
+  [[ "$stderr" != *"fatal kubectl exit"* ]]
   [ ! -f "$TEST_ROOT/root-payload.json" ]
   run grep -q 'apply -f -' "$CALL_LOG"
   [ "$status" -eq 1 ]
