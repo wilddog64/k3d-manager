@@ -23,3 +23,7 @@ checked). Test `S1` in `scripts/tests/bin/dispatch_stall_watch.bats` fails on th
 Other Slack senders were not audited: `bin/k3dm-hermes`, `bin/k3dm-slack-notify`, `bin/k3dm-webhook`, `bin/k3dm-sandbox-reaper`,
 `scripts/lib/webhook/render.py` and the rest of `scripts/lib/webhook/`. Option: one filter in the shared send path
 (`k3dm-slack-notify` and the webhook's post helper) that replaces `$HOME` with `~` in every message.
+
+## Live observation (2026-11-17)
+
+A real stall notice at 10:21 PST (18:21Z, slug `vault-unseal-secret-follows-keychain-restore`, 48 min after d2a72d35 landed at 09:33 PST) read `evidence ~/.local/share/k3d-manager/worktrees/v1.44.2/vault-unseal-secret-follows-keychain-restore.run/stall-20261117T182150Z`: the stall-watch part works live (operator screenshot, 2026-11-18). The other Slack senders are still unaudited, so the doc stays OPEN.
