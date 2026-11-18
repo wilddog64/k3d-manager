@@ -24,6 +24,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    Operator chose diagnose first: diagnostic pushed as lib-foundation `884e3aa` (job log, live workers, re-list after
    2s, signal masks, xargs version); CI run 44298944446 FAILED and showed BOTH colliding workers ran (<a_b>, <a b>) but only one .a_b.lock -> both claimed key
    a_b (corrects the 'never claimed' reading). Runner xargs is findutils 4.10.0 (local images 4.9.0). Fable told; waiting.
+   ROOT CAUSE (Fable, Claude-verified): runner is ubuntu-26.04, mkdir = uutils 0.10.0; concurrent mkdir of one path both
+   exit 0 (136/500 vs GNU 0/500) -> lock not exclusive. Library bug. Proposed fix: noclobber file lock + stub-mkdir test;
+   _foundation_vcluster_lock same pattern. Awaiting operator go on fix scope.
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.

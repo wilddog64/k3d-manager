@@ -2,7 +2,7 @@
 
 **Status:** LANDED — lib-foundation `7027b38` on `release/v0.5.7` (test-only: timing flake fixed; collision test now names the missing file — #157 root cause still unknown)
 **Priority:** P2
-**Waiting on:** investigation — since 2026-11-18 (two workers both claimed key a_b on the runner; Fable investigating)
+**Waiting on:** operator decision — since 2026-11-18 (root cause found: uutils mkdir on ubuntu-26.04 is not exclusive; library fix scope)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
@@ -87,3 +87,19 @@ claims on one path also leave one directory.
 
 Runner facts: GNU findutils xargs **4.10.0** (local repro images had 4.9.0), nproc 4, SigIgn 0x1004 (SIGQUIT, SIGPIPE),
 SIGCHLD not ignored. No `mkdir` override in `scripts/lib`. Fable investigating (read-only).
+
+## Root cause (2026-11-18, Fable; verified by Claude)
+
+GitHub `ubuntu-latest` is now `ubuntu-26.04` (run 44298944446: `Image: ubuntu-26.04`, version 20261103.629). There,
+`/usr/bin/mkdir` is uutils coreutils 0.10.0 (`rust-coreutils`, `/usr/lib/cargo/bin/coreutils/mkdir`), not GNU. When two
+processes `mkdir` the same path at once, both can exit 0, so the `_run_parallel_worker` claim loop
+(`while ! mkdir "${out}/.${key}.lock"`) is not exclusive: both colliding items take key `a_b` and overwrite each other's
+files. Fable cites uutils 0.10.0 `src/uu/mkdir/src/mkdir.rs:342` (`Err(_) if path.is_dir() => Ok(())`; upstream main
+adds `config.recursive &&`).
+
+Claude's check in Docker `ubuntu:26.04`, 2026-11-18: concurrent `mkdir` of one path, both exit 0 in 136/500 (uutils) vs
+0/500 (`gnumkdir`). A sequential `mkdir` of an existing dir still returns 1, so only the race is affected. Fable: real
+`_run_parallel` collision 15/200 with uutils vs 0/200 with GNU mkdir; ubuntu:24.04 0/2000 — why 850 local runs passed.
+
+This is a library bug on Ubuntu 26.04 (any colliding keys running concurrently lose a result), not only a test flake.
+`_foundation_vcluster_lock` (`scripts/lib/system.sh:2172`) uses the same `mkdir` lock pattern.
