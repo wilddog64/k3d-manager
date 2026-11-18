@@ -167,3 +167,4 @@
 - 2026-11-18: dirused M9 (purge stops holding service) drafted; proof on ffm01 owed before review.
 - 2026-11-18: dirused M8 /purge merged fa3a07c, v0.0.18 released; k3d-manager release CI green ebac0d8c (lint fix 03b86250).
 - 2026-11-18: hub at ebac0d8c; plans-panel fix LIVE-VERIFIED; DispatchMetricsStale live on hub.
+- 2026-11-18: Anthropic API key copied to M4 and probed (plan 5 child C prerequisite).
