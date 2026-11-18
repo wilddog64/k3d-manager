@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Encrypted travel password bundle.** Enrolled laptops can decrypt service passwords delivered through a shared folder; the hub republishes on changes and alerts when publishing is stale.
+
 ## [1.44.2] - 2026-11-17
 
 ### Added

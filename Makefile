@@ -2404,3 +2404,33 @@ machine-secrets-export:
 machine-secrets-import:
 	@test -n "$(FILE)" || { echo 'Usage: make machine-secrets-import FILE=<file> [FORCE=1]' >&2; exit 2; }
 	@if [ "$(FORCE)" = 1 ]; then bin/k3dm-machine-secrets import --in "$(FILE)" --force; else bin/k3dm-machine-secrets import --in "$(FILE)"; fi
+
+.PHONY: password-bundle-enroll password-bundle-add-recipient password-bundle-remove-recipient password-bundle-publish password-bundle-show password-bundle-install password-bundle-uninstall
+
+## Enroll this laptop for encrypted service password delivery
+password-bundle-enroll:
+	@./scripts/k3d-manager password_bundle_enroll
+
+## Add a laptop recipient: NAME=<name> KEY=<age public key>
+password-bundle-add-recipient:
+	@./scripts/k3d-manager password_bundle_add_recipient
+
+## Remove a laptop recipient and republish: NAME=<name>
+password-bundle-remove-recipient:
+	@./scripts/k3d-manager password_bundle_remove_recipient
+
+## Publish encrypted service passwords
+password-bundle-publish:
+	@./scripts/k3d-manager password_bundle_publish
+
+## Show the latest encrypted service passwords
+password-bundle-show:
+	@./scripts/k3d-manager password_bundle_show
+
+## Install the password bundle schedule
+password-bundle-install:
+	@./scripts/k3d-manager password_bundle_install
+
+## Remove the password bundle schedule
+password-bundle-uninstall:
+	@./scripts/k3d-manager password_bundle_uninstall
