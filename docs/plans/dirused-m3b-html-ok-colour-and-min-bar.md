@@ -41,6 +41,14 @@ its blue bar fill is 1% of 90px, under one pixel, so the bar reads as empty grey
 - Update H16 only if needed for the new `ok` class on the 10% volume row (its node-row assertion is unchanged).
 - Red on main cbf37ac: H17 and H19 fail there; paste the failing lines.
 
+## Amendment after PR review (Claude, 2026-11-18)
+
+Blind Argon review of PR #24, verified by Claude: `min-width:3px` overrides `width:0%`, so a 0% volume, and a zero-total
+volume (bar `0`), draw a 3px coloured sliver as if they held data. Fix: when the clamped bar value is 0, render the bar
+with no inner span (`<span class="bar"></span>`). Test **H20_ZeroFillDrawsNoSliver**: a 0% volume and a zero-total volume
+render `<span class="bar"></span>` with no inner span; a 1% volume still renders `<span style="width:1%">` (positive control).
+H20 is red on 945efca.
+
 ## Files
 
 - `src/Dirused.Common/Renderers/HtmlRenderer.cs`
@@ -76,9 +84,11 @@ must_not:
     text: "the bar fill has no minimum width, so 1% renders under one pixel — red today (H19)"
   - id: N3
     text: "an incomplete or zero-size volume is labelled OK (H18)"
+  - id: N4
+    text: "a 0% or zero-size volume draws a coloured sliver (H20) — red on 945efca"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1, N2, N3]
+    proves: [M1, M2, M3, N1, N2, N3, N4]
     kind: offline
     command: portable tests H16-H19 (H17, H19 red on main cbf37ac) plus the full portable suite; Windows CI on the PR
     intent: A healthy disk now shows a green bar and an OK label, a nearly empty disk still shows a sliver of bar, and warning and critical disks look exactly as before.
