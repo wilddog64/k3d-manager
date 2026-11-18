@@ -37,7 +37,11 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    one NEW to this diff and reproduced: noclobber accepts an existing symlink->/dev/null (two claims rc 0; old mkdir rc 1),
    needs a planted link in a user-owned dir — low. Rest pre-existing (shared --out cleanup, RETURN trap, 255-byte key loop,
    dot-prefixed keys skipped by *.item glob — latent, Makefile items are scripts/tests/ paths, mkdir w/o --, peak==2 test).
-   Fable blind review on the same brief RUNNING (operator: compare Astra 6.2 vs Fable). Then scope check + merge.
+   Fable blind review (same brief, 67,675 tokens, 102 s): 5 findings, 1 new+real = the same symlink->/dev/null case
+   Astra found (Fable rated it low, also covered :875); 1 new but not reproduced (test sort locale: C, C.UTF-8,
+   en_US.UTF-8 same order on macOS and ubuntu:26.04); 3 pre-existing (unbounded claim loop: long key or missing --out
+   spins forever, reproduced; no INT/TERM trap; old dir lock blocks after upgrade). Verdict: nothing blocks v0.5.7.
+   NEXT: scope check + operator merge; operator to decide on P3 capture of the pre-existing findings.
    P3 filed: docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md (waiting on Astra rates).
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
