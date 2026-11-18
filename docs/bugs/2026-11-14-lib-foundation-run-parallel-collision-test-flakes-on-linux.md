@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured, not triaged
 **Priority:** P2
-**Waiting on:** investigation — since 2026-11-14
+**Waiting on:** operator decision — since 2026-11-18 (two test-only fixes proposed upstream; #157 not reproduced)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
@@ -40,3 +40,24 @@ Attempt 2 of the same run was green. Not reproduced on macOS (0/40 local runs).
 
 Loop the test in a Linux container (ubuntu, bash 5, GNU xargs) until it reproduces, then read
 the result-gathering code in `_run_parallel`. Also make the loop assertion fail per key.
+
+## Investigation 2026-11-18 (Claude)
+
+**#157 (sanitized collision, missing `a_b` result): not reproduced in 850 runs.**
+- 300 runs of the test alone: `ubuntu-bats` image (bats 1.10, bash 5.2.21, GNU xargs 4.9), aarch64, `--cpus 2`.
+- 400 runs instrumented, on 1 CPU with 3 busy loops.
+- 150 runs of the whole `run_parallel.bats`: ubuntu 24.04 amd64 (emulated), bats 1.13.0 (the CI version), `env -i HOME PATH` as in CI.
+- What the code allows: the summary printed under errexit, so `xargs` returned 0 and every worker exited 0, but one
+  `.item` file was missing. That leaves either two workers both winning `mkdir "${out}/.${key}.lock"` (and the second
+  overwriting the first's files), or `xargs` never starting one worker. Neither looks possible from the code, and the CI
+  log for run 43594861512 has expired.
+
+**A second flake was found: test 4 ("summary has sorted result lines followed by slowest and total"), 10/150 on emulated amd64.**
+`grep -Eq '^FAIL fail-item 0s \(rc 7\)$'` fails. Cause: `_run_parallel_worker` times each job as the difference
+of two whole-second `date +%s` readings (`scripts/lib/foundation/scripts/lib/system.sh:878-882`). A job of a few
+milliseconds that straddles a second boundary reports `1s`. The odds equal the job's run time as a fraction of a
+second: rare on a fast runner, about 7% under emulation. This is a test defect, not a `_run_parallel` defect: the
+assertion should accept `[0-9]+s`, as the SLOWEST and TOTAL lines already do.
+
+**Next step:** fix upstream in lib-foundation, both test-only. (1) Test 4 accepts `[0-9]+s` for the fail-item line.
+(2) The #157 loop assertion fails per key and dumps the out directory listing, so the next CI red says which case it was.
