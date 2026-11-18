@@ -842,6 +842,10 @@ function _hub_data_run_step() {
 }
 
 function _hub_data_repoint_vault() {
+  _no_trace _hub_data_repoint_vault_untraced "$@"
+}
+
+function _hub_data_repoint_vault_untraced() {
   local context="$1" dir="${2:-}" root_token count idx shard ns="secrets" release="vault" verb
   root_token="$(_hub_data_generate_root "$ns" "$release")" || return 1
   _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$root_token" || return 1

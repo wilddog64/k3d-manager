@@ -1040,6 +1040,19 @@ _setup_s2_repoint_env() {
   [ "$status" -eq 1 ]
 }
 
+@test "recover S2-6: no shard or root token in xtrace output" {
+  _setup_s2_repoint_env
+  source <(sed -n '/^function _no_trace() {/,/^}/p' "$PWD/scripts/lib/foundation/scripts/lib/system.sh")
+  declare -f _no_trace | grep -q 'set +x'
+  local rc=0 trace="$TEST_ROOT/xtrace.log"
+  ( BASH_XTRACEFD=9; set -x; _hub_data_repoint_vault ctx ) 9>"$trace" 2>/dev/null || rc=$?
+  [ "$rc" -eq 0 ]
+  grep -q '_hub_data_repoint_vault ctx' "$trace"
+  [ -f "$TEST_ROOT/unseal-payload.json" ]
+  run grep -E 'SHARD-A|SHARD-B|\bROOT\b' "$trace"
+  [ "$status" -eq 1 ]
+}
+
 make_recovery_recipe_fixture() {
   local destination="$1" repo_root
   repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
