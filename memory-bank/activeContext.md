@@ -512,4 +512,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
   - Pending operator: show-service-passwords P2 decision; make install-dispatch-metrics go on the M4; M6 /file live check.
 - 2026-11-18: dirused PR #31 CI GREEN on b5f96a6 (push + pull_request, windows + portable). WP1 cause: report lists files twice, and status is two spaces before '['; Claude fixed the test (d28b810, b5f96a6). Blind Argon diff review running (scratchpad argon-pr31.txt).
 - 2026-11-18: dirused PR #31 blind Argon diff review: NONE. Ready for operator merge; then tag v0.0.18 and operator live E2.
+- 2026-11-18: dirused PR #31 MERGED (fa3a07c) by operator; v0.0.18 tagged + released (pre-release, 2 zips + 2 sha256). M8 live E2 next (operator). k3d-manager CI green on ebac0d8c (7/7) -> operator promote REF=ebac0d8c.
 

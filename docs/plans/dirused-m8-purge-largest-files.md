@@ -1,7 +1,7 @@
 # dirused M8: `/purge` deletes the files `/largest` lists (dry run unless `/confirm`)
 
 **Filed:** 2026-11-18
-**Status:** DISPATCHED 2026-11-18 (rev 2 after blind Fable + Astra review), branch m8-purge from M7 merge 19e66d0
+**Status:** LANDED — merged PR wilddog64/dirused#31 (fa3a07c), released v0.0.18 (pre-release) 2026-11-18; CI green Windows + portable; Windows mutation proofs (e) WP3, (h) WP7, (j) WP5 red on CI; blind Argon diff review NONE. Live E2 (operator: scratch folder, then dry run on ffm01) pending.
 **Repo / branch:** wilddog64/dirused / `m8-purge` (from main 19e66d0, M7 merge)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** high (first feature that deletes files, on production admin shares where deletes bypass the Recycle Bin)

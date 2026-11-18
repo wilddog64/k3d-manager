@@ -165,3 +165,4 @@
 - [ ] v1.45.0 plan 4 web-console: intent approved 2026-11-18 (6h, idle TOTP tmux lock); spec review next
 - [x] P1 CI red (age missing on runner): LANDED 4c9c13ab, LIVE-VERIFIED run 44345021811 on bd5184a4
 - 2026-11-18: dirused M9 (purge stops holding service) drafted; proof on ffm01 owed before review.
+- 2026-11-18: dirused M8 /purge merged fa3a07c, v0.0.18 released; k3d-manager release CI green ebac0d8c (lint fix 03b86250).
