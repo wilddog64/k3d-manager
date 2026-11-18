@@ -5,7 +5,7 @@
 **Introduced by:** `ddd9329e` (v1.45.0 plan 2, password travel bundle)
 **Should have been caught by:** deploy step (the land gate ran BATS on the M4, which has `age`; nothing checked that CI installs it)
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-18 (intent approval, then dispatch)
+**Waiting on:** fix running — since 2026-11-18 (Luna)
 **Prior art:** `docs/bugs/2026-10-31-ci-reds-reproducible-locally-no-fast-gate.md` (exact-slug review) — read, different root cause (script syntax); `make find-similar-docs` not run
 **Filed:** 2026-11-18
 
@@ -67,4 +67,5 @@ interface:
 - Positive control in the same file: a fixture copy of `action.yml` without `age` makes the check fail.
 - Red today: run it against the unfixed `action.yml` and paste the failing line.
 
-**Intent approved:** pending (operator)
+**Intent approved:** operator, 2026-11-18
+**Intent approval note:** "go ahead for P1 and dispatch to Luna", after Claude listed E1/E2 as written
