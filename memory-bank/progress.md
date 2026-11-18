@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: dashboard DRAFT fix landed 72b9b031; dirused /update live-verified (0.0.11→0.0.12).
 - 2026-11-18: dirused M4 merged + v0.0.11 released; plan dashboard DRAFT fix dispatched.
 - 2026-11-18: PR #26 (dirused M4) CI green on 0ea4c54; awaiting operator merge.
 - 2026-11-18: PR #26 test fixes landed cf1c637; W3 FindCalls assert (Claude spec error) fix dispatched.

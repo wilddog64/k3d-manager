@@ -1,7 +1,7 @@
 # dirused M4 — new-release notice and `/update` self-update
 
 **Filed:** 2026-11-18
-**Status:** LANDED — PR #26 merged 568a829, released v0.0.11 (2026-11-18); E2 (live update to N+1) pending on the work laptop
+**Status:** LIVE-VERIFIED (update path) — PR #26 merged 568a829; v0.0.11 → v0.0.12 via `/update` on the work laptop, operator 2026-11-18; the stderr notice was not observed live (bare `dirused` prints usage and runs no check)
 **Repo / branch:** wilddog64/dirused / `m4-update-notice` (from main after PR #25 merges)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** medium (first network call; replaces its own executable)
