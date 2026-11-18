@@ -189,3 +189,23 @@ Same diff (`main...k3d-manager-v1.44.2`, code only). Argon: one agy run, 9 findi
 **Pair 5 read:** Argon found the one secret-exposure bug; Fable found the one functional break in the DR path that Argon and
 CI both missed, plus more behaviour defects, at about 6% of the Fable weekly allowance. Fable's edge again came from running
 probes (real `_kubectl`, scratch dispatch roots) instead of reading. Supports Argon-first plus Fable on high-risk release diffs.
+
+## Pair 6 — 2026-11-18, release diff review: lib-foundation PR #89 (v0.5.7), Argon, Astra and Fable, all blind
+
+Same brief (`docs/plans/release-lib-foundation-pr89-v0.5.7-review.md`) and diff (`f8025a2..5492724 -- scripts`). Argon: agy
+`gemini-4-argon-medium`. Astra: codex `gpt-6.2-astra`, first trial (253,880 input of which 226,816 cached, 1,291 output).
+Fable: Agent subagent, 67,675 tokens, 102 s. Claude checked every finding against the code.
+
+| Reviewer | Findings | New in diff and real | New, not reproduced | Pre-existing real | Already accepted |
+|---|---|---|---|---|---|
+| Argon | 2 | 0 | 0 | 1 (RETURN-only trap) | 1 (old dir lock) |
+| Astra | 7 | 1 (noclobber accepts symlink->/dev/null; rated high, really low) | 0 | 6 | 0 |
+| Fable | 5 | 1 (same bug, both lock sites, rated low) | 1 (test `sort` locale; same order in C, C.UTF-8, en_US on macOS and ubuntu:26.04) | 3 (incl. unbounded claim loop, reproduced) | 0 |
+
+Claude reproduced the symlink bug (two claims rc 0 on bash 3.2 and 5; old `mkdir` rc 1). Pre-existing findings captured as
+two P3s (`docs/bugs/2026-11-18-lib-foundation-*`).
+
+**Pair 6 read:** Fable most accurate (correct severity, stated what it did not run); Astra matched Fable on the one new bug and
+read widest, but inflated severity and did not state its limits; Argon found nothing new. Operator verdict: "Fable is still
+the best of among three but Astra is also worth a try for second eye. Google's Gemini 4 is the weakest one." Medium/high-risk
+spec review switched to Fable + Astra (operator go 2026-11-18). Low-risk specs and routine diff review stay on Argon.

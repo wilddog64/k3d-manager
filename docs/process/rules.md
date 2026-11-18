@@ -123,8 +123,10 @@ escape rate of reviewed and unreviewed changes; the verdict on whether agent rev
 taken at the v1.46.0 cut, after two releases of data.
 
 **Review tiering (operator, 2026-11-15).** Spec review of a medium- or high-risk change (Makefile, hub,
-dispatch tooling, a shared contract) goes to Argon and Fable in parallel, each blind to the other; Claude
-verifies every finding against the code, drops refuted ones and sends one merged list. A low-risk spec (docs,
+dispatch tooling, a shared contract) goes to Fable and Astra (codex `gpt-6.2-astra`) in parallel, each blind to the
+other; Claude verifies every finding against the code, drops refuted ones and sends one merged list. (Argon and Fable
+until 2026-11-18; switched by the operator after Pair 6: "Fable is still the best of among three but Astra is also worth
+a try for second eye. Google's Gemini 4 is the weakest one", then "default-reviewer go as you suggested".) A low-risk spec (docs,
 a value pin, a single-file fix) goes to Argon only. Diff review after the verifier passes goes to Argon; Fable
 only for a high-risk land call. On a spec Claude wrote, Claude rejects a reviewer finding only when the code
 shows it is wrong. Each dual review is logged as a trial pair in `docs/reviews/reviewer-trial-fable-vs-argon.md`.

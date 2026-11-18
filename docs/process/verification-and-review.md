@@ -10,7 +10,7 @@ commands are in [`../howto/codex-dispatch.md`](../howto/codex-dispatch.md).
 | # | Stage | Who | Sees | Produces | Catches |
 |---|---|---|---|---|---|
 | 1 | Spec with `## Acceptance` | Claude writes; operator approves intent | the bug, the code | `must` / `must_not` / `evidence` / `interface`, mutants | vague "fixed" criteria |
-| 2 | Spec review | Argon (low risk); Argon **and** Fable blind (medium/high risk) | spec + code, not each other | findings with file:line | contradictions, missing contract readers |
+| 2 | Spec review | Argon (low risk); Fable **and** Astra blind (medium/high risk; Argon + Fable until 2026-11-18) | spec + code, not each other | findings with file:line | contradictions, missing contract readers |
 | 3 | Implementation | dispatched worker (Codex, Sol, agy) in a worktree | spec + code | uncommitted diff + full gate output | — (stops on a spec contradiction) |
 | 4 | Gate rerun | Claude, outside the worker sandbox | the diff | `make test`, `make test-pytest`, targeted suites | sandbox-only reds and sandbox-only greens |
 | 5 | Pre-fix red | Claude | new tests + old code | which tests fail before the fix | tests that cannot fail |
