@@ -1,7 +1,7 @@
 # dirused M5: `/largest`, the largest cleanup-candidate files (logs, dumps, backups, temp)
 
 **Filed:** 2026-11-18
-**Status:** LANDED 2dc1aee on `m5-largest` (Claude verified 2026-11-18: 92/92 portable, Windows CI green incl. W1-W3; landed with --allow-out-of-scope because the dispatch-time spec snapshot listed 4 in-scope files by bare name); PR wilddog64/dirused#28 open, awaiting operator merge, then v0.0.15 and operator E2
+**Status:** LANDED — PR wilddog64/dirused#28 merged 9d8735f; released v0.0.15 (pre-release, 2 zips + sha256) 2026-11-18. Awaiting operator E2
 **Repo / branch:** wilddog64/dirused / `m5-largest` (from main 594eff6)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** low-medium (read-only: the scanner collects one more bounded list; no file is deleted or opened; default output unchanged without the switch)
