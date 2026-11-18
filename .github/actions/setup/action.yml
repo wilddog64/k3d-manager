@@ -8,7 +8,7 @@ runs:
       run: |
         set -euo pipefail
         sudo apt-get update
-        sudo apt-get install -y shellcheck python3-pip
+        sudo apt-get install -y shellcheck python3-pip age ripgrep
 
     - name: Install bats 1.11.0
       shell: bash
