@@ -393,3 +393,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 - 2026-11-18: land PID-reuse P3 VERIFIED and landed, `ca27c8bf` (Luna). Diff = spec; pre-fix tests 1-2 red, 3 green;
   guard-forced-false mutation turns 3 red; land+resume bats and shellcheck green. Pushed; `make hub-sync` not run. WIP 1/3.
+
+- 2026-11-18: run_parallel test fix LANDED in lib-foundation `7027b38` (`release/v0.5.7`, pushed; Luna). Claude reproduced
+  P1 (date shim: old red, new green), P2a/P2b (skip .item a_b-2 / .log sleep_a: old green, new red naming the file) on
+  scratch copies; both tests green on the unmodified lib. Remaining: v0.5.7 release PR (Argon review while Copilot capped),
+  Linux CI, subtree pull into k3d-manager. #157 root cause still unknown; the new assertion will name it next time. WIP 0/3.

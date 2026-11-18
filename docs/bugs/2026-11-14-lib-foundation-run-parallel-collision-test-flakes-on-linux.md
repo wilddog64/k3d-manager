@@ -1,8 +1,8 @@
 # lib-foundation `run_parallel.bats` #157 (sanitized-collision test) flakes on Linux CI
 
-**Status:** OPEN — captured, not triaged
+**Status:** LANDED — lib-foundation `7027b38` on `release/v0.5.7` (test-only: timing flake fixed; collision test now names the missing file — #157 root cause still unknown)
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-18 (`docs/plans/lib-foundation-v0.5.7-run-parallel-test-flakes.md`, Luna, lib-foundation `release/v0.5.7`)
+**Waiting on:** live check — since 2026-11-18 (Linux CI on the lib-foundation v0.5.7 release PR, then subtree pull into k3d-manager)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
