@@ -5,6 +5,19 @@ The webhook tries the configured AI candidates in order. The default order is `a
 `antigravity.google/oauth-callback`, while this host's gemini-cli uses an API key. A working
 credential for one does not prove that the other works.
 
+## Vault is checked first (ArgoCD alerts)
+
+Before asking an AI candidate about an ArgoCD alert, the webhook makes two read-only kubectl calls once
+per job, each with `--request-timeout=10s`. They read the Vault pod labels (`vault-sealed`,
+`vault-initialized`, `vault-active`) and the `vault-backend` ClusterSecretStore status. There is no exec
+and no Secret read. kubectl `Warning:` lines are dropped before the JSON is parsed. A pod missing a label
+shows as `<pod> state unavailable` and is not counted as sealed. The line reads `Vault pods: state
+unavailable` only when no pod has all three labels.
+
+When any fully labelled pod is sealed, the analysis says Vault is sealed and skips the AI candidates and
+the per-alert diagnostics. Otherwise both summaries go into the prompt, so the model does not blame app
+configuration or probes for a failure that comes from Vault.
+
 ## Configuration
 
 - `K3DM_AI_BIN_ORDER` sets the comma-separated candidate order.

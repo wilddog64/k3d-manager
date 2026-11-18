@@ -2,9 +2,12 @@
 
 ## [Unreleased]
 
+## [1.44.2] - 2026-11-17
+
 ### Added
 
 - **Hermes `vault_seal` sensor.** Hermes reads the Vault pod labels each cycle and reports Vault as unsealed, sealed (from the second sealed cycle) or unknown. It only reads labels: no exec, no Vault API call, no Secret read, and no repair can unseal.
+- **`codex-dispatch` tracks other projects (multi-project M1).** `scripts/etc/projects.list` registers each repo with its release scheme. `start --project <name>` picks that project's version: the release branch for k3d-manager, and the latest `v*` tag plus one patch for tag-released repos such as dirused. Ledger events for those tasks carry `project`, the verify, land, handoff, resume and abandon steps find the task's version, and `open --project/--count` filter and count per project. k3d-manager tasks behave as before. Pulled forward from v1.45.0 by the operator.
 
 ### Fixed
 
@@ -13,10 +16,14 @@
 - **Every Hermes repair card says whether to press Approve** ("Recommended: Approve — <when>. If you do nothing: <what>."), on both the Slack button card and the text card.
 - **A resolved Hermes incident names each withdrawn proposal** and says nothing needs approving, so the old buttons are no longer left looking actionable.
 - **Alert diagnoses check Vault first.** The webhook's ArgoCD alert analysis reads the Vault seal labels and the `vault-backend` ClusterSecretStore once per job. When Vault is sealed it says so and skips Gemini; otherwise Gemini sees both summaries. Before, it blamed app configuration and probes during a Vault seal.
+- **Hub recovery rewrites the `vault-unseal` Secret from the restored shards (unseal watchdog stage 2).** `_hub_data_repoint_vault` cached the restored shards in the Keychain but left the Secret holding the replaced Vault's shard, so after a recovery the watchdog could not unseal the restored Vault (2026-11-15). The non-drill path now writes the whole Secret from stdin JSON (replaced if it exists, created if not, so no stale `shard-N` survives). No shard appears in argv or logs, and a failed write fails the step.
+- **Review fixes to the Vault-sealed work.** The webhook drops kubectl `Warning:` lines before parsing the JSON, so a deprecation or throttling warning can no longer turn a sealed Vault into "state unavailable". It reports each pod on its own, so one pod without a label no longer hides a sealed one. The reads also carry `--request-timeout`, and `--` goes before the ArgoCD app name. Hermes reads an unknown `vault-sealed` label value as unknown, not unsealed, and no longer offers r7 when it has no Vault pod data. Its resolved text shows the time in UTC and names a repair that ran, and its incident text names ArgoCD only when ArgoCD contributes.
+- **The stall-watch Slack notice shows the evidence path as `~/…`** instead of the full home-directory path, so the message no longer exposes the user name.
 
 ### Changed
 
 - **Stall recovery dashboard reads in plain words.** Operator decisions and After resume show names like "Refused (state changed)" and "Stalled again" instead of `{decision="precondition_failed"}`, and the Incidents table has titled, fixed-width columns so the task name is no longer cut off.
+- **The Stall recovery dashboard row is expanded by default**, its panels moved to the top level. Three bar gauges also got a fixed colour the nested layout had kept the colour check from seeing.
 
 ## [1.44.1] - 2026-11-17
 
