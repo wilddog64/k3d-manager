@@ -65,6 +65,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-18: dirused-m4-w3-findcalls LANDED 0ea4c54 (superseding all 3 prior M4 slugs). PR #26 CI ALL GREEN on head 0ea4c54 (portable + windows, both push and PR runs). Ready for operator merge. After merge: tag release N (next v0.0.x), then N+1 for live E2 on the work laptop. WIP 0/3.
 - 2026-11-18: dirused-m4-windows-ci LANDED cf1c637 (land needed --superseding for BOTH prior slugs). Windows CI on cf1c637: U14 passes; W3 fails FindCalls 0 vs 1 — the /json scan correctly runs the update check; Claude's amendment 2 wrongly kept that assert. Amendment 3 dispatched as dirused-m4-w3-findcalls (drop the assert). WIP 1/3.
 - 2026-11-18: PR #26 Windows CI red on 5c2a984 (run 44362590748): W3 asserted rc!=0 for bare 'update' target (rc 0 on runner; checks that matter passed); U14 flaky (File.Move overwrite while readers open -> UnauthorizedAccessException; prod TryWrite swallows). Test-only amendment 2 dispatched as dirused-m4-windows-ci (Luna). WIP 1/3.
 - 2026-11-18: dirused M4 review fixes LANDED 5c2a984 on m4-update-notice (superseding), pushed to PR #26. Verify: portable 86/86, Windows tests build; U15 red on c918ff6 SelfUpdater (message and staged-file asserts both), U17 red when notice printed from CheckAsync, U16/W3 red by compile (IsFlag absent). CI rerun next, then merge on operator's word; release N then N+1 for E2. WIP 0/3.

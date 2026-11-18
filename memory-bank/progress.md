@@ -1,6 +1,7 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
 
+- 2026-11-18: PR #26 (dirused M4) CI green on 0ea4c54; awaiting operator merge.
 - 2026-11-18: PR #26 test fixes landed cf1c637; W3 FindCalls assert (Claude spec error) fix dispatched.
 - 2026-11-18: PR #26 Windows CI red (test-only: W3, flaky U14); fix dispatched to Luna.
 - 2026-11-18: dirused M4 review fixes landed 5c2a984, PR #26 updated; CI rerun.
