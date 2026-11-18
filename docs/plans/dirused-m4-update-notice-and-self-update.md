@@ -1,7 +1,7 @@
 # dirused M4 — new-release notice and `/update` self-update
 
 **Filed:** 2026-11-18
-**Status:** READY — reviewed (Fable + Astra), D1-D2 decided, intents approved; dispatch to Luna after PR #25 merges
+**Status:** LANDED c918ff6 (PR #26); review-fix amendment below dispatched to Luna 2026-11-18
 **Repo / branch:** wilddog64/dirused / `m4-update-notice` (from main after PR #25 merges)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** medium (first network call; replaces its own executable)
@@ -141,7 +141,7 @@ stdout unchanged; **W2** the existing `Program.Run` overloads make no network ca
 
 - `Directory.Build.props`, `src/Dirused.Cli/Program.cs`, `src/Dirused.Cli/Dirused.Cli.csproj`
 - `src/Dirused.Common/ArgParser.cs`
-- `src/Dirused.Common/Update/` (new: `IReleaseSource.cs`, `GitHubReleaseSource.cs`, `UpdateCheck.cs`, `SelfUpdater.cs`, `Sha256File.cs`, `UpdateState.cs`)
+- `src/Dirused.Common/Update/*.cs` (new: IReleaseSource, IUpdateFileOperations, GitHubReleaseSource, ReleaseSelector, UpdateCheck, SelfUpdater, Sha256File, UpdateState)
 - `tests/Dirused.Tests.Portable/UpdateTests.cs` (new), `tests/Dirused.Tests/UpdateWiringTests.cs` (new)
 - `.github/workflows/release.yml`, `tools/live-check.ps1`
 - `README.md`, `tools/PACKAGE-README.txt`, `CHANGELOG.md`
@@ -174,6 +174,44 @@ check frequency; state races; partial-failure paths; E2 strengthened. Accepted f
 Accepted from Astra only: update lock vs concurrent startup cleanup; pagination bound. Rejected: Astra's signed manifest
 (out of scope, trust model stated instead); "N4 forbids metadata" (N4 reworded to asset downloads).
 
+## Amendment after PR review (Claude, 2026-11-18)
+
+Blind Argon review of PR #26 (c918ff6), each finding checked against the code by Claude:
+
+1. **Accepted — held lock deletes another updater's staging.** `SelfUpdater.cs:32` takes the lock inside the `try`;
+   when it throws, the `finally` at `:53` still deletes `.dirused-update\` and tries to delete the lock file, so a second
+   `/update` can remove the first one's staged exe mid-swap. Fix: when the lock is not acquired, print
+   "Another update is running." and return 1 without touching the staging folder or the lock file.
+2. **Accepted — bare words act as flags.** `Program.cs:23-31,63` match `version`, `update` and `noupdatecheck` with
+   `TrimStart('/','-')` and no prefix check, so `dirused update` (a folder named `update`) self-updates, `dirused version`
+   prints the version, and `dirused C:\ /output version` errors. ArgParser already requires a `/` (not `//`) or `-`
+   prefix (`ArgParser.cs:75`). Fix: add `public static bool ArgParser.IsFlag(string arg, string name)` with that same rule
+   and use it for all three checks in `Program.cs`.
+3. **Accepted (low) — notice written from a background thread.** `UpdateCheck.PrintNotice` runs in the continuation of
+   `CheckAsync`, so the notice can interleave with scan stderr and can still be written after the 1 s grace expired.
+   Fix: `CheckAsync` only updates the state and remembers whether a notice is due; the notice is written on the
+   calling thread by `WaitAfterReport` (make it an instance method, or pass the `UpdateCheck`), and only if the check
+   finished within the grace. `NoticedUtc` is written only when the line is printed. A check that finishes after the
+   grace prints nothing in that run.
+4. **Rejected — relative state path.** `UpdateState.Write("x.json")` throws on `Directory.CreateDirectory("")`, but
+   the only production path is `%LOCALAPPDATA%\dirused\update-check.json`, always absolute.
+
+Tests (all red on c918ff6; paste the failing lines):
+
+- **U15_HeldLockLeavesOtherUpdatersFilesAlone:** create `.dirused-update\dirused.exe` in scratch, hold
+  `dirused.update.lock` with `FileShare.None`, run `SelfUpdater.RunAsync` → rc 1; the staged file and the lock file
+  still exist; exe byte-identical. Positive control: after releasing the lock, an update succeeds.
+- **U16_OnlyPrefixedWordsAreFlags:** `ArgParser.IsFlag` is true for `/update`, `-update`, `/UPDATE`; false for
+  `update`, `//update`, `C:\update`, `/updates`.
+- **U17_NoticeIsWrittenOnlyByWaitAfterReport:** a fake source that completes immediately with a newer version:
+  after `CheckAsync` finishes, the error writer is still empty; after `WaitAfterReport` it holds the notice line once.
+  A source that completes 1.5 s later with a newer version: `WaitAfterReport` with a 1 s grace returns, and 1 s
+  after that the error writer is still empty (the late completion writes nothing). Update U2 and U11 if they relied
+  on `CheckAsync` printing.
+- **W3_BareWordsAreScanTargets (Windows):** `Program.RunWithReleaseSource(["update"], ...)` and `(["version"], ...)`
+  never call the fake source's download and never print `dirused 0.0.`; `(["/version"], ...)` still prints it
+  (positive control).
+
 ## Acceptance
 
 ```yaml
@@ -197,11 +235,17 @@ must_not:
     text: "a failed /update changes or removes the current exe (U7, U13)"
   - id: N4
     text: "an asset is downloaded or installed without /update (U12)"
+  - id: N5
+    text: "an /update that cannot take the lock deletes the staging folder or lock of the update holding it (U15) — red on c918ff6"
+  - id: N6
+    text: "a bare word (update, version, noupdatecheck) without a / or - prefix acts as a flag (U16, W3) — red on c918ff6"
+  - id: N7
+    text: "the notice is written from the background check, or after the grace expired (U17) — red on c918ff6"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1, N2, N3, N4]
+    proves: [M1, M2, M3, N1, N2, N3, N4, N5, N6, N7]
     kind: offline
-    command: portable tests U1-U14 with a fake release source and file system; Windows tests W1-W2; Windows CI on the PR
+    command: portable tests U1-U17 with a fake release source and file system; Windows tests W1-W3; Windows CI on the PR
     intent: The notice shows up once a day without slowing a scan or touching its output, the off switch really turns it off, and a failed update leaves your working copy alone.
   - id: E2
     proves: [M1, M2, M3]
