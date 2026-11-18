@@ -1,11 +1,12 @@
 # Bug: vault-sealed landings (fadf8438, bea02b84) — post-land Fable review findings
 
-**Status:** LANDED — webhook W1–W6 in 59dd12e5; Hermes H1–H3, H5 in ebdd140a; guide H4 in 4ecee69c. Claude verified: pre-fix red 5/5 in each, all 10 spec mutations red, targeted suites green.
+**Status:** LIVE-VERIFIED — fixes deployed on the hub 2026-11-18 (promote 637061f1, tag hub-promote/20261118T012954Z). Landed as webhook W1–W6 in 59dd12e5; Hermes H1–H3, H5 in ebdd140a; guide H4 in 4ecee69c. Claude verified offline: pre-fix red 5/5 in each, all 10 spec mutations red, targeted suites green.
 **Priority:** P2 (proposed: the webhook sealed check fails open on any kubectl warning; the rest are P3 hygiene)
 **Introduced by:** fadf8438 (Hermes, Luna) and bea02b84 (webhook, Flash), both v1.44.2
 **Should have been caught by:** review
 **Introducing change reviewed:** no (the specs had Argon + Fable; the two diffs had no diff review before land)
-**Waiting on:** live check — since 2026-11-17 (needs `make hub-promote`; was: fix running (operator: "dispatch two small ones"; `docs/plans/webhook-vault-sealed-review-fixes.md`, `docs/plans/hermes-vault-sealed-review-fixes.md`; H4 by Claude))
+**Fix commit:** `8352227d`
+**Live evidence:** 2026-11-18 · run claude-hub-pane-deployed-code-read · env m5 · scenario webhook-and-hermes-run-fixed-code-after-promote · commit 637061f1 · proves fix
 **Prior art:** `docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md`, `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (exact-slug pass; `find-similar-docs` not run) — the specs these landings implemented; none records these defects.
 **Filed:** 2026-11-17
 
@@ -42,3 +43,11 @@ tests use window=1 and single pods.
 
 One follow-up dispatch per file group: webhook W1–W5 (capture stderr separately for these two reads; assert argv; per-pod
 unknown), Hermes H1–H3 and H5, and Claude writes H4. W6 rides along only if the webhook dispatch already touches that line.
+
+## Live verification (Claude, 2026-11-18 ~01:35Z, read-only, hub pane work:1.0)
+
+The spec evidence is offline only, so the live check proves the deployed processes run the fixed code:
+- Hub checkout HEAD 637061f1, clean (`git status --porcelain` 0), `bin/` and `scripts/` identical to 637061f1; `bin/k3dm-webhook` unchanged between 59dd12e5 and 637061f1.
+- Webhook (launchd, long-running, PID 75816): file mtime 15:43:18 PST < process start 16:01:13 PST, so the running process loaded the W1–W6 code. No restart needed.
+- Hermes (launchd interval job): each run starts fresh from the 637061f1 checkout (H1–H3, H5).
+- Not exercised: a real sealed-Vault alert through the webhook (E2 of the r7 bug stays open there).
