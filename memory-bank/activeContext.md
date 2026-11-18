@@ -453,3 +453,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-18: medium/high-risk spec review pair switched to Fable + Astra (operator go; Argon stays low-risk/diff); rules.md, verification-and-review.md, trial pair 6 logged (8042333f).
 - 2026-11-18: Astra metrics (Luna run 2) exited 0; Claude verified: post-fix 3 pass, pre-fix 1+3 red/2 green, extra mutation (drop gpt-6.2-sol) red, file 223 pass. Fable blind diff review running (Pair 7 data point); land after it.
 - 2026-11-18: Astra metrics LANDED 34502bfe, verify pass recorded; Fable blind review no defects (Astra cost still $0: only run is 6.2, unpriced). Spec renamed (no version prefix). E2 live waits on operator hub-promote.
+- 2026-11-18: Astra live: tokens_by_model gpt-6.2-astra on hub Pushgateway (manual make dispatch-metrics; 38 earlier push timeouts). No hub-promote needed. E2 defect: identity rows only for landed tasks; review child abandoned -> no row.
