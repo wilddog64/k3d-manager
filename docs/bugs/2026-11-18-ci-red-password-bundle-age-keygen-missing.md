@@ -1,11 +1,12 @@
 # CI red on the release branch: password_bundle.bats needs age-keygen, the CI runner has none
 
-**Status:** LANDED — fix `4c9c13ab` 2026-11-18 (Luna, landed by Claude); E2 live CI check pending
+**Status:** LIVE-VERIFIED — fix `4c9c13ab` 2026-11-18 (Luna, landed by Claude); E2 by Claude 2026-11-18: CI run 44345021811 on `bd5184a4` green on all 7 check-runs, `test (3)` password_bundle.bats `1..8` all ok, `test (4)` ci_setup_installs ok; the launchd `rg` exit-127 is gone
+**Fix commit:** 4c9c13ab
+**Live evidence:** 2026-11-18 · run 44345021811 · env github-actions-ubuntu-24.04 · scenario release-branch-ci · commit bd5184a4 · proves E2
 **Priority:** P1 — every CI run on `k3d-manager-v1.45.0` since `d14b5d9e` fails, so the release PR merge gate cannot pass and any new regression is hidden behind the same red
 **Introduced by:** `ddd9329e` (v1.45.0 plan 2, password travel bundle)
 **Should have been caught by:** deploy step (the land gate ran BATS on the M4, which has `age`; nothing checked that CI installs it)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-18 (release-branch CI on the pushed head)
 **Prior art:** `docs/bugs/2026-10-31-ci-reds-reproducible-locally-no-fast-gate.md` (exact-slug review) — read, different root cause (script syntax); `make find-similar-docs` not run
 **Filed:** 2026-11-18
 
