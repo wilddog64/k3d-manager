@@ -17,6 +17,10 @@ PID-reuse P3; run_parallel investigation and its test-only fixes upstream.
 is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes (hub change needs operator go).
 
 **Next, in order:**
+0. **PR #89 CI RED (2026-11-18): the new assertion caught the real #157** — 5 locks for 6 items, last item `a_b` never
+   claimed, xargs rc 0; 4/9 CI runs fail this way, 0/850 local; SIGCHLD-ignored local repro negative. Evidence in the
+   run_parallel bug doc. Awaiting operator: add a second diagnostic (late re-list + `$RP_LOG` + signal masks) to #89, or
+   fix in the library.
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.
