@@ -132,6 +132,8 @@ The Hermes diagnose-and-approve flow for stale metrics is **out of scope**: it i
 - `docs/guides/grafana-dashboards/k3dm-agent-dispatch.md`
 - `docs/howto/codex-dispatch.md`
 - `CHANGELOG.md`
+- `scripts/tests/bin/codex_dispatch_ledger.bats` (amended 2026-11-18 after verification: its `s1_snapshot` must wait for, or exclude, `metrics.lock`/`metrics.log` now that ledger appends start the scheduler)
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats` (amended 2026-11-18: add panel 9 to the exclusion set at :68-72; item 7 changes panel 9's description, a reader of the dashboard contract missed by the spec)
 
 ## Out of scope
 
