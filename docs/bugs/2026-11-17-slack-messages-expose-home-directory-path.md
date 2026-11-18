@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing (stall-watch notice since the dispatch stall detector, v1.44.1)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision
+**Waiting on:** fix running — since 2026-11-18 (operator: "go ahead to open a P3 then dispatch to Luna"; `docs/plans/webhook-slack-home-path-scrub.md`)
 **Prior art:** not run (vector store unreachable: context `k3d-k3d-cluster` does not exist; exact-slug glob found none)
 
 ## Report
