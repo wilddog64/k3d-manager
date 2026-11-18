@@ -1,8 +1,8 @@
 # lib-foundation `run_parallel.bats` #157 (sanitized-collision test) flakes on Linux CI
 
-**Status:** LANDED — lib-foundation `7027b38` on `release/v0.5.7` (test-only: timing flake fixed; collision test now names the missing file — #157 root cause still unknown)
+**Status:** LANDED — lib-foundation `a561b16` on `release/v0.5.7` (noclobber lock claims for `_run_parallel_worker` and `_foundation_vcluster_lock`; root cause uutils `mkdir` on ubuntu-26.04); test fixes `7027b38`
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-18 (Luna, `docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md`)
+**Waiting on:** live check — since 2026-11-18 (PR #89 CI, three green bats runs on ubuntu-26.04)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test

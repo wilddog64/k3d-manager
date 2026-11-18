@@ -28,7 +28,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    exit 0 (136/500 vs GNU 0/500) -> lock not exclusive. Library bug. Proposed fix: noclobber file lock + stub-mkdir test;
    _foundation_vcluster_lock same pattern. Operator go (incl. vCluster lock) -> spec
    docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md; DISPATCHED to Luna, slug lf-v057-exclusive-lock-claims
-   (base 884e3aa). After land: verify, push, update CHANGE.md (no longer test-only), 3 green CI runs on PR #89 (E2).
+   (base 884e3aa). LANDED a561b16 (Claude-verified: pre-fix red, mutations, ubuntu:26.04 full suite no regression;
+   verify recorded). CHANGE.md 5492724 pushed; PR #89 title/body updated. NEXT: E2 = 3 green bats CI runs (watcher
+   re-running), then Argon review of PR #89 + merge gates.
 1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
    2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
    (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.
