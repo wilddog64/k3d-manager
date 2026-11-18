@@ -1,7 +1,7 @@
 # dirused M4 — new-release notice and `/update` self-update
 
 **Filed:** 2026-11-18
-**Status:** DRAFT — blind review done (Fable + Astra, adjudicated below); waits on operator decisions D1-D2 and intent approval, then dispatch to Luna
+**Status:** READY — reviewed (Fable + Astra), D1-D2 decided, intents approved; dispatch to Luna after PR #25 merges
 **Repo / branch:** wilddog64/dirused / `m4-update-notice` (from main after PR #25 merges)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** medium (first network call; replaces its own executable)
@@ -19,9 +19,9 @@ workflow publishes without `-p:Version`, so every build reports assembly version
   notice; `/update` downloads, verifies and replaces the exe. Nothing installs without `/update`.
 - **Network:** "Yes, with opt-out". dirused may call github.com from the work laptop; a switch and an env var turn the
   check off; a failed check is silent and never fails a scan.
-- **D1 (pending): grace wait.** A scan that finishes before the check would otherwise never record a result. Proposed:
+- **D1 (decided 2026-11-18: "Up to 1 second"): grace wait.** A scan that finishes before the check would otherwise never record a result. Proposed:
   after the report, wait at most 1 second more for an in-flight check, then exit without it.
-- **D2 (pending): authenticating corporate proxy.** `HttpClient` uses the system proxy but sends no proxy credentials, so a
+- **D2 (decided 2026-11-18: "Send to proxy only"): authenticating corporate proxy.** `HttpClient` uses the system proxy but sends no proxy credentials, so a
   proxy that answers 407 blocks the check and `/update` on the laptop. Proposed: send the Windows logon credentials to the
   proxy only (`DefaultProxyCredentials = CredentialCache.DefaultCredentials`); nothing is sent to GitHub.
 
@@ -210,4 +210,5 @@ evidence:
     intent: On your work laptop, an old copy tells you about the new release and updates itself with one command.
 ```
 
-**Intent approved:** pending (operator)
+**Intent approved:** operator, 2026-11-18
+**Intent approval note:** "Approve, dispatch" (E1/E2 as written; dispatch after PR #25 merges)
