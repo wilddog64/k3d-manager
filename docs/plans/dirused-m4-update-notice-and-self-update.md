@@ -1,7 +1,7 @@
 # dirused M4 — new-release notice and `/update` self-update
 
 **Filed:** 2026-11-18
-**Status:** LANDED c918ff6 + 5c2a984 (PR #26); Windows CI test fixes (amendment 2) dispatched to Luna 2026-11-18
+**Status:** LANDED c918ff6 + 5c2a984 + cf1c637 (PR #26); amendment 3 (W3 FindCalls) dispatched to Luna 2026-11-18
 **Repo / branch:** wilddog64/dirused / `m4-update-notice` (from main after PR #25 merges)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Risk:** medium (first network call; replaces its own executable)
@@ -231,6 +231,15 @@ PR #26 Windows CI on 5c2a984 (run 44362590748), test-only failures:
 
 Change only `tests/Dirused.Tests/UpdateWiringTests.cs` and `tests/Dirused.Tests.Portable/UpdateTests.cs`. Gate: the full
 portable suite passes and `dotnet build tests/Dirused.Tests` succeeds; Windows CI on the PR is the final gate.
+
+## Amendment 3: W3 must not forbid the scan's update check (Claude, 2026-11-18)
+
+Windows CI on cf1c637 (run 44364074773): W3 failed at `UpdateWiringTests.cs:46`, `Assert.Equal(0, source.FindCalls)`,
+actual 1. With amendment 2 the bare word is now really scanned (`[word, "/json"]`), and a scan correctly starts the
+background update check, which lists releases once. Amendment 2 wrongly said to keep the `FindCalls` assertion; W3 as
+first specified only forbids a download and the version line. Fix: in W3's loop, remove `Assert.Equal(0,
+source.FindCalls)`; keep `Assert.Equal(0, source.DownloadCalls)`, the target-name assertion, the no-`dirused 0.0.`
+assertion and the `/version` positive control. Change only `tests/Dirused.Tests/UpdateWiringTests.cs`.
 
 ## Acceptance
 
