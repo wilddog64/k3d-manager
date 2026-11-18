@@ -26,3 +26,7 @@ refuses correctly.
 Do not consume the correlator's transition on a re-sample, or replay it on the next `_poll`. Test: resolve during a
 re-sample, then `_poll` posts the withdrawal; a re-sample without a resolve leaves pending intact (control, existing
 test 13).
+
+## Fable confirmation (2026-11-18)
+
+Fable found the same (its #5) independently, adding that the approval still executes after the resolve and `test_resolved_keeps_pending_on_approval_resample` pins this without asserting what approve does next.

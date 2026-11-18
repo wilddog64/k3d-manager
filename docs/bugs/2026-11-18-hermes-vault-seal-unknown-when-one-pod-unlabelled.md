@@ -23,3 +23,7 @@ effect today.
 
 Mirror the webhook: ignore pods without valid labels unless none has them. Test: vault-0 `true`, vault-1 unlabelled
 → sealed; all unlabelled → unknown (control).
+
+## Fable confirmation (2026-11-18)
+
+Fable adds two related points: (a) any one sealed pod counts as sealed in both components, so an active unsealed leader plus a sealed standby short-circuits every webhook alert (`bin/k3dm-webhook:2092`, `sensors.py:917`); (b) a pod with only `vault-sealed=true` is "state unavailable" in the webhook (needs all three labels, `:2075-2078`) but sealed in Hermes. Both harmless on the single-replica hub.

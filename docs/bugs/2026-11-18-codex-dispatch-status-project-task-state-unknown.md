@@ -24,3 +24,7 @@ Operator reads `unknown` for a task that is working; Claude counts WIP from `ope
 
 Reuse the first loop's running check (pid file / process probe) in the second loop. Test: a project task with a live
 pid and no `exit` shows `state: running`; with `exit` present it shows `exited (0)` (control).
+
+## Fable confirmation (2026-11-18)
+
+Fable reproduced it (live pid in `v0.0.5` → `state: unknown`). Also: the loop prints `exited (0)` where the first prints `exited successfully`, so `bin/k3dm-codex-land-pending:70,80` (release version only, greps `exited successfully`) cannot land project tasks.

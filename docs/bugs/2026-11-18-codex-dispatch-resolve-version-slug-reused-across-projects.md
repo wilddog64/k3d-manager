@@ -24,3 +24,7 @@ Needs a slug reused across repos; none exist today.
 
 Count the k3d-manager match too and refuse when there is more than one candidate. Test: same slug in `v1.44.2`
 (k3d-manager) and `v0.0.3` (dirused) → error naming `--version`; slug only in `v0.0.3` → resolves (control).
+
+## Fable confirmation (2026-11-18)
+
+Fable reproduced it: `a1` in `v0.0.11` (dirused) and `v1.44.2`, `abandon --slug a1` → `would record: abandon v0.0.11/a1`. The same resolver serves `land`, `resume`, `verify` and `handoff`.

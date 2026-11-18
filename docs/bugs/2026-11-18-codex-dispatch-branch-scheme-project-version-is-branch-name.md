@@ -26,3 +26,7 @@ project would dispatch, then vanish from every reader.
 Either map `scheme=branch` to a `v`-prefixed directory, or teach the readers a project-version directory list.
 Test: register a `scheme=branch` project in a scratch registry, `start`, then `status <slug>` shows it (positive control:
 the `scheme=tag` case already passes).
+
+## Fable confirmation (2026-11-18)
+
+Fable reproduced it: `task/main/c1`, ledger `version:"main"`; `abandon --slug c1` → `no start in ledger: v1.44.2/c1` and `--version main` is rejected, so the task is orphaned. Simplest fix: refuse `scheme=branch` for non-k3d-manager projects at `start`.

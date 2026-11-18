@@ -172,3 +172,20 @@ blind Fable review after land; Claude re-read every finding against the code.
 
 **Read:** a diff review found a real fail-open (W1) that two blind spec reviews could not see, since it lives in an existing
 helper the spec told the worker to reuse. Evidence for keeping a diff review on medium-risk landings.
+
+## Pair 5 — 2026-11-18, release diff review: PR #163 (v1.44.2), Argon then Fable, both blind
+
+Same diff (`main...k3d-manager-v1.44.2`, code only). Argon: one agy run, 9 findings. Fable: three parallel area reviews
+(hub_data, dispatch, webhook/Hermes), about 321K tokens total (91K + 120K + 111K), most findings checked by running probes.
+
+- **Argon:** 9 findings. 8 confirmed (1 medium: shards under xtrace, fixed in PR; 7 low), 1 duplicate of an open bug, 0 refuted.
+- **Fable:** about 25 findings. All checked items confirmed, 0 refuted, 1 not a finding (bash 3.2 on a bash-4 script), 3 by design.
+  Unique medium: recovery exits silently on a missing `vault-unseal` (fixed in PR; the tests were vacuous because the stub
+  returned where `_kubectl` exits), Hermes approve re-propose voids digest/expiry, r7 two-cluster parsing, klog lines.
+  Unique low/latent: project dir above the release, non-semver tag, root token in `jq` argv (pre-existing).
+- **Overlap:** dispatch stall scan, slug collision, `scheme=branch`, status `unknown`, resample withdraw, unlabelled pod (6).
+  Fable confirmed the xtrace fix as clean.
+
+**Pair 5 read:** Argon found the one secret-exposure bug; Fable found the one functional break in the DR path that Argon and
+CI both missed, plus more behaviour defects, at about 6% of the Fable weekly allowance. Fable's edge again came from running
+probes (real `_kubectl`, scratch dispatch roots) instead of reading. Supports Argon-first plus Fable on high-risk release diffs.

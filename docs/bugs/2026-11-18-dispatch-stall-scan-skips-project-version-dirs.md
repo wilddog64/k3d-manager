@@ -23,3 +23,7 @@ A stalled project dispatch is only noticed by hand. k3d-manager tasks are unaffe
 
 Scan every `v*` directory that holds a task without `exit`/`landed`, not just the newest. Test: a stalled task under
 `v0.0.3` while `v1.44.2` exists is reported; a finished one there is not (control).
+
+## Fable confirmation (2026-11-18)
+
+Fable (blind diff review, same PR) reproduced this in a scratch root and rated it high: a live-pid task in `v0.0.5` with an empty `v1.44.2/` beside it printed nothing from `stalled --live`. The reverse case is `docs/bugs/2026-11-18-codex-dispatch-project-version-above-release-hides-k3d-manager-tasks.md`.

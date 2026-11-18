@@ -38,3 +38,30 @@ shards did not ask for an xtrace test; S2-3 checked kubectl argv and stderr, not
 **Process note:** a spec that moves shards, tokens or keys through shell variables should carry a `set -x` trace test
 (like S2-6) as a `must_not`, with the real `_no_trace` loaded — the bats suite stubs `_no_trace` as a pass-through,
 which first made S2-6 fail even after the fix.
+
+## Second review: blind Fable diff review (2026-11-18)
+
+With Fable quota spare (operator: 64% of the weekly allowance left), three blind, read-only Fable reviews ran in parallel
+on the same diff, split by area. Claude verified every finding against the code.
+
+| Area | Finding | Verdict | Record |
+|---|---|---|---|
+| hub_data | Secret probe and write lacked `--no-exit`: a missing `vault-unseal` (or API error) exited recovery at step 6 with no message; S2-2/S2-5 stubs returned instead of exiting (medium) | Confirmed. **Fixed in 3609a2ad**: `--no-exit` on both; the S2 stub now exits like the real `_kubectl`; S2-2/S2-5 red before the fix | this file |
+| hub_data | `key-threshold` recorded as the shard count (low) | Confirmed, no reader outside tests; init is 1/1 | — |
+| hub_data | drill skips the Secret rewrite (low) | By design ("Drill branch unchanged") | — |
+| hub_data | root token in `jq --arg` in `hub_recovery.sh:75` (low, pre-existing) | Confirmed, P3 | `docs/bugs/2026-11-18-hub-recovery-root-token-in-jq-argv.md` |
+| dispatch | stall scan misses project dirs (high) | Same as Argon #4, P3 (latent for dirused) | Fable section in `docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md` |
+| dispatch | project dir above the release hides k3d-manager tasks (high) | Confirmed, latent, P3 | `docs/bugs/2026-11-18-codex-dispatch-project-version-above-release-hides-k3d-manager-tasks.md` |
+| dispatch | slug collision; `scheme=branch`; status `unknown` (medium) | Same as Argon #5, #2, #3 | Fable sections in those docs |
+| dispatch | non-semver highest tag resets version to v0.0.1 (medium) | Confirmed, P3 | `docs/bugs/2026-11-18-codex-dispatch-non-semver-highest-tag-resets-project-version.md` |
+| dispatch | bash 3.2 arithmetic (low) | Not a finding: script already needs bash 4 (`local -A` on `main`) | — |
+| dispatch | `open`, `prune`, metrics, docs, test gaps (low) | Confirmed, P3 hygiene | `docs/bugs/2026-11-18-codex-dispatch-multi-project-low-findings.md` |
+| webhook | `_kubectl_json` drops only `Warning: ` lines (medium) | Confirmed in code; hub behaviour unproven, P3 | `docs/bugs/2026-11-18-webhook-kubectl-json-filter-misses-klog-lines.md` |
+| Hermes | r7 reads only the first `not synced` group; `<= 2` untested (medium/low) | Confirmed, P3 | `docs/bugs/2026-11-18-hermes-r7-reads-only-first-eso-not-synced-group.md` |
+| Hermes | approve re-propose voids digest/expiry checks (medium, pre-existing) | Confirmed, P3 | `docs/bugs/2026-11-18-hermes-approve-repropose-voids-digest-and-expiry-checks.md` |
+| Hermes | resolve during re-sample (low) | Same as Argon #9 | Fable section in that doc |
+| Hermes | sealed card recommends r3/r4; Withdrawn lists unshown repairs (low) | Confirmed, P3 | `docs/bugs/2026-11-18-hermes-sealed-root-cause-card-recommends-other-repairs.md` |
+| Hermes/webhook | any-sealed-pod rule; label-set disagreement (low) | Confirmed, single-replica hub | Fable section in `docs/bugs/2026-11-18-hermes-vault-seal-unknown-when-one-pod-unlabelled.md` |
+| webhook | LLM call when the cluster is unreachable (low) | By design (spec: the diagnosis always sees the state lines) | — |
+
+**Gate result after both reviews:** two medium defects fixed in the PR (8eeaaeb8, 3609a2ad); no P0/P1 open; the rest captured as P3.
