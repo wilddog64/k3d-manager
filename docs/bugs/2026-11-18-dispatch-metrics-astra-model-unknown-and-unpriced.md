@@ -1,11 +1,11 @@
 # dispatch-metrics: Astra 6.2 runs show as model `other` and cost $0
 
-**Status:** OPEN — captured 2026-11-18 while dispatching the first Astra review (lib-foundation PR #89)
+**Status:** VERIFIED — fix `34502bfe` landed and offline-verified 2026-11-18 (captured while dispatching the first Astra review, lib-foundation PR #89)
 **Priority:** P3 — reporting only; tokens and run time are still exported
 **Introduced by:** pre-existing (codex added `gpt-6.2-astra` and `gpt-6.2-sol`; the allowlist and price file were never updated)
 **Should have been caught by:** none
 **Introducing change reviewed:** no
-**Waiting on:** fix running — since 2026-11-18 (Luna, slug dispatch-metrics-astra-price; spec docs/plans/v1.45.0-dispatch-metrics-astra-allowlist-and-price.md)
+**Waiting on:** live check — since 2026-11-18 (operator hub-promote, then Claude checks the model identity panel)
 **Prior art:** `docs/bugs/2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero.md` (exact-slug review) — read, different root cause (Claude price); `docs/bugs/2026-11-16-dispatch-metrics-xhigh-tier-runs-unpriced.md` — read, different root cause (tier suffix not stripped). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18
 **Approval:** operator, 2026-11-18: "go ahead to file P3 bug" (after Claude reported the two gaps below)
@@ -46,3 +46,8 @@ The ledger keeps the 2026-11-18 Astra run's tokens, so its cost appears once the
 
 Spec decision: price `gpt-6-astra` from the trackers above (as `gpt-6-luna` was), and leave `gpt-6.2-astra` allowlisted
 but unpriced until a rate is published or the operator supplies one. Do not price 6.2 with the 6.0 rate.
+
+## Outcome (2026-11-18)
+
+Landed `34502bfe`: `gpt-6.2-astra` and `gpt-6.2-sol` allowlisted, `gpt-6-astra` priced. Fable blind review noted the only
+Astra run in the ledger is `gpt-6.2-astra`, so Astra cost still shows $0 until a 6.2 rate is published or supplied.

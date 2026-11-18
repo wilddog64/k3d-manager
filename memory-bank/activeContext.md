@@ -43,7 +43,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    spins forever, reproduced; no INT/TERM trap; old dir lock blocks after upgrade). Verdict: nothing blocks v0.5.7.
    Scope check passed (3 spec files + CHANGE.md). PR #89 MERGED by operator 2026-11-18 -> main 15d5001. RELEASED: tag v0.5.7
    (annotated, peels to 15d5001) + GH release Latest; release/v0.5.8 created at 15d5001; main unprotected (404). NEXT:
-   k3d-manager subtree pull of v0.5.7. Astra metrics spec docs/plans/v1.45.0-dispatch-metrics-astra-allowlist-and-price.md
+   k3d-manager subtree pull of v0.5.7. Astra metrics spec docs/plans/dispatch-metrics-astra-allowlist-and-price.md
    intent approved 2026-11-18; DISPATCHED to Luna (gpt-6-luna) slug dispatch-metrics-astra-price.
    Run 1 stopped correctly: spec said unlisted->unknown, code says other (:1865-1866); spec fixed ff579a70; RESUMED (2).
    Review rows lf-v057-review-argon/-astra abandoned (operator go 2026-11-18). Older findings captured as two P3s (grooming):
@@ -452,3 +452,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - dirused v0.0.10 released (tag cbf37ac, #22+#23 merged): pre-release, 2 zips + .sha256, notes from [v0.0.10]. .sha256 CRLF fix still pending → M4 spec. Office live check L1-L15 still open.
 - 2026-11-18: medium/high-risk spec review pair switched to Fable + Astra (operator go; Argon stays low-risk/diff); rules.md, verification-and-review.md, trial pair 6 logged (8042333f).
 - 2026-11-18: Astra metrics (Luna run 2) exited 0; Claude verified: post-fix 3 pass, pre-fix 1+3 red/2 green, extra mutation (drop gpt-6.2-sol) red, file 223 pass. Fable blind diff review running (Pair 7 data point); land after it.
+- 2026-11-18: Astra metrics LANDED 34502bfe, verify pass recorded; Fable blind review no defects (Astra cost still $0: only run is 6.2, unpriced). Spec renamed (no version prefix). E2 live waits on operator hub-promote.

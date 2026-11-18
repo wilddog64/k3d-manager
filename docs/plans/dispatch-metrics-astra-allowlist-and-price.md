@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-18
 **Branch:** `k3d-manager-v1.45.0`
-**Status:** PLANNED — ready for dispatch
+**Status:** LANDED — `34502bfe` (Luna, run 2), offline verify pass (Claude); Fable blind diff review: no defects; E2 live pending hub-promote
 **Covers:** `docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md`
 **Risk:** low (two allowlist entries, one price entry, two tests; no logic change)
 **Reviewed:** Claude only (P3, data-only change; all readers grepped)
