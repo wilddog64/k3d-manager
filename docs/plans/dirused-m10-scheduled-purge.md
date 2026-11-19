@@ -54,3 +54,14 @@ Operator, after the v0.0.20 live check: "can we add a /schedule so that we can s
 also handle tomcat stop and start". The switch is `/schedule <time>` (was `/at`), with `/schedule /list` and
 `/schedule /cancel <id>`. The scheduled run includes M9's Tomcat stop, delete and verified start. M10 still lands after M9,
 since `/runplan` calls the M9 path; both go to spec review together once M9's proofs are in.
+
+## Amendment 2 (operator, 2026-11-19): dirused runs on the office jump box, not a laptop
+
+Operator: "this is not going to run from my laptop as it is running from office jump box". Every "laptop" above means the
+jump box; the plan dir is `%LOCALAPPDATA%\dirused\plans\` on the jump box. The jump box is always on and on the server
+network, so the laptop-asleep/VPN concern goes away and running the task on the jump box becomes the default (no copy of
+dirused on each server). The remaining risk is credentials: a task that opens `\\server\d$` needs the operator's network
+identity, so it runs either "only when logged on" (works while the jump-box session is open or disconnected, fails after
+logoff) or "whether logged on or not" with a stored password (needs the "Log on as a batch job" right; breaks at password
+rotation). Which one the jump box allows is an operator check, recorded before spec review. Bare `HH:MM` uses the jump
+box's time zone rule from point 4.
