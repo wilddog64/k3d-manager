@@ -1,4 +1,4 @@
-## Handoff 2026-11-18 — v1.45.0: 2 lands + P3 verified; lib-foundation v0.5.7 PR #89 open — START HERE
+## Handoff 2026-11-18 — v1.45.0: lib-foundation v0.5.7 released + subtree-pulled (8fad0831) — START HERE
 
 **Objective done this session:** land the travel bundle and test-all; copy the Anthropic key to the M4; fix the land
 PID-reuse P3; run_parallel investigation and its test-only fixes upstream.
@@ -51,9 +51,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md. Astra metrics P3 approved for dispatch
    ("yes for that"); gpt-6-astra $10/$1/$50 (third-party), gpt-6.2-astra unpublished -> allowlist only, unpriced.
    P3 filed: docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md (waiting on Astra rates).
-1. PR #89: wait for CI (Linux bats is the real check for the timing fix); review by Argon (Copilot capped to
-   2026-12-01); address findings; operator merges; tag v0.5.7; then subtree-pull lib-foundation into k3d-manager
-   (`scripts/lib/foundation`) and mark the run_parallel bug VERIFIED.
+1. DONE 2026-11-18: v0.5.7 subtree-pulled into k3d-manager `8fad0831` (vendored bats 79/79). Remaining: confirm
+   k3d-manager CI green on that head (all check-runs), then run_parallel bug Waiting on -> none.
+   Also already done (progress.md): Astra metrics LANDED 34502bfe; push-reliability + DispatchMetricsStale live on hub.
 2. Child C (`dispatch-stall-c-diagnose`): take captures E1-E4 on the M4 (key now present; claude is 2.1.327 — update
    fixture names/version), commit fixtures, re-dispatch to Luna; then child B.
 3. Live checks: test-all E2 on the M4 (Claude: `make test-all` prints "metrics not published", Pushgateway group

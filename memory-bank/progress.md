@@ -176,3 +176,4 @@
 - 2026-11-18: dirused M8 /purge merged fa3a07c, v0.0.18 released; k3d-manager release CI green ebac0d8c (lint fix 03b86250).
 - 2026-11-18: hub at ebac0d8c; plans-panel fix LIVE-VERIFIED; DispatchMetricsStale live on hub.
 - 2026-11-18: Anthropic API key copied to M4 and probed (plan 5 child C prerequisite).
+- 2026-11-18: lib-foundation v0.5.7 subtree-pulled into k3d-manager 8fad0831 (squash; system.sh noclobber locks); vendored bats 79/79; Makefile:1783 sole caller, globs *.log/*.rc only (dot-prefixed file locks unaffected). run_parallel bug Waiting on: live check (k3d-manager CI).
