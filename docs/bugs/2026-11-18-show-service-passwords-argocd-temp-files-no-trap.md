@@ -5,7 +5,7 @@
 **Introduced by:** v1.43.5 (`401e4eca`, squash merge #148)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-18 (spec reviewed by Fable + Astra and revised; intent approval)
+**Waiting on:** dispatch — since 2026-11-18
 **Prior art:** `docs/bugs/2026-09-21-show-service-passwords-keycloak-block-defeats-redaction.md` (slug match, no score; `find-similar-docs` not run: the vector store is on the hub) — read, different root cause
 **Found by:** Luna (Codex), stopping the `v1.45.0-service-password-travel-bundle` dispatch on 2026-11-18 because its spec forbade plaintext in `TMPDIR`.
 
@@ -209,4 +209,6 @@ pre-fix" was false for the argv test, and that the here-string ban had no test. 
 not check make's status. Both noted the newline/NUL difference; it is accepted and named. Everything is folded in above;
 no finding was refuted.
 
-**Intent approved:** no
+**Intent approved:** operator, 2026-11-18
+
+Approval note: "approve those two", after Claude quoted the E1 and E2 intents.
