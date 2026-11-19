@@ -144,15 +144,20 @@ install-prometheus-credential-rotator:
 
 .PHONY: install-test-metrics
 install-test-metrics:
-	sed \
+	@sed \
 	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl \
-	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist" || { echo "install-test-metrics: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist" >&2; exit 1; }
+	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
+	  echo "install-test-metrics: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
+	else \
 	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.test-metrics" 2>/dev/null || true; \
-	  launchctl bootstrap "gui/$$(id -u)" \
-	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; \
+	  if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; then \
+	    echo "install-test-metrics: OK, com.k3d-manager.test-metrics loaded (nightly 04:30); log: $(HOME)/Library/Logs/k3dm-test-metrics.log"; \
+	  else \
+	    echo "install-test-metrics: FAILED, launchctl bootstrap of com.k3d-manager.test-metrics did not load the agent" >&2; exit 1; \
+	  fi; \
 	fi
 
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-host test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
