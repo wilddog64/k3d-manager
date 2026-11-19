@@ -138,7 +138,7 @@ input the output is byte-identical.
   `README.md`, never inside the fixture. Post-fix stdout must `cmp` equal to each, and make exits 0.
 - **M5.** In `vault-flaky` mode make exits 0, `fake-make-calls` contains `install-vault-port-forward` once, and stdout
   equals the `rotated` fixture. In `vault-down` mode make exits non-zero and stderr carries the existing
-  `ERROR: Vault unreachable at 127.0.0.1:18200` error text (`Makefile:1068`). Both are red if the retry probe is not fed the header (`-H @-` without `printf |`).
+  `ERROR: Vault unreachable at 127.0.0.1:18200` error text (`Makefile:1068`). The `vault-flaky` test is red if the retry probe is not fed the header (`-H @-` without `printf |`).
 - All other existing tests stay and must pass unchanged.
 
 ## Files
