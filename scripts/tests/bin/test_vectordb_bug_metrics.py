@@ -141,6 +141,28 @@ def test_plan_approval_and_plan_metrics(metrics, tmp_path):
     assert 'release="v1.43.5"' in output and 'execution="ready",verification="n/a"} 1' in output
 
 
+def test_plan_child_specs_fold_out_of_plan_rows(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    docs = {
+        "docs/plans/v1.58.0-umbrella.md": "# Umbrella\n**Status:** PROPOSED\n**Release:** v1.58.0 plan 1 (branch k3d-manager-v1.58.0)\n",
+        "docs/plans/v1.58.0-umbrella-a.md": "# Umbrella A\n**Release:** v1.58.0 plan 1 part A of A/B (umbrella ...)\n",
+        "docs/plans/v1.58.0-umbrella-2b.md": "# Umbrella 2b\n**Release:** v1.58.0 plan 1 part 2b (umbrella ...)\n",
+        "docs/plans/v1.58.0-child-m2.md": "# Child M2\n**Parent plan:** `docs/plans/v1.58.0-other.md`\n",
+        "docs/plans/v1.58.0-other.md": "# Other\n**Release:** v1.58.0 plan 2 (displaced foo, operator)\n",
+        "docs/plans/v1.58.0-partial.md": "# Partner part split\n**Release:** v1.58.0 plan 3 (branch ...)\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = [line for line in output.splitlines() if line.startswith("k3dm_plan_info{")]
+    assert len(rows) == 3
+    assert 'k3dm_plan_child_docs{repo="k3d-manager",release="v1.58.0"} 3' in output
+    assert 'k3dm_plan_info_skipped{repo="k3d-manager"} 0' in output
+    release_doc_counts = [
+        int(m.group(1))
+        for m in re.finditer(r'k3dm_plan_release_docs\{[^}]*release="v1\.58\.0"[^}]*\}\s+(\d+)', output)
+    ]
+    assert sum(release_doc_counts) == 3
+
+
 def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_path):
     assert tmp_path.resolve() != ROOT.resolve()
     docs = {

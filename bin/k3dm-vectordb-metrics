@@ -371,6 +371,7 @@ def _plan_has_branch(root, release):
 def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
     texts = _plan_texts(root, ref) if texts is None else texts
     counts, skipped = defaultdict(int), 0
+    children = defaultdict(int)
     branch = _scan_branch(root, ref)
     parsed = []
     for path, text in texts.items():
@@ -379,6 +380,10 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
             skipped += 1
             continue
         release = "v" + ".".join(match.groups()[:3])
+        if re.search(r"(?mi)^\*\*Release:\*\*\s*v\d+\.\d+\.\d+\s+plan\s+\d+\s+part\b", text) or \
+           re.search(r"(?m)^\*\*Parent plan:\*\*", text):
+            children[release] += 1
+            continue
         plan = Path(path).stem
         status = _status_value(text)
         execution, verification = _plan_state(status)
@@ -550,6 +555,8 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
                  for release, count in sorted(overlap_counts.items()))
     lines.extend(f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
                  for (release, order, execution, verification), count in sorted(counts.items()))
+    lines.extend(f'k3dm_plan_child_docs{{repo="{repo}",release="{release}"}} {count}'
+                 for release, count in sorted(children.items()))
     lines.extend([f'k3dm_plan_info_skipped{{repo="{repo}"}} {skipped}',
                   f'k3dm_plan_docs_scan_timestamp_seconds{{repo="{repo}"}} {time.time()}'])
     return "\n".join(lines) + "\n"
