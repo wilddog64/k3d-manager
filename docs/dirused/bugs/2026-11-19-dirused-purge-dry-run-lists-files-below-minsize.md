@@ -1,11 +1,12 @@
 # dirused `/purge` lists every `/largest` match, including files below `/minsize`, so the files that would be deleted are hard to pick out
 
-**Status:** OPEN
+**Status:** LANDED — 529ec87 on branch m8c-purge-hide-below-minsize, PR wilddog64/dirused#33 (Flash implemented; Claude verified: portable 122/122, pre-fix red on b708b63, 2 mutants red)
 **Priority:** P3 — usability: the would-delete rows are all there, just mixed in with rows that can never be deleted; workaround: read only the `[would delete]` rows
 **Introduced by:** M8 (wilddog64/dirused, released v0.0.18)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** fix running — since 2026-11-19
+**Waiting on:** live check — since 2026-11-19 (after merge + release v0.0.20)
+**Fix commit:** 529ec87 (wilddog64/dirused PR #33)
 **Spec:** `docs/plans/dirused-m8c-purge-hide-below-minsize.md` (operator: "go ahead to write a bug and dispatch to flash", 2026-11-19)
 **Intent approved:** operator, 2026-11-19
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
