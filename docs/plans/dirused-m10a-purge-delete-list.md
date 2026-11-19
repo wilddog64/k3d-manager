@@ -107,11 +107,23 @@ changed since list (id)` and nothing is deleted. E2 step 1 is the proof (host, d
 
 ## Files
 
-- `src/Dirused.Core/Scanner.cs`, `src/Dirused.Common/Largest.cs`, `Purge.cs`, `ArgParser.cs`, `Options.cs`, new `PurgeList.cs`
-- `src/Dirused.Cli/Program.cs`, `src/Dirused.Common/Renderers/TextRenderer.cs`, `HtmlRenderer.cs` (no volume line for list results)
-- `tests/Dirused.Tests.Portable/` (`ArgParserTests.cs`, `PurgeTests.cs`, `LargestTests.cs`, new `PurgeListTests.cs`)
+- `src/Dirused.Core/Scanner.cs`
+- `src/Dirused.Common/Largest.cs`
+- `src/Dirused.Common/Purge.cs`
+- `src/Dirused.Common/ArgParser.cs`
+- `src/Dirused.Common/Options.cs`
+- `src/Dirused.Common/PurgeList.cs` (new)
+- `src/Dirused.Cli/Program.cs`
+- `src/Dirused.Common/Renderers/TextRenderer.cs`
+- `src/Dirused.Common/Renderers/HtmlRenderer.cs`
+- `src/Dirused.Common/Renderers/SummaryRenderer.cs` (rule 11: list results out of the Nodes/Volumes tables)
+- `tests/Dirused.Tests.Portable/ArgParserTests.cs`
+- `tests/Dirused.Tests.Portable/PurgeTests.cs`
+- `tests/Dirused.Tests.Portable/LargestTests.cs`
+- `tests/Dirused.Tests.Portable/PurgeListTests.cs` (new)
 - `tests/Dirused.Tests/ProgramPurgeTests.cs` (Windows end to end)
-- `README.md`, `CHANGELOG.md`, help text in `ArgParser.cs`
+- `README.md`
+- `CHANGELOG.md`
 
 ## What NOT to Do
 
