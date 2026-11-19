@@ -165,3 +165,12 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   restart; file size does not mark restart days. Notepad found no `server startup` (searched Down from the cursor without
   wrap, so not conclusive). The post-start check must ignore pre-start lines and treat only `SEVERE` after the start as
   failure; INFO/WARNING noise like this is normal. Still owed: one real `Server startup in` line (findstr across all files).
+- **Proof 5 complete (operator, jump box, 2026-11-19 13:56, `findstr /c:"Server startup in" \\us03p02ffm01\d$\tomcat\tomcat\logs\catalina.*`):**
+  files are `catalina.YYYY-MM-DD.log`; line text
+  `04-Nov-2026 23:57:06.258 INFO [main] org.apache.catalina.startup.Catalina.start Server startup in [13830] milliseconds`.
+  Five starts on record: 14-Oct 08:12 (10659 ms), 03-Nov 20:36 (10621) and 20:37 (9256), 04-Nov 23:49 (12878) and
+  23:57 (13830). Startup takes about 9–14 s, so a 120 s wait for the line has ample margin. Matching rule for the spec:
+  a line in the current local-date `catalina.*.log` whose timestamp is at or after the service start time and which
+  contains `org.apache.catalina.startup.Catalina.start Server startup in [`. Last start was 04-Nov, so Tomcat has run
+  since then, which fits proof 1 (an old stderr file still held).
+- **All proofs (1–5) are in.** Next: the M9 spec.
