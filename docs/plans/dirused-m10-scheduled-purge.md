@@ -83,3 +83,8 @@ box's time zone rule from point 4.
      delete.txt do not change a scheduled run (to change it: `/schedule /cancel <id>`, edit, schedule again).
    - At run time each line still passes the M8 checks, same file ID, size not smaller than in the list, plus M9's
      stop/delete/start for held Tomcat files.
+
+Operator, 2026-11-19: "go with your suggestion" — scheduled runs use the copy taken at schedule time; result is reported in a
+run report next to the plan and in `/schedule /list` (no pop-up). Split: M10a (`docs/plans/dirused-m10a-purge-delete-list.md`,
+the list, no M9 dependency) first; M10b (`/schedule` over a list) after M9. Switch names `/savelist` and `/fromlist`
+(`/output` is already the HTML path; `/list` stays for `/schedule /list`).
