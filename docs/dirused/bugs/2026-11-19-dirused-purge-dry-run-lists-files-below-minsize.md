@@ -5,7 +5,9 @@
 **Introduced by:** M8 (wilddog64/dirused, released v0.0.18)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** operator decision — since 2026-11-19
+**Waiting on:** fix running — since 2026-11-19
+**Spec:** `docs/plans/dirused-m8c-purge-hide-below-minsize.md` (operator: "go ahead to write a bug and dispatch to flash", 2026-11-19)
+**Intent approved:** operator, 2026-11-19
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Prior art:** `docs/dirused/bugs/2026-11-19-dirused-purge-dry-run-refuses-without-pattern.md` (same feature, different issue); find-similar-docs unavailable (vector store context missing), exact-slug glob found none
 **Filed:** 2026-11-19
