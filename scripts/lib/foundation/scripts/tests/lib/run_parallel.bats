@@ -49,10 +49,34 @@ PY
   printf 'sleep:a\0sleep:b\0sleep:c\0sleep:d\0a b\0a_b\0' | _run_parallel --jobs 2 --out "$RP_ROOT/out" -- "$RP_JOB"
   assert_max_overlap "$RP_ROOT/events" 2
   for key in sleep_a sleep_b sleep_c sleep_d a_b a_b-2; do
-    [ -f "$RP_ROOT/out/$key.log" ] && [ -f "$RP_ROOT/out/$key.rc" ] && [ -f "$RP_ROOT/out/$key.sec" ]
+    for ext in log rc sec item; do
+      if [ ! -f "$RP_ROOT/out/$key.$ext" ]; then
+        echo "missing: $key.$ext"
+        ls -la "$RP_ROOT/out"
+        for f in "$RP_ROOT/out"/*.item; do [ -e "$f" ] && printf '%s -> %s\n' "${f##*/}" "$(cat "$f")"; done
+        return 1
+      fi
+    done
   done
   [ "$(cat "$RP_ROOT/out/a_b.rc")" -eq 0 ]
   [ "$(cat "$RP_ROOT/out/a_b-2.rc")" -eq 0 ]
+}
+
+@test "colliding keys stay separate even when mkdir succeeds on an existing directory" {
+  real="$(command -v mkdir)"
+  mkdir "$RP_ROOT/bin"
+  cat >"$RP_ROOT/bin/mkdir" <<EOF
+#!/bin/sh
+# mimics uutils coreutils 0.10.0 mkdir losing a race (ubuntu:26.04, 2026-11-18): exits 0 when the directory already exists
+for a in "\$@"; do last="\$a"; done; [ -d "\$last" ] && exit 0; exec "$real" "\$@"
+EOF
+  chmod +x "$RP_ROOT/bin/mkdir"
+  PATH="$RP_ROOT/bin:$PATH"; export PATH
+  mkdir "$RP_ROOT/probe"; mkdir "$RP_ROOT/probe"
+  printf 'a b\0a_b\0' | _run_parallel --jobs 1 --out "$RP_ROOT/out" -- "$RP_JOB"
+  [ -f "$RP_ROOT/out/a_b.item" ]
+  [ -f "$RP_ROOT/out/a_b-2.item" ]
+  [ "$(sort "$RP_ROOT/out/a_b.item" "$RP_ROOT/out/a_b-2.item")" = $'a b\na_b' ]
 }
 
 @test "orders unknown items first and known items longest first; times file is reusable" {
@@ -84,7 +108,7 @@ PY
   [ "$(sed -n '1p' "$RP_ROOT/summary" | cut -d' ' -f1-2)" = 'PASS alpha' ]
   [ "$(sed -n '2p' "$RP_ROOT/summary" | cut -d' ' -f1-2)" = 'FAIL fail-item' ]
   [ "$(sed -n '3p' "$RP_ROOT/summary" | cut -d' ' -f1-2)" = 'PASS zeta' ]
-  grep -Eq '^FAIL fail-item 0s \(rc 7\)$' "$RP_ROOT/summary"
+  grep -Eq '^FAIL fail-item [0-9]+s \(rc 7\)$' "$RP_ROOT/summary"
   grep -Eq '^SLOWEST .+ [0-9]+s$' "$RP_ROOT/summary"
   grep -Eq '^TOTAL [0-9]+s$' "$RP_ROOT/summary"
 }

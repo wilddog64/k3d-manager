@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.5.7] — 2026-11-18
+
+### Fixed
+- `_run_parallel_worker` and `_foundation_vcluster_lock` claim their lock by creating the lock file under bash `noclobber` (`O_EXCL`) instead of `mkdir`. On `ubuntu-26.04`, `/usr/bin/mkdir` is uutils coreutils 0.10.0, where two concurrent `mkdir` calls on one path can both exit 0 (136/500 in Docker `ubuntu:26.04`; GNU 0/500): two items with the same sanitized key both claimed it and overwrote each other's results, and two `foundation_ensure_vcluster_cli` callers could both hold the lock. Locks are now files; the vCluster release uses `rm -f`. Stub-`mkdir` regression tests are red on the old code on any platform. Reference: k3d-manager `docs/plans/lib-foundation-v0.5.7-exclusive-lock-claims.md`.
+- `run_parallel.bats` (test-only): the summary test accepts any whole number of seconds for the failing job, since job time is a difference of whole-second `date +%s` readings and a fast job that straddles a second reports `1s` (10/150 runs on amd64 under emulation). The collision test checks `log`, `rc`, `sec` and `item` for every key and, on the first missing file, prints its name, the out directory and every item mapping; the old `&&` chain could only fail on its last check. Reference: k3d-manager `docs/bugs/2026-11-14-lib-foundation-run-parallel-collision-test-flakes-on-linux.md`.
+
 ## [v0.5.6] — 2026-11-14
 
 ### Fixed
