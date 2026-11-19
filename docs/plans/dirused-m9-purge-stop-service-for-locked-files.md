@@ -141,3 +141,15 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
 - **Proof 1 (operator, 2026-11-19, verbal "yes" to "does Tomcat85.exe hold the old `stderr.2026-11-03` file?"):** the
   procrun service keeps an old, past-cutoff redirect file open, so `/purge /confirm` skips it as locked and only a stop
   frees it. M9 stays in scope as designed (stop, delete, start). No screenshot; the M9 live check re-confirms it.
+
+## Amendment 2 (operator, 2026-11-19): heap dumps anywhere in the scan
+
+- **Proof 2 (operator screenshot, 2026-11-19):** `\\us03p02ffm01\d$\tomcat` holds `EnvironmentPropertiesManager` and
+  `tomcat` (the install root `D:\Tomcat\Tomcat`). Heap dumps are "somewhere in this directory", not necessarily under the
+  install root. Operator: "/largest should be able to find *.hprof if this file grows huge".
+- **Change to Amendment 1 scope:** `*.hprof` / `java_pid*.hprof` count as heap dumps anywhere under the scanned target,
+  not only under the install root. Tomcat log patterns stay limited to the install root.
+- **Design constraint found:** dirused reads ffm01 over `d$` from the jump box, so the Restart Manager cannot name the
+  remote process holding a file (it only sees local processes). A file is "held" when opening it over SMB fails with a
+  sharing violation; the stop decision uses the path rules above, not the holder's identity.
+- Still owed: proof 5 (newest `catalina.*.log` startup line text on ffm01).
