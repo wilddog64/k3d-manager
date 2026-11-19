@@ -227,3 +227,23 @@ fixture must blank `K3DM_PROJECTS_LIST`, two dirused live-evidence lines unparse
 **Pair 7 read:** Fable again broader and better at testability and process gaps; Argon's two unique finds were both real
 and one (missing `--tags`) also exposed a pre-existing P3 in the lib-foundation pass. Argon's proofs were concrete
 reproducers this time. Argon worth keeping as the cheap second eye on specs.
+
+## Pair 8 — 2026-11-18, spec review: dispatch stall child C (headless Claude diagnosis), Fable and Astra, blind
+
+First Fable + Astra spec pair under the 2026-11-18 rule. Same brief, same spec (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`
+at `3e908a12`). Fable: Agent subagent, 142,335 tokens, 298 s, 20 tool uses, "ready with changes". Astra: codex `gpt-6.2-astra`
+read-only, 78,474 tokens, "not ready". Claude checked every finding against the code and the 2.1.328 captures.
+
+| Reviewer | Findings | Severity | Real, unique | Real, shared | Refuted |
+|---|---|---|---|---|---|
+| Astra | 14 | 3 blocker, 10 major, 1 minor | 6 (Acceptance YAML does not parse; backticked paths under `## Files` widen dispatch scope; `<run>/spec.md` snapshot must win for external-repo runs; Keychain dynamic readers machine-secrets/setup; model must be a `claude_models` key; path safety: O_NOFOLLOW, dot slugs, symlinked outputs) | 8 | 0 |
+| Fable | 14 | 0 blocker, 7 major, 7 minor | 4 (spend must be bounded before sending because `--max-budget-usd` is checked after the turn; exact argv never captured, closed by E9 $0.0015; redaction-echo test; unsafe evidence filenames) | 8 | 0 |
+
+Shared: E7 control contradicts the exporter (cost series emitted with value 0 without a diagnosis); per-stall lock and FORCE
+withdrawing the old correction; redaction before sending; Acceptance gaps (Slack lines, mode, classifier precedence, env
+exactly the allowlist); must_not controls via mutants; `_dispatch_open` and other ledger readers; citation drift.
+
+**Pair 8 read:** heavy overlap; neither produced a false finding. Astra caught the three mechanical blockers (YAML parse,
+scope gate, snapshot precedence) by running the parsers; Fable caught the money and proof gaps (post-turn cap, uncaptured
+argv). Astra rated severity higher and was cheaper (78K vs 142K). The pair found more together than either alone: keep
+Fable + Astra for medium/high-risk specs.

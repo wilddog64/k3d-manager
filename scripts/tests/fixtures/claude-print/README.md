@@ -18,6 +18,7 @@ child environment only; every output file was scanned for the key value afterwar
 | `tools-read-grep-glob-init-2.1.328.jsonl` | E4 probe | E4 flags, `--output-format stream-json --verbose`, prompt "Reply ok" | 0 | 0.000838 |
 | `tools-default-bare-init-2.1.328.jsonl` | E4 probe | no `--tools`, `--permission-mode dontAsk --permission-prompts none`, stream-json | 0 | 0.001 |
 | `toolless-stdin-2.1.328.jsonl` | E4 (tool-less rework) | `--tools "" --permission-mode dontAsk --permission-prompts none`, stream-json, prompt on stdin asking for a Write | 0 | 0.006784 |
+| `exact-argv-2.1.328.json` | E9 (child C argv as specified) | `--output-format json --max-budget-usd 0.05 --tools "" --permission-mode dontAsk --permission-prompts none --strict-mcp-config --no-session-persistence`, prompt on stdin from `exact-argv-prompt-2.1.328.txt` (captured 2026-11-19 ~04:40 UTC) | 0 | 0.001496 |
 
 ## What the captures show
 
@@ -36,3 +37,6 @@ child environment only; every output file was scanned for the key value afterwar
   Asked to Write and run Bash, the model reported neither tool exists; `permission_denials` is `[]` (never offered,
   not refused) and no file appeared.
 - **Tool-less (E4 rework):** `--tools ""` gives `tools: []`; a prompt piped on stdin is accepted; one turn, no file.
+- **Exact argv (E9):** the full child C argv runs in one turn (rc 0, `num_turns: 1`, `terminal_reason: "completed"`),
+  returns both `=== DIAGNOSIS ===` / `=== CORRECTION ===` sections in `result`, writes nothing into the cwd, leaves no
+  `~/.claude/projects/<cwd>` transcript directory (`--no-session-persistence`), and stderr is empty. Tokens 179 in / 39 out.
