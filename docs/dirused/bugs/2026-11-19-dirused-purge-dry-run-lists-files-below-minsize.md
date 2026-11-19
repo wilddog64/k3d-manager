@@ -5,7 +5,7 @@
 **Introduced by:** M8 (wilddog64/dirused, released v0.0.18)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** live check — since 2026-11-19 (after merge + release v0.0.20)
+**Waiting on:** live check — since 2026-11-19 (released v0.0.20, merge 31edffe; operator E2 on work laptop)
 **Fix commit:** 529ec87 (wilddog64/dirused PR #33)
 **Spec:** `docs/plans/dirused-m8c-purge-hide-below-minsize.md` (operator: "go ahead to write a bug and dispatch to flash", 2026-11-19)
 **Intent approved:** operator, 2026-11-19
