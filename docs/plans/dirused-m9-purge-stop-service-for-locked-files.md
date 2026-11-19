@@ -117,3 +117,7 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   token without a local prompt (the account already reads `d$`, which needs it). To prove read-only before the spec:
   from a non-elevated prompt, `sc.exe \\us03p02ffm01 qc tomcat85-std` and `sc.exe \\us03p02ffm01 sdshow tomcat85-std`
   (the DACL shows whether Administrators hold stop rights, `RP`/`WP` in the `BA` entry).
+- Proof 3 partial (operator, 2026-11-19, `sc qc` on us03p02ffm01): `BINARY_PATH_NAME` = `D:\Tomcat\Tomcat\bin\Tomcat85.exe //RS//Tomcat85`.
+  Procrun (commons-daemon) service named `Tomcat85`; install root `D:\Tomcat\Tomcat` (parent of `bin`), which is the root
+  the Amendment 1 install-root rule should resolve. Still owed: the rest of the `qc` output (service key name, START_TYPE,
+  DEPENDENCIES, SERVICE_START_NAME), `sdshow`, and whether the prompt was non-elevated.
