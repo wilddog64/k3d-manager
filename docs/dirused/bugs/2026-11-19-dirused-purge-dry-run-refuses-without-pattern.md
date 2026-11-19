@@ -5,11 +5,12 @@
 **Introduced by:** M8 (`docs/plans/dirused-m8-purge-largest-files.md`, review rev 2: explicit pattern list required for every `/purge`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Fable + Astra)
-**Waiting on:** operator decision — since 2026-11-19
+**Waiting on:** fix running — since 2026-11-19
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Prior art:** `docs/plans/dirused-m8-purge-largest-files.md` (design source, not a bug); `make find-similar-docs` returned nothing — none above threshold
+**Spec:** `docs/plans/dirused-m8b-purge-dry-run-without-patterns.md` (operator: "go ahead to dispatch this to Luna", 2026-11-19)
 **Filed:** 2026-11-19
-**Intent approved:** no
+**Intent approved:** operator, 2026-11-19
 
 ## Symptom
 
