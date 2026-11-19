@@ -65,3 +65,21 @@ identity, so it runs either "only when logged on" (works while the jump-box sess
 logoff) or "whether logged on or not" with a stored password (needs the "Log on as a batch job" right; breaks at password
 rotation). Which one the jump box allows is an operator check, recorded before spec review. Bare `HH:MM` uses the jump
 box's time zone rule from point 4.
+
+## Amendment 3 (operator, 2026-11-19): session, one-time, and a reviewable delete list
+
+1. **Session:** "disconnect will not logout account". The task uses "run only when the user is logged on", with no stored
+   password. If the session has been logged off by 19:00, the task does not run and the next `/schedule /list` shows it missed.
+2. **One-time only:** each `/schedule` registers a single run at one time; no repeat option. A repeat would delete files
+   nobody reviewed.
+3. **Delete list instead of patterns (operator: "what if next time the pattern changed and not in our list? ... files to
+   delete should store in a delete.txt"):** proposed flow, pending operator confirmation:
+   - `dirused <targets> /largest <patterns> /purge /out delete.txt` writes the would-delete rows to a plain text file, one
+     file per line, tab-separated: size, modified time, file ID, path. A comment header records host list, date and arguments.
+   - The operator reviews it and may delete lines. Lines added by hand (no matching file ID) are refused at use.
+   - `dirused /purge /list delete.txt /confirm` deletes now; `dirused /purge /list delete.txt /schedule 19:00 PST` schedules.
+     `/list` takes no patterns; the list is the whole selection.
+   - At schedule time dirused copies the list into the plan directory and the task uses that copy, so later edits to
+     delete.txt do not change a scheduled run (to change it: `/schedule /cancel <id>`, edit, schedule again).
+   - At run time each line still passes the M8 checks, same file ID, size not smaller than in the list, plus M9's
+     stop/delete/start for held Tomcat files.
