@@ -1057,14 +1057,13 @@ restore:
 show-service-passwords:
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	[ -n "$$_vault_tok" ] || { echo "[show-service-passwords] ERROR: cannot read secrets/vault-root (check k3d-k3d-cluster context)" >&2; exit 1; }; \
-	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then \
+	if ! printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then \
 		echo "[show-service-passwords] Vault credential lookup unavailable; restarting its port-forward" >&2; \
 		$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
 		__vault_ready=0; \
 		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
 			sleep 1; \
-			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
+			if printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
 		done; \
 		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault unreachable at 127.0.0.1:18200 with the secrets/vault-root token (port-forward restarted, still failing)" >&2; exit 1; }; \
 	fi
@@ -1073,26 +1072,22 @@ show-service-passwords:
 	@echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
-	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_argocd_vault_file=$$(mktemp); _argocd_initial_file=$$(mktemp); _argocd_payload=$$(mktemp); \
-	curl -sf -H "@$$_vault_hdr" \
+	_argocd_vault_pw=$$(printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- \
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
-	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password",""))' 2>/dev/null >"$$_argocd_vault_file" || true; \
-	kubectl get secret argocd-initial-admin-secret -n cicd \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null >"$$_argocd_initial_file" || true; \
+	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password",""))' 2>/dev/null || true); \
+	_argocd_initial_pw=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
 	_argocd_url="$${SHOW_SERVICE_PASSWORDS_ARGOCD_URL:-https://argocd.3ai-talk.org}"; _argocd_vault_code=000; _argocd_initial_code=000; _argocd_vault_rejected=0; \
 	for _argocd_candidate in vault initial; do \
-	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_file="$$_argocd_vault_file"; else _argocd_candidate_file="$$_argocd_initial_file"; fi; \
-	  if [ -s "$$_argocd_candidate_file" ]; then \
-	    jq -n --arg username admin --rawfile password "$$_argocd_candidate_file" '{username:$$username,password:($$password|rtrimstr("\n"))}' >"$$_argocd_payload"; \
-	    _argocd_code=$$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @"$$_argocd_payload" "$$_argocd_url/api/v1/session" || true); \
+	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_pw="$$_argocd_vault_pw"; else _argocd_candidate_pw="$$_argocd_initial_pw"; fi; \
+	  if [ -n "$$_argocd_candidate_pw" ]; then \
+	    _argocd_code=$$(printf '%s' "$$_argocd_candidate_pw" | jq -Rs '{username:"admin",password:(.|rtrimstr("\n"))}' | curl -q -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @- "$$_argocd_url/api/v1/session" || true); \
 	    if [ "$$_argocd_candidate" = vault ]; then _argocd_vault_code="$$_argocd_code"; else _argocd_initial_code="$$_argocd_code"; fi; \
-	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$(cat "$$_argocd_candidate_file")"; break; fi; \
+	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$_argocd_candidate_pw"; break; fi; \
 	    if [ "$$_argocd_candidate" = vault ] && [ "$$_argocd_code" != 000 ] && [ "$${_argocd_code#5}" = "$$_argocd_code" ]; then _argocd_vault_rejected=1; fi; \
 	  fi; \
 	done; \
-	if [ -z "$$_argocd" ]; then _argocd="$$(cat "$$_argocd_vault_file" 2>/dev/null || true)"; [ -n "$$_argocd" ] || _argocd="$$(cat "$$_argocd_initial_file" 2>/dev/null || true)"; fi; \
-	rm -f "$$_vault_hdr" "$$_argocd_vault_file" "$$_argocd_initial_file" "$$_argocd_payload"; \
+	if [ -z "$$_argocd" ]; then _argocd="$$_argocd_vault_pw"; [ -n "$$_argocd" ] || _argocd="$$_argocd_initial_pw"; fi; \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
@@ -1100,23 +1095,19 @@ show-service-passwords:
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_grafana=$$(curl -sf -H "@$$_vault_hdr" \
+	_grafana=$$(printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- \
 	  "http://127.0.0.1:18200/v1/secret/data/observability/grafana" 2>/dev/null | \
 	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
-	rm -f "$$_vault_hdr"; \
 	echo "  Grafana     https://grafana.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_grafana:-N/A}";\
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_prom_creds=$$(curl -sf \
-	  -H "@$$_vault_hdr" \
+	_prom_creds=$$(printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf \
+	  -H @- \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
 	  | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["data"]; print(d.get("user","admin")+"|"+d.get("password","N/A"))' 2>/dev/null || true); \
-	rm -f "$$_vault_hdr"; \
 	_prom_user=$${_prom_creds%%|*}; \
 	_prom_pass=$${_prom_creds##*|}; \
 	echo "  Prometheus  https://prometheus.3ai-talk.org";\
