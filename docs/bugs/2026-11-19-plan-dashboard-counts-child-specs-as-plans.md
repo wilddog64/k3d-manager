@@ -1,11 +1,11 @@
 # Plan dashboard counts each child spec file as its own release plan
 
-**Status:** OPEN — captured 2026-11-19 by Claude from an operator screenshot
+**Status:** LANDED — d1bc155f (2026-11-19), 147+1 tests pass, new test red without the fix; captured 2026-11-19 by Claude from an operator screenshot
 **Priority:** P3
 **Introduced by:** pre-existing (the plan scan never knew child specs; exposed by the 2026-11-18 splits of plans 1, 3 and 4)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-19
+**Waiting on:** live check — since 2026-11-19 (after next hub-promote)
 **Prior art:** docs/bugs/2026-11-18-plan-dashboard-ready-on-your-go-ignores-draft-status.md (not scored) — read, different root cause; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing), exact-slug glob found nothing
 
 ## Symptom
