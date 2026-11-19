@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** dispatch — since 2026-11-18 (revised after Fable + Astra blind review, trial Pair 8)
+**Waiting on:** fix running — since 2026-11-18 (Flash, slug 2026-11-14-dispatch-stall-c-diagnose-r2; first run abandoned)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet 2026-11-14; reworked by Claude 2026-11-18 (tool-less single turn, from 2.1.328 captures); revised after Fable + Astra blind review 2026-11-18
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` part 2 (operator, 2026-11-14: "go with your recommendation")

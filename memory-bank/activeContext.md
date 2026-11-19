@@ -53,10 +53,10 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    P3 filed: docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md (waiting on Astra rates).
 1. DONE 2026-11-18: v0.5.7 subtree-pulled `8fad0831`; CI 7/7 green on `11b3cc96`; run_parallel bug closed out.
    Also already done (progress.md): Astra metrics LANDED 34502bfe; push-reliability + DispatchMetricsStale live on hub.
-2. Child C (`dispatch-stall-c-diagnose`): E1-E4 CAPTURED 2026-11-18 on 2.1.328 (`scripts/tests/fixtures/claude-print/`,
-   findings in the bug doc's last section). Spec REWORKED 3e908a12 (tool-less, stdin, stall_diagnosis event). Fable +
-   Astra blind review running (Astra out: scratchpad c-review-astra.md); operator pre-approved intent via the review.
-   Next: adjudicate, revise, log trial Pair 8, dispatch Flash (agy gemini-3.8-flash-medium); then child B.
+2. Child C (`dispatch-stall-c-diagnose`): Fable + Astra blind review adjudicated (28 findings, 0 refuted), spec revised
+   b1a30cfb + intent-line fix 698eabae; E9 exact-argv capture committed ($0.0015); trial Pair 8 logged. DISPATCHED to Flash
+   (agy gemini-3.8-flash-medium) as slug `2026-11-14-dispatch-stall-c-diagnose-r2` (old run dir kept; land needs
+   `--superseding 2026-11-14-dispatch-stall-c-diagnose`). WIP 1/3. Next: watch exit, verify (pre-fix red, mutants per must_not), land; E8 live on M4; then child B.
 3. Live checks: test-all E2 on the M4 (Claude: `make test-all` prints "metrics not published", Pushgateway group
    timestamp unchanged); E3: operator ran `make install-test-metrics` on m5 2026-11-18; proof = next 04:30 nightly (OfflineSuiteStale quiet). Target now prints one status line (653a6f86). Travel bundle E2/E3
    by operator; its install waits on the P2 show-service-passwords temp-file bug (option A chosen 2026-11-18: secrets on
