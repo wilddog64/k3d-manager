@@ -131,3 +131,10 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   SERVICE_START_NAME `PROD\msa01tomcat$` (group managed service account). Own process and no dependencies: stopping it
   stops nothing else. Remote config query works from the jump box. Still owed for proof 4: `sc.exe \\us03p02ffm01 sdshow tomcat85`
   from a non-elevated prompt.
+- **Proof 4 (operator, 2026-11-19, from the jump box: `sc.exe \\us03p02ffm01 sdshow tomcat85`):**
+  `D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)S:(AU;FA;…;;;WD)`.
+  This is the stock Windows service DACL: built-in Administrators (`BA`) hold `RP` (start) and `WP` (stop); interactive
+  and service users (`IU`, `SU`) can only query. So stop/start needs the account's remote token to include Administrators
+  on ffm01, which the existing `d$` access already shows. Proven read-only up to that point; an actual remote stop is first
+  exercised in M9's live check (operator, maintenance window). The `S:` audit entry logs every failed access, so a
+  refused stop is visible to the server's security log. M9 needs no local elevation on the jump box.
