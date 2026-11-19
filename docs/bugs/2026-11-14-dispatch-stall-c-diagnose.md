@@ -1,8 +1,8 @@
 # Bug (child C): headless Claude diagnosis of a stalled dispatch, paid by the API credit
 
-**Status:** OPEN
+**Status:** LANDED — e05a08ed on k3d-manager-v1.45.0 2026-11-18 (Flash worker, Claude verified and landed); E8 live run by Claude on the M4 passed, operator judges the correction
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** fix running — since 2026-11-18 (Flash, slug 2026-11-14-dispatch-stall-c-diagnose-r2; first run abandoned)
+**Waiting on:** operator decision — since 2026-11-18 (judge E8 correction.md; compare $0.052646 with the Anthropic Console)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet 2026-11-14; reworked by Claude 2026-11-18 (tool-less single turn, from 2.1.328 captures); revised after Fable + Astra blind review 2026-11-18
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` part 2 (operator, 2026-11-14: "go with your recommendation")
@@ -373,3 +373,13 @@ not in backticks: the dispatch scope gate reads every backticked string under th
   external-repo runs; model must be a `claude_models` key; `project` carried; 64 KiB correction cap for child B;
   helper timeouts and bare-name resolution; readers `_dispatch_open`, dispatch-logs, vectordb-metrics,
   machine-secrets/setup listed; citations fixed.
+- 2026-11-18: Flash (slug `-r2`) exited 0 without committing; diff limited to the four Files. Claude verified:
+  242 passed (stall-diagnose 17 + dispatch-metrics 225); pre-fix 16/17 red (the passing test reads only the exporter);
+  five Claude mutants red (prompt redaction, diagnosis redaction, full env to claude, no O_EXCL, no spend bound).
+  Committed in the task worktree and landed `--superseding 2026-11-14-dispatch-stall-c-diagnose` at e05a08ed.
+- 2026-11-18 (2026-11-19T03:12:49Z), E8 live, m4-air.local, claude 2.1.328, real Keychain key, scratch root holding a
+  copy of `v1.44.1/e8-toy-stall.run` (production ledger untouched): stdout `ok <dir>`, rc 0, 23 s; outputs all 0600;
+  ledger line `stall_diagnosis` status ok cost_usd 0.052646 model claude-opus-5-5; 1 turn, 4 input / 2094 output
+  tokens; no Slack line (correct for ok); no `sk-ant-` in any output. Diagnosis: agent froze after 5 steps, no gate
+  child; correction restarts spec `2026-11-14-dispatch-stall-a-detector.md` (the toy run's spec) with step logging
+  and 1800 s alarms. Quality and Console spend: operator.
