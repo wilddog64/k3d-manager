@@ -1,7 +1,7 @@
 # dirused M10a: save the would-delete list to a file, and delete from that file
 
 **Filed:** 2026-11-19
-**Status:** READY pending Astra — rev 3, intent approved by operator 2026-11-19 ("approved"); rev 2 Fable blind review: no safety blocker, NOT READY on 6 majors (all taken, see Review log); Astra blind review owed after codex quota, before dispatch
+**Status:** READY — rev 4 (Astra blind on rev 3: NOT READY, all taken, see Review log), rev 3 intent approved by operator 2026-11-19 ("approved"); rev 2 Fable blind review: no safety blocker, NOT READY on 6 majors (all taken, see Review log)
 **Repo / branch:** wilddog64/dirused / `m10a-purge-delete-list` (from main 4130598, v0.0.21)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** `docs/plans/dirused-m10-scheduled-purge.md` Amendment 3 (operator, 2026-11-19: "files to delete should store in a
@@ -14,8 +14,14 @@ handling. M10b (`/schedule`) and M9 (Tomcat stop/start) build on it.
 
 Operator: "what if next time the pattern changed and not in our list?". Today `/confirm` runs a new scan with the given
 patterns, so what is deleted is whatever matches at that moment, not the list that was reviewed. M10a makes the reviewed list
-the unit of deletion. Rule: **a list line deletes a file only if it is byte-for-byte the file that was reviewed** (same
-volume, same file ID, same size, same modified time). Anything else is skipped. Growing live logs are out of scope here;
+the unit of deletion. Rule: **a list line deletes a file only if the file at that path still has the reviewed identity and
+metadata** (same NTFS volume serial, same 64-bit file ID, same size, same modified time to the tick). Anything else is
+skipped. This detects replacement, rotation, growth and touch; it does not detect a deliberate in-place rewrite that
+restores size and timestamp (out of scope: such a user can delete the file anyway).
+
+**Trust model:** the list file is trusted operator input. Deleting lines is the supported edit; a valid line added by hand
+is treated as the operator's choice. dirused does not bind a list to a digest of the reviewed version. (M10b protects its
+scheduled copy with a user-only ACL.) Growing live logs are out of scope here;
 M9/M10b decide that rule.
 
 ## Behaviour
@@ -26,7 +32,8 @@ M9/M10b decide that rule.
    and the volume serial is in `Volume.SerialNumber` (`src/Dirused.Common/ScanResult.cs:12`). Pass the ID through
    `LargestCollector.Offer` (`src/Dirused.Common/Largest.cs:44`, new trailing `ulong? fileId = null`) from `Scanner.cs:164`;
    the fallback enumeration (`Scanner.cs:74-113`, `FileInfo`) passes null. IDs 0 and `ulong.MaxValue` count as null
-   (`Scanner.cs:143`). The dry run still opens no file.
+   (`Scanner.cs:143`). The dry run still opens no file. Only rows on a volume whose `Volume.FileSystem` is `NTFS`
+   (`ScanResult.cs:14`) and whose serial is non-zero get an ID; others count as no-ID (64-bit IDs are not unique on ReFS).
 2. After the dry run, every row with status `would delete` **and** a non-null file ID is written. A `would delete` row with
    no ID is not written; the summary says `N file(s) not saved: no file ID (server does not report one)`.
 3. **Format** (UTF-8 with BOM, CRLF written; CRLF or LF and BOM or no BOM accepted on read):
@@ -48,10 +55,12 @@ M9/M10b decide that rule.
    `/parallel`, `/largestcount`, `/savelist`) is a usage error with the exact message
    `/fromlist can only be combined with /purge, /confirm, /html, /output, /json and /csv`. `/fromlist` without `/purge` is
    `/fromlist requires /purge`. These bypass `ArgParser.cs:224`, `:229-231` and `:248` for `/fromlist` only.
-6. **Validation before anything is opened:** the list is read and validated before `Program.cs:59` opens the purge log and
+6. **Validation before any purge candidate, the purge log or the output is opened:** the list is read and validated before `Program.cs:59` opens the purge log and
    before `:65` opens the output (`ReportOutput.cs:18` truncates). `/fromlist` path equal to `/output` or the purge log is a
    usage error. Line 1 (after BOM) must be `# dirused delete list v1` and line 2 must parse as
-   `# purge days=<D> minsize=<bytes>`; else `not a dirused delete list: <file>`, exit 1, nothing opened or written.
+   `# purge days=<D> minsize=<bytes>` with D in 1..3650 and minsize in 1..2^62; else `not a dirused delete list: <file>`,
+   exit 1, nothing opened or written. ("Opens no file" in this spec means no purge candidate; startup self-update cleanup
+   at `Program.cs:15-23` and the `/savelist` destination rename are outside it.)
 7. **Age and size use the list's own values.** The pre-open chain uses D and minsize from line 2, never the CLI defaults
    (`ArgParser.cs:114,136`), so a reviewed row is not re-filtered by defaults.
 8. **Line rules.** Lines after line 2 that start with `#`, and blank or whitespace-only lines, are ignored. Data lines are
@@ -135,21 +144,23 @@ must_not:
   - id: N1
     text: "a listed path whose file was replaced (new file ID, same size, backdated time) is deleted; asserts 'skipped: file changed since list (id)' while a matching line in the same run is deleted"
   - id: N2
-    text: "a listed file with the same ID that grew or whose modified time changed is deleted; asserts 'skipped: file changed since list (size or time)' with a matching line deleted in the same run"
+    text: "a listed file with the same ID whose size changed (time equal), or whose time changed (size equal), is deleted; two cases, each asserts 'skipped: file changed since list (size or time)', the file survives, and a matching line is deleted in the same run"
   - id: N3
-    text: "a line with a malformed field, id 0 or all-F is deleted or opened; asserts it under 'Bad list lines:' with a valid line deleted in the same run"
+    text: "a line with a malformed field, id 0 or all-F is deleted or opened; asserts it under 'Bad list lines:', zero Open and zero Stat calls for its path on the fake, and a valid line deleted in the same run"
   - id: N4
-    text: "a handle reporting null or different volume serial lets the line delete; asserts 'skipped: file changed since list (volume)'"
+    text: "a handle reporting null or different volume serial lets the line delete; asserts 'skipped: file changed since list (volume)', the file survives, and a matching peer in the same run is deleted"
+  - id: N5
+    text: "a list whose line 2 has days 0, negative, over 3650, or minsize 0 is processed; asserts 'not a dirused delete list' and no purge log or output created"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, M4, M5, M6, M7, M8, N1, N2, N3, N4]
+    proves: [M1, M2, M3, M4, M5, M6, M7, M8, N1, N2, N3, N4, N5]
     kind: offline
-    command: "dotnet test tests/Dirused.Tests.Portable; new tests red on 4130598 (pre-fix: /savelist and /fromlist are 'Unknown switch', so every new-message and new-status assertion is red); separate mutants each red: skip ID compare (N1), skip volume compare only (N4), drop the :127 check for list rows (N2), accept id 0 (N3), use CLI default minsize instead of line 2 (M2), allow /fromlist with /file (M7), open with Delete in the dry run (M4), Stat for scan rows (M8), compare from a separate open instead of opened.Info (M2, fake swaps the file between opens); Windows CI ProgramPurgeTests end to end: save, replace one file with a backdated same-size file, append to another, /fromlist /confirm"
+    command: "dotnet test tests/Dirused.Tests.Portable; pre-fix red is shown with executable-level tests only (Program.Run with /savelist and /fromlist on 4130598 gives 'Unknown switch'); tests that use the new interfaces are proven by the mutants below, recorded separately; separate mutants each red: skip ID compare (N1), skip volume compare only (N4), drop the :127 check for list rows (N2), accept id 0 (N3), accept days 0 in line 2 (N5), save a non-NTFS row (M1), use CLI default minsize instead of line 2 (M2), allow /fromlist with /file (M7), open with Delete in the dry run (M4), Stat for scan rows (M8), compare from a separate open instead of opened.Info (M2, fake swaps the file between opens); Windows CI ProgramPurgeTests end to end: save, replace one file with a backdated same-size file, append to another, /fromlist /confirm"
     intent: Only files you reviewed in delete.txt can be deleted; a replaced, grown or broken line deletes nothing.
   - id: E2
     kind: live
     proves: [M1, M2, M3]
-    command: "operator, jump box: (1) /largest *.log /purge /savelist on one server's tomcat logs, then /fromlist dry run shows 'would delete' for the rotated logs (not '(volume)' or '(id)'): proves the scan ID matches the handle ID over \\host\d$ (record host, date, version); (2) scratch folder on a share with files older than 1 day: /largest *.tmp /purge /minsize 1 /savelist, delete one line, /fromlist /confirm, only the remaining files are gone"
+    command: "operator, jump box: (1) /largest *.log /purge /savelist on one server's tomcat logs, then /fromlist dry run shows 'would delete' for the rotated logs (not '(volume)' or '(id)'): proves the scan ID matches the handle ID over \\host\d$ (record host, date, version); (2) scratch folder on a share with files older than 1 day: /largest *.tmp /purge /minsize 1KB /savelist (files of at least 1 KB), delete one line, /fromlist /confirm, only the remaining files are gone"
     intent: On the jump box, save a list, edit it, and see that only what's left in it gets deleted.
 interface:
   - "/savelist <file>"
@@ -182,3 +193,9 @@ interface:
   ignored; 6 age/minsize from list line 2, days and `/minsize` disallowed with `/fromlist`. Minors: unconditional
   `/savelist` collision check, validate before `:59`/`:65`, HTML tables, `no longer exists` text, Stat flags, RoundtripKind,
   OrdinalIgnoreCase, `/savelist` with `/summary` refused, separate `(volume)` status, empty/write-failure behaviour.
+- rev 3, 2026-11-19, Astra blind (codex gpt-6.2-astra): NOT READY. Claude adjudicated: B1 ID reuse / ReFS / restored
+  timestamps: accidental match of volume+ID+size+tick time is not a realistic failure for this operator tool; taken as
+  wording (no "byte-for-byte") plus NTFS-only saving. B2 list as authority: taken as an explicit trust model, no digest
+  (the operator's approved flow is editing the list). B3 dry-run wording scoped to purge candidates. Major: N4 control,
+  zero Open/Stat for bad lines, N2 split into size-only and time-only, pre-fix red via executable-level tests and mutants
+  recorded separately; header bounds (N5), writer skips serial 0. Minor: E2 `/minsize 1KB`.
