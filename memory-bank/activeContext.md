@@ -62,7 +62,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    stdin only, no mktemp; spec in the bug doc, Fable + Astra blind review running, then intent approval, then Luna).
 4. Grooming Sunday 2026-11-22 (agenda section below).
 
-**Open questions for operator:** promote timing for v1.45.0 live checks; show-service-passwords P2 LIVE-VERIFIED (E2 PASS on hub at 072bcb57, output hash identical, TMPDIR 60→60); travel-bundle E2/E3 now unblocked.
+**Open questions for operator:** NO promote needed (2026-11-18: deploy/hub=072bcb57 already has travel bundle + test-all; only docs + lib v0.5.7 ahead, lib change affects test-all/vcluster CLI only) — operator runs travel-bundle E2/E3 and test-all E3 (`make install-test-metrics`) on the hub; show-service-passwords P2 LIVE-VERIFIED (E2 PASS on hub at 072bcb57, output hash identical, TMPDIR 60→60); travel-bundle E2/E3 now unblocked.
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
