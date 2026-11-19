@@ -96,3 +96,13 @@ tomcat. ensure tomcat start without issue".
   scheduled run (M10) records the same result in its run report.
 - **Proof owed, added to the list above:** proof 5. Where Tomcat writes its startup line on ffm01, and its exact text
   (read-only: the newest `catalina.*.log`).
+
+## Proof 1 partial evidence (operator screenshot, dirused 0.0.20, us03p02ffm01, 2026-11-19)
+
+`/largest /purge` dry run listed `tomcat85-stderr.2026-11-04.log` 117G and `tomcat85-stdout.2026-11-04.log` 7.2G, both with
+modified time 2026-11-18, and `tomcat85-stderr.2026-11-03.log` 9.8G modified 2026-11-04; all three `would delete`
+(default `/purge 1`). Reading: procrun opened the `2026-11-04` pair at the last service start and still writes to them, so
+the held files are the *current* ones, not old ones. The 2026-11-18 time is more than a day old even though the files are
+open, which fits NTFS updating the directory-entry time lazily while a handle is open. A `/confirm` run would therefore
+likely get `failed: in use` on the two 11-04 files and free only the 9.8G file. This supports Amendment 1 (stop, delete,
+start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm which process holds which file, and proofs 2–4.

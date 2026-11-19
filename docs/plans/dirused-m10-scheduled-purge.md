@@ -22,7 +22,7 @@ then start tomcat. ensure tomcat start without issue".
 
 ## Proposed behaviour (draft)
 
-1. `dirused <targets> /largest <patterns> /purge [days] /at <time>` runs the dry run now and shows the list. It then writes
+1. `dirused <targets> /largest <patterns> /purge [days] /schedule <time>` runs the dry run now and shows the list. It then writes
    a plan file with each file's path, size, last-modified time and file ID, the M9 service it would stop, and the original
    arguments. The plan goes under `%LOCALAPPDATA%\dirused\plans\`, with an ACL for the current user only.
    It asks `Schedule deleting these N file(s), SIZE, at 19:00 PST (Tue 2026-11-19)? [y/N]` (`/yes` skips the prompt).
@@ -36,7 +36,7 @@ then start tomcat. ensure tomcat start without issue".
 4. **Time:** `<time>` is `HH:MM` with an optional zone (`PST`/`PDT`/`PT`, or `UTC`). A bare `HH:MM` is accepted only when
    the laptop's time zone is Pacific; otherwise it is refused with a message asking for the zone. A time already passed
    today means tomorrow, and the prompt shows the full date.
-5. `dirused /at /list` shows pending plans with their time, host, file count and size. `dirused /at /cancel <id>` removes
+5. `dirused /schedule /list` shows pending plans with their time, host, file count and size. `dirused /schedule /cancel <id>` removes
    the task and the plan.
 6. **Plan expiry:** a plan more than 24 h old when it runs deletes nothing and reports `expired`.
 
@@ -47,3 +47,10 @@ then start tomcat. ensure tomcat start without issue".
   laptop sleeps or is off at 19:00 (Task Scheduler's "run as soon as possible after a missed start").
 - How the operator learns the result: the run report file only, or also a Windows toast or email.
 - The test seam: an `ITaskScheduler` fake for portable tests; registering a real task on CI.
+
+## Amendment 1 (operator, 2026-11-19): name is `/schedule`; same release as M9
+
+Operator, after the v0.0.20 live check: "can we add a /schedule so that we can schedule delete largest files at a given time?
+also handle tomcat stop and start". The switch is `/schedule <time>` (was `/at`), with `/schedule /list` and
+`/schedule /cancel <id>`. The scheduled run includes M9's Tomcat stop, delete and verified start. M10 still lands after M9,
+since `/runplan` calls the M9 path; both go to spec review together once M9's proofs are in.
