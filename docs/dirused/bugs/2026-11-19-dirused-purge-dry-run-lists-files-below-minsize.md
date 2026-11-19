@@ -5,7 +5,7 @@
 **Introduced by:** M8 (wilddog64/dirused, released v0.0.18)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** fix running — since 2026-11-19 (M8d, see Recurrence)
+**Waiting on:** live check — since 2026-11-19 (M8d landed 81f232c, PR wilddog64/dirused#34; after merge + release v0.0.21)
 **Fix commit:** 529ec87 (wilddog64/dirused PR #33)
 **Spec:** `docs/plans/dirused-m8c-purge-hide-below-minsize.md` (operator: "go ahead to write a bug and dispatch to flash", 2026-11-19)
 **Intent approved:** operator, 2026-11-19
@@ -57,3 +57,6 @@ would free 0B`. All 96 matches total 627M, so all 15 shown rows are below 1 GB. 
 skip reason, and `modification time unknown` / `modified within N day(s)` come before `smaller than`, so small recent files keep
 an age label that M8c does not hide. Spec gap (Claude, M8c spec): the hide rule assumed every small file is labelled
 `smaller than`. Fix: M8d (`docs/plans/dirused-m8d-purge-size-check-before-age.md`), check size before age.
+
+M8d landed 2026-11-19 as 81f232c (Flash implemented; Claude added a large unknown-time control and verified: portable
+124/124, new tests red on 31edffe (3), mutants drop-age (2) and drop-unknown-time (1) red). PR wilddog64/dirused#34.
