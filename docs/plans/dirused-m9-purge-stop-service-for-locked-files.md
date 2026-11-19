@@ -121,3 +121,7 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   Procrun (commons-daemon) service named `Tomcat85`; install root `D:\Tomcat\Tomcat` (parent of `bin`), which is the root
   the Amendment 1 install-root rule should resolve. Still owed: the rest of the `qc` output (service key name, START_TYPE,
   DEPENDENCIES, SERVICE_START_NAME), `sdshow`, and whether the prompt was non-elevated.
+- Services console (operator screenshot, 2026-11-19, host assumed us03p02ffm01): display name `Apache Tomcat 9`, Running,
+  Automatic, log on as a `PROD\msa…` domain managed service account. The display name says Tomcat 9 while the binary and
+  procrun name say `Tomcat85`, so dirused must address the service by its key name (from `sc qc`), never by display name,
+  and must not infer the Tomcat version from either. Start/stop rights come from the service DACL, not the run-as account.
