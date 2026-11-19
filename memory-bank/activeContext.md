@@ -54,8 +54,9 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 1. DONE 2026-11-18: v0.5.7 subtree-pulled into k3d-manager `8fad0831` (vendored bats 79/79). Remaining: confirm
    k3d-manager CI green on that head (all check-runs), then run_parallel bug Waiting on -> none.
    Also already done (progress.md): Astra metrics LANDED 34502bfe; push-reliability + DispatchMetricsStale live on hub.
-2. Child C (`dispatch-stall-c-diagnose`): take captures E1-E4 on the M4 (key now present; claude is 2.1.327 — update
-   fixture names/version), commit fixtures, re-dispatch to Luna; then child B.
+2. Child C (`dispatch-stall-c-diagnose`): E1-E4 CAPTURED 2026-11-18 on 2.1.328 (`scripts/tests/fixtures/claude-print/`,
+   findings in the bug doc's last section). Next: rework the spec to tool-less single turn (plan 5 part 2; Grep/Glob
+   do not exist in 2.1.328), Fable + Astra blind review, intent re-approval, then Luna; then child B.
 3. Live checks: test-all E2 on the M4 (Claude: `make test-all` prints "metrics not published", Pushgateway group
    timestamp unchanged); E3 after promote (operator re-runs `make install-test-metrics` on the hub). Travel bundle E2/E3
    by operator; its install waits on the P2 show-service-passwords temp-file bug (option A chosen 2026-11-18: secrets on

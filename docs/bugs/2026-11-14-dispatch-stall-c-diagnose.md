@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** dispatch — since 2026-11-14 (intent approved; queued by file and slot)
+**Waiting on:** investigation — since 2026-11-18 (E1-E4 captured on 2.1.328; spec rework to tool-less single turn per plan 5 part 2 before dispatch)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
@@ -159,3 +159,19 @@ No change to `bin/k3dm-codex-dispatch`, `bin/k3dm-dispatch-metrics`, any dashboa
 - Show each of E5's seven outcomes red on today's tree (tool absent), then green; show E6's bad-fixture run red and the real run green; show E7 with and without the event.
 - Run, from the repo root, with the 1800-second alarm: `perl -e 'alarm shift; exec @ARGV' 1800 /opt/homebrew/bin/python3 -m pytest scripts/tests/bin/test_dispatch_stall_diagnose.py scripts/tests/bin/test_dispatch_metrics.py`, and `shellcheck` on the tool if it is bash, `ruff check` if python. Paste each command, rc and proving lines; list every error seen.
 - Leave changes uncommitted; do not push; do not touch `docs/bugs/`.
+
+## Live captures 2026-11-18 (claude 2.1.328, m4-air)
+
+E1-E4 captured by Claude; files and provenance in `scripts/tests/fixtures/claude-print/README.md` (names carry
+2.1.328, not the 2.1.323 above; help flag set identical to 2.1.323, wording only). Total spend about $0.03. Findings the
+rework must absorb:
+
+1. **Grep and Glob do not exist in 2.1.328.** `--tools Read,Grep,Glob` loads only `Read`; the `--bare` default is
+   `Bash, Edit, Read`. The Read/Grep/Glob design above degrades silently, which confirms plan 5 part 2's tool-less
+   rework: `--tools ""` loads no tools and accepts the prompt on stdin (captured, one turn, no file written).
+2. **401 has `subtype: "success"`.** Classify on `is_error` + `api_error_status` (401, `authentication_error`), exit 1.
+3. **Budget overshoot is real:** cap 0.0001, spent 0.0004302 (`error_max_budget_usd`, `budget_exhausted`, exit 1).
+   The wall clock stays the second limit.
+4. **Token counts come from `modelUsage.<model>`**, not top-level `usage` (zero in the budget case).
+5. E1 cost for a 4-token reply on `claude-opus-5-5` was $0.0085 (1,671 cache-creation tokens of bare system prompt).
+

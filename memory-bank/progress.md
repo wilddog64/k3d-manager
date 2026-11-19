@@ -177,3 +177,4 @@
 - 2026-11-18: hub at ebac0d8c; plans-panel fix LIVE-VERIFIED; DispatchMetricsStale live on hub.
 - 2026-11-18: Anthropic API key copied to M4 and probed (plan 5 child C prerequisite).
 - 2026-11-18: lib-foundation v0.5.7 subtree-pulled into k3d-manager 8fad0831 (squash; system.sh noclobber locks); vendored bats 79/79; Makefile:1783 sole caller, globs *.log/*.rc only (dot-prefixed file locks unaffected). run_parallel bug Waiting on: live check (k3d-manager CI).
+- 2026-11-18: child C E1-E4 captured on m4-air, claude 2.1.328 (~$0.03): scripts/tests/fixtures/claude-print/. Grep/Glob absent in 2.1.328 (--tools Read,Grep,Glob loads only Read) -> tool-less rework confirmed (--tools "" + stdin captured); 401 subtype "success"; budget overshoot 4.3x; tokens from modelUsage. Child C waits on spec rework.
