@@ -138,3 +138,6 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   on ffm01, which the existing `d$` access already shows. Proven read-only up to that point; an actual remote stop is first
   exercised in M9's live check (operator, maintenance window). The `S:` audit entry logs every failed access, so a
   refused stop is visible to the server's security log. M9 needs no local elevation on the jump box.
+- **Proof 1 (operator, 2026-11-19, verbal "yes" to "does Tomcat85.exe hold the old `stderr.2026-11-03` file?"):** the
+  procrun service keeps an old, past-cutoff redirect file open, so `/purge /confirm` skips it as locked and only a stop
+  frees it. M9 stays in scope as designed (stop, delete, start). No screenshot; the M9 live check re-confirms it.
