@@ -58,10 +58,11 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    fixture names/version), commit fixtures, re-dispatch to Luna; then child B.
 3. Live checks: test-all E2 on the M4 (Claude: `make test-all` prints "metrics not published", Pushgateway group
    timestamp unchanged); E3 after promote (operator re-runs `make install-test-metrics` on the hub). Travel bundle E2/E3
-   by operator; its install waits on the P2 show-service-passwords temp-file bug (operator decision).
+   by operator; its install waits on the P2 show-service-passwords temp-file bug (option A chosen 2026-11-18: secrets on
+   stdin only, no mktemp; spec in the bug doc, Fable + Astra blind review running, then intent approval, then Luna).
 4. Grooming Sunday 2026-11-22 (agenda section below).
 
-**Open questions for operator:** promote timing for v1.45.0 live checks; decision on the show-service-passwords P2.
+**Open questions for operator:** promote timing for v1.45.0 live checks; intent approval of the show-service-passwords P2 spec (after reviews).
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
@@ -509,7 +510,7 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
   - k3d-manager: lint fix 03b86250 (lint green there; rest cancelled by next push). Promote candidate ebac0d8c once ALL check-runs green (check `gh api repos/wilddog64/k3d-manager/commits/<sha>/check-runs`; if newer memory-bank commits exist, use newest green head). Then operator: make hub-promote REF=<sha>, make appsets-check, make platform-ops; Claude: make hub-promote-status, then live checks (travel bundle E2/E3, M2 metrics, plans-panel Blocked-by fix 72b9b031, metrics push 795e101e alert+dashboard, lint bug E2).
   - dirused M8: PR wilddog64/dirused#31 (m8-purge). Windows mutation proofs DONE on CI: (e)->WP3 red, (h)->WP7 red, (j)->WP5 red; scratch branches deleted. Open: WP1 (ProgramPurgeTests.PurgeDryRunKeepsFilesAndConfirmDeletesListedOldFile) red on Windows = TEST bug: text report lists files twice (folder listing + Largest section). d28b810 restricted to Largest section -> b.log not found; b5f96a6 makes the lookup print the full report; read that run's log, fix selector, get CI green. Then blind Argon review, operator merge, tag v0.0.18, operator live E2 (scratch dir, then dry run on ffm01).
   - dirused M9 DRAFT (stop Tomcat service for locked files): proof owed on ffm01 (is stderr.2026-11-03 held AND older than cutoff; hprof held?; sc qc). Operator decisions recorded in the plan.
-  - Pending operator: show-service-passwords P2 decision; make install-dispatch-metrics go on the M4; M6 /file live check.
+  - Pending operator: show-service-passwords P2 spec intent approval (after Fable + Astra); dispatch-metrics installed by operator (E5 being watched); M6 /file live check.
 - 2026-11-18: dirused PR #31 CI GREEN on b5f96a6 (push + pull_request, windows + portable). WP1 cause: report lists files twice, and status is two spaces before '['; Claude fixed the test (d28b810, b5f96a6). Blind Argon diff review running (scratchpad argon-pr31.txt).
 - 2026-11-18: dirused PR #31 blind Argon diff review: NONE. Ready for operator merge; then tag v0.0.18 and operator live E2.
 - 2026-11-18: dirused PR #31 MERGED (fa3a07c) by operator; v0.0.18 tagged + released (pre-release, 2 zips + 2 sha256). M8 live E2 next (operator). k3d-manager CI green on ebac0d8c (7/7) -> operator promote REF=ebac0d8c.

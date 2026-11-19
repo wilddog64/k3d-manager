@@ -32,6 +32,7 @@
 - 2026-11-18: test-all metrics (P2) spec dispatched to Flash; child C abandoned (prerequisite captures missing, API key item absent); travel bundle exited, verification pending.
 
 - 2026-11-18: travel bundle: Luna stopped on spec/code conflict; N1 scoped, P2 bug filed (show-service-passwords untrapped temp files), Luna resumed.
+- 2026-11-18: show-service-passwords P2: operator chose option A; fix spec written (Vault token and ArgoCD passwords on stdin only, no mktemp, output unchanged; jq --arg rejected, it exposes argv). Fable + Astra blind review running. operator ran make install-dispatch-metrics; E5 push 1 seen at load.
 - 2026-11-18: travel bundle (v1.45.0 plan 2) intent approved and dispatched to Luna.
 - 2026-11-18: v1.45.0 = remote-promote-approval, travel bundle, multi-project records, SSH console, stall recovery; ArgoCD HA to backlog (6a034e89). Travel bundle spec dispatch-ready pending operator intent approval (ac6583f0).
 - 2026-11-18: webhook-slack-home-path-scrub (P3) LANDED ce4c06fa (live check pending). Promoted 637061f1 (hub-promote/20261118T012954Z); vault-sealed findings LIVE-VERIFIED; dashboard live; stage 2 E4 waits on next real recovery. v1.44.2 release PR #163 open. Argon review done: #1 (shards under xtrace) fixed 8eeaaeb8 with test S2-6; 7 P3s captured (7f3a196a); #7 duplicate. Fable 3-way review: missing vault-unseal exit fixed 3609a2ad; 8 more P3s (e82bad63). MERGED 8352227d (PR #163, 2026-11-18 01:16Z); tagged v1.44.2, release published; enforce_admins restored. Live checks still open.
