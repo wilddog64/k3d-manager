@@ -62,7 +62,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    stdin only, no mktemp; spec in the bug doc, Fable + Astra blind review running, then intent approval, then Luna).
 4. Grooming Sunday 2026-11-22 (agenda section below).
 
-**Open questions for operator:** promote timing for v1.45.0 live checks; show-service-passwords P2 LANDED 51581c60 — needs operator (after CI green on 072bcb57; b2467463 was red on Linux-only /opt/homebrew/bin/jq in test stubs) `make hub-promote REF=072bcb57 && make appsets-check && make platform-ops`, then Claude runs E2 after (baseline hashes in the bug doc).
+**Open questions for operator:** promote timing for v1.45.0 live checks; show-service-passwords P2 LIVE-VERIFIED (E2 PASS on hub at 072bcb57, output hash identical, TMPDIR 60→60); travel-bundle E2/E3 now unblocked.
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 

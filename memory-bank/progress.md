@@ -38,6 +38,7 @@
 - 2026-11-18: show-service-passwords P2 intents approved by operator (f443e8e5); dispatched to Luna gpt-6-luna, slug show-service-passwords-stdin-secrets (WIP 1/3).
 - 2026-11-18: show-service-passwords P2 LANDED 51581c60: 20/20 bats, N1/N2 red on 12a14c9d, mutants red; E2 pre-promote baseline on hub (rc 0, sha 08c95af9…). Waiting on promote + E2 after.
 - 2026-11-18: CI test (1) red on b2467463: show-service-passwords stubs hard-coded /opt/homebrew/bin/jq (absent on Linux runner). Claude fixed (072bcb57, REAL_JQ resolved from PATH); CI rerunning; promote target is now 072bcb57.
+- 2026-11-18: operator promoted 072bcb57; Claude E2 on hub PASS (rc 0, sha 08c95af9… identical before/after, TMPDIR 60→60). show-service-passwords P2 LIVE-VERIFIED; travel-bundle E2/E3 unblocked.
 - 2026-11-18: Luna run 1 gave up (python-in-zsh quoting garbled the Makefile; restored, no changes). Resume 2 with apply_patch guidance; Claude's prompt wrongly suggested `make -n` (executes $(MAKE) lines) -> Luna ran it once (failed at kubectl: no cluster context on M4; no Vault call, no install, plist untouched Oct 23); Claude killed run 2, resume 3 with correction. Liveness-gate hunk kept.
 - 2026-11-18: travel bundle (v1.45.0 plan 2) intent approved and dispatched to Luna.
 - 2026-11-18: v1.45.0 = remote-promote-approval, travel bundle, multi-project records, SSH console, stall recovery; ArgoCD HA to backlog (6a034e89). Travel bundle spec dispatch-ready pending operator intent approval (ac6583f0).
