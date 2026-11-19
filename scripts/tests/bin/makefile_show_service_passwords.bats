@@ -11,7 +11,9 @@ show_service_passwords_full_target() {
 }
 
 run_show_service_passwords() {
-  local mode="$1" bin="$BATS_TEST_TMPDIR/bin"
+  local mode="$1" bin="$BATS_TEST_TMPDIR/bin" real_jq
+  real_jq="$(command -v jq)"
+  [ -n "$real_jq" ]
   mkdir -p "$bin" "$BATS_TEST_TMPDIR/$mode/home" "$BATS_TEST_TMPDIR/$mode/tmp"
   : >"$BATS_TEST_TMPDIR/session-bodies"
   : >"$BATS_TEST_TMPDIR/curl-args"
@@ -55,7 +57,7 @@ case "$url" in
     [[ "$header" == 'X-Vault-Token: s3cr3t-root-tok' ]] || exit 22
     printf '%s' '{"data":{"data":{"password":"vault-pass"}}}' ;;
   */api/v1/session)
-    if [[ "$data" == @- ]]; then body="$(tr -d '\r\n' | /opt/homebrew/bin/jq -c .)"; else body="$(tr -d '\r\n' <"${data#@}" | /opt/homebrew/bin/jq -c .)"; fi
+    if [[ "$data" == @- ]]; then body="$(tr -d '\r\n' | "$REAL_JQ" -c .)"; else body="$(tr -d '\r\n' <"${data#@}" | "$REAL_JQ" -c .)"; fi
     printf '%s\n' "$body" >>"$BATS_TEST_TMPDIR/session-bodies"
     case "$body:$MAKE_TEST_ARGOCD_MODE" in
       '{"username":"admin","password":"vault-pass"}':stale) code=401 ;;
@@ -78,10 +80,10 @@ STUB
   cat >"$bin/jq" <<'STUB'
 #!/bin/bash
 printf '%s\n' "$*" >>"$BATS_TEST_TMPDIR/jq-args"
-exec /opt/homebrew/bin/jq "$@"
+exec "$REAL_JQ" "$@"
 STUB
   chmod +x "$bin"/*
-  if env HOME="$BATS_TEST_TMPDIR/$mode/home" TMPDIR="$BATS_TEST_TMPDIR/$mode/tmp" PATH="$bin:$PATH" MAKE="$bin/fake-make" MAKE_TEST_ARGOCD_MODE="$mode" SHOW_SERVICE_PASSWORDS_ARGOCD_URL=http://argocd.test make --no-print-directory -f "$MAKEFILE" show-service-passwords >"$BATS_TEST_TMPDIR/$mode/stdout" 2>"$BATS_TEST_TMPDIR/$mode/stderr"; then
+  if env HOME="$BATS_TEST_TMPDIR/$mode/home" TMPDIR="$BATS_TEST_TMPDIR/$mode/tmp" PATH="$bin:$PATH" REAL_JQ="$real_jq" MAKE="$bin/fake-make" MAKE_TEST_ARGOCD_MODE="$mode" SHOW_SERVICE_PASSWORDS_ARGOCD_URL=http://argocd.test make --no-print-directory -f "$MAKEFILE" show-service-passwords >"$BATS_TEST_TMPDIR/$mode/stdout" 2>"$BATS_TEST_TMPDIR/$mode/stderr"; then
     SHOW_STATUS=0
   else
     SHOW_STATUS=$?
