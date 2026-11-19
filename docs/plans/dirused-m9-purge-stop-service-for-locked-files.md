@@ -159,3 +159,9 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   `catalina.2026-11-19` exists at 0 KB. So the post-start check reads the catalina file for the current local date, and
   must tolerate it existing empty before the startup lines arrive. Still owed: the exact `Server startup in` line, from
   `catalina.2026-11-18`.
+- **Proof 5, catalina format (operator screenshot of `catalina.2026-11-18`, 2026-11-19):** JULI one-line format
+  `dd-MMM-yyyy HH:mm:ss.SSS LEVEL [thread] class.method message`, e.g. `18-Nov-2026 20:48:03.643 INFO [https-openssl-nio-443-exec-2] …`.
+  Correction to the line above: the 28 KB on 11-18 is HTTP parse errors (INFO) and RMI accept-loop `WARNING`s, not a
+  restart; file size does not mark restart days. Notepad found no `server startup` (searched Down from the cursor without
+  wrap, so not conclusive). The post-start check must ignore pre-start lines and treat only `SEVERE` after the start as
+  failure; INFO/WARNING noise like this is normal. Still owed: one real `Server startup in` line (findstr across all files).
