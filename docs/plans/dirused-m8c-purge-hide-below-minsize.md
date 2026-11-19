@@ -55,6 +55,7 @@ Every other skip reason (`modified within`, `read-only`, `hard-linked`, `changed
 - `src/Dirused.Common/Renderers/HtmlRenderer.cs`
 - `src/Dirused.Common/ArgParser.cs` (help text only)
 - `tests/Dirused.Tests.Portable/*.cs` (renderer tests)
+- `tests/Dirused.Tests/ProgramPurgeTests.cs` (only an assertion on a `smaller than` row; added 2026-11-19 after dispatch, spec defect: it was named under Contract readers but missing here)
 - `README.md`
 - `CHANGELOG.md`
 
