@@ -1,11 +1,11 @@
 # Bug: `show-service-passwords` can leave the Vault root token and ArgoCD password in temp files
 
-**Status:** OPEN — captured 2026-11-18
+**Status:** LANDED — `51581c60` on `k3d-manager-v1.45.0` 2026-11-18 (Luna, 3 resumes; Claude verified: N1/N2 red on `12a14c9d`, 20/20 green, retry-probe and jq-argv mutants red); captured 2026-11-18
 **Priority:** P2 (plaintext credential left in `$TMPDIR` only when one of three blocks is interrupted or fails mid-way; must be fixed before the travel-bundle LaunchAgent runs the target every 15 minutes)
 **Introduced by:** v1.43.5 (`401e4eca`, squash merge #148)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-18
+**Waiting on:** live check — since 2026-11-18 (E2 pre-promote baseline on the hub at `ebac0d8c`: rc 0, 31 lines, sha256 `08c95af9291bd9db…`, masked `4ffa096f3f528f11…`, TMPDIR entries 60→60)
 **Prior art:** `docs/bugs/2026-09-21-show-service-passwords-keycloak-block-defeats-redaction.md` (slug match, no score; `find-similar-docs` not run: the vector store is on the hub) — read, different root cause
 **Found by:** Luna (Codex), stopping the `v1.45.0-service-password-travel-bundle` dispatch on 2026-11-18 because its spec forbade plaintext in `TMPDIR`.
 

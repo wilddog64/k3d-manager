@@ -36,6 +36,7 @@
 - 2026-11-18: show-service-passwords spec revised after Fable + Astra (both: token-in-URL ban, real HOME in fixtures, real install on pre-fix run; plus M5 behavioural test, here-string detector, curl -q, exact session bodies); no finding refuted (6d605fe0). Waiting on operator intent approval.
 - 2026-11-18: dispatch-metrics E5 PASS: pushes at load +16 s and +899 s, runs=2, last exit 0; plan LIVE-VERIFIED.
 - 2026-11-18: show-service-passwords P2 intents approved by operator (f443e8e5); dispatched to Luna gpt-6-luna, slug show-service-passwords-stdin-secrets (WIP 1/3).
+- 2026-11-18: show-service-passwords P2 LANDED 51581c60: 20/20 bats, N1/N2 red on 12a14c9d, mutants red; E2 pre-promote baseline on hub (rc 0, sha 08c95af9…). Waiting on promote + E2 after.
 - 2026-11-18: Luna run 1 gave up (python-in-zsh quoting garbled the Makefile; restored, no changes). Resume 2 with apply_patch guidance; Claude's prompt wrongly suggested `make -n` (executes $(MAKE) lines) -> Luna ran it once (failed at kubectl: no cluster context on M4; no Vault call, no install, plist untouched Oct 23); Claude killed run 2, resume 3 with correction. Liveness-gate hunk kept.
 - 2026-11-18: travel bundle (v1.45.0 plan 2) intent approved and dispatched to Luna.
 - 2026-11-18: v1.45.0 = remote-promote-approval, travel bundle, multi-project records, SSH console, stall recovery; ArgoCD HA to backlog (6a034e89). Travel bundle spec dispatch-ready pending operator intent approval (ac6583f0).
