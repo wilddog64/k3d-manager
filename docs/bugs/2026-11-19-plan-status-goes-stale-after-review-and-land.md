@@ -6,7 +6,7 @@
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
 **Waiting on:** dispatch — since 2026-11-19
-**Triage:** operator, 2026-11-19 ("file one and go with your suggestion"): fix 1 (land writes Status) + fix 2 (pre-commit refuses impossible combinations)
+**Triage:** operator, 2026-11-19 ("file one and go with your suggestion"): fix 1 (land writes Status) + fix 2 (pre-commit refuses DRAFT with approved intent); Argon rev-1 review narrowed fix 2 (no "landed"-word rule: umbrella plans)
 **Prior art:** `docs/bugs/2026-11-18-plan-dashboard-ready-on-your-go-ignores-draft-status.md` (exact-slug pass; `make find-similar-docs` unavailable: vector store context missing) — read, different root cause: that fix made `DRAFT` show "spec not reviewed", which is correct; this bug is the Status line itself going stale
 
 ## Symptom
