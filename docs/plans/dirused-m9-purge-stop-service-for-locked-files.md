@@ -125,3 +125,9 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   Automatic, log on as a `PROD\msa…` domain managed service account. The display name says Tomcat 9 while the binary and
   procrun name say `Tomcat85`, so dirused must address the service by its key name (from `sc qc`), never by display name,
   and must not infer the Tomcat version from either. Start/stop rights come from the service DACL, not the run-as account.
+- **Proof 3 complete** (operator, 2026-11-19, from the jump box: `sc.exe \\us03p02ffm01 qc tomcat85` → SUCCESS):
+  SERVICE_NAME `tomcat85`; TYPE `10 WIN32_OWN_PROCESS`; START_TYPE `2 AUTO_START`; BINARY_PATH_NAME
+  `D:\Tomcat\Tomcat\bin\Tomcat85.exe //RS//Tomcat85`; DISPLAY_NAME `Apache Tomcat 9`; DEPENDENCIES none;
+  SERVICE_START_NAME `PROD\msa01tomcat$` (group managed service account). Own process and no dependencies: stopping it
+  stops nothing else. Remote config query works from the jump box. Still owed for proof 4: `sc.exe \\us03p02ffm01 sdshow tomcat85`
+  from a non-elevated prompt.
