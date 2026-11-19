@@ -145,7 +145,10 @@ input the output is byte-identical.
 
 - `Makefile` (target `show-service-passwords` only)
 - `scripts/tests/bin/makefile_show_service_passwords.bats`
-- `scripts/tests/fixtures/show-service-passwords/stale.out`, `rotated.out`, `unreachable.out`, `README.md` (new)
+- `scripts/tests/fixtures/show-service-passwords/stale.out` (new)
+- `scripts/tests/fixtures/show-service-passwords/rotated.out` (new)
+- `scripts/tests/fixtures/show-service-passwords/unreachable.out` (new)
+- `scripts/tests/fixtures/show-service-passwords/README.md` (new)
 
 ## Contract readers
 
