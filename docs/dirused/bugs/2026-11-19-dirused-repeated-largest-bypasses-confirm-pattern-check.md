@@ -5,7 +5,7 @@
 **Introduced by:** M8 (wilddog64/dirused fa3a07c, released v0.0.18)
 **Should have been caught by:** review
 **Introducing change reviewed:** yes (both)
-**Waiting on:** live check — since 2026-11-19 (after merge + release v0.0.19)
+**Waiting on:** live check — since 2026-11-19 (released v0.0.19, merge b708b63; operator E2 on work laptop)
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Prior art:** `docs/dirused/bugs/2026-11-19-dirused-purge-dry-run-refuses-without-pattern.md` (same parser lines, different root cause); find-similar-docs not run
 **Fix commit:** 1f0779f (wilddog64/dirused PR #32)
