@@ -153,3 +153,9 @@ start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm
   remote process holding a file (it only sees local processes). A file is "held" when opening it over SMB fails with a
   sharing violation; the stop decision uses the path rules above, not the holder's identity.
 - Still owed: proof 5 (newest `catalina.*.log` startup line text on ffm01).
+- **Proof 5 partial (operator screenshot, 2026-11-19, `\\us03p02ffm01\d$\tomcat\tomcat\logs`):** daily JULI files
+  `catalina.YYYY-MM-DD` (Explorer hides the extension), one per day with activity. Most are 1 KB; about weekly there is a
+  14–38 KB file (10-14, 10-21, 10-28, 11-04, 11-11, 11-18 at 10:29 PM), which looks like a restart day. Today's
+  `catalina.2026-11-19` exists at 0 KB. So the post-start check reads the catalina file for the current local date, and
+  must tolerate it existing empty before the startup lines arrive. Still owed: the exact `Server startup in` line, from
+  `catalina.2026-11-18`.
