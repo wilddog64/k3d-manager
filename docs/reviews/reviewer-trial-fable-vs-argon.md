@@ -247,3 +247,22 @@ exactly the allowlist); must_not controls via mutants; `_dispatch_open` and othe
 scope gate, snapshot precedence) by running the parsers; Fable caught the money and proof gaps (post-turn cap, uncaptured
 argv). Astra rated severity higher and was cheaper (78K vs 142K). The pair found more together than either alone: keep
 Fable + Astra for medium/high-risk specs.
+
+## Pair 9 — 2026-11-18, spec review: browser SSH console behind Cloudflare Access (v1.45.0 plan 4, critical), Fable and Astra, blind
+
+Same brief, same spec (`docs/plans/v1.45.0-web-console-ssh-behind-cloudflare-access.md` at `00220305`). Fable: Agent subagent, 68,450
+tokens, 458 s, 30 tool uses, "not ready". Astra: codex `gpt-6.2-astra` read-only, 66,185 tokens, "not ready". Claude spot-checked
+the design blockers against the tree (no `## Files` or `## Contract readers`; `bin/cluster-up:1872-1876` re-render; Remote Login in
+`docs/howto/machine-setup.md:62,74`; sibling plan needs hub sshd).
+
+| Reviewer | Findings | Severity | Real, unique | Real, shared | Refuted |
+|---|---|---|---|---|---|
+| Astra | 14 | 9 blocker, 5 major | 2 (operator-only identity boundary: Access policy condition and origin JWT check unspecified; port/listener contract self-contradicts, IPv4-only vs optional IPv6) | 12 | 0 |
+| Fable | 17 | 7 blocker, 7 major, 3 minor | 4 (tmux lock bypasses proven by live scratch probes: reconnect, Ctrl-C, non-zero exit, session switch; console on the hub tunnel causes split-brain and dies with `make down`; intent line passes only because Filed predates the gate; `work` session absent leaves the groups split) | 12 | 0 |
+
+Shared: YAML parse failure; no `## Files`; Remote Login conflict; render/revoke undone by `cluster-up`; no external proof; forwarding
+outside ForceCommand; revoke leaves sessions; machine lists and secrets transfer; root ownership; acceptance gaps; scope split.
+
+**Pair 9 read:** both rejected the spec, with heavy overlap and no false findings. Fable was the stronger reviewer here because it
+proved the lock bypasses empirically instead of arguing them; Astra rated more items as blockers, at similar cost (66K vs 68K).
+Keep Fable + Astra for critical specs.
