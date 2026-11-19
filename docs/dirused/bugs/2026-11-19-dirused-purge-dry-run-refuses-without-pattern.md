@@ -1,13 +1,14 @@
 # dirused `/purge` dry run refuses to run without a `/largest` pattern, so a user cannot preview before choosing what to delete
 
-**Status:** OPEN — captured 2026-11-19 by Claude from an operator screenshot
+**Status:** LANDED — f79ba4c on branch m8b-purge-dry-run, PR wilddog64/dirused#32 (Flash implemented; Claude verified: portable 121/121, pre-fix red on fa3a07c, 2 mutants red)
 **Priority:** P3 — usability: workaround is a separate `/largest` run (no `/purge`) to see the files, then a second run with patterns
 **Introduced by:** M8 (`docs/plans/dirused-m8-purge-largest-files.md`, review rev 2: explicit pattern list required for every `/purge`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Fable + Astra)
-**Waiting on:** fix running — since 2026-11-19
+**Waiting on:** live check — since 2026-11-19 (after merge + release)
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Prior art:** `docs/plans/dirused-m8-purge-largest-files.md` (design source, not a bug); `make find-similar-docs` returned nothing — none above threshold
+**Fix commit:** f79ba4c (wilddog64/dirused PR #32)
 **Spec:** `docs/plans/dirused-m8b-purge-dry-run-without-patterns.md` (operator: "go ahead to dispatch this to Luna", 2026-11-19)
 **Filed:** 2026-11-19
 **Intent approved:** operator, 2026-11-19
