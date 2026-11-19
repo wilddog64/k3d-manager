@@ -289,3 +289,22 @@ For a side-by-side comparison, dispatch the same spec under separate slugs, such
 ### Stall watch
 
 A live dispatch may report `stalled`. `K3DM_DISPATCH_STALL_SECONDS` (default 2700) controls the silence threshold, and `K3DM_DISPATCH_STALL_MAX_PROCS` (default 200, provisional) controls the process threshold; zero disables the corresponding check. Install the watcher with `make install-dispatch-stall-watch`. In v1.44.1 it detects stalls and tells the operator; it does not stop anything.
+
+### Stall diagnose
+
+`bin/k3dm-dispatch-stall-diagnose <stall-dir>` sends one headless, tool-less `claude -p` turn the redacted evidence of a stalled dispatch (inlined in the prompt on stdin) and gets back a diagnosis and a correction prompt. The tool writes `diagnosis.md` and `correction.md` into the stall directory, appends one `stall_diagnosis` ledger event to `<root>/ledger.jsonl`, and posts a single Slack alert line when it cannot produce a correction. It never resumes a dispatch, never calls `codex-dispatch`, and never touches the dispatch worktree.
+
+Configuration environment variables:
+- `K3DM_STALL_DIAGNOSE_BUDGET_USD` (default `0.50`, maximum `5.00`)
+- `K3DM_STALL_DIAGNOSE_MODEL` (default `claude-opus-5-5`; must be an allowlisted Claude model priced in `scripts/etc/agent/codex-model-prices.json`)
+- `K3DM_STALL_DIAGNOSE_TIMEOUT_S` (default `300`, range 30..1800)
+
+The tool reads the Anthropic API key from the macOS Keychain item `k3dm-anthropic-api-key` under account `k3dm` via `security find-generic-password`. If the key is missing or rejected with an API 401, the tool records status `key_rejected` and notifies Slack with a hint to rotate `k3dm-anthropic-api-key`.
+
+Every status recorded in `<stall>/diagnose.status` is sticky across repeat invocations. To force a re-run on an existing stall directory, set `K3DM_STALL_DIAGNOSE_FORCE=1`.
+
+To diagnose a stalled dispatch by hand, pass its stall folder:
+
+```bash
+bin/k3dm-dispatch-stall-diagnose ~/.local/share/k3d-manager/worktrees/v1.45.0/my-task.run/stall-20261118T000000Z
+```
