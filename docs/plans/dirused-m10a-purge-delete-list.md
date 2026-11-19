@@ -1,14 +1,14 @@
 # dirused M10a: save the would-delete list to a file, and delete from that file
 
 **Filed:** 2026-11-19
-**Status:** DRAFT rev 3 — rev 2 Fable blind review: no safety blocker, NOT READY on 6 majors (all taken, see Review log); rev 3 awaits intent approval; Astra blind review owed after codex quota, before dispatch
+**Status:** READY pending Astra — rev 3, intent approved by operator 2026-11-19 ("approved"); rev 2 Fable blind review: no safety blocker, NOT READY on 6 majors (all taken, see Review log); Astra blind review owed after codex quota, before dispatch
 **Repo / branch:** wilddog64/dirused / `m10a-purge-delete-list` (from main 4130598, v0.0.21)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** `docs/plans/dirused-m10-scheduled-purge.md` Amendment 3 (operator, 2026-11-19: "files to delete should store in a
 delete.txt and use that for deletion"; "go with your suggestion"). M10a is the list half, with no scheduling and no Tomcat
 handling. M10b (`/schedule`) and M9 (Tomcat stop/start) build on it.
 **Implementer:** Luna (Codex). **Verifier:** Claude. Live check by the operator on the office jump box.
-**Intent approved:** no
+**Intent approved:** operator, 2026-11-19
 
 ## Why
 
