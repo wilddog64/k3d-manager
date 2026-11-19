@@ -10,10 +10,11 @@ setup() {
   WORK="${BATS_TEST_TMPDIR}/scratch-repo"
   ORIGIN="${BATS_TEST_TMPDIR}/origin.git"
   export HOME="${BATS_TEST_TMPDIR}/home" XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
+  export K3DM_REPO_SYNC_STATE_DIR="${BATS_TEST_TMPDIR}/repo-sync" K3DM_HUB_DEPLOY_CHECKOUT_WAIT=0
   mkdir -p "$WORK/bin" "$WORK/scripts/lib/foundation/scripts/lib" "$WORK/scripts/etc/argocd/applicationsets" "$HOME" "$XDG_CONFIG_HOME/k3d-manager" "${BATS_TEST_TMPDIR}/stubs"
   printf 'hub\n' > "$XDG_CONFIG_HOME/k3d-manager/machine-role"
   printf 'fixture\n' > "$WORK/.fixture-root"
-  cp "$REPO/bin/k3dm-hub-deploy" "$WORK/bin/"
+  cp "${TEST_HUB_DEPLOY:-$REPO/bin/k3dm-hub-deploy}" "$WORK/bin/k3dm-hub-deploy"
   cp "$REPO/bin/k3dm-require-role" "$WORK/bin/"
   cp "$REPO/scripts/lib/foundation/scripts/lib/system.sh" "$WORK/scripts/lib/foundation/scripts/lib/"
   cp "$REPO/Makefile" "$WORK/Makefile"
@@ -25,7 +26,9 @@ setup() {
 [[ "$*" == *"-C $TEST_WORK "* ]] || { echo "git escaped fixture: $*" >&2; exit 97; }
 [[ -f "$FIXTURE_ROOT" ]] || exit 98
 printf 'git %s\n' "$*" >> "$CALLS"
+[[ "${FAIL_REMOTE:-0}" != 1 || "$*" != *ls-remote* ]] || exit "${REMOTE_FAIL_CODE:-43}"
 [[ "$("$REAL_GIT" -C "$TEST_WORK" remote get-url origin)" == "$TEST_ORIGIN" ]]
+if [[ "${FAKE_CLEAN:-0}" == 1 && "$*" == *"status --porcelain --untracked-files=no"* ]]; then exit 0; fi
 exec "$REAL_GIT" "$@"
 EOF
   cat > "$WORK/bin/k3dm-hub-promote" <<'EOF'
@@ -54,10 +57,70 @@ printf '%s\n' "${PROMOTE_OUTPUT:-promoted}"
 EOF
   cat > "$BATS_TEST_TMPDIR/stubs/make" <<'EOF'
 #!/usr/bin/env bash
-[[ -f "$FIXTURE_ROOT" ]] || exit 98
+[[ -f "$FIXTURE_ROOT" && "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
 target="${*: -1}"
+state="$HOME/.local/share/k3d-manager/hub-deploy/state"
+if [[ -e "$state" ]]; then
+  [[ -r "$state" ]] || exit 94
+  [[ "$(grep -c '^appsets ' "$state")" == 1 && "$(grep -c '^launchd ' "$state")" == 1 ]] || exit 93
+  printf '%s\n' "state-at-$target" >> "$BATS_TEST_TMPDIR/state-snapshots"
+  cat "$state" >> "$BATS_TEST_TMPDIR/state-snapshots"
+fi
 printf '%s\n' "$target" >> "$CALLS"
 [[ "${FAIL_STEP:-}" != "$target" ]] || exit "${FAIL_CODE:-23}"
+if [[ "$target" == install-* ]]; then
+  [[ "$K3DM_REPO_SYNC_STATE_DIR" == "$BATS_TEST_TMPDIR/repo-sync" && "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
+  [[ "$(cat "$K3DM_REPO_SYNC_STATE_DIR/lock/pid")" == "$PPID" ]] || exit 97
+  [[ "${LATE_INSTALL:-0}" == 1 || -e /dev/fd/9 ]] || exit 96
+  [[ -z "${K3DM_AGENT_LOAD+x}" ]] || exit 95
+  head_sha="$("$REAL_GIT" -C "$TEST_WORK" rev-parse HEAD)"
+  dirty="$("$REAL_GIT" -C "$TEST_WORK" status --porcelain --untracked-files=no)"
+  printf 'head %s\nclean %s\nlock-owner %s\nagent-load unset\nfd9 open\n' "$head_sha" "${dirty:+no}" "$(cat "$K3DM_REPO_SYNC_STATE_DIR/lock/pid")" >> "$BATS_TEST_TMPDIR/install-details"
+  if [[ "${LATE_INSTALL:-0}" == 1 ]]; then
+    cp "$TEST_WORK/scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl" "$BATS_TEST_TMPDIR/late-render"
+    (
+      for unused in {1..100}; do
+        [[ ! -e "$BATS_TEST_TMPDIR/installer-go" ]] || break
+        sleep 0.1
+      done
+      cp "$BATS_TEST_TMPDIR/late-render" "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+      touch "$BATS_TEST_TMPDIR/installer-done"
+    ) &
+    touch "$BATS_TEST_TMPDIR/installer-ready"
+    wait
+    exit 0
+  fi
+  if [[ "${NO_REWRITE:-0}" != 1 ]]; then
+    plist="$HOME/Library/LaunchAgents/com.k3d-manager.${target#install-}.plist"
+    if [[ "${RESTORE_MTIME:-0}" == 1 ]]; then cp -p "$plist" "$BATS_TEST_TMPDIR/original-stamp"; fi
+    cp "$TEST_WORK/scripts/etc/launchd/com.k3d-manager.${target#install-}.plist.tmpl" "$plist"
+    if [[ "${RESTORE_MTIME:-0}" == 1 ]]; then touch -r "$BATS_TEST_TMPDIR/original-stamp" "$plist"; fi
+  fi
+  mkdir -p "$HOME/.test-launchctl"
+  touch "$HOME/.test-launchctl/com.k3d-manager.${target#install-}"
+  if [[ "${MOVE_HEAD:-0}" == 1 ]]; then "$REAL_GIT" -C "$TEST_WORK" checkout -q "$MOVE_TO"; fi
+  if [[ "${BREAK_PID:-0}" == 1 ]]; then printf '99999999\n' > "$K3DM_REPO_SYNC_STATE_DIR/lock/pid"; fi
+  if [[ "${KILL_DEPLOY:-0}" == 1 ]]; then kill -9 "$PPID"; fi
+fi
+if [[ "$target" == platform-ops ]]; then
+  if [[ "${SLEEP_CHILD:-0}" == 1 ]]; then
+    sleep 20 &
+    printf '%s\n' "$!" > "$BATS_TEST_TMPDIR/sleeper-pid"
+    printf '%s\n' "$$" > "$BATS_TEST_TMPDIR/make-pid"
+    touch "$BATS_TEST_TMPDIR/sleeper-ready"
+    wait
+  fi
+  mkdir -p "$HOME/.local/share/k3d-manager/repo-sync"
+  "$REAL_GIT" -C "$TEST_WORK" ls-remote origin refs/heads/deploy/hub | cut -f1 > "$HOME/.local/share/k3d-manager/repo-sync/deployed-platform-ops"
+  [[ -z "${PIN_OVERRIDE:-}" ]] || printf '%s\n' "$PIN_OVERRIDE" > "$HOME/.local/share/k3d-manager/repo-sync/deployed-platform-ops"
+  if [[ "${PIN_MISSING:-0}" == 1 ]]; then rm "$HOME/.local/share/k3d-manager/repo-sync/deployed-platform-ops"; fi
+fi
+EOF
+  cat > "$BATS_TEST_TMPDIR/stubs/launchctl" <<'EOF'
+#!/usr/bin/env bash
+[[ "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
+[[ "$1" == print && "${PRINT_FAIL:-0}" == 0 ]] || exit 113
+[[ -f "$HOME/.test-launchctl/${2##*/}" ]] || exit 113
 EOF
   cat > "$BATS_TEST_TMPDIR/stubs/kubectl" <<'EOF'
 #!/usr/bin/env bash
@@ -70,6 +133,9 @@ EOF
   "$REAL_GIT" -C "$WORK" init -q
   "$REAL_GIT" -C "$WORK" config user.name 'Hub deploy tests'
   "$REAL_GIT" -C "$WORK" config user.email 'hub-deploy-tests@example.invalid'
+  mkdir -p "$WORK/scripts/etc/launchd"
+  printf 'base\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl"
+  printf 'base\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl"
   printf 'base\n' > "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
   "$REAL_GIT" -C "$WORK" add .
   "$REAL_GIT" -C "$WORK" commit -qm base
@@ -77,6 +143,8 @@ EOF
   "$REAL_GIT" -C "$WORK" remote add origin "$ORIGIN"
   "$REAL_GIT" -C "$WORK" push --quiet origin "$BASE_SHA:refs/heads/deploy/hub"
   "$REAL_GIT" -C "$WORK" checkout -qb changed "$BASE_SHA"
+  printf 'changed\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl"
+  printf 'changed\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl"
   printf 'changed\n' > "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
   "$REAL_GIT" -C "$WORK" commit -qam changed
   CHANGED_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
@@ -88,6 +156,8 @@ EOF
   OTHER_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
   "$REAL_GIT" -C "$WORK" push --quiet origin "$OTHER_SHA:refs/heads/fixture-other"
   export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
+  [[ "$HOME" == "$BATS_TEST_TMPDIR/home" && "$K3DM_REPO_SYNC_STATE_DIR" == "$BATS_TEST_TMPDIR/repo-sync" ]]
+  [[ -d "$WORK/.git" && "$(command -v make)" == "$BATS_TEST_TMPDIR/stubs/make" && "$(command -v launchctl)" == "$BATS_TEST_TMPDIR/stubs/launchctl" ]]
 }
 
 @test "M1: changed ApplicationSets run every step in order" {
@@ -171,4 +241,474 @@ EOF
   run env SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=outage PROMOTE_TO_SHA="$OTHER_SHA" "$WORK/bin/k3dm-hub-deploy" fixture-other
   [ "$status" -eq 0 ]
   grep -qx 'skip=1 reason=outage' "$CALLS"
+}
+
+@test "P1 superseded stops before rollout" {
+  [[ "$(cat "$FIXTURE_ROOT")" == fixture ]]
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" PIN_OVERRIDE="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" fixture-changed
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'deploy/hub has moved on; superseded'* ]]
+  [ "$(grep -cx rollout "$CALLS" || true)" -eq 0 ]
+}
+
+@test "P1 first run writes complete state" {
+  [[ "$(cat "$FIXTURE_ROOT")" == fixture ]]
+  run "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'no reconcile state yet; full launchd reconcile owed'* ]]
+  grep -qx "appsets $BASE_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  grep -qx "launchd $BASE_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test "P1 docs teach the deployment and old copies fail" {
+  [[ "$(cat "$FIXTURE_ROOT")" == fixture ]]
+  grep -q 'make hub-deploy REF=<commit-ish>' "$REPO/CLAUDE.md"
+  grep -q 'make hub-deploy REF=<commit-ish>' "$REPO/docs/process/rules.md"
+  grep -q 'pending reinstall is retried' "$REPO/docs/howto/hub-promote.md"
+  grep -q 'reinstalls changed launchd agents' "$REPO/Makefile"
+  old_docs="$REPO/scripts/tests/fixtures/remote-promote-1-docs"
+  [ "$(grep -c 'make hub-deploy REF=<commit-ish>' "$old_docs/CLAUDE.md" || true)" -eq 0 ]
+  [ "$(grep -c 'make hub-deploy REF=<commit-ish>' "$old_docs/docs/process/rules.md" || true)" -eq 0 ]
+  [ "$(grep -c 'pending reinstall is retried' "$old_docs/docs/howto/hub-promote.md" || true)" -eq 0 ]
+  [ "$(grep -c 'reinstalls changed launchd agents' "$old_docs/help.txt" || true)" -eq 0 ]
+}
+
+install_fixture() {
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.test-launchctl"
+  printf 'old plist\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  touch "$HOME/.test-launchctl/com.k3d-manager.sandbox-reaper"
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+}
+
+@test "P1 reinstall journals and verifies a real rewrite" {
+  install_fixture
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'launchd ran 0'* ]]
+  grep -qx install-sandbox-reaper "$CALLS"
+  grep -qx "head $CHANGED_SHA" "$BATS_TEST_TMPDIR/install-details"
+  grep -qx 'clean ' "$BATS_TEST_TMPDIR/install-details"
+  grep -qx 'agent-load unset' "$BATS_TEST_TMPDIR/install-details"
+  grep -qx 'fd9 open' "$BATS_TEST_TMPDIR/install-details"
+  grep -q '^state-at-install-sandbox-reaper$' "$BATS_TEST_TMPDIR/state-snapshots"
+  grep -qx 'pending sandbox-reaper' "$BATS_TEST_TMPDIR/state-snapshots"
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+  grep -qx changed "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+}
+
+@test "P1 dirty checkout is pending while clean checkout installs" {
+  install_fixture
+  printf 'dirty\n' >> "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'pending; rerun bin/k3dm-hub-deploy <ref>'* ]]
+  [[ "$output" != *'make install-'* ]]
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  "$REAL_GIT" -C "$WORK" checkout -- scripts/etc/argocd/applicationsets/test.yaml
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test "P1 disabled load persists and later retries" {
+  install_fixture
+  run env K3DM_AGENT_LOAD=0 PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agent load disabled (K3DM_AGENT_LOAD=0)'* ]]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test "P1 unchanged plist and failed load stay pending, successful rewrite clears it" {
+  install_fixture
+  touch -t 203501010000 "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  run env NO_REWRITE=1 PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'plist not rewritten'* ]]
+  run env RESTORE_MTIME=1 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'plist not rewritten'* ]]
+  run env PRINT_FAIL=1 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'plist written but not loaded'* ]]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+}
+
+@test "P1 failed reapply retains its base and retries" {
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" FAIL_STEP=appsets-reapply "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 23 ]
+  grep -qx "appsets $BASE_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ "$(grep -cx appsets-reapply "$CALLS")" -eq 2 ]
+  grep -qx "appsets $CHANGED_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test "P1 exit 75 from TTY-path child is remapped" {
+  run env PROMOTE_FAIL=75 "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'(child exit 75)'* ]]
+  run env FAIL_REMOTE=1 REMOTE_FAIL_CODE=75 "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'(child exit 75)'* ]]
+  run env FAIL_STEP=appsets-check FAIL_CODE=75 "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'(child exit 75)'* ]]
+  run "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 0 ]
+}
+
+@test "P1 lost state forces reapply while a valid state skips it" {
+  state_dir="$HOME/.local/share/k3d-manager/hub-deploy"
+  mkdir -p "$state_dir"
+  printf 'partial\n' > "$state_dir/state.tmp.12345"
+  run "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'state unreadable; full launchd reconcile and appsets reapply owed'* ]]
+  grep -qx appsets-reapply "$CALLS"
+  : > "$CALLS"
+  run "$WORK/bin/k3dm-hub-deploy" fixture-base
+  [ "$status" -eq 0 ]
+  [ "$(grep -cx appsets-reapply "$CALLS" || true)" -eq 0 ]
+}
+
+@test "P1 excluded and unwired agents are skipped while wired agent installs" {
+  install_fixture
+  mkdir -p "$HOME/Library/LaunchAgents"
+  for name in webhook-token-rotate dispatch-stall-watch dispatch-metrics webhook hermes heartbeat prometheus-auth-proxy vault-failover; do
+    printf 'template\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.$name.plist.tmpl"
+    printf 'installed\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.$name.plist"
+  done
+  "$REAL_GIT" -C "$WORK" add scripts/etc/launchd
+  "$REAL_GIT" -C "$WORK" commit -qm 'extra templates'
+  fixture_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  run env PROMOTE_TO_SHA="$fixture_sha" "$WORK/bin/k3dm-hub-deploy" extra
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'launchd unwired 5'* ]]
+  [[ "$output" == *'launchd webhook-token-rotate is excluded'* ]]
+  grep -qx install-sandbox-reaper "$CALLS"
+  [ "$(grep -Ec '^(install-token-rotator|install-dispatch|install-webhook|install-hermes|install-heartbeat|install-prometheus-auth-proxy|install-vault-failover)' "$CALLS" || true)" -eq 0 ]
+}
+
+@test "P1 fresh pidless lock is retained and dead owner lock is recovered" {
+  install_fixture
+  mkdir -p "$K3DM_REPO_SYNC_STATE_DIR/lock"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ -d "$K3DM_REPO_SYNC_STATE_DIR/lock" ]
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  printf '99999999\n' > "$K3DM_REPO_SYNC_STATE_DIR/lock/pid"
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test "P1 superseded run records the applied appsets base" {
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" PIN_OVERRIDE="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 1 ]
+  grep -qx "appsets $CHANGED_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  grep -qx 'launchd full' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  : > "$CALLS"
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  "$REAL_GIT" -C "$WORK" checkout "$BASE_SHA" -- scripts/etc/argocd/applicationsets/test.yaml
+  "$REAL_GIT" -C "$WORK" commit -qm revert
+  revert_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  run env PROMOTE_TO_SHA="$revert_sha" "$WORK/bin/k3dm-hub-deploy" revert
+  [ "$status" -eq 0 ]
+  grep -qx appsets-reapply "$CALLS"
+  printf 'again\n' > "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
+  "$REAL_GIT" -C "$WORK" commit -qam again
+  again_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  run env PROMOTE_TO_SHA="$again_sha" "$WORK/bin/k3dm-hub-deploy" again
+  [ "$status" -eq 0 ]
+  "$REAL_GIT" -C "$WORK" checkout "$revert_sha" -- scripts/etc/argocd/applicationsets/test.yaml
+  "$REAL_GIT" -C "$WORK" commit -qm revert-again
+  last_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  : > "$CALLS"
+  run env PROMOTE_TO_SHA="$last_sha" "$WORK/bin/k3dm-hub-deploy" revert-again
+  [ "$status" -eq 0 ]
+  grep -qx appsets-reapply "$CALLS"
+}
+
+@test "P1 installer keeps run lock after deploy is killed" {
+  install_fixture
+  env PROMOTE_TO_SHA="$CHANGED_SHA" LATE_INSTALL=1 "$WORK/bin/k3dm-hub-deploy" changed > "$BATS_TEST_TMPDIR/first-output" 2>&1 &
+  deploy_pid=$!
+  for unused in {1..100}; do
+    [[ ! -e "$BATS_TEST_TMPDIR/installer-ready" ]] || break
+    sleep 0.1
+  done
+  [ -e "$BATS_TEST_TMPDIR/installer-ready" ]
+  kill -9 "$deploy_pid"
+  wait "$deploy_pid" 2>/dev/null || true
+  "$REAL_GIT" -C "$WORK" checkout "$BASE_SHA" -- scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl
+  "$REAL_GIT" -C "$WORK" commit -qm revert-template
+  revert_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  run env PROMOTE_TO_SHA="$revert_sha" "$WORK/bin/k3dm-hub-deploy" revert
+  [ "$status" -eq 75 ]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  touch "$BATS_TEST_TMPDIR/installer-go"
+  for unused in {1..100}; do
+    [[ ! -e "$BATS_TEST_TMPDIR/installer-done" ]] || break
+    sleep 0.1
+  done
+  [ -e "$BATS_TEST_TMPDIR/installer-done" ]
+  for unused in {1..100}; do
+    run env PROMOTE_TO_SHA="$revert_sha" "$WORK/bin/k3dm-hub-deploy" revert
+    [[ "$status" == 75 ]] || break
+    sleep 0.1
+  done
+  [ "$status" -eq 0 ]
+  grep -qx base "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+}
+
+@test "P1 unrelated child does not keep run lock after deploy is killed" {
+  env SLEEP_CHILD=1 "$WORK/bin/k3dm-hub-deploy" base > "$BATS_TEST_TMPDIR/first-output" 2>&1 &
+  deploy_pid=$!
+  for unused in {1..100}; do
+    [[ ! -e "$BATS_TEST_TMPDIR/sleeper-ready" ]] || break
+    sleep 0.1
+  done
+  [ -e "$BATS_TEST_TMPDIR/sleeper-ready" ]
+  run "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 75 ]
+  kill -9 "$deploy_pid"
+  wait "$deploy_pid" 2>/dev/null || true
+  run "$WORK/bin/k3dm-hub-deploy" base
+  result="$status"
+  kill "$(cat "$BATS_TEST_TMPDIR/make-pid")" "$(cat "$BATS_TEST_TMPDIR/sleeper-pid")" 2>/dev/null || true
+  [ "$result" -eq 0 ]
+}
+
+@test "P1 journal survives death after rewrite and a template revert" {
+  mkdir -p "$HOME/Library/LaunchAgents"
+  printf 'old plist\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  "$REAL_GIT" -C "$WORK" checkout -qb original "$BASE_SHA"
+  run "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 0 ]
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" KILL_DEPLOY=1 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -ne 0 ]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  "$REAL_GIT" -C "$WORK" checkout "$BASE_SHA" -- scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl
+  "$REAL_GIT" -C "$WORK" commit -qm revert-template
+  revert_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  : > "$CALLS"
+  run env PROMOTE_TO_SHA="$revert_sha" "$WORK/bin/k3dm-hub-deploy" revert
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+  grep -qx base "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+}
+
+@test "P1 moved checkout and lost lock after install are pending" {
+  install_fixture
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" MOVE_HEAD=1 MOVE_TO="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'checkout moved during install'* ]]
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  run env BREAK_PID=1 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'checkout lock lost'* ]]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  rm -rf "$K3DM_REPO_SYNC_STATE_DIR/lock"
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+}
+
+@test "P1 template blob check rejects edited bytes even if status reports clean" {
+  install_fixture
+  printf 'edited\n' >> "$WORK/scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl"
+  run env FAKE_CLEAN=1 PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  "$REAL_GIT" -C "$WORK" checkout -- scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test "P1 failed install stays soft but failed platform step stops" {
+  install_fixture
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" FAIL_STEP=install-sandbox-reaper FAIL_CODE=7 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'install failed (exit 7)'* ]]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run env FAIL_STEP=platform-ops FAIL_CODE=37 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 37 ]
+  [[ "$output" == *'stopped at platform-ops'* ]]
+}
+
+@test "P1 first failed install retries at the same ref" {
+  install_fixture
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" FAIL_STEP=install-sandbox-reaper FAIL_CODE=7 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  : > "$CALLS"
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+}
+
+@test "P1 invalid state forces recovery and valid state avoids it" {
+  state_dir="$HOME/.local/share/k3d-manager/hub-deploy"
+  mkdir -p "$state_dir"
+  for bad in garbage duplicate-launchd duplicate-pending invalid-sha; do
+    case "$bad" in
+      garbage) printf 'appsets %s\nlaunchd %s\ngarbage\n' "$BASE_SHA" "$BASE_SHA" > "$state_dir/state" ;;
+      duplicate-launchd) printf 'appsets %s\nlaunchd %s\nlaunchd %s\n' "$BASE_SHA" "$BASE_SHA" "$BASE_SHA" > "$state_dir/state" ;;
+      duplicate-pending) printf 'appsets %s\nlaunchd %s\npending sandbox-reaper\npending sandbox-reaper\n' "$BASE_SHA" "$BASE_SHA" > "$state_dir/state" ;;
+      invalid-sha) printf 'appsets %040d\nlaunchd %s\n' 0 "$BASE_SHA" > "$state_dir/state" ;;
+    esac
+    : > "$CALLS"
+    run "$WORK/bin/k3dm-hub-deploy" base
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'state unreadable; full launchd reconcile and appsets reapply owed'* ]]
+    grep -qx appsets-reapply "$CALLS"
+  done
+  : > "$CALLS"
+  run "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 0 ]
+  [ "$(grep -cx appsets-reapply "$CALLS" || true)" -eq 0 ]
+}
+
+@test "P1 checkout behind and ahead both wait until the promoted commit" {
+  mkdir -p "$HOME/Library/LaunchAgents"
+  printf 'old plist\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  "$REAL_GIT" -C "$WORK" checkout -qb original "$BASE_SHA"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  [[ "$output" == *'hub checkout is not at '* ]]
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+  : > "$CALLS"
+  "$REAL_GIT" -C "$WORK" checkout "$BASE_SHA" -- scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl
+  "$REAL_GIT" -C "$WORK" commit -qm revert-template
+  ahead_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  printf 'pending sandbox-reaper\n' >> "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  [[ "$output" == *'hub checkout is not at '* ]]
+  run env PROMOTE_TO_SHA="$ahead_sha" "$WORK/bin/k3dm-hub-deploy" revert
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test "P1 checkout catches up by the short deadline" {
+  mkdir -p "$HOME/Library/LaunchAgents"
+  printf 'old plist\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  "$REAL_GIT" -C "$WORK" checkout -qb original "$BASE_SHA"
+  ( sleep 1; "$REAL_GIT" -C "$WORK" checkout -q changed ) &
+  checkout_pid=$!
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" K3DM_HUB_DEPLOY_CHECKOUT_WAIT=2 "$WORK/bin/k3dm-hub-deploy" changed
+  wait "$checkout_pid"
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test "P1 two-line state is valid and writes retain private modes" {
+  install_fixture
+  state_dir="$HOME/.local/share/k3d-manager/hub-deploy"
+  mkdir -p "$state_dir"
+  printf 'appsets %s\nlaunchd full\n' "$BASE_SHA" > "$state_dir/state"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'state unreadable'* ]]
+  grep -qx install-sandbox-reaper "$CALLS"
+  if [[ "$(uname -s)" == Darwin ]]; then
+    [ "$(/usr/bin/stat -f '%Lp' "$state_dir")" == 700 ]
+    [ "$(/usr/bin/stat -f '%Lp' "$state_dir/state")" == 600 ]
+  else
+    [ "$(/usr/bin/stat -c '%a' "$state_dir")" == 700 ]
+    [ "$(/usr/bin/stat -c '%a' "$state_dir/state")" == 600 ]
+  fi
+}
+
+@test "P1 partial success then revert reinstalls both changed and pending agents" {
+  mkdir -p "$HOME/Library/LaunchAgents"
+  for name in cleanup sandbox-reaper; do printf 'old\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.$name.plist"; done
+  "$REAL_GIT" -C "$WORK" checkout -qb original "$BASE_SHA"
+  run "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 0 ]
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" FAIL_STEP=install-sandbox-reaper FAIL_CODE=7 "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx changed "$HOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+  grep -qx 'pending sandbox-reaper' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  "$REAL_GIT" -C "$WORK" checkout "$BASE_SHA" -- scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl
+  "$REAL_GIT" -C "$WORK" commit -qm revert-cleanup
+  revert_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  : > "$CALLS"
+  run env PROMOTE_TO_SHA="$revert_sha" "$WORK/bin/k3dm-hub-deploy" revert
+  [ "$status" -eq 0 ]
+  grep -qx install-cleanup "$CALLS"
+  grep -qx install-sandbox-reaper "$CALLS"
+  grep -qx base "$HOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+  grep -qx changed "$HOME/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+  [ "$(grep -c '^pending ' "$HOME/.local/share/k3d-manager/hub-deploy/state" || true)" -eq 0 ]
+}
+
+@test "P1 first run remains first after failure before state write" {
+  run env FAIL_REMOTE=1 "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 43 ]
+  [ ! -e "$HOME/.local/share/k3d-manager/hub-deploy/state" ]
+  [ -e "$HOME/.local/share/k3d-manager/hub-deploy/run.lock" ]
+  run "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'no reconcile state yet; full launchd reconcile owed'* ]]
+  grep -qx "appsets $BASE_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test "P1 missing platform pin stops before rollout and valid pin proceeds" {
+  run env PIN_MISSING=1 "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'stopped at platform-ops-pin'* ]]
+  [ "$(grep -cx rollout "$CALLS" || true)" -eq 0 ]
+  run "$WORK/bin/k3dm-hub-deploy" base
+  [ "$status" -eq 0 ]
+  grep -qx rollout "$CALLS"
+}
+
+@test "P1 launchd table covers the templates and exclusions match setup" {
+  expected='alertmanager-auth-proxy alertmanager-port-forward cleanup cloud-bridge dispatch-metrics dispatch-stall-watch heartbeat hermes hub-data-export hub-loki-port-forward hub-pushgateway-port-forward hub-snapshot node-health-watch password-bundle prometheus-auth-proxy prometheus-credential-rotator prometheus-port-forward repo-sync sandbox-reaper test-metrics vault-failover vault-port-forward webhook webhook-token-rotate'
+  actual="$(for path in "$REPO"/scripts/etc/launchd/com.k3d-manager.*.plist.tmpl; do
+    name="${path##*/com.k3d-manager.}"
+    printf '%s\n' "${name%.plist.tmpl}"
+  done | sort | tr '\n' ' ' | sed 's/ $//')"
+  [ "$actual" = "$expected" ]
+  for name in webhook-token-rotate dispatch-stall-watch dispatch-metrics; do
+    grep -q "^$name|" "$REPO/scripts/etc/machine/not-installed.list"
+    grep -q "$name" "$REPO/bin/k3dm-hub-deploy"
+  done
+  for name in repo-sync prometheus-credential-rotator test-metrics hub-data-export cleanup node-health-watch sandbox-reaper vault-port-forward prometheus-port-forward hub-pushgateway-port-forward hub-loki-port-forward alertmanager-port-forward alertmanager-auth-proxy cloud-bridge hub-snapshot password-bundle; do
+    grep -q "$name" "$REPO/bin/k3dm-hub-deploy"
+  done
+}
+
+@test "P1 checkout moving during one install blocks later installs" {
+  install_fixture
+  printf 'old\n' > "$HOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" MOVE_HEAD=1 MOVE_TO="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-cleanup "$CALLS"
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  [[ "$output" == *'checkout moved during install'* ]]
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  run "$WORK/bin/k3dm-hub-deploy" changed
+  [ "$status" -eq 0 ]
+  grep -qx install-sandbox-reaper "$CALLS"
 }

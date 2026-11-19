@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Default scope: standing docs a reader navigates. Plans/retros are included because their
 # links are followed too, but see SKIP_DIRS for vendored trees.
 DEFAULT_GLOBS = ("docs/**/*.md", "memory-bank/**/*.md", "README.md", "CHANGELOG.md")
-SKIP_DIRS = ("scripts/lib/foundation/", "scripts/lib/acg/", "node_modules/")
+SKIP_DIRS = ("scripts/lib/foundation/", "scripts/lib/acg/", "node_modules/", "scripts/tests/fixtures/")
 
 EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.IGNORECASE)
 # [text](target) — target stops at whitespace so an optional "title" is ignored.
@@ -153,7 +153,7 @@ def check_file(path):
 def main(argv):
     if argv:
         files = [Path(a).resolve() for a in argv]
-        files = [f for f in files if f.suffix == ".md" and f.is_file()]
+        files = [f for f in files if f.suffix == ".md" and f.is_file() and not any(s in f.as_posix() for s in SKIP_DIRS)]
     else:
         files = default_files()
 

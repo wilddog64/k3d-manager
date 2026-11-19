@@ -2348,7 +2348,7 @@ help:
 	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
 	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
 	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 or SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=... optional)"
-	@echo "    make hub-deploy REF=...    Promote, reconcile and verify the hub (typed confirmation required)"
+	@echo "    make hub-deploy REF=...    Promote, reconcile and verify the hub (typed confirmation required; reinstalls changed launchd agents)"
 	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
 	@echo "    make hub-rollback          Return deploy/hub to the state before the last promotion"
 	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"

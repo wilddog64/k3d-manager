@@ -81,18 +81,18 @@ Full text. `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` carry a short summary in the
 ### The hub reads deploy/hub; promote to reach it
 
 - **The hub reads `deploy/hub`; promote to reach it (operator, 2026-11-07; supersedes the 2026-07-24 release-branch tracking).**
-  A release or feature branch does not reach the running hub until the operator runs `make hub-promote REF=<commit-ish>`
-  (CI-green commit on `origin`, typed confirmation, `hub-promote/<UTC>` tag), then `make appsets-check` and
-  `make platform-ops`. Before asking for a live check of anything ArgoCD or platform-ops deploys, confirm with
-  `make hub-promote-status` that the commit is promoted, and ask for a promote if not: config on the release branch
-  is inert until then. `make appsets-reapply` pins both stages to `deploy/hub` (hub first, `APPSETS_STAGE=hub` stops
-  there to soak); rerun it only when ApplicationSet manifests change. A new ApplicationSet must carry
-  `k3dm.k3d.io/rollout-stage`. `make platform-ops` applies the promoted tree, not the checkout, and fails closed when
-  `deploy/hub` is missing: the first promote is the bootstrap in `docs/howto/hub-promote.md`. Run it from the
-  operator's tmux (Keychain), then confirm `kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter`.
-  Rollback: `make hub-rollback`.
+  A release or feature branch does not reach the running hub until the operator runs `make hub-deploy REF=<commit-ish>`
+  from the operator's tmux (Keychain). The command requires typed confirmation, tags the promotion, reapplies
+  ApplicationSets only when changed, runs `appsets-check` and `platform-ops`, checks the exporter rollout, and
+  reinstalls changed installed launchd agents with a wired installer. Before asking for a live check, confirm with
+  `make hub-promote-status` that the commit is promoted, and ask for a promote if not. A new ApplicationSet must carry
+  `k3dm.k3d.io/rollout-stage`. The manual fallback is `make hub-promote REF=<commit-ish>`, `make appsets-reapply`
+  when ApplicationSets changed, `make appsets-check`, and `make platform-ops`; see `docs/howto/hub-promote.md`.
+  `make appsets-reapply` pins both stages to `deploy/hub`; `APPSETS_STAGE=hub` stops after the hub stage to soak.
+  `make platform-ops` applies the promoted tree and fails closed when `deploy/hub` is missing; the howto describes the
+  first-promote bootstrap. Rollback: `make hub-rollback`.
 
-Hub promote enforcement (moved from `CLAUDE.md` 2026-11-14; the rule is operator 2026-11-07, superseding 2026-07-24): green check runs and typed confirmation are enforced by `bin/k3dm-hub-promote` (`check_runs`, `show_and_confirm`); `k3dm.k3d.io/rollout-stage` on every ApplicationSet by `scripts/tests/plugins/argocd_appset_rollout_stage.bats`.
+Hub promote enforcement for `make hub-deploy REF=<commit-ish>` (moved from `CLAUDE.md` 2026-11-14; the rule is operator 2026-11-07, superseding 2026-07-24): green check runs and typed confirmation are enforced by `bin/k3dm-hub-promote` (`check_runs`, `show_and_confirm`); `k3dm.k3d.io/rollout-stage` on every ApplicationSet by `scripts/tests/plugins/argocd_appset_rollout_stage.bats`.
 
 ## Environment Constraints
 

@@ -31,8 +31,13 @@ make hub-deploy REF=<commit-ish>
 
 It keeps the typed `promote` confirmation, reapplies ApplicationSets only when
 their manifests changed, checks their values branch, applies platform resources,
-and waits for the vulnerability exporter rollout. If a step fails, fix it and
-rerun the same command; an already-current `deploy/hub` ref continues with the
+and waits for the vulnerability exporter rollout. After `platform-ops`, changed
+launchd agents installed on this host with a wired installer are reinstalled from
+a checkout locked at the promoted commit; a pending reinstall is retried by the
+next `bin/k3dm-hub-deploy <ref>` run, including a rerun of the same ref. A changed
+template without a wired installer is listed as `unwired` in the summary and must
+be reinstalled with its own setup command. If a step fails, fix it and rerun the
+same command; an already-current `deploy/hub` ref continues with the
 remaining steps.
 
 The individual commands remain available as a manual fallback:
