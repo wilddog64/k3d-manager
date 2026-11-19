@@ -388,3 +388,11 @@ interface:
   - "skipped: changed since scan (smaller)"
   - "service-stop / service-start / service-started / service-start-failed"
 ```
+
+## Operator requirement 4 (2026-11-19): a design document for the purge logic
+
+Operator: "document the logic in a proper document as logic looks a bit not easy to understand if there is no document".
+Rev 2 (M9a and M9b) adds `docs/purge.md` in the dirused repo and lists it under Files: the whole `/purge` decision path in
+one place (scan, list, dry run, confirm), every check in order with its status text, the held-file and Tomcat stop/start
+flow, the startup check, exit codes, and the purge log format, with a flow diagram. M9a writes the document for the existing
+logic plus held-file detection; M9b extends it with stop, delete, start and verify. The README links to it.
