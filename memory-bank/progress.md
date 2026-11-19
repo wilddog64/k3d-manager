@@ -198,3 +198,4 @@
 - 2026-11-18: plan 4 round 2 adjudicated (umbrella ## Re-review round 2): Fable + Astra both A, C not ready; agreed real bugs (socket under 0700, _wc_priv exits + sudo -n, first-install hostkey, revoke drill, spoofable listener, DoS, Match scan bypass). O3 decision presented to operator.
 - 2026-11-18: operator O3 = runtime only (O2 covers login/approval/promote; install/enrol trusted, named residuals). Round-3 rewrites of plans 1 and 4 started.
 - 2026-11-18: plan 4 v3 drafted (A 12/13/14/9, C 12/12/11/8, B v3 changes, umbrella OQ 1-13); acceptance verified (no unproved/dangling ids). Round-3 review next; plan 1 v3 still running.
+- 2026-11-18: plan 1 v3 drafted (1 11/7/9/5, 2a 13/8/7/3, 2b 9/7/7/3, 2c 14/8/9/6, 2d 14/9/11/3; order 1,2a,2d,2c,2b; umbrella Q1-Q20; tag creation blocked; residuals R2c-1..7); acceptance verified. Round-3 reviews running for both plans.
