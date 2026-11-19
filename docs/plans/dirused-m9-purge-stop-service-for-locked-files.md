@@ -106,3 +106,14 @@ the held files are the *current* ones, not old ones. The 2026-11-18 time is more
 open, which fits NTFS updating the directory-entry time lazily while a handle is open. A `/confirm` run would therefore
 likely get `failed: in use` on the two 11-04 files and free only the 9.8G file. This supports Amendment 1 (stop, delete,
 start) over "drop M9". Still owed: `handle.exe tomcat85-std` on ffm01 to confirm which process holds which file, and proofs 2–4.
+
+## Proof 4 partial evidence (operator screenshots, 2026-11-19)
+
+- `where handle.exe` → not found; `where sc.exe` → `C:\Windows\System32\sc.exe`. Sysinternals is not installed, so proof 1
+  falls back to Resource Monitor, and M9 cannot depend on `handle.exe` at run time. If dirused must name the process
+  holding a file, use the Windows Restart Manager API (`RmStartSession`/`RmRegisterResources`/`RmGetList`, built in).
+- The operator's account is an administrator but runs with a filtered UAC token; elevation is a UAC prompt (operator uses
+  `gsudo`). Open: a remote `sc \\host stop` runs over a network logon, where a domain admin normally gets the full
+  token without a local prompt (the account already reads `d$`, which needs it). To prove read-only before the spec:
+  from a non-elevated prompt, `sc.exe \\us03p02ffm01 qc tomcat85-std` and `sc.exe \\us03p02ffm01 sdshow tomcat85-std`
+  (the DACL shows whether Administrators hold stop rights, `RP`/`WP` in the `BA` entry).
