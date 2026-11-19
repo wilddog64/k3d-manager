@@ -51,8 +51,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
    2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md. Astra metrics P3 approved for dispatch
    ("yes for that"); gpt-6-astra $10/$1/$50 (third-party), gpt-6.2-astra unpublished -> allowlist only, unpriced.
    P3 filed: docs/bugs/2026-11-18-dispatch-metrics-astra-model-unknown-and-unpriced.md (waiting on Astra rates).
-1. DONE 2026-11-18: v0.5.7 subtree-pulled into k3d-manager `8fad0831` (vendored bats 79/79). Remaining: confirm
-   k3d-manager CI green on that head (all check-runs), then run_parallel bug Waiting on -> none.
+1. DONE 2026-11-18: v0.5.7 subtree-pulled `8fad0831`; CI 7/7 green on `11b3cc96`; run_parallel bug closed out.
    Also already done (progress.md): Astra metrics LANDED 34502bfe; push-reliability + DispatchMetricsStale live on hub.
 2. Child C (`dispatch-stall-c-diagnose`): E1-E4 CAPTURED 2026-11-18 on 2.1.328 (`scripts/tests/fixtures/claude-print/`,
    findings in the bug doc's last section). Next: rework the spec to tool-less single turn (plan 5 part 2; Grep/Glob
