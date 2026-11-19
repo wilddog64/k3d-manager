@@ -266,3 +266,25 @@ outside ForceCommand; revoke leaves sessions; machine lists and secrets transfer
 **Pair 9 read:** both rejected the spec, with heavy overlap and no false findings. Fable was the stronger reviewer here because it
 proved the lock bypasses empirically instead of arguing them; Astra rated more items as blockers, at similar cost (66K vs 68K).
 Keep Fable + Astra for critical specs.
+
+## Pair 10 — 2026-11-18, spec review: remote promote approval (v1.45.0 plan 1, hub), Fable and Astra, blind
+
+Same brief, same spec (`docs/plans/v1.45.0-remote-promote-approval.md` at `cb3ef345`). Fable: Agent subagent, 162,178 tokens,
+316 s, 16 tool uses, "not ready". Astra: codex `gpt-6.2-astra` read-only, 87,701 tokens, "not ready". Claude checked the
+intent gate (rc 1), `cloud_actions.py` length (52), `not-installed.list:2`, the fetch-then-resolve order (`bin/k3dm-hub-promote:322-323`)
+and the platform-ops archive pattern (`Makefile:1392-1396`).
+
+| Reviewer | Findings | Severity | Real, unique | Real, shared | Refuted |
+|---|---|---|---|---|---|
+| Astra | 15 | 6 blocker, 8 major, 1 minor | 3 (equivalent mutants such as `expires <= now`; no captured commit is green; `--wait-final` and Slack completion readers missing) | 12 | 0 |
+| Fable | 18 | 3 blocker, 7 major, 8 minor | 5 (reinstalls agents the hub deliberately skips; ahead check blocks 2 of the last 14 ordinary promotes, measured from tags; resolve before fetch; intent paragraph silently skips the evidence check; otpauth URI in tmux scrollback) | 12 | 0 |
+
+Shared: same-user forgery; Part 1 reinstalls from a stale checkout; rerun skips launchd; expiry and single use at consume;
+rc 2 walks back; state-machine gaps; Acceptance insufficient for a verifier; `## Files` scoping; Part 3 300 s poll versus
+the TOTP window; citations wrong again.
+
+**Pair 10 read:** both rejected the spec, with heavy overlap and no false findings. Fable measured against repo history
+(the hub-promote tags) and found the operational defects. Astra found the test-design defects (equivalent mutants,
+fixtures without proof). Fable cost nearly twice as much (162K vs 88K). The completing agent's "corrected citations"
+were themselves wrong: concatenated `cat -n` output gave wrong line numbers. Next time, verify the drafting agent's
+citations before a blind review.

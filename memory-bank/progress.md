@@ -186,3 +186,4 @@
 - 2026-11-18: unblocking 3 v1.45.0 plans (operator ask): plan 5 dispatch-stall-recovery set IN PROGRESS, intents per part (00220305); plan 4 web-console Fable + Astra blind review running; plan 1 remote-promote outline being completed into a spec (Channel A first, TOTP required), review after.
 - 2026-11-18: plan 4 review done, NOT READY (both reviewers, Pair 9); decisions D1-D5 owed by operator. Plan 1 spec committed cb3ef345; blind review running.
 - 2026-11-18: child C LANDED e05a08ed; E8 live PASS on M4 ($0.052646); operator judges correction. Plan 1 blind review done (both not ready).
+- 2026-11-18: plan 1 review recorded (Pair 10), decisions P1-P4 owed.
