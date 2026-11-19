@@ -190,7 +190,7 @@ Every other file keeps M8's strict checks.
 
 **Repo / branch:** wilddog64/dirused / `m9-purge-stop-tomcat` (from main 1eb1455, v0.0.22)
 **Version:** v0.0.23
-**Risk:** high — stops and starts a production service
+**Risk:** medium — stops and starts a production service, but only off-hours: the team restarts Tomcat after 7:00 PM (operator, 2026-11-19: "less risky than others but still need more care"). Review stays Fable + Astra blind.
 **Implementer:** Luna (Codex). **Verifier:** Claude. Live check: operator, maintenance window on us03p02ffm01.
 
 ## Problem
@@ -372,7 +372,7 @@ evidence:
   - id: E2
     proves: [M1, M3, M4, M6]
     kind: live
-    command: "operator, maintenance window, jump box: dry run over \\\\us03p02ffm01\\d$\\tomcat shows 'would delete after stopping tomcat85' for the held stderr/stdout files; then /confirm (prompt, answer y) frees them; dirused reports the startup line; operator confirms the app responds"
+    command: "operator, after 7:00 PM, jump box: dry run over \\\\us03p02ffm01\\d$\\tomcat shows 'would delete after stopping tomcat85' for the held stderr/stdout files; then /confirm (prompt, answer y) frees them; dirused reports the startup line; operator confirms the app responds"
     intent: In a window you choose, run it against ffm01, watch Tomcat stop, the big log files go, and Tomcat come back with its startup line.
 interface:
   - "/yes"
