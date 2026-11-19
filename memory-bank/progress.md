@@ -187,3 +187,4 @@
 - 2026-11-18: plan 4 review done, NOT READY (both reviewers, Pair 9); decisions D1-D5 owed by operator. Plan 1 spec committed cb3ef345; blind review running.
 - 2026-11-18: child C LANDED e05a08ed; E8 live PASS on M4 ($0.052646); operator judges correction. Plan 1 blind review done (both not ready).
 - 2026-11-18: plan 1 review recorded (Pair 10), decisions P1-P4 owed.
+- 2026-11-18: operator "all as recommended" for plan 1 P1-P4 and plan 4 D1-D5. Rewrites started: plan 1 -> Part 1, 2a, 2b specs; plan 4 -> A, C specs now, B after D5 captures.
