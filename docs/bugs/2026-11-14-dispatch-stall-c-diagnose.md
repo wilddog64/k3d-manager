@@ -6,7 +6,8 @@
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet 2026-11-14; reworked by Claude 2026-11-18 (tool-less single turn, from 2.1.328 captures); revised after Fable + Astra blind review 2026-11-18
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` part 2 (operator, 2026-11-14: "go with your recommendation")
-**Intent approved:** operator, 2026-11-18 — rework approved subject to Fable + Astra blind review (Claude adjudicates), then dispatch to Flash ("go ahead to rewrite Child C spec, and approve with Fable + Astra blind review then dispatch Flash"). Was: operator, 2026-11-14 (Read/Grep/Glob design).
+**Intent approved:** operator, 2026-11-18
+**Intent note:** rework approved subject to Fable + Astra blind review (Claude adjudicates), then dispatch to Flash ("go ahead to rewrite Child C spec, and approve with Fable + Astra blind review then dispatch Flash"). Was: operator, 2026-11-14 (Read/Grep/Glob design).
 **Introduced by:** pre-existing
 **Should have been caught by:** none
 **Prior art:** docs/bugs/2026-11-14-codex-dispatch-silent-running-raises-no-alert.md (parent) — child spec
