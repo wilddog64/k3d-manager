@@ -75,3 +75,24 @@ the old file" or is dropped. That is the operator's call once the proof is in.
 - Whether a tie between services is common on these hosts (several Tomcats under one folder).
 - The test seam: an `IServiceControl` fake for portable tests; a Windows test with a throwaway service is probably not
   possible on CI runners (service install needs admin). Check before writing the Acceptance block.
+
+## Amendment 1 (operator, 2026-11-19): scope and "starts without issue"
+
+Operator: "this include stop tomcat, delete largest files if there are tomcat logfiles and java heap dump, then start
+tomcat. ensure tomcat start without issue".
+
+- **Scope:** the service stop happens only when at least one locked file is a Tomcat log or a Java heap dump. Those are
+  files under the Tomcat install root matching `logs\*.log`, `logs\*.txt`, `*stdout*`, `*stderr*`, `catalina.out`, or
+  `*.hprof` / `java_pid*.hprof` anywhere under the root. A locked file of any other kind is reported
+  `failed: in use (not a Tomcat log or heap dump)` and never causes a stop. The exact list is settled with proof 1.
+- **"Starts without issue" means more than Running.** After the start, dirused waits until all three hold:
+  (a) the service is Running;
+  (b) the service is still Running after a settle period (default 60 s), so it has not crashed straight after starting;
+  (c) Tomcat's own startup line appears. A new `catalina.<date>.log` / `catalina.out` written after the start contains
+      `Server startup in`, and no `SEVERE` line appears between the start and that line.
+  An HTTP probe of the Tomcat connector (port from `conf\server.xml`) is optional and decided at spec review.
+- **If the start fails:** one automatic retry (stop, then start). If that also fails: exit 3 and a loud error naming the
+  host, the service and the last 20 lines of the catalina log. The purge log records `service-start-failed`. The
+  scheduled run (M10) records the same result in its run report.
+- **Proof owed, added to the list above:** proof 5. Where Tomcat writes its startup line on ffm01, and its exact text
+  (read-only: the newest `catalina.*.log`).
