@@ -1,13 +1,14 @@
 # dirused M10a.1: delete-list review fixes (Argon findings on PR #35)
 
 **Filed:** 2026-11-19
-**Status:** DRAFT — awaits operator intent approval
+**Status:** READY — operator approved 2026-11-19
 **Repo / branch:** wilddog64/dirused / `m10a-purge-delete-list` (on top of 7a48ec0, PR #35, not yet merged)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** `docs/plans/dirused-m10a-purge-delete-list.md` (rev 4)
 **Risk:** medium (delete feature; adds skip reasons and error handling only, never a new delete path)
 **Implementer:** Luna (Codex). **Verifier:** Claude.
-**Intent approved:** no
+**Intent approved:** operator, 2026-11-19
+Intent note: operator replied "approve" to the six fixes summarised in chat (2026-11-19).
 
 ## Problem
 
