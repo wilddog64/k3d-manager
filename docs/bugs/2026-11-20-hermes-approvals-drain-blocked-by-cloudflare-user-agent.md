@@ -7,7 +7,8 @@
 **Introducing change reviewed:** unknown
 **Waiting on:** dispatch — since 2026-11-20
 **Approval:** operator 2026-11-20 ("approve P1, and dispatch to Flash"; "go ahead with (a)": spec + dispatch, not a direct edit)
-**Intent approved:** operator, 2026-11-20 ("intents approve")
+**Intent approved:** operator, 2026-11-20
+**Intent approval note:** ("intents approve")
 **Prior art:** docs/plans/v1.44.0-hermes-slack-config-sensors.md (exact grep "User-Agent") — same Cloudflare rule, fixed for sensors only; `make find-similar-docs` unavailable (vector store needs the dead M4 k3d context)
 **Release:** v1.45.0 (P1 on the open release)
 
