@@ -1211,6 +1211,9 @@ def token_expiry_advisory(header_fetch, state, today, token=None, warn_days=14, 
     days = info["days"]
     horizon = f"in {days} day(s)" if days >= 0 else f"{abs(days)} day(s) ago"
     return (f"Hermes advisory: GitHub token {info['service']} expires {horizon} "
-            f"({info['expires_at']}). Renew as a no-expiration classic PAT "
-            f"(scopes: repo + workflow) in the same Keychain slot, then verify: "
-            f"bin/k3dm-hermes preflight.")
+            f"({info['expires_at']}). Renew: GitHub > Settings > Developer settings > "
+            f"Fine-grained tokens > this token > Regenerate token (keeps its scope: "
+            f"wilddog64/k3d-manager only, Actions read/write). Do not replace it with a classic "
+            f"PAT, which grants write to every repo. On the hub, store it with "
+            f"`security add-generic-password -U -a k3dm -s {info['service']} -w` "
+            f"(paste at the prompt), then verify: bin/k3dm-hermes preflight.")

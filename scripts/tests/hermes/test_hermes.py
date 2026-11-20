@@ -1885,6 +1885,9 @@ def test_token_expiry_advisory_dedup_and_silence():
     state = {}
     first = token_expiry_advisory(hdr, state, "2026-11-25", token="x", now=now)
     assert first is not None and "k3dm-hermes-gh-token" in first and "preflight" in first
+    assert "Regenerate token" in first and "Fine-grained" in first
+    assert "security add-generic-password -U -a k3dm -s k3dm-hermes-gh-token -w" in first
+    assert "no-expiration" not in first and "repo + workflow" not in first
     assert token_expiry_advisory(hdr, state, "2026-11-25", token="x", now=now) is None
     assert token_expiry_advisory(hdr, state, "2026-11-26", token="x", now=now) is not None
     far = token_headers({"github-authentication-token-expiration": "2027-06-01 00:00:00 UTC"})
