@@ -1,6 +1,6 @@
 # dirused: the delete list shows modification times in local time, readable at a glance
 
-**Status:** SPEC — written 2026-11-20, waiting on intent approval
+**Status:** SPEC — written 2026-11-20, intents approved, dispatching to Flash
 **Tracked:** dirused (OOB repo), not a k3d-manager release; no `docs/ideas.md` row (operator 2026-11-20).
 **Repo / branch:** wilddog64/dirused / task branch from main 2ca49a2 (v0.0.23)
 **Version:** v0.0.24
@@ -8,7 +8,7 @@
 times exactly, so the new format must read back to the same instant, down to the tick.
 **Implementer:** Flash or Luna, whichever slot is free (operator 2026-11-20). **Verifier:** Claude.
 **Filed:** 2026-11-20
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-20
 **Approval:** operator 2026-11-20 ("make LastWriteUtc human readable (local time base on setting) ... dispatch to either Flash or Luna")
 **Origin:** M9a E2 (operator, jump box, 2026-11-20): `type m9a.txt` shows `lastWriteUtc` as `2026-11-20T16:08:16.0126039Z`,
 which an operator in Pacific time has to convert by hand.
