@@ -1,4 +1,10 @@
-## Current state 2026-11-20 15:33 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 15:43 PST — v1.45.0 open — START HERE
+
+**Resume here after /clear (15:43):**
+- priv_open fix spec READY after Fable review (commit 29c28ad3): `docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md`. Waiting on operator **go** to dispatch to Flash (agy) — 3rd of 3 open dispatches (2c, 2e paused on Codex quota).
+- New P2 (operator set, 2026-11-20): `docs/bugs/2026-11-20-codex-quota-panels-no-data-on-premium-limit-record.md` — exporter takes newest rate_limits record even when limit_id=premium (null limits). Needs a fix spec (Acceptance + intents) in the doc; dispatch would be 4th open → wait for a land or operator approval to exceed WIP. Claude quota export fine (dry-run: 5h 5%, 7d 11%). Codex: weekly 100% until Tue 11-24 07:32 PST.
+- Web-console E11-E14 rerun after the priv_open fix lands; script kept at scratchpad wc/wc-live.sh (certs expire 22:59 tonight — regenerate).
+- tmux: leftover session 20261119035136 killed; root scratch dir removed.
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),

@@ -1,11 +1,11 @@
 # Bug: Codex quota panels show "No data" when the newest rate-limit record is a `premium` one
 
-**Status:** OPEN — captured 2026-11-20 from the operator's Agent activity dashboard screenshot, not triaged
-**Priority:** P2 (proposed; the quota panels go blank while the reading-age panel still counts, workaround: Codex `/status` or the session file)
+**Status:** OPEN — captured 2026-11-20 from the operator's Agent activity dashboard screenshot, priority set by the operator
+**Priority:** P2 (operator, 2026-11-20: "this should be a P2 because it originally had data but now disappears. I need to know claude and codex quota, especially codex as I didn't open its cli"); the quota panels go blank while the reading-age panel still counts, workaround: Codex `/status` or the session file
 **Introduced by:** pre-existing (the exporter assumes one rate-limit record shape)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-20
+**Waiting on:** dispatch — since 2026-11-20
 **Prior art:** exact-slug glob none; `make find-similar-docs` not run (unavailable on the M4 today, see the 2026-11-20 priv_open bug); grep for `rate_limits|k3dm_codex_quota` hit `docs/bugs/2026-11-07-claude-plan-quota-not-exported.md` and `docs/bugs/2026-11-14-quota-efficiency-panels-compare-only-last-two-readings.md` — titles read, different root cause (Claude quota export; panel comparison window)
 
 ## Symptom
