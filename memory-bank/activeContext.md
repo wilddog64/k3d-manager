@@ -1,4 +1,4 @@
-## Current state 2026-11-20 15:30 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 15:33 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -36,7 +36,7 @@ last 5 progress lines). Any edit to this section must also bump the header times
    LIVE-VERIFIED 2026-11-20 14:50 (Console $0.08 month = E1-E4 ~$0.03 + E9 $0.0015 + E8 $0.052646). Done.
 2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): 3 intents (E1-E3) listed to operator 2026-11-20 12:20,
    APPROVED by operator 14:34 (recorded in spec). Dispatch blocked: Makefile shared with paused 2c (one dispatch per file) and Codex quota until 2026-11-24 07:32.
-3. Web-console part A E11–E14 BLOCKED 2026-11-20 15:12 by new bug `docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md` (P2 proposed; `_wc_priv_open` checks with sudo /usr/bin/true, NOPASSWD in k3d-manager sudoers). Operator: stop until the fix lands; rerun all E11-E14 after. Fix spec written in the bug doc (P2, Claude-owned, intents E1-E4 approved 2026-11-20, scope adds _wc_revoke headless check); Fable spec review running; then dispatch to Flash (agy). Run script kept at scratchpad wc/wc-live.sh (fixed ls/stat, P3b trace). Was: operator at the keyboard
+3. Web-console part A E11–E14 BLOCKED 2026-11-20 15:12 by new bug `docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md` (P2 proposed; `_wc_priv_open` checks with sudo /usr/bin/true, NOPASSWD in k3d-manager sudoers). Operator: stop until the fix lands; rerun all E11-E14 after. Fix spec written in the bug doc (P2, Claude-owned, intents E1-E4 approved 2026-11-20, scope adds _wc_revoke headless check); Fable spec review NEEDS FIXES (2 blockers: E2 harness unbuildable via WC_BIN; E1 stub unfaithful) - all findings verified and adopted in the spec 15:33; open call now /bin/sleep 0, confirm _wc_priv_ticket (id -u == 0). Next: dispatch to Flash (agy) on operator go. Run script kept at scratchpad wc/wc-live.sh (fixed ls/stat, P3b trace). Was: operator at the keyboard
    with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,
    expired) and the part B scratch sshd enabled control, captures P2-P5, then reads redacted output. Order E11 -> E12 ->
    E13 -> E14 (E14 revoke last; uninstall removes the test CA). Plan Status fixed to "verify recorded" 2026-11-20.

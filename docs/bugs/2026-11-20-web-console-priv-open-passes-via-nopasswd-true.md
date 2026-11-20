@@ -1,11 +1,11 @@
 # Bug: `_wc_priv_open` reports a sudo ticket that does not exist on Macs with k3d-manager's sudoers
 
-**Status:** OPEN — captured 2026-11-20 during the web-console part A live check (E11 prerequisite P3); fix spec below, Fable review pending
+**Status:** OPEN — captured 2026-11-20 during the web-console part A live check (E11 prerequisite P3); fix spec below, revised after Fable review 2026-11-20
 **Priority:** P2 (Claude-owned per the P2/P3 split; install fails partway on a Mac with k3d-manager's sudoers, workaround: `sudo -v` first)
 **Introduced by:** 8faebd87 (web-console part A)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** dispatch — since 2026-11-20 (after Fable spec review)
+**Waiting on:** dispatch — since 2026-11-20
 **Prior art:** `docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md` (exact-slug glob none; `make find-similar-docs` unavailable, no cluster context; found by `grep -il "usr/bin/true"`) — read, different root cause: that bug added the `NOPASSWD: /usr/bin/true` rule on purpose so headless `sudo -n true` probes pass
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait ("I thought P3 bugs are waiting for grooming not P2"); dispatch to Flash, Fable reviews the spec first ("intents approve and send to Fable for review"). Target branch `k3d-manager-v1.45.0`; part A is unreleased, so this is a fix inside v1.45.0, not a patch release.
 **Intent approved:** operator, 2026-11-20 ("intents approve and send to Fable for review"; E1–E4). The approval came before Claude showed the text, so Claude showed the intents in the same session.
@@ -49,41 +49,85 @@ no ticket goes past the check and fails at its first real privileged step.
 
 ## Fix
 
-1. `_wc_priv_open` (`scripts/lib/web_console_common.sh:47`) keeps its first two branches unchanged: in fixture mode
-   it appends `priv_open` to `calls.log`, and with no terminal it prints the existing message and returns 10 without
-   calling sudo. It then makes two `_wc_priv` calls. Neither command may be granted NOPASSWD by `bin/install-sudoers.sh`
-   (today: `/usr/bin/true`, `k3d-manager-update-hosts`, `k3s*`, `systemctl`, `apt-get`, `dnf`, `yum`, `microdnf`).
-   - **Open:** a call with fd 0 and fd 1 still on the terminal, so `_run_command` uses interactive `sudo` and the
-     password prompt appears here. Suggested: `_wc_priv /usr/bin/id -u 1>&2 2>/dev/null`. The order matters:
-     `1>&2` first, so fd 1 points at the terminal that stderr was on. It must not print anything except at most
-     the uid.
-   - **Confirm:** `out=$(_wc_priv /usr/bin/id -u </dev/null 2>/dev/null)`. Both fds are off the terminal, so this
-     runs as `sudo -n` and needs a real ticket. Return 0 only if the call succeeds and `out` is exactly `0`.
-     Otherwise keep the existing message ("cached admin ticket not usable from a pipe…") and return 10. A failed
-     open also returns 10, as today.
-2. `_wc_revoke`'s headless branch (`bin/k3dm-web-console-sshd:375`) uses the same confirm call as its test,
-   ideally through a small shared helper in `web_console_common.sh` (for example `_wc_priv_ticket`). The message
-   and return code 10 stay the same.
-3. Fixture shim (`scripts/tests/bin/web_console_sshd.bats`, the python shim near line 440): `id` with `-u` prints
-   `0`, so fixture-mode `_wc_priv_open` still passes.
-4. Update the existing `[M3] tty opens a ticket…` test (line ~932). It pins the calls `/usr/bin/true` and
-   `-n /usr/bin/true`, and its stub fails every `sudo -n`, which is the opposite of the real host. Re-pin it to the
-   new calls.
+Revised 2026-11-20 after the Fable spec review (verdict NEEDS FIXES: 2 blockers, 5 should-fix; all were checked
+against the code and adopted).
+
+1. **`_wc_priv_open`** (`scripts/lib/web_console_common.sh:47`).
+   - Keep its first branch (`:48-53`) unchanged: in fixture mode it appends `priv_open` to `calls.log`; with no
+     terminal it prints the existing message and returns 10 without calling sudo.
+   - Replace the two `/usr/bin/true` lines (`:54-58`) with exactly these two lines:
+
+         _wc_priv /bin/sleep 0 2>/dev/null || return 10
+         _wc_priv_ticket || {
+
+     The `|| {` block keeps the existing message and `return 10`.
+   - **Open call.** `/bin/sleep 0` is silent and not granted NOPASSWD by `bin/install-sudoers.sh`. It is already in
+     the fixture tool list (`:38`). fd 0 and fd 1 are untouched, so `_run_command` runs interactive `sudo`, and the
+     password prompt appears here.
+2. **New helper `_wc_priv_ticket`** in `web_console_common.sh`, right after `_wc_priv_open`. It is the
+   confirm call. Its body is one line, shaped so it passes the static test at `web_console_sshd.bats:913-917`,
+   which requires `||`, `&&` or `; then` and a literal `2>/dev/null` on every `_wc_priv /` line:
+
+       local out; out=$(_wc_priv /usr/bin/id -u </dev/null 2>/dev/null) && [[ "$out" = 0 ]] || return 10
+
+   Both fds are off the terminal, so this runs as `sudo -n` and succeeds only with a real ticket. Output of exactly
+   `0` proves the command ran as root. `--quiet` hides only messages, `--soft` returns the real rc, and sudo's own
+   errors go to stderr, so nothing but the uid reaches `out`.
+3. **`_wc_revoke`'s headless branch** (`bin/k3dm-web-console-sshd:375`) becomes
+   `elif ! _wc_priv_ticket; then`. The message and return code 10 stay the same.
+4. **Fixture shim** (`scripts/tests/bin/web_console_sshd.bats`).
+   - Line 356 (`id`): with args `['-u']`, print `0`, or exit 1 when `get('ticket')=='closed'`. `-un` and the passwd
+     form stay as they are.
+   - Line 474: the `ticket=closed` knob currently fails only `true`. Move it so that it fails `id -u` as above, and
+     drop the `true` case. The headless-revoke test at `:987-989` must stay green unchanged.
+5. **Existing test `[M3] tty opens a ticket and confirms it works in a pipe`** (`:925`). It models
+   `timestamp_timeout=0`: the open call succeeds and every `-n` call fails, which is a legitimate case. Keep the stub
+   and the rc 10 and message assertions. Change only the two pinned strings at `:945-946`, to `/bin/sleep 0` and
+   `-n /usr/bin/id -u`.
 
 ## Contract readers
 
 `_wc_priv_open` is internal to web-console, and its return contract (0 / 10) does not change.
 
-- **Writer:** `scripts/lib/web_console_common.sh:47` (`_wc_priv_open`) — calls change from `/usr/bin/true` to the
-  open and confirm calls.
+- **Writers:**
+  - `scripts/lib/web_console_common.sh:54-58` (`_wc_priv_open`): the checks change.
+  - New `_wc_priv_ticket` in the same file.
 - **Readers:**
   - `bin/k3dm-web-console-sshd:374` (revoke, terminal branch), `:707` and `:722` (install and uninstall): unchanged,
-    still `|| return 10`.
-  - `bin/k3dm-web-console-sshd:375` (revoke, headless branch): its check changes, per item 2.
-  - `scripts/tests/bin/web_console_sshd.bats:117`, `:935` (heredoc caller), `:1424`, `:1426`: the no-terminal and
-    fixture paths are unchanged; the `[M3]` test at about line 932 is re-pinned, per item 4.
+    `|| return 10`.
+  - `bin/k3dm-web-console-sshd:375` (revoke, headless branch): changes to `_wc_priv_ticket`.
+  - `scripts/tests/bin/web_console_sshd.bats`:
+    - `:117`, `:935` (child-script caller), `:1424`, `:1426`: unchanged paths.
+    - `:925-947`: re-pinned (Fix item 5).
+    - `:987-989`: depends on the `ticket=closed` knob (Fix item 4).
+    - Shim `:356` and `:474`: change.
+    - Static test `:908-918`: constrains the new lines (Fix item 2).
 - **Not changed:** the `NOPASSWD: /usr/bin/true` rule (`bin/install-sudoers.sh:39`) stays. Headless k3d probes
   depend on it (`docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md`).
+
+## Test design (required, from the review)
+
+- **Stub form.** Both new tests use a `sudo()` shell function stub, as the existing test does at `:931`. A function
+  wins over PATH because `_run_command` calls bare `sudo`. The stub never execs its arguments. It appends `$*` to
+  a call log, then decides:
+  - **NOPASSWD rule** (`/usr/bin/true`, with or without `-n`): exit 0. It never touches the ticket file. Real host:
+    `sudo /usr/bin/true` opens no ticket.
+  - **Any other `-n` call:** exit 1 with `sudo: a password is required` on stderr unless the ticket file exists. With
+    the ticket file, `-n /usr/bin/id -u` prints `0` (or the value in `$WC_STUB_UID` when the test sets it) and exits
+    0; any other `-n` call exits 0 silently.
+  - **A non `-n` call for any other command:** "the password was typed". Create the ticket file and exit 0, unless
+    `$WC_STUB_DENY` is set, in which case exit 1 (wrong password).
+  - **Fixture assertions, first:** `type -t sudo` is `function`, and the ticket file is absent.
+- **E1 harness.** A child script, as at `:926-940`: source `system.sh` and `web_console_common.sh`, define the stub,
+  call `_wc_priv_open` and print its rc. Run it under `wc_pty_run`.
+- **E2 harness.** Do not run `"$WC_BIN" revoke`: `_wc_main_env` resets PATH and runs `unset -f sudo`, and fixture
+  mode replaces `_wc_priv` entirely.
+  - Source the script with the suite's existing pattern, `source "$WC_BIN"; wc_library` (as at `:782`). `main` is
+    guarded by `[[ "${BASH_SOURCE[0]}" = "$0" ]]`. Do not call `_wc_fixture_gate`, and do not set `K3DM_WC_ROOT`, so
+    `_wc_priv` stays the real `_run_command` path.
+  - Define the stub, and override `_wc_port_lookup`, `_wc_revoke_mark` and `_wc_stop` with sentinels that append
+    their name to a log and return 0. Then run `_wc_revoke </dev/null`.
+- **Tags.** Name new tests `[bug-2026-11-20] [E1] ...` and `[bug-2026-11-20] [E2] ...`, after the part A tag style.
 
 ## Acceptance
 
@@ -96,9 +140,9 @@ must:
   - id: M3
     text: Headless revoke (stdin or stdout not a terminal) continues past its ticket check only when the same sudo -n confirm call succeeds and prints 0; otherwise it exits 10 with "revoke needs an open sudo ticket or a terminal" and makes no other privileged call.
   - id: M4
-    text: Every privileged call still goes through _wc_priv / _run_command; there is no direct sudo in web_console_common.sh or bin/k3dm-web-console-sshd.
+    text: Every privileged call still goes through _wc_priv / _run_command; there is no direct sudo in web_console_common.sh or bin/k3dm-web-console-sshd; the commands the ticket check uses (/bin/sleep, /usr/bin/id) appear in no NOPASSWD line of bin/install-sudoers.sh.
   - id: M5
-    text: Unchanged paths stay unchanged - no terminal and no fixture returns 10 with no sudo call; fixture mode appends priv_open to calls.log and passes.
+    text: Unchanged paths stay unchanged - no terminal and no fixture returns 10 with no sudo call; fixture mode appends priv_open to calls.log and passes; ticket=closed still makes fixture headless revoke exit 10.
 must_not:
   - id: N1
     text: _wc_priv_open returns 0 when no sudo ticket exists and the sudoers grants NOPASSWD /usr/bin/true.
@@ -109,33 +153,34 @@ evidence:
     proves: [M1, M2, N1]
     kind: offline
     intent: On a Mac set up with make sudoers, the web-console install asks for your password at the start and only continues once sudo really works from a pipe, instead of skipping the prompt and failing halfway.
-    check: BATS under wc_pty_run with a PATH sudo stub modelled on the m4-air capture (2026-11-20, sudo 1.9.17p2, sudo -n -l shows NOPASSWD /usr/bin/true; sudo -n /usr/bin/true rc 0 with no ticket; sudo -n -v "a password is required") - sudo -n /usr/bin/true exits 0 always; any other sudo -n exits 1 with "sudo: a password is required" unless a scratch ticket file exists; a non -n call creates the ticket file and runs the command, printing 0 for /usr/bin/id -u. Fixture asserts first that the stub is the sudo on PATH and the ticket file starts absent. No ticket -> rc 0, the call log shows a non -n call for a non-NOPASSWD command before the -n confirm. Positive control - a stub whose non -n call fails (wrong password) -> rc 10. Pre-fix red - the same test against 8faebd87's _wc_priv_open returns 0 with no non -n call for a non-NOPASSWD command, so the test fails.
+    check: BATS child script under wc_pty_run with the Test design stub (modelled on the m4-air capture 2026-11-20, sudo 1.9.17p2 - sudo -n -l lists NOPASSWD /usr/bin/true; sudo /usr/bin/true and sudo -n /usr/bin/true exit 0 with no ticket and no prompt; sudo -n -v "a password is required"). Case A no ticket - rc 0, the ticket file exists afterwards (rc 0 implies ticket), and the call log has a non -n call for a non-NOPASSWD command before "-n /usr/bin/id -u". Case B (positive control) WC_STUB_DENY=1 - rc 10. Case C WC_STUB_UID=501 - rc 10 (uid must be exactly 0). Pre-fix red - with 8faebd87's _wc_priv_open (git show 8faebd87:scripts/lib/web_console_common.sh) case A returns 0 with no ticket file, so the test fails on behaviour, not on a call string.
   - id: E2
     proves: [M3, N2]
     kind: offline
     intent: A revoke run from a script with no open sudo session stops at once with a clear message, instead of starting and failing partway through.
-    check: BATS - headless revoke (stdin /dev/null) with the E1 stub and no ticket file exits 10 with the message and calls.log/stub log shows no privileged call after the check; positive control - with the ticket file present the check passes and revoke proceeds into the fixture. Pre-fix red - on 8faebd87 the no-ticket case passes the check.
+    check: BATS per the E2 harness - no ticket file, _wc_revoke </dev/null exits 10 with the message and the sentinel log is empty; positive control - ticket file present, the check passes and the _wc_port_lookup sentinel is logged. Pre-fix red - on 8faebd87's revoke check the no-ticket case reaches the sentinels.
   - id: E3
     proves: [M4, M5]
     kind: offline
     intent: The fix changes only the ticket check; the rest of the web-console safety checks still pass.
-    check: make test-bin-file or the full scripts/tests/bin/web_console_sshd.bats green, including the existing no-direct-sudo static test, the no-terminal test (line ~117) and fixture-mode install/revoke/uninstall tests; shellcheck clean on the touched files.
+    check: scripts/tests/bin/web_console_sshd.bats green in full, including the static test at :908-918 extended with an assertion that no NOPASSWD line of bin/install-sudoers.sh names /bin/sleep or /usr/bin/id, the no-terminal test at :117 extended to assert calls.log or the stub log is unchanged, the re-pinned [M3] test, and the ticket=closed revoke test at :987-989; shellcheck clean on the touched files.
   - id: E4
     proves: [M1, M2, N1]
     kind: live
     intent: On your M4, after sudo -k, make install-web-console-sshd with a throwaway CA asks for your password once at the start and finishes, with no "a password is required" errors.
-    check: operator on m4-air in tmux, Claude reading the pane - sudo -k, then the part A E11 install with a throwaway CA; one prompt at the start, install rc 0, make web-console-sshd-check rc 0; then the part A E11-E14 rerun and uninstall PURGE=1.
+    check: mandatory before LIVE-VERIFIED (it is the only proof that a ticket opened on the tty is usable by sudo -n with fds redirected). Operator on m4-air in tmux, Claude reading the pane - sudo -k, then the part A E11 install with a throwaway CA; one prompt at the start, install rc 0, make web-console-sshd-check rc 0; then the part A E11-E14 rerun and uninstall PURGE=1.
 interface:
   - _wc_priv_open -> 0 | 10 (unchanged)
+  - _wc_priv_ticket -> 0 | 10 (new, internal)
   - k3dm-web-console-sshd revoke headless -> exit 10 + "revoke needs an open sudo ticket or a terminal" (unchanged text)
 ```
 
 ## Files
 
-- `scripts/lib/web_console_common.sh` — `_wc_priv_open`, plus the optional `_wc_priv_ticket` helper.
+- `scripts/lib/web_console_common.sh` — `_wc_priv_open` and the new `_wc_priv_ticket`.
 - `bin/k3dm-web-console-sshd` — the headless check in `_wc_revoke` only.
-- `scripts/tests/bin/web_console_sshd.bats` — the shim's `id -u`, the re-pinned `[M3]` test, and new E1/E2 tests.
-- `CHANGELOG.md` — one Fixed line under the v1.45.0 section.
+- `scripts/tests/bin/web_console_sshd.bats` — shim lines 356 and 474, the re-pinned `[M3]` test, the extended static and no-terminal tests, and new E1/E2 tests.
+- `CHANGELOG.md` — one line under `## [Unreleased]` → `### Fixed`.
 
 ## Worker definition of done
 
