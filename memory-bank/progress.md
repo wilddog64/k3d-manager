@@ -79,3 +79,4 @@
 - 2026-11-20 12:38: 2c and 2e Astra round 5 both exited 1 at 12:37: codex usage limit, resets 2026-11-24 07:32 (blocks Astra and Luna). Partial, uncommitted in worktrees: 2c daemon + client(116) + authority(170) + howto + Makefile/not-installed.list, tests unknown; 2e 13 files +458/-245 + 5 new tests. Gates not run clean. Waiting on operator decision (wait for reset / agy / Claude finishes).
 - 2026-11-20 13:38: dirused PR #39 merged a2d0508 (operator, 21:37Z). M9b dispatch closed via abandon (land blocked by false VIOLATION bug; reason records landed via PR). WIP 2/3 (2c, 2e quota-stopped). Next: main CI, tag v0.0.26.
 - 2026-11-20 13:50: dirused main CI green on a2d0508; tag v0.0.26 pushed at a2d0508 (operator go); release build running.
+- 2026-11-20 13:52: dirused v0.0.26 released (pre-release, win-x64/arm64 zips + .sha256, run 44823783100). Waiting on operator M9b E2 live check after 19:00 PT.
