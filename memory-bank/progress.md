@@ -1,5 +1,6 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
+- 2026-11-19: remote-promote 2a approval store landed e826f6f8, verified (offline). dirused: merged branches deleted, only main remains.
 - 2026-11-19: bugs dashboard Earliest/Latest stat panels get fixed text.valueSize 20 (fd9bc6a4; operator: Latest wrapped). Live after next promote.
 - 2026-11-19: hub-deploy-self-update landed 3b541f3b and verified (offline); live E2 after the next promote.
 - 2026-11-19: 2a spec amended (pre-read approve refusals carry kept); plan-status + 2a sent back with corrections (verifier coverage gaps). Trial: Sonnet caught plan-status test gaps Claude missed.
