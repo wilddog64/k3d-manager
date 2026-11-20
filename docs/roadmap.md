@@ -603,6 +603,8 @@ Branch `k3d-manager-v1.45.0`, cut from `main` after v1.44.0 merges (it depends o
 
 **v1.45.0 plan 5:** [`dispatch-stall-recovery`](plans/v1.45.0-dispatch-stall-recovery.md) (operator, 2026-11-14: "go with your recommendation"). When a dispatch hangs, stop it safely, have headless Claude diagnose it and write a correction paid from the API key, ask the operator Approve/Deny in Slack with the correction shown, then resume; a Stall recovery row on the Agent Dispatch dashboard. The detection half ships in the v1.44.1 patch (`docs/bugs/2026-11-14-dispatch-stall-a-detector.md`).
 
+**v1.45.0 plan 6 (cap exception, operator 2026-11-20: "let make an exception for v1.45.0 as decoupling help future multiple project management"):** [`make-up-app-none`](plans/v1.45.0-make-up-app-none.md): `make up APP=none` launches bare ACG nodes (no k3s, hub, Vault, ArgoCD or apps), the first step of decoupling apps from `make up`. Follow-on plan (not v1.45.0): `OS=linux|win` and `NODE_COUNT` 2-5. SPEC rev 3; blind review and intent pending.
+
 ### Candidate milestone — v1.46.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
