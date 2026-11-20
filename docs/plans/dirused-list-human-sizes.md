@@ -1,6 +1,6 @@
 # dirused: the delete list shows sizes a person can read (minsize=1GB, a size column)
 
-**Status:** SPEC — written 2026-11-20, intents approved, dispatching to Flash
+**Status:** VERIFIED 2026-11-20 — LANDED dirused@67ce6ee (Flash) 2026-11-20; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, 12 new tests red on 2e62aed, mutants red; 188/188; Claude fixed Windows test column count (spec defect) f491e45; CI 4/4 green; Argon blind no findings; PR #38 merged c91e9b7, tag v0.0.25. E2 (operator, jump box) pending
 **Tracked:** dirused (OOB repo), not a k3d-manager release; no `docs/ideas.md` row (OOB, as for v0.0.24).
 **Repo / branch:** wilddog64/dirused / task branch from main 2e62aed (v0.0.24)
 **Version:** v0.0.25
