@@ -7,9 +7,9 @@ PID-reuse P3; run_parallel investigation and its test-only fixes upstream.
 - Travel bundle LANDED `ddd9329e..d14b5d9e`; test-all metrics LANDED `64a8de5c` — both await live checks (below).
 - Land PID-reuse P3 VERIFIED `ca27c8bf` (`docs/bugs/2026-11-18-codex-dispatch-land-refuses-on-reused-pid.md`): pre-fix
   tests 1-2 red, guard-forced-false turns 3 red; land+resume bats + shellcheck green. Offline-only fix, no live check.
-- run_parallel: lib-foundation `7027b38` on `release/v0.5.7` (test-only; Claude reproduced date-shim and worker-mutation
-  proofs). **Release PR wilddog64/lib-foundation#89 OPEN** (normal PR; CHANGE.md v0.5.7 `## [v0.5.7] — 2026-11-18`).
-  Bug doc LANDED, Waiting on: live check (Linux CI on #89). #157 root cause still unknown.
+- run_parallel: DONE. P2 flake VERIFIED (lib-foundation PR #89 merged 2026-11-18, root cause uutils `mkdir` on ubuntu-26.04,
+  fixed with noclobber lock claims; subtree-pulled `8fad0831`; k3d-manager CI 7/7). P3 follow-up
+  `docs/bugs/2026-11-18-lib-foundation-run-parallel-claim-loop-unbounded-and-key-edge-cases.md` waits on grooming 2026-11-22.
 - `k3dm-anthropic-api-key` present on m4-air (pulled from m5-air.local via `bin/k3dm-machine-secrets pull --repo`).
 - Dispatch WIP 0/3.
 
