@@ -29,3 +29,4 @@
 - 2026-11-20 (morning): 3 ideas rows for grooming (rework_ratio + operator time, required reviewed field, weekly live-check slot), operator ask.
 - 2026-11-20 (morning): CI lint red on 82d105e4 (6 pyflakes: 2 unused datetime imports in bin/k3dm-dispatch-recover from child B, 4 in test_promote_mover.py from Luna 412e59be). Claude miss: linted 2d before the correction and never ran pinned ruff on child B. Fixed (claude_edit after land); lint clean, 91 + 18 tests pass.
 - 2026-11-20 (morning): "other" in Tokens by repo traced (6.45 M = one dispatch whose worktree version v1.44.0 differs from its ledger version v1.44.1); appended to the tokens-by-repo P3.
+- 2026-11-20 06:49: CI green on 9d7973b6 (7/7). Promote SHA given to operator: 9d7973b62d04063c4af905da3909567fbcbaf596. Docs-only commits pushed after.
