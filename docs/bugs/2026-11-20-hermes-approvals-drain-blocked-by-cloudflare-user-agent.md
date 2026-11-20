@@ -1,11 +1,11 @@
 # Bug: the approvals drain is blocked by Cloudflare (Python's default User-Agent), so every Slack Approve is silently lost
 
-**Status:** OPEN — spec written 2026-11-20, dispatch to Flash approved by operator
+**Status:** VERIFIED 2026-11-20 — LANDED 970aeb23 on k3d-manager-v1.45.0 (Flash; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, pre-fix 3 assertion reds, mutants a–e red); E4 live passed (Claude, m4-air, 16:29Z); E5 pending promote
 **Priority:** P1 (operator, 2026-11-20: "approve P1, and dispatch to Flash") — blocks the v1.45.0 release PR
 **Introduced by:** pre-existing (`scripts/lib/hermes/approvals.py`, v1.33.0 4b6ce874; Cloudflare UA block first recorded 2026-11-13)
 **Should have been caught by:** spec (v1.44.0 `docs/plans/v1.44.0-hermes-slack-config-sensors.md` found the rule, capture 3b, but fixed only the sensors; child B `docs/bugs/2026-11-14-dispatch-stall-b-approval.md` reused `approvals.py` without the header)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-20
+**Waiting on:** live check — since 2026-11-20
 **Approval:** operator 2026-11-20 ("approve P1, and dispatch to Flash"; "go ahead with (a)": spec + dispatch, not a direct edit)
 **Intent approved:** operator, 2026-11-20
 **Intent approval note:** ("intents approve")
@@ -92,3 +92,17 @@ interface:
 - Mutation: in a scratch copy, drop the header from each of the three requests in turn and show the matching test goes red.
 - Lint: the pinned ruff the CI uses (`make lint` or the repo's pyflakes step) on the changed files; no unused imports.
 - Paste each command, rc and proving lines; list every error seen. Leave changes uncommitted; do not push; no live check (E4, E5 belong to Claude and the operator); do not touch `docs/bugs/`.
+
+## Live evidence
+
+E4 (Claude, m4-air.local, 2026-11-20T16:29:16Z, relay `https://k3dm-slack-relay.k3dm.workers.dev/hermes/approvals`, M4 Keychain
+drain token present, 64 chars, never printed; probe `e4_probe.py` imports the landed `scripts/lib`):
+
+| Request | Result |
+|---|---|
+| control: Bearer token, no User-Agent (urllib default) | 403 `cloudflare`, `error code: 1010` |
+| Bearer token, `User-Agent: k3dm-hermes/1` | 200 |
+| `fetch_approvals(url, token)` (landed code) | list of 0 items (empty queue, not a swallowed 403) |
+
+E5 still open: child B E9 rerun on a fresh toy card (operator presses Approve), then `make hub-deploy REF=970aeb23` and a Hermes
+`r` approval drained on the M5.
