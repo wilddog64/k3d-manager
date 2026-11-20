@@ -776,7 +776,7 @@ install_fixture() {
 }
 
 @test "P1 launchd table covers the templates and exclusions match setup" {
-  expected='alertmanager-auth-proxy alertmanager-port-forward cleanup cloud-bridge dispatch-metrics dispatch-stall-watch heartbeat hermes hub-data-export hub-loki-port-forward hub-pushgateway-port-forward hub-snapshot node-health-watch password-bundle prometheus-auth-proxy prometheus-credential-rotator prometheus-port-forward repo-sync sandbox-reaper test-metrics vault-failover vault-port-forward webhook webhook-token-rotate'
+  expected='alertmanager-auth-proxy alertmanager-port-forward cleanup cloud-bridge dispatch-metrics dispatch-stall-watch heartbeat hermes hub-data-export hub-loki-port-forward hub-pushgateway-port-forward hub-snapshot node-health-watch password-bundle prometheus-auth-proxy prometheus-credential-rotator prometheus-port-forward repo-sync sandbox-reaper test-metrics vault-failover vault-port-forward web-console-sshd webhook webhook-token-rotate'
   actual="$(for path in "$REPO"/scripts/etc/launchd/com.k3d-manager.*.plist.tmpl; do
     name="${path##*/com.k3d-manager.}"
     printf '%s\n' "${name%.plist.tmpl}"
