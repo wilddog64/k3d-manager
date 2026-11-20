@@ -1,7 +1,8 @@
 # dirused M9: /purge stops the service holding a locked file, deletes it, and starts the service again
 
-**Status:** DRAFT rev 1 (spec below, 2026-11-19) — proofs 1–5 in; next spec review (Fable + Astra blind: high risk, it
-stops a production service), then operator intent approval, then dispatch
+**Status:** SPLIT 2026-11-19 — rev 1 reviewed (Fable FIX, Astra REWORK), adjudicated below; M9a (read-only detection)
+is `docs/plans/dirused-m9a-held-file-detection.md`; M9b (stop/delete/start) is outlined below and is specced after M9a's
+live check
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Depends on:** M8 (`docs/plans/dirused-m8-purge-largest-files.md`) merged and released.
 **Filed:** 2026-11-18
@@ -396,3 +397,37 @@ Rev 2 (M9a and M9b) adds `docs/purge.md` in the dirused repo and lists it under 
 one place (scan, list, dry run, confirm), every check in order with its status text, the held-file and Tomcat stop/start
 flow, the startup check, exit codes, and the purge log format, with a flow diagram. M9a writes the document for the existing
 logic plus held-file detection; M9b extends it with stop, delete, start and verify. The README links to it.
+
+## Adjudication of the rev 1 reviews (Claude, 2026-11-19)
+
+Reviews: `~/.local/share/k3d-manager/reviews/dirused-m9/m9-review-fable.md` (FIX) and `m9-review-astra.md` (REWORK).
+Both recommended a split. Every finding below is taken. Where it lands is in the last column.
+
+| Finding | Source | Decision | Lands in |
+|---|---|---|---|
+| Startup check matches wall-clock lines: time zone, shutdown SEVERE noise, stale mtime, two quick starts | Fable B1, Astra B8 | Taken: record catalina.*.log names and lengths before Start, read only appended bytes or a new file; proof owed: SEVERE lines at recorded starts | M9b |
+| Service state outcomes: retry a Running service, Stop refused, STOP_PENDING, 1056, cancelled recovery, log write before Start, later hosts after a failed start | Fable B2, Astra B6/B7 | Taken: retry only when not Running; Running + log check failed = report, exit 3, no bounce; Stop refused = skip Start; CancellationToken.None in recovery; Start before any log write; later groups "not attempted"; restart only what this run stopped | M9b |
+| Held file passes the age rule only through a stale directory time | Fable B3 | Operator D1: held redirect logs are exempt from the age rule | M9a §5 |
+| Scan rows not identity-checked; prompt with no held row of known identity; no revalidation before Stop | Astra B1/B4 | Taken: scan-row ID check (M9a §6), ID equality measured live (M9a §4.6); require one held row with valid ID, revalidate before Stop and on the delete handle | M9a, M9b |
+| `//RS//` is any procrun service, error 32 any holder; broad patterns; hprof unattributed | Astra B2, Fable M5/M6 | Taken: patterns narrowed to `<Name>-stdout/stderr.*.log` in `<root>\logs`; operator D2: a held hprof never causes a stop | M9a §4 |
+| Mapped/subst drives, quoted binary path | Astra B3, Fable M7 | Taken: only DRIVE_FIXED letters map local; quoted path parsed | M9a §2-3 |
+| Stop rights checked only at Stop; SCM over-privileged; 1051 | Astra B5, Fable m17 | Taken: M9a uses query rights only; M9b opens one handle with stop+start+query before stopping; 1051 = failed stop | M9a §2, M9b |
+| 19:00-06:00 not enforced under `/yes`; non-affirmative input; list not shown before the question | Fable M12, Astra M9 | Taken: window enforced under `/yes`, `y`/`yes` only, full list shown first; switch name decided in M9b | M9b |
+| Dry run and confirm disagree for a grown held row; probe failure silent; ProgramPurgeTests.cs:314 | Fable M4, Astra M10 | Taken | M9a §5, Contract readers |
+| Start failure exit 3 hidden by exit 4 at Program.cs:157/:186 | Fable M8, Astra M11 | Taken: `PurgeRun.ServiceStartFailed`, takes precedence | M9b |
+| Clock/delay seams; RunWithPurge seams; Program tests | Fable M9 | Taken: services/drive seams in M9a; clock/delay/input in M9b | M9a, M9b |
+| No real-Windows tests | Fable M10 | Taken: ProbeHeld vs Open on windows-latest (M9a E1W); `sc create` throwaway service (M9b) | M9a, M9b |
+| Vacuous Acceptance items, E2 overclaims, mutants per invariant, invalid-only group control | Fable M11, Astra M14 | Taken: M9a Acceptance rewritten with paired controls and named mutants | M9a, M9b |
+| Missing readers: PurgeList.cs:47 writer, ArgParser KnownSwitches :16, /fromlist whitelist :116, UsageText | Fable, Astra | Taken: one `IsWouldDelete` predicate (M9a); switch readers in M9b | M9a, M9b |
+| Stale line refs Purge.cs:254, :149 | Fable | Taken: now :264, :148-157 | M9a |
+| Abnormal exit leaves Tomcat stopped | Fable | Taken: document `sc \\host start tomcat85` in docs/purge.md; warn on next run | M9b |
+
+## M9b outline (specced after M9a lands and its E2 runs)
+
+M9b goes to Luna after M9a merges (both touch Purge.cs). It uses M9a's E2 facts: the scan ID equals the handle ID, and
+the SCM list works over the jump box's rights. Scope: open one service handle with stop+start+query; Stop, wait for
+Stopped, recheck held rows by ID, delete, Start, then the byte-offset startup check with one retry only when not
+Running; the operator prompt with the full list; `/yes` (or a renamed switch) only inside 19:00-06:00;
+`PurgeRun.ServiceStartFailed` exit 3 taking precedence over 4; new purge log lines; recovery note and next-run warning;
+a Windows CI test against a throwaway `sc create` service; docs/purge.md extended. Proof owed before M9b's spec: SEVERE
+lines present at the recorded ffm01 starts, from catalina.*.log.
