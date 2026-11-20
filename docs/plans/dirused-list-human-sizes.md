@@ -1,6 +1,7 @@
 # dirused: the delete list shows sizes a person can read (minsize=1GB, a size column)
 
-**Status:** VERIFIED 2026-11-20 — LANDED dirused@67ce6ee (Flash) 2026-11-20; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, 12 new tests red on 2e62aed, mutants red; 188/188; Claude fixed Windows test column count (spec defect) f491e45; CI 4/4 green; Argon blind no findings; PR #38 merged c91e9b7, tag v0.0.25. E2 (operator, jump box) pending
+**Status:** LIVE-VERIFIED 2026-11-20 — E2 PASS 2026-11-20 (operator, jump box 09:16 PST): v3 m9a3.txt minsize=1GB, size column 138G/9.8G/8.5G; /fromlist m9a3.txt and v2 m9a2.txt both same 3 rows, 0 skipped. Earlier: LANDED dirused@67ce6ee (Flash) 2026-11-20; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, 12 new tests red on 2e62aed, mutants red; 188/188; Claude fixed Windows test column count (spec defect) f491e45; CI 4/4 green; Argon blind no findings; PR #38 merged c91e9b7, tag v0.0.25.
+**Live evidence:** 2026-11-20 · operator jump box us03p02ffm01 · dirused v0.0.25/0.0.25 · commit c91e9b7 · proves E2
 **Tracked:** dirused (OOB repo), not a k3d-manager release; no `docs/ideas.md` row (OOB, as for v0.0.24).
 **Repo / branch:** wilddog64/dirused / task branch from main 2e62aed (v0.0.24)
 **Version:** v0.0.25

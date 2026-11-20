@@ -1,6 +1,7 @@
 # dirused: the delete list shows modification times in local time, readable at a glance
 
-**Status:** VERIFIED 2026-11-20 — LANDED dirused@aa41dc0 (Flash), PR #37 merged 2e62aed, tag v0.0.24; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, mutants a–g red, 169/169 (also TZ Tokyo, Los Angeles); Windows CI green; Argon blind review clean. Claude moved the CHANGELOG entry under [Unreleased]. E2 partial 2026-11-20 08:50 PST: v2 header and Pacific lastWrite confirmed on the jump box; /fromlist replays (m9a2.txt, old m9a.txt) still to show
+**Status:** LIVE-VERIFIED 2026-11-20 — E2 PASS 2026-11-20 (operator, jump box): v2 list m9a2.txt with Pacific -08:00 times; /fromlist m9a2.txt /purge on v0.0.25 same 3 rows, 0 skipped. Earlier: LANDED dirused@aa41dc0 (Flash), PR #37 merged 2e62aed, tag v0.0.24; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, mutants a–g red, 169/169 (also TZ Tokyo, Los Angeles); Windows CI green; Argon blind review clean. Claude moved the CHANGELOG entry under [Unreleased].
+**Live evidence:** 2026-11-20 · operator jump box us03p02ffm01 · dirused v0.0.24/0.0.25 · commit 2e62aed · proves E2
 **Tracked:** dirused (OOB repo), not a k3d-manager release; no `docs/ideas.md` row (operator 2026-11-20).
 **Repo / branch:** wilddog64/dirused / task branch from main 2ca49a2 (v0.0.23)
 **Version:** v0.0.24

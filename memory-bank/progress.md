@@ -50,3 +50,5 @@
 - 2026-11-20: PR #38 Windows CI red: tests/Dirused.Tests/ProgramPurgeTests.cs:292 asserted 6 columns (Windows-only suite, missed in spec Contract readers = spec defect, not Flash). Claude fixed 6->7 in dirused@f491e45, pushed; Argon blind review: no findings. CI rerunning.
 - 2026-11-20: dirused PR #38 merged c91e9b7 (CI 4/4 green on f491e45, Argon no findings); tag v0.0.25 pushed; release build running. Next: operator E2 on jump box.
 - 2026-11-20: dirused v0.0.25 released (win-x64/arm64 zips + .sha256). Waiting on operator E2 (jump box).
+- 2026-11-20: dirused v0.0.25 E2 steps 1-3 PASS (operator 09:16 PST): update 0.0.24->0.0.25, m9a3.txt v3, minsize=1GB, size col 138G/9.8G/8.5G beside exact bytes, /fromlist m9a3.txt /purge same 3 rows+statuses, 0 skipped. Outstanding: /fromlist m9a2.txt /purge (v2 replay) for both v0.0.24 and v0.0.25 E2.
+- 2026-11-20: dirused v0.0.24 and v0.0.25 LIVE-VERIFIED: /fromlist m9a2.txt (v2) on 0.0.25 reads, same 3 rows, 0 skipped; v3 E2 passed earlier. Both plans closed.
