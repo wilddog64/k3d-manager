@@ -5,7 +5,9 @@
 **Introduced by:** pre-existing (design of `bin/k3dm-hub-deploy`, which runs from `$REPO_ROOT`, the hub checkout)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-19
+**Waiting on:** dispatch — since 2026-11-19
+**Triage:** operator, 2026-11-19: "go ahead to file a P2 bug then dispatch to Luna if there is a free slot"
+**Spec:** `docs/plans/hub-deploy-self-update-one-command.md`
 **Prior art:** `docs/bugs/2026-11-06-hub-code-lag-invisible-and-no-catch-up-step.md` (not scored: `make find-similar-docs` vector store unavailable on the M4) — read, related: that fix made lag visible and added catch-up steps, not a self-update of hub-deploy; `docs/bugs/2026-11-12-hub-checkout-stops-following-deploy-hub-and-promote-guard-fails-open.md` — read, different root cause
 **Filed:** 2026-11-19
 
