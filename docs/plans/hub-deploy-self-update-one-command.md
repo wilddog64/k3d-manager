@@ -1,6 +1,6 @@
 # hub-deploy fetches, catches the checkout up and re-execs its promoted copy: one promote command
 
-**Status:** READY rev 2 — Fable + Astra blind reviews of rev 1 (both FIX) adjudicated, 2026-11-19
+**Status:** VERIFIED — 3b541f3b, 2026-11-19 (Sonnet Acceptance verifier + Claude: 42/42, pre-fix 8 red, 5 mutants red); E2 live check waits on promote
 **Bug:** `docs/bugs/2026-11-19-hub-deploy-runs-stale-checkout-copy-of-itself.md` (P2)
 **Risk:** medium — changes `bin/k3dm-hub-deploy` control flow before appsets-check/platform-ops on the hub
 **Agent:** Luna (codex gpt-6-luna)

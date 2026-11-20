@@ -1,11 +1,11 @@
 # hub-deploy runs the hub checkout's old copy of itself, so a promote that changes the deploy path needs a second promote, and the operator's command differs between promotes
 
-**Status:** OPEN — captured 2026-11-19, not triaged
+**Status:** VERIFIED — 3b541f3b, 2026-11-19 (offline E1); live E2 pending
 **Priority:** P2 — a promote applies, but new deploy-path behaviour (Part 1 launchd reinstall) waits for a second run; workaround: wait for repo-sync (up to 5 min) and run `make hub-deploy REF=<sha>` again
 **Introduced by:** pre-existing (design of `bin/k3dm-hub-deploy`, which runs from `$REPO_ROOT`, the hub checkout)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-19
+**Waiting on:** live check — since 2026-11-19
 **Triage:** operator, 2026-11-19: "go ahead to file a P2 bug then dispatch to Luna if there is a free slot"
 **Spec:** `docs/plans/hub-deploy-self-update-one-command.md`
 **Prior art:** `docs/bugs/2026-11-06-hub-code-lag-invisible-and-no-catch-up-step.md` (not scored: `make find-similar-docs` vector store unavailable on the M4) — read, related: that fix made lag visible and added catch-up steps, not a self-update of hub-deploy; `docs/bugs/2026-11-12-hub-checkout-stops-following-deploy-hub-and-promote-guard-fails-open.md` — read, different root cause
