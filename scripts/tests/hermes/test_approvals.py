@@ -236,3 +236,38 @@ def test_dispatch_id_pattern_is_opt_in_for_fetch_and_delete():
     assert approvals.delete_approval("https://relay", "tok", d_item["action_id"], opener,
                                      id_pattern=approvals.DISPATCH_ACTION_ID_RE)
     assert len(deleted) == 2
+
+
+def test_fetch_and_delete_approvals_send_user_agent_and_isolate_token():
+    # E1 proves [M1, M2, N1, N2]
+    calls = []
+    token = "secret-token-12345678"
+    approvals.fetch_approvals("https://relay/hermes/approvals", token, fake_opener(calls))
+    assert len(calls) == 1
+    _url, method, headers, _data = calls[0]
+    assert method == "GET"
+    headers_lower = {k.lower(): v for k, v in headers.items()}
+    assert headers_lower.get("user-agent") == "k3dm-hermes/1"
+    assert headers_lower.get("authorization") == f"Bearer {token}"
+    for header, value in headers.items():
+        if header.lower() != "authorization":
+            assert token not in str(value)
+
+    del_calls = []
+    approvals.delete_approval("https://relay/hermes/approvals", token, "r2-0123abcd", fake_opener(del_calls))
+    assert len(del_calls) == 1
+    _del_url, del_method, del_headers, _del_data = del_calls[0]
+    assert del_method == "DELETE"
+    del_headers_lower = {k.lower(): v for k, v in del_headers.items()}
+    assert del_headers_lower.get("user-agent") == "k3dm-hermes/1"
+    assert del_headers_lower.get("authorization") == f"Bearer {token}"
+    for header, value in del_headers.items():
+        if header.lower() != "authorization":
+            assert token not in str(value)
+
+
+def test_approvals_user_agent_is_sensors_hermes_user_agent():
+    # E3 proves [M4, N3]
+    from hermes import sensors
+    assert approvals.HERMES_USER_AGENT is sensors.HERMES_USER_AGENT
+    assert approvals.HERMES_USER_AGENT == "k3dm-hermes/1"

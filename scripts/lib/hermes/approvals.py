@@ -10,6 +10,8 @@ import re
 import urllib.parse
 import urllib.request
 
+from hermes.sensors import HERMES_USER_AGENT
+
 APPROVAL_DRAIN_SERVICE = "k3dm-hermes-approval-drain-token"
 ACTION_ID_RE = re.compile(r"^r[0-9]+-[0-9a-f]{8}$")
 DISPATCH_ACTION_ID_RE = re.compile(r"^d[0-9]+-[0-9a-f]{8}$")
@@ -26,7 +28,8 @@ def fetch_approvals(drain_url, token, opener=urllib.request.urlopen, timeout=10,
     if not _usable(drain_url, token):
         return []
     request = urllib.request.Request(drain_url, method="GET",
-                                     headers={"Authorization": f"Bearer {token}"})
+                                     headers={"Authorization": f"Bearer {token}",
+                                              "User-Agent": HERMES_USER_AGENT})
     try:
         with opener(request, timeout=timeout) as response:
             items = json.loads(response.read())
@@ -47,7 +50,8 @@ def delete_approval(drain_url, token, action_id, opener=urllib.request.urlopen, 
         return False
     url = f"{drain_url.rstrip('/')}/{urllib.parse.quote(action_id)}"
     request = urllib.request.Request(url, method="DELETE",
-                                     headers={"Authorization": f"Bearer {token}"})
+                                     headers={"Authorization": f"Bearer {token}",
+                                              "User-Agent": HERMES_USER_AGENT})
     try:
         with opener(request, timeout=timeout):
             return True

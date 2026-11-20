@@ -21,7 +21,7 @@ from hermes.approvals import (  # noqa: E402
     APPROVAL_DRAIN_SERVICE, DISPATCH_ACTION_ID_RE, fetch_approvals,
     delete_approval, interactive_blocks,
 )
-from hermes.sensors import _keychain_secret  # noqa: E402
+from hermes.sensors import HERMES_USER_AGENT, _keychain_secret  # noqa: E402
 from hermes.slack import post_interactive, post_summary  # noqa: E402
 
 SLACK_SERVICE = "k3dm-slack-webhook"
@@ -132,7 +132,8 @@ def _refusal(proposal, run, root, state):
 
 
 def _health_probe(url, token):
-    request = Request(url, headers={"Authorization": f"Bearer {token}"})
+    request = Request(url, headers={"Authorization": f"Bearer {token}",
+                                    "User-Agent": HERMES_USER_AGENT})
     try:
         with urlopen(request, timeout=10):
             return None

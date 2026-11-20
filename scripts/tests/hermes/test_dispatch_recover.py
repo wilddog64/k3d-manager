@@ -251,3 +251,42 @@ def test_non_exited_landed_and_violation_dispatches_refuse_resume(monkeypatch, t
         recover.main()
         assert calls == [], state_kind
         assert any("dispatch is not exited cleanly" in line for line in summaries), state_kind
+
+
+def test_health_probe_sends_user_agent_bearer_and_returns_error_code(monkeypatch):
+    # E2 proves [M3, N1, N2]
+    captured = []
+    token = "test-drain-token-xyz"
+
+    class FakeOkResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def stub_urlopen(request, timeout=10):
+        captured.append(request)
+        return FakeOkResponse()
+
+    monkeypatch.setattr(recover, "urlopen", stub_urlopen)
+    res = recover._health_probe("https://relay.invalid/drain", token)
+    assert res is None
+    assert len(captured) == 1
+    req = captured[0]
+    headers_lower = {k.lower(): v for k, v in req.header_items()}
+    assert headers_lower.get("user-agent") == "k3dm-hermes/1"
+    assert headers_lower.get("authorization") == f"Bearer {token}"
+    for header, value in req.header_items():
+        if header.lower() != "authorization":
+            assert token not in str(value)
+
+    # Positive control: stub answering 403 makes probe return 403
+    from urllib.error import HTTPError
+
+    def stub_urlopen_403(request, timeout=10):
+        raise HTTPError(request.full_url, 403, "Forbidden", {}, None)
+
+    monkeypatch.setattr(recover, "urlopen", stub_urlopen_403)
+    res_403 = recover._health_probe("https://relay.invalid/drain", token)
+    assert res_403 == 403
