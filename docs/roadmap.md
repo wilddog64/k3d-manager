@@ -471,7 +471,7 @@ takes resources into account (battery, a memory reserve for the hub, the M4 pref
 Plan 3 of 5 is [`web-console-ssh-behind-cloudflare-access`](plans/v1.45.0-web-console-ssh-behind-cloudflare-access.md):
 a browser SSH console to the M5 and M4 for the operator only. Each machine has its own outbound `cloudflared` connector,
 and a Cloudflare Access app accepts only the operator's GitHub identity, with 2FA by authenticator app or GitHub Mobile.
-A dedicated `sshd` on a loopback-only, uncommon port (default 42722; macOS Remote Login stays off) accepts only Access short-lived certificates. It includes a `revoke` emergency stop. Critical: dispatch needs the operator's go.
+A dedicated `sshd` on a loopback-only, uncommon port (default 42722; the console sshd runs beside Remote Login, which D1 leaves as it is) accepts only Access short-lived certificates. It includes a `revoke` emergency stop. Critical: dispatch needs the operator's go.
 
 Plan 4 of 5 is [`dev-staging-prod-promotion-path`](plans/v1.43.11-dev-staging-prod-promotion-path.md) (operator,
 2026-10-25, "so we don't work on hostiger directly"). Phase 1: a persistent k3s staging cluster built like Hostinger, plus `env`

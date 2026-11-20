@@ -41,3 +41,5 @@ install-dispatch-metrics|operator-run: make install-dispatch-metrics on the mach
 dispatch-metrics|operator-run LaunchAgent on the machine that runs dispatches, loaded by make install-dispatch-metrics (live E5)
 install-password-bundle|not installed by setup: the operator runs make password-bundle-install on the hub, after docs/bugs/2026-11-18-show-service-passwords-argocd-temp-files-no-trap.md is fixed (v1.45.0 plan 2)
 password-bundle|not installed by setup until docs/bugs/2026-11-18-show-service-passwords-argocd-temp-files-no-trap.md is fixed; then the operator runs make password-bundle-install on the hub
+install-web-console-sshd|not installed by setup: operator-run once with a password; adds a root LaunchDaemon (docs/plans/v1.45.0-web-console-a-console-sshd.md)
+web-console-sshd|system LaunchDaemon installed once by make install-web-console-sshd

@@ -160,6 +160,7 @@ install-test-metrics:
 	  fi; \
 	fi
 
+.PHONY: install-web-console-sshd uninstall-web-console-sshd revoke-web-console-sshd web-console-sshd-check
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-host test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
@@ -631,6 +632,18 @@ install-sudoers:
 ## Install the fixed system launchd socket relays for browser listeners
 install-browser-relays:
 	bin/install-browser-relays.sh
+
+install-web-console-sshd:
+	bin/k3dm-web-console-sshd install $${CA_FILE:+--ca-file "$$CA_FILE"} $${AFTER_REVOKE:+--after-revoke}
+
+uninstall-web-console-sshd:
+	@case "$${PURGE-}" in ""|0) set -- ;; 1) set -- --purge ;; *) echo "PURGE must be 1 or unset" >&2; exit 2 ;; esac; bin/k3dm-web-console-sshd uninstall "$$@"
+
+revoke-web-console-sshd:
+	bin/k3dm-web-console-sshd revoke
+
+web-console-sshd-check:
+	bin/k3dm-web-console-sshd check
 
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
@@ -2379,6 +2392,10 @@ help:
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
 	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
+	@echo "    make install-web-console-sshd     Install the loopback console daemon (CA_FILE=path, AFTER_REVOKE=1)"
+	@echo "    make web-console-sshd-check       Check the installed daemon and listener"
+	@echo "    make revoke-web-console-sshd      Stop the daemon and its sessions"
+	@echo "    make uninstall-web-console-sshd   Remove the daemon (PURGE=1 removes the host keys and CA)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo "    make cloudflared-config         Check or install the repo-managed Cloudflare tunnel config"
 	@echo "    make cloudflare-preflight       Read-only HTTPS/TLS preflight (ZONE_ID=<zone>; DRY_RUN=1 prints the plan)"
