@@ -67,6 +67,7 @@ is refused with `--repo`). `make hub-sync` NOT run after the k3d-manager pushes 
 
 ## Session 2026-11-17 (after handoff) — v1.44.2 opened
 
+- 2026-11-19: forecast panel fix fd9bc6a4 LIVE-VERIFIED (operator screenshot: Earliest and Latest both one line). Needed an Argo CD hard refresh of cicd/hub-grafana-dashboards after the promote (repo cache lag).
 - 2026-11-19 18:10: operator PROMOTED deploy/hub -> 3d5fd9ef (tag hub-promote/20261120T020945Z): hub-deploy self-update installed (its E2 = next promote), forecast panel fix, 2a engine (inert). Live: forecast panel one-line check asked of operator. Release 3 commits ahead (plan-status ffe30f17 + docs).
 - 2026-11-19: M9a pass 1: 11 files in scope, production builds, but 18 test sites fail CS1503 (LargestFile[] vs List). RESUMED (resume 2, correction 1 in session scratchpad m9a-correction-1.md). Claude builds/tests after exit.
 - 2026-11-19: plan-status-auto-land LANDED ffe30f17 + VERIFIED (Sonnet verifier PASS, Claude pre-fix 6 red reproduced; trial: agree). Land needed --allow-out-of-scope (cross_repo.bats from Claude correction). Status set by hand (land ran the pre-fix script). Release CI GREEN on 3d5fd9ef (run 44656415001): operator may promote REF=3d5fd9ef. M9a (Flash) EXITED 0: verify next. WIP: M9a only.
