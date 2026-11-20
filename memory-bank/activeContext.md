@@ -1,4 +1,4 @@
-## Current state 2026-11-20 11:05 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 11:40 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -10,9 +10,14 @@ tag hub-promote/20261120T175509Z); 7 docs-only commits after it, no promote need
 **Done today:** child B E9 + E10 LIVE-VERIFIED (72ab5903, 92fd27f7) after the P1 hermes approvals UA fix (970aeb23,
 LIVE-VERIFIED on M5). dirused list local time (v0.0.24) and human sizes (v0.0.25) LIVE-VERIFIED.
 
-**Dispatch WIP 1/3:** `dirused-m9b-stop-delete-start` (Flash) correction round 3 running (worker pid 17889, agy 17912;
-prompt scratchpad m9b-correction-3.md): Argon #1 throwing Stop must not abort, #2 finally QueryState, #4 M2 redirected
-input. On exit: Claude reruns portable tests + targeted mutants, commits in dirused worktree, then PR + Windows CI.
+**Dispatch WIP 1/3 (ledger) / 0 running:** `dirused-m9b-stop-delete-start` round 3 exited 0; Claude verified (216/216,
+3 mutants red, rerun in scratch) and committed 61e8516; PR wilddog64/dirused#39 open, Windows CI next, then merge gate.
+Ledger shows "VIOLATION: agent committed" = false positive (Claude's own between-round commits; captured P3
+`docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md`); no `land`, closes via PR.
+
+**Handoff guard (2026-11-20, operator "go with your recommendation"):** `.claude/hooks/handoff-on-clear.sh` now appends a
+computed Live state block (commits since the START HERE header line last changed, dirty tree, open dispatches, hub ref,
+last 5 progress lines). Any edit to this section must also bump the header timestamp, or the hook reports STALE.
 
 **NEXT (operator):**
 1. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): diagnosis.md + correction.md printed to the operator
