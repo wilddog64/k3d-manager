@@ -1157,3 +1157,114 @@ def test_e8_n3_curl_failure_does_not_return_secret_in_body_or_error(monkeypatch,
     result = promote_mover.CurlApi(str(token)).get("/repos/a/b", 2)
     assert result == (0, None)
     assert "secret-token" not in repr(result)
+
+
+def test_e7_m9_n8_absent_tag_after_real_update_is_unknown(repo, monkeypatch):
+    instance = mover(repo)
+    original = instance._git
+    def hide_tag_observation(args, *positional, **kwargs):
+        if args and args[0] == "ls-remote" and len(args) > 2 and str(args[-1]).startswith("refs/tags/hub-promote/"):
+            return subprocess.CompletedProcess(args, 0, "", "")
+        return original(args, *positional, **kwargs)
+    monkeypatch.setattr(instance, "_git", hide_tag_observation)
+    with pytest.raises(hub_approval.Unknown) as error:
+        instance.move("p1-1234abcd", repo["new"], "k3d-manager-v1.45.0", lambda attempt: None,
+                      time.monotonic() + 60)
+    assert error.value.code == "push_unknown"
+    assert git(repo["git"], repo["origin"], "rev-parse", "refs/heads/deploy/hub") == repo["new"]
+    assert git(repo["git"], repo["origin"], "for-each-ref", "--format=%(refname)", "refs/tags/hub-promote")
+
+
+def test_e7_m9_n8_rejected_flag_with_zero_exit_is_not_a_real_update(repo, monkeypatch):
+    instance = mover(repo)
+    original = instance._git
+    branch_ref = "refs/heads/deploy/hub"
+    branch_pushes = []
+    tag_pushes = []
+    def reject_with_zero(args, *positional, **kwargs):
+        if args and args[0] == "push":
+            if any(str(arg).startswith("--force-with-lease=") for arg in args):
+                branch_pushes.append(args)
+                line = "!\t{}:{}\t[rejected]\n".format(repo["new"], branch_ref)
+                return subprocess.CompletedProcess(args, 0, line, "")
+            tag_pushes.append(args)
+        return original(args, *positional, **kwargs)
+    monkeypatch.setattr(instance, "_git", reject_with_zero)
+    with pytest.raises(hub_approval.Unknown) as error:
+        instance.move("p1-1234abcd", repo["new"], "k3d-manager-v1.45.0", lambda attempt: None,
+                      time.monotonic() + 60)
+    assert error.value.code == "push_unknown"
+    assert len(branch_pushes) == 1
+    assert tag_pushes == []
+    assert git(repo["git"], repo["origin"], "rev-parse", branch_ref) == repo["old"]
+    assert git(repo["git"], repo["origin"], "for-each-ref", "--format=%(refname)", "refs/tags/hub-promote") == ""
+
+
+def test_e9_m10_fresh_already_spent_does_not_call_note_refusal(repo, tmp_path):
+    engine, request_id = approved_engine(repo, tmp_path)
+    instance = mover(repo)
+    attempt = attempt_object(instance, repo, request_id, "hub-promote/20261021T030001Z")
+    instance._git(["push", "--porcelain", str(repo["origin"]),
+                   "{}:refs/tags/{}".format(attempt["object"], attempt["tag"])])
+    note_calls = []
+    original_note = engine.note_refusal
+    def record_note(*args, **kwargs):
+        note_calls.append(args)
+        return original_note(*args, **kwargs)
+    engine.note_refusal = record_note
+    with pytest.raises(hub_approval.Refused) as error:
+        promote_mover.promote(engine, instance, request_id, repo["new"], time.monotonic() + 30)
+    assert error.value.code == "already_spent"
+    assert error.value.approval == "final"
+    assert note_calls == []
+
+
+def test_e5_m5_squash_pr_merge_not_ancestor_does_not_authorize(repo):
+    _squash, target, head = _squash_fixture(repo)
+    tree = git(repo["git"], repo["work"], "rev-parse", "{}^{{tree}}".format(target))
+    unrelated_merge = git(repo["git"], repo["work"], "commit-tree", tree, input_text="unrelated merge\n")
+    ancestry = subprocess.run([repo["git"], "merge-base", "--is-ancestor", unrelated_merge, target],
+                              cwd=repo["work"], capture_output=True, text=True, check=False)
+    assert ancestry.returncode == 1
+    git(repo["git"], repo["work"], "push", "-q", str(repo["origin"]),
+        "{}:refs/heads/mutant-fixture-merge".format(unrelated_merge))
+    row = {"number": 17, "head": {"sha": head}, "merge_commit_sha": unrelated_merge,
+           "merged_at": "2026-01-01T00:00:00Z"}
+    instance = mover(repo, ScriptedApi(pulls=[row]))
+    instance._fetch(time.monotonic() + 30)
+    with pytest.raises(hub_approval.Refused) as error:
+        instance._contains(target, repo["old"], time.monotonic() + 30)
+    assert error.value.code == "not_contained"
+
+
+def test_e1_m1_fetches_disable_implicit_tags(repo, monkeypatch):
+    instance = mover(repo)
+    original = instance._git
+    fetches = []
+    def record_git(args, *positional, **kwargs):
+        if args and args[0] == "fetch":
+            fetches.append(list(args))
+        return original(args, *positional, **kwargs)
+    monkeypatch.setattr(instance, "_git", record_git)
+    result = instance.move("p1-1234abcd", repo["new"], "k3d-manager-v1.45.0", lambda attempt: None,
+                           time.monotonic() + 60)
+    assert result["outcome"] == "moved"
+    assert len(fetches) >= 2
+    assert all("--no-tags" in args for args in fetches)
+
+
+def test_e10_m13_pre_push_git_call_uses_remaining_budget(repo, monkeypatch):
+    deadline = 20.0
+    instance = promote_mover.Mover(str(repo["origin"]), "owner/repo", Api(), "", str(repo["mirror"]),
+                                   Clock(), monotonic=lambda: 10.0, git=repo["git"])
+    original_run = subprocess.run
+    calls = []
+    def record_run(args, **kwargs):
+        if "fetch" in args:
+            calls.append((list(args), kwargs.get("timeout")))
+        return original_run(args, **kwargs)
+    monkeypatch.setattr(promote_mover.subprocess, "run", record_run)
+    result = instance.move("p1-1234abcd", repo["new"], "k3d-manager-v1.45.0", lambda attempt: None, deadline)
+    assert result["outcome"] == "moved"
+    assert calls
+    assert all(timeout == 10.0 for _args, timeout in calls)
