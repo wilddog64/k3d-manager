@@ -1,4 +1,4 @@
-## Current state 2026-11-20 12:35 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 12:29 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -12,13 +12,13 @@ LIVE-VERIFIED on M5). dirused list local time (v0.0.24) and human sizes (v0.0.25
 
 **Dispatch WIP 3/3 (ledger), none running (2026-11-20 12:35):**
 - `remote-promote-2c-root-daemon` (Luna, base d1ec381c contains 2d): 4 rounds, each ends after ~1-2 min with one partial
-  file (daemon 74 lines, untracked). Same codex/model/effort as 2d (whose rounds ran ~20 min). Stopped resuming; operator
-  decision: keep nudging Luna round by round, or switch model.
+  file (daemon 74 lines, untracked). Same codex/model/effort as 2d (whose rounds ran ~20 min). Operator chose Astra 12:29:
+  resumed on gpt-6.2-astra (resume 5, prompt scratchpad 2c-astra.md), running.
 - `remote-promote-2e-cve-pin-branch` (Luna): rounds 1-3 lost to long-line truncation (23 spec lines > 400 chars; fixed
-  with `fold -s -w 160`); round 4 wrote services-git.yaml only. Same operator decision.
+  with `fold -s -w 160`); round 4 wrote services-git.yaml only. Resumed on gpt-6.2-astra 12:29 (resume 5), running.
 - `dirused-m9b-stop-delete-start` (agy Flash): test bug traced (1 GiB default /minsize; `/crit 0%` unparsed; /fromlist
   rejects /minsize and /crit). Flash round 5 fixed the first two; Claude fixed the /fromlist args (ced1c01). Windows CI
-  then exit 1 instead of 3 at line 357 (step 1); Claude pushed 20b0949 making the assertion print stderr; CI pending.
+  then exit 1 instead of 3 at line 357 (step 1); Claude pushed 20b0949 making the assertion print stderr; stderr showed `/warn must be below /crit`; 61b7268 uses /warn 1 /crit 2; CI pending.
   PR wilddog64/dirused#39. Ledger VIOLATION = P3 false positive; closes via PR. Agy resume 4 replayed round 3 (no work).
 - Web-console part C QUEUED: shares `Makefile` + `scripts/etc/machine/not-installed.list` with 2c (one dispatch per
   file) and WIP is full; start after 2c lands.
