@@ -1,6 +1,6 @@
 # hub-deploy fetches, catches the checkout up and re-execs its promoted copy: one promote command
 
-**Status:** DRAFT rev 1 — review owed (medium risk: hub deploy path; Fable + Astra blind)
+**Status:** READY rev 2 — Fable + Astra blind reviews of rev 1 (both FIX) adjudicated, 2026-11-19
 **Bug:** `docs/bugs/2026-11-19-hub-deploy-runs-stale-checkout-copy-of-itself.md` (P2)
 **Risk:** medium — changes `bin/k3dm-hub-deploy` control flow before appsets-check/platform-ops on the hub
 **Agent:** Luna (codex gpt-6-luna)
@@ -9,72 +9,99 @@
 
 ## Problem
 
-`make hub-deploy REF=<sha>` runs `bin/k3dm-hub-deploy` from the hub checkout (`REPO_ROOT`, `:3`). That checkout trails
-deploy/hub until repo-sync's next 5-minute run, so:
-1. `k3dm-hub-promote` resolves REF locally (`bin/k3dm-hub-promote:87`, `resolve_on_origin`) and fails for a commit the
-   checkout has not fetched; the operator has to `git fetch origin` first.
-2. The deploy runs the old copy of `bin/k3dm-hub-deploy`. 2026-11-19 16:06 PST: deploy/hub `072bcb5..364dce3`, checkout
-   still at `072bcb57`, whose copy has no launchd reconcile, so Part 1 (`643747e5`) did not run; repo-sync moved the
-   checkout at ~16:11.
+`make hub-deploy REF=<sha>` runs `bin/k3dm-hub-deploy` from the hub checkout (`REPO_ROOT`, `:3`), and that checkout trails
+deploy/hub until repo-sync's next 5-minute run. 2026-11-19 16:06 PST, M5: deploy/hub `072bcb5..364dce3` with the checkout
+still at `072bcb57`, so the old copy ran (no launchd reconcile: Part 1 `643747e5` did not run, no
+`~/.local/share/k3d-manager/hub-deploy/` directory); repo-sync moved the checkout at ~16:11.
 
-Once the checkout is at the promoted commit, everything `hub-deploy` calls through `make -C "$REPO_ROOT"` and
-`"$REPO_ROOT/bin/..."` is already the promoted code. Only the bytes of the running script are stale, so re-executing that
-one file is enough.
+The bytes bash is running, and the libraries it sourced (`:6`, `system.sh`), are the pre-promote ones even after the
+checkout moves. Children started with `make -C "$REPO_ROOT"` read whatever checkout exists when they start. So the
+deploy must (a) bring the checkout to the promoted commit before any apply, and (b) re-exec the promoted script.
 
-## Change (`bin/k3dm-hub-deploy` only, plus docs)
+Not changed (rev 1 was wrong): REF resolution. `bin/k3dm-hub-promote:322` already fetches before `resolve_on_origin`
+(`:323`); no extra fetch.
 
-Two stages, told apart by `K3DM_HUB_DEPLOY_PREV` (unset: first stage; set: re-exec stage).
+## Change (`bin/k3dm-hub-deploy`, plus tests and docs)
 
-1. **Self blob.** Right after the usage check (`:14-15`), record
-   `self_blob="$(git -C "$REPO_ROOT" hash-object -- "${BASH_SOURCE[0]}")"` (empty on failure; empty disables re-exec).
-2. **Fetch (first stage only).** Immediately before the promote (`:81`):
-   `_run_command --soft -- git -C "$REPO_ROOT" fetch --quiet --no-tags origin 9>&-`; failure → `stop fetch <code>`.
-3. **Catch up and re-exec (first stage only).** Immediately after `new` is read (`:82`) and before the appsets block:
-   1. Run `_run_command --soft -- "$REPO_ROOT/bin/k3dm-repo-sync" 9>&-` once; its exit status is ignored (a held
-      repo-sync lock or a dirty checkout just means no catch-up).
-   2. If `checkout_ok` (HEAD == `$new`, clean tracked tree; move the existing `checkout_ok` definition, `:149-154`, above
-      this point unchanged), `self_blob` is non-empty, and `git -C "$REPO_ROOT" rev-parse "$new:bin/k3dm-hub-deploy"`
-      differs from `self_blob`: print
-      `hub-deploy: deploy script changed in <new7>; continuing with the promoted copy`, close the run lock with
-      `exec 9>&-`, then `exec env K3DM_HUB_DEPLOY_PREV="$old" "$REPO_ROOT/bin/k3dm-hub-deploy" "$new"`.
-   3. If the checkout is not at `$new`: print `hub-deploy: hub checkout not at <new7>; continuing with the running copy`
-      and continue unchanged (the launchd step already waits for the checkout, `:176-184`).
-   4. Otherwise (same blob) continue silently.
-4. **Re-exec stage** (`K3DM_HUB_DEPLOY_PREV` set):
-   - Its value must match `^[0-9a-f]{40}([0-9a-f]{24})?$` and pass `git cat-file -e "<v>^{commit}"`, and `$1` must be a
-     full sha of the same form; otherwise `die 'K3DM_HUB_DEPLOY_PREV must be a commit sha'`.
-   - Role check, state dir, run lock and state read/init run as today; `old="$K3DM_HUB_DEPLOY_PREV"` replaces the
-     `remote_sha` read at `:69` (so a missing state file starts from the pre-promote base, as today).
-   - No fetch, no promote, no repo-sync, no re-exec. `new="$(remote_sha)"` must equal `$1`, else print
-     `hub-deploy: deploy/hub moved from <ref7> to <new7> before the promoted copy ran; superseded` and `stop superseded 1`.
-   - Everything from the appsets block on is unchanged, and the summary line prints `old..new` from the pre-promote sha.
-5. **Bootstrap note.** The first promote after this change lands still runs the old copy; that run is the last one that
-   needs a second `make hub-deploy REF=<sha>` (record it in the howto).
+Two stages, told apart by `K3DM_HUB_DEPLOY_PREV` (unset: stage 1; set: stage 2).
+
+1. **Stage 1, bind the target.** After the promote (`:81`) and the `new` read (`:82`): resolve
+   `want="$(git -C "$REPO_ROOT" rev-parse --verify "$ref^{commit}")"` (promote has fetched). If `new != want`: print
+   `hub-deploy: deploy/hub is <new7>, not the promoted <want7>; superseded` and `stop superseded 1`.
+2. **Stage 1, catch the checkout up (checkout only).** Move the `checkout_ok`, `lock_stamp`, `take_lock`, `release_lock`
+   definitions and `RS_DIR`/`RS_STALE` (`:144-170`) above this point unchanged; install `trap release_lock EXIT` here.
+   Loop until a deadline of `${K3DM_HUB_DEPLOY_CHECKOUT_WAIT:-330}` s (the existing variable, `:176`), sleeping
+   `min(10, remaining)` between tries:
+   - `take_lock` (repo-sync's directory lock); on failure release and retry.
+   - If `checkout_ok`: done.
+   - Else, if the tracked tree is clean (`status --porcelain --untracked-files=no` empty) and HEAD is an ancestor of
+     `$new` (`merge-base --is-ancestor HEAD "$new"`): `git -C "$REPO_ROOT" merge --ff-only --quiet "$new"`; then
+     re-check `checkout_ok`.
+   - Otherwise (dirty, diverged): release the lock and retry (repo-sync's own reset-with-backup path, `bin/k3dm-repo-sync:259-281`,
+     is the only thing allowed to reset a diverged hub checkout).
+   - Always `release_lock` before sleeping or leaving the loop.
+   On timeout: print `hub-deploy: hub checkout not at <new7> with a clean tracked tree; nothing applied` and
+   `stop checkout-catch-up 1`. This happens before the appsets block, so no apply runs and `appsets` in state is not
+   advanced; the rerun hint (`stop`, `:10`) is the retry.
+3. **Stage 1, re-exec.** With the checkout at `$new`:
+   - If `git -C "$REPO_ROOT" grep -q K3DM_HUB_DEPLOY_PREV "$new" -- bin/k3dm-hub-deploy` fails (the promoted copy
+     predates this handoff, e.g. a rollback): print
+     `hub-deploy: promoted copy has no handoff; continuing with the running copy` and continue in this process.
+   - Else, if `[[ -x "$REPO_ROOT/bin/k3dm-hub-deploy" ]]`: print
+     `hub-deploy: continuing with the promoted copy at <new7>` and
+     `exec env K3DM_HUB_DEPLOY_PREV="$old" "$REPO_ROOT/bin/k3dm-hub-deploy" "$new"`. Do not close fd 9 first; the
+     promoted copy's `exec 9>>` (`:22`) replaces it and re-acquires the lock.
+   - Not executable: `stop handoff 1`.
+4. **Stage 2** (`K3DM_HUB_DEPLOY_PREV` set):
+   - Right after the usage check: copy it to a local `prev`, `unset K3DM_HUB_DEPLOY_PREV`, and require `prev` and `$1`
+     to match `^[0-9a-f]{40}([0-9a-f]{24})?$`; else `die 'K3DM_HUB_DEPLOY_PREV must be a commit sha'`. After the role
+     gate, `git cat-file -e "$prev^{commit}"` must succeed (same die).
+   - Role gate, state dir, run lock and state read/init run as today; `old="$prev"` replaces the `remote_sha` read at
+     `:69`.
+   - No promote, no catch-up loop, no re-exec. `new="$(remote_sha)"` must equal `$1` and `checkout_ok` must hold, else
+     print `hub-deploy: deploy/hub or the checkout moved from <ref7> before the promoted copy ran; superseded` and
+     `stop superseded 1`.
+   - Everything from the appsets block on is unchanged; the summary prints `<prev7>..<new7>`.
+5. **Accepted residuals** (write them in the howto):
+   - `k3dm-require-role` and `k3dm-hub-promote` always run from the pre-promote checkout, so a change to them takes effect one promote later.
+   - The promote that delivers this change runs the old copy; it is the last one needing a second
+     `make hub-deploy REF=<sha>`.
+   - Stage 1 always writes state before promote (`:71-80`), so stage 2's "no state" branch is reachable only by a direct
+     call with the env var.
+   - A deploy/hub move between promote and platform-ops is still caught only by the pin check (`:98-103`), as today.
 
 ## Files
 
 - `bin/k3dm-hub-deploy`
-- `scripts/tests/bin/hub_deploy.bats`
-- `docs/howto/hub-promote.md`: the single command; drop any separate `git fetch` / `hub-sync` step for the M5; the bootstrap note
-- `docs/howto/makefile.md`: `hub-deploy` row says it fetches and runs the promoted copy
+- `scripts/tests/bin/hub_deploy.bats`: the fixture commits, as the promoted revision, a `bin/k3dm-hub-deploy` that is the
+  real script plus one first line appending `stage2 <args> prev=$K3DM_HUB_DEPLOY_PREV` to `$CALLS`; a second fixture revision
+  without the string `K3DM_HUB_DEPLOY_PREV` for the no-handoff case; the existing git stub keeps logging; the checkout
+  catch-up uses the fixture repo (no repo-sync stub needed, repo-sync is not called)
+- `docs/howto/hub-promote.md`: the single command on the M5; no `git fetch` / `hub-sync` step there; the residuals above
+- `docs/howto/makefile.md`: the `hub-deploy` row says it catches the checkout up and runs the promoted copy
 
 ## Contract readers
 
-- `K3DM_HUB_DEPLOY_PREV` (new env var): writer `bin/k3dm-hub-deploy` (step 3.2), reader `bin/k3dm-hub-deploy` (step 4).
-  `grep -rn K3DM_HUB_DEPLOY_PREV` is empty before the change.
-- `bin/k3dm-repo-sync` (called once, unchanged): takes `~/.local/share/k3d-manager/repo-sync/lock`; `hub-deploy`'s own
-  use of that lock (`:144-170`) comes later and is unchanged.
-- `bin/k3dm-hub-promote promote` (`:81`, unchanged): now called after a fetch; still called exactly once per deploy.
-- `Makefile:525-527` (`hub-deploy`): unchanged.
+- `K3DM_HUB_DEPLOY_PREV` (new env var): writer `bin/k3dm-hub-deploy` stage 1; reader `bin/k3dm-hub-deploy` stage 2, which
+  unsets it, so no child sees it. `grep -rn K3DM_HUB_DEPLOY_PREV` is empty before the change. It is a cross-version
+  contract: step 3's `git grep` makes a promoted copy without it run in-process instead.
+- repo-sync lock `~/.local/share/k3d-manager/repo-sync/lock` (`bin/k3dm-repo-sync:17,35-44,341-350,520-526`): now also taken
+  in stage 1 for the catch-up, with the same `take_lock` (`:157-170`); repo-sync, when it finds the lock held, prints
+  `already running` and exits 0, as today.
+- Hub checkout HEAD: writers `bin/k3dm-repo-sync` (`:259-288`) and now `bin/k3dm-hub-deploy` (fast-forward only, clean tree,
+  under the lock).
+- `K3DM_HUB_DEPLOY_CHECKOUT_WAIT` (`:176`): now bounds both waits.
+- `bin/k3dm-hub-promote promote`: unchanged, still called once per deploy.
+- `Makefile:525-527`: unchanged.
 - Remote-promote 2b/2c/2d/2e specs (`docs/plans/v1.45.0-remote-promote-2{b,c,d,e}-*.md`) cite `bin/k3dm-hub-deploy` line
-  numbers; not started; they rebase onto this change.
+  numbers; not started; they rebase onto this.
 
 ## What NOT to Do
 
-- Do not run `hub-deploy`, `hub-promote`, `repo-sync` or `make` targets against the real hub or `$HOME`; tests use the
-  existing stubs and a scratch HOME.
-- Do not re-exec more than once, and never from the re-exec stage.
-- Do not call `k3dm-hub-promote promote` twice in one deploy.
+- Do not call `bin/k3dm-repo-sync` from hub-deploy, and do not reset or rebase the checkout (fast-forward only).
+- Do not apply anything (appsets, platform-ops, installers) unless the checkout is at the target.
+- Do not re-exec more than once, or from stage 2; do not call promote twice.
+- Do not run hub-deploy, hub-promote, repo-sync or make targets against the real hub or `$HOME`.
 - Do not change `bin/k3dm-hub-promote`, `bin/k3dm-repo-sync` or the Makefile.
 - Do not update `memory-bank/`, create a PR, or skip hooks.
 
@@ -83,39 +110,39 @@ Two stages, told apart by `K3DM_HUB_DEPLOY_PREV` (unset: first stage; set: re-ex
 ```yaml
 must:
   - id: M1
-    text: "first stage runs 'git fetch --quiet --no-tags origin' before 'k3dm-hub-promote promote'; a failing fetch stops at 'fetch' and promote is never called"
+    text: "checkout behind the promoted sha with a clean tree: stage 1 fast-forwards it under the repo-sync lock, prints 'continuing with the promoted copy at <new7>', and the promoted copy runs with prev=<pre-promote sha> and $1=<promoted full sha>; across both stages promote is called once and hub-deploy invokes appsets-check and platform-ops once each; summary <pre7>..<new7>"
   - id: M2
-    text: "when repo-sync moves the checkout to the promoted sha and the promoted bin/k3dm-hub-deploy blob differs from the running one, the promoted copy runs with K3DM_HUB_DEPLOY_PREV=<pre-promote sha> and \$1=<promoted full sha>, after 'deploy script changed' is printed; appsets-check and platform-ops each run exactly once across both stages; promote runs exactly once"
+    text: "checkout dirty, diverged, or repo-sync lock held past K3DM_HUB_DEPLOY_CHECKOUT_WAIT: stops at checkout-catch-up with 'nothing applied'; no appsets-reapply, appsets-check or platform-ops call; state appsets value unchanged; the lock directory is removed on exit"
   - id: M3
-    text: "same blob → no re-exec and no message; checkout not at the promoted sha after repo-sync → 'hub checkout not at <new7>; continuing with the running copy' and no re-exec; repo-sync exiting non-zero does not stop the deploy"
+    text: "promoted copy without the string K3DM_HUB_DEPLOY_PREV: prints 'promoted copy has no handoff', does not exec, and finishes in-process"
   - id: M4
-    text: "re-exec stage does not fetch, promote, run repo-sync or re-exec; its summary prints <pre-promote7>..<new7>; with no state file it uses the pre-promote sha as the appsets base"
+    text: "deploy/hub not equal to the commit REF resolves to after promote: stage 1 stops superseded before the catch-up"
   - id: M5
-    text: "re-exec stage with deploy/hub != \$1 prints the superseded line and exits non-zero before appsets-check; invalid K3DM_HUB_DEPLOY_PREV or non-sha \$1 dies with 'K3DM_HUB_DEPLOY_PREV must be a commit sha'"
+    text: "stage 2: invalid prev or non-sha $1 dies 'K3DM_HUB_DEPLOY_PREV must be a commit sha'; deploy/hub != $1 or checkout not at $1 stops superseded before appsets-check; stage 2 never calls promote or execs; children do not see K3DM_HUB_DEPLOY_PREV"
   - id: M6
-    text: "the run lock is released before exec: the promoted copy acquires it (no 'another run is active')"
+    text: "the promoted copy acquires the run lock (no 'another run is active'); the existing 38 tests pass, including 'role gate refuses before git'"
 must_not:
   - id: N1
-    text: "a deploy whose promoted bin/k3dm-hub-deploy differs from the running copy finishes without running the promoted copy (red on 34b60bf9: no re-exec exists)"
+    text: "a deploy whose checkout trails the promoted sha finishes without the promoted copy running (red on 34b60bf9: no catch-up or exec)"
   - id: N2
-    text: "the first stage calls promote without a prior fetch (red on 34b60bf9)"
-  - id: N3
-    text: "a deploy calls promote twice or re-execs twice (paired with M2's single re-exec)"
+    text: "a deploy runs appsets-check or platform-ops while the checkout is not at the promoted sha (red on 34b60bf9: with the checkout held behind, both run)"
 evidence:
   - id: E1
-    proves: [M1, M2, M3, M4, M5, M6, N1, N2, N3]
+    proves: [M1, M2, M3, M4, M5, M6, N1, N2]
     kind: offline
-    command: "bats scripts/tests/bin/hub_deploy.bats (all 38 existing tests still pass); new tests red on 34b60bf9; mutants red: drop the exec (N1), drop the fetch (N2), allow re-exec in the re-exec stage (N3), keep fd 9 open across exec (M6), skip the deploy/hub == \$1 check (M5); shellcheck bin/k3dm-hub-deploy clean"
-    intent: "Offline proof that one hub-deploy command fetches the commit, catches the hub checkout up and finishes with the promoted deploy script, without promoting or applying twice."
+    command: "bats scripts/tests/bin/hub_deploy.bats; new tests red on 34b60bf9; mutants red: drop the exec (N1), continue on catch-up timeout (N2/M2), drop the git grep guard (M3), drop the REF binding (M4), allow stage 2 to promote or exec (M5, counted calls), skip the unset (M5 child env); shellcheck bin/k3dm-hub-deploy clean; the Acceptance YAML parses"
+    intent: "Offline proof that one hub-deploy command brings the hub checkout to the promoted commit and finishes with the promoted deploy script, and applies nothing when it cannot."
   - id: E2
-    proves: [M2, M4]
+    proves: [M1]
     kind: live
-    command: "operator, on the M5, the next promote that changes bin/k3dm-hub-deploy after this one is on deploy/hub: 'make hub-deploy REF=<sha>' alone (no fetch, no hub-sync); Claude reads the pane: the 'deploy script changed' line, one promote tag, summary <old7>..<new7>"
+    command: "operator, on the M5, the first promote after the one that delivers this change: 'make hub-deploy REF=<sha>' alone; Claude reads the pane: 'continuing with the promoted copy', one promote tag, summary <old7>..<new7>, no 'checkout-catch-up' stop"
     intent: "On the real hub, you type one command and the new deploy code runs in that same promote."
 interface:
-  - "hub-deploy: deploy script changed in <new7>; continuing with the promoted copy"
-  - "hub-deploy: hub checkout not at <new7>; continuing with the running copy"
-  - "hub-deploy: deploy/hub moved from <ref7> to <new7> before the promoted copy ran; superseded"
+  - "hub-deploy: continuing with the promoted copy at <new7>"
+  - "hub-deploy: promoted copy has no handoff; continuing with the running copy"
+  - "hub-deploy: hub checkout not at <new7> with a clean tracked tree; nothing applied"
+  - "hub-deploy: deploy/hub is <new7>, not the promoted <want7>; superseded"
+  - "hub-deploy: deploy/hub or the checkout moved from <ref7> before the promoted copy ran; superseded"
   - "K3DM_HUB_DEPLOY_PREV must be a commit sha"
   - "K3DM_HUB_DEPLOY_PREV"
 ```
