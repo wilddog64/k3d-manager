@@ -17,7 +17,7 @@ input. On exit: Claude reruns portable tests + targeted mutants, commits in diru
 **NEXT (operator):**
 1. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): diagnosis.md + correction.md printed to the operator
    2026-11-20 11:05 (files: session 628c342a scratchpad `e8root/v1.44.1/e8-toy-stall.run/stall-20261117T030605Z/`).
-   Operator judges quality and compares $0.052646 with the Anthropic Console -> then LIVE-VERIFIED.
+   Quality ACCEPTED by operator 2026-11-20 11:15; only the Console comparison of $0.052646 remains -> then LIVE-VERIFIED.
 2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): operator intent approval -> Luna dispatch.
 3. Web-console part A E11–E14 (`docs/plans/v1.45.0-web-console-a-console-sshd.md` lines 722-775): operator at the keyboard
    with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,

@@ -2,7 +2,7 @@
 
 **Status:** LANDED — e05a08ed on k3d-manager-v1.45.0 2026-11-18 (Flash worker, Claude verified and landed); E8 live run by Claude on the M4 passed, operator judges the correction
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** operator decision — since 2026-11-18 (judge E8 correction.md; compare $0.052646 with the Anthropic Console)
+**Waiting on:** operator decision — since 2026-11-20 (correction judged good; compare $0.052646 with the Anthropic Console)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet 2026-11-14; reworked by Claude 2026-11-18 (tool-less single turn, from 2.1.328 captures); revised after Fable + Astra blind review 2026-11-18
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` part 2 (operator, 2026-11-14: "go with your recommendation")
@@ -383,3 +383,6 @@ not in backticks: the dispatch scope gate reads every backticked string under th
   tokens; no Slack line (correct for ok); no `sk-ant-` in any output. Diagnosis: agent froze after 5 steps, no gate
   child; correction restarts spec `2026-11-14-dispatch-stall-a-detector.md` (the toy run's spec) with step logging
   and 1800 s alarms. Quality and Console spend: operator.
+- 2026-11-20 11:15 PST, E8 judgement: Claude printed diagnosis.md + correction.md (no secret markers) to the operator;
+  operator accepted the restart correction ("go ahead to restart task", "go with your correction"). No real restart
+  run: the toy agent is a freeze stub and spec A is already LIVE-VERIFIED. Remaining: Console spend comparison.
