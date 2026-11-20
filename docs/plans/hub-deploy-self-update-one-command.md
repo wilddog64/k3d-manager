@@ -1,6 +1,6 @@
 # hub-deploy fetches, catches the checkout up and re-execs its promoted copy: one promote command
 
-**Status:** VERIFIED — 3b541f3b, 2026-11-19 (Sonnet Acceptance verifier + Claude: 42/42, pre-fix 8 red, 5 mutants red); E2 live check waits on promote
+**Status:** LIVE-VERIFIED — 3b541f3b, 2026-11-19 (Sonnet Acceptance verifier + Claude: 42/42, pre-fix 8 red, 5 mutants red); E2 live 2026-11-20: operator ran `make hub-deploy REF=9d7973b6…` alone on the M5, Claude read the pane: "continuing with the promoted copy at 9d7973b", one tag hub-promote/20261120T152130Z, summary 3d5fd9e..9d7973b, no checkout-catch-up stop
 **Bug:** `docs/bugs/2026-11-19-hub-deploy-runs-stale-checkout-copy-of-itself.md` (P2)
 **Risk:** medium — changes `bin/k3dm-hub-deploy` control flow before appsets-check/platform-ops on the hub
 **Agent:** Luna (codex gpt-6-luna)

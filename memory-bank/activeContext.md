@@ -23,8 +23,8 @@ compression not yet pushed (batched until 2d lands). Hub `deploy/hub` = `3d5fd9e
   `security add-generic-password -U … -w`). No webhook/Hermes restart needed (M5 Hermes ignores `d` IDs until promote).
   Remaining: operator `/hermes-auth` (24h), then Claude stages a toy stalled dispatch; Approve resumes once (E9), Deny
   leaves it exited and the relay queue empty (E10).
-- Web-console part A E11–E14 (operator); child C E8 (M4); travel bundle E2/E3; test-all E3; hub-deploy self-update E2,
-  dashboard panels and velocity tile after the next promote.
+- Web-console part A E11–E14 (operator); child C E8 (M4); travel bundle E2/E3; test-all E3. Done 2026-11-20 after promote
+  9d7973b6: hub-deploy self-update E2 LIVE-VERIFIED, velocity tile live (3 = v1.44.0/1/2).
 
 **Captured this session (P3, grooming):** `docs/bugs/2026-11-19-web-console-sshd-no-set-euo-pipefail.md` (also: its BATS
 file is 555 s, the slowest; GitHub SSH keepalive now in dotfiles `ssh/m4-air/config`),
@@ -66,3 +66,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20 (morning): CI lint red on 82d105e4 (6 pyflakes: 2 unused datetime imports in bin/k3dm-dispatch-recover from child B, 4 in test_promote_mover.py from Luna 412e59be). Claude miss: linted 2d before the correction and never ran pinned ruff on child B. Fixed (claude_edit after land); lint clean, 91 + 18 tests pass.
 - 2026-11-20 (morning): "other" in Tokens by repo traced (6.45 M = one dispatch whose worktree version v1.44.0 differs from its ledger version v1.44.1); appended to the tokens-by-repo P3.
 - 2026-11-20 06:49: CI green on 9d7973b6 (7/7). Promote SHA given to operator: 9d7973b62d04063c4af905da3909567fbcbaf596. Docs-only commits pushed after.
+- 2026-11-20 07:23: promote 3d5fd9ef -> 9d7973b6 done by operator (tag hub-promote/20261120T152130Z; appsets-check ok, platform-ops ok, exporter rolled out). hub-deploy self-update E2 LIVE-VERIFIED from the pane. ArgoCD hub-grafana-dashboards still on 3d5fd9ef at 15:23Z (waiting on its poll) before checking the velocity tile.
+- 2026-11-20 07:26: ArgoCD hub-grafana-dashboards synced 9d7973b6 on its own at 15:25:11Z (no refresh needed, ~3.5 min after promote). Velocity tile live: panel 34 Releases / 7 days, Prometheus count = 3 (v1.44.0, v1.44.1, v1.44.2); operator screenshot shows it.
