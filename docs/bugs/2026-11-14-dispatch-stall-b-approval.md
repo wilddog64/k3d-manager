@@ -251,3 +251,18 @@ No change to `bin/k3dm-hermes`, `repairs.py`, `bin/k3dm-codex-dispatch`, the Mak
 2. Should the relay's replaced-card text name the dispatch drain for `d` ids (`index.js:278`, "next Hermes poll")? Left alone because the brief says nothing else in the relay changes.
 3. Is the `k3dm-slack-webhook` value on the M5 the `k3d-manager` app webhook (per `docs/guides/hermes.md` step 3), so the M4 copy gets working buttons? Not checkable from the repo.
 4. Proposal expiry is 2 hours (longer than the 1 hour approval TTL, shorter than the 24h re-auth): operator to confirm.
+
+## Live evidence: E9 (2026-11-20, M4, operator + Claude)
+
+Toy `e9b-approve`, scratch root `scratchpad/e9b`, stub worker (`model: toy-stub`), overrides passed inline with `env`; production worktree
+root checked empty for the slug. First attempt (`e9-approve`, 15:40Z) was blocked by the approvals User-Agent P1
+(`docs/bugs/2026-11-20-hermes-approvals-drain-blocked-by-cloudflare-user-agent.md`); rerun after 970aeb23 landed:
+
+- 16:32Z `bin/k3dm-dispatch-recover` posted the card `d1-a4a50fac` (correction sha256 `cd7fa41a1bee`); health probe passed (`health_alert_at` 0).
+- Operator pressed Approve; relay ack "d1-a4a50fac approved by @wilddog64".
+- 16:34:24Z drain by hand: proposal `resumed`; `codex-dispatch status`: exited successfully, `resumes: 1`; stub ran once more
+  (16:34:26Z, `codex-2.log`); `prompt-2.md` ends with the staged `correction.md`.
+- Second drain: no further resume (`resumes: 1`, one extra stub run). Authorised relay GET afterwards: 0 items.
+- Slack: "Dispatch e9b-approve resumed with the approved correction (by @wilddog64)".
+
+E9 PASS. E10 (Deny) next, on the 15:40Z `e9-approve` card.

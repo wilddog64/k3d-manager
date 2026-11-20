@@ -104,5 +104,5 @@ drain token present, 64 chars, never printed; probe `e4_probe.py` imports the la
 | Bearer token, `User-Agent: k3dm-hermes/1` | 200 |
 | `fetch_approvals(url, token)` (landed code) | list of 0 items (empty queue, not a swallowed 403) |
 
-E5 still open: child B E9 rerun on a fresh toy card (operator presses Approve), then `make hub-deploy REF=970aeb23` and a Hermes
+E5 part 1 PASS 2026-11-20 16:34Z: child B E9 on fresh card `d1-a4a50fac` resumed the toy once (evidence in child B doc). Still open: `make hub-deploy REF=970aeb23` and a Hermes
 `r` approval drained on the M5.
