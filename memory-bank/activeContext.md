@@ -1,4 +1,4 @@
-## Current state 2026-11-20 12:40 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 12:35 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -10,18 +10,16 @@ tag hub-promote/20261120T175509Z); 7 docs-only commits after it, no promote need
 **Done today:** child B E9 + E10 LIVE-VERIFIED (72ab5903, 92fd27f7) after the P1 hermes approvals UA fix (970aeb23,
 LIVE-VERIFIED on M5). dirused list local time (v0.0.24) and human sizes (v0.0.25) LIVE-VERIFIED.
 
-**Dispatch WIP 3/3, all running (2026-11-20 12:40):**
-- `remote-promote-2c-root-daemon` (Luna, base d1ec381c contains 2d): round 1 stopped on a misreading (thought 2d missing;
-  pre-fix triples are the verifier's job), round 2 wrote a partial daemon then stopped, round 3 = continue prompt.
-- `remote-promote-2e-cve-pin-branch` (Luna): rounds 1-2 stopped because 23 spec lines > 400 chars truncate codex tool
-  output; round 3 told to read 40-line chunks through `fold -s -w 160`.
-- `dirused-m9b-stop-delete-start` (agy Flash): Windows CI 89/90; Claude traced
-  `ServiceStartFailureExits3WithCritTargetOnScanPathAndFromList` (line 357, step 1, got 0) to a TEST bug: default
-  PurgeMinBytes = 1 GiB (Options.cs:8) so the 2 KB file is never a candidate; `/crit 0%` is not parsed (ArgParser.cs:195
-  needs digits 1..100). Round 4 resume replayed round 3's result and exited with no work; round 5 (pid 22497) carries the
-  test-only fix prompt (scratchpad m9b-r4.md). Then verify, commit, push, watch PR wilddog64/dirused#39 Windows CI.
-  Ledger "VIOLATION: agent committed" is the P3 false positive
-  (`docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md`); closes via PR, no `land`.
+**Dispatch WIP 3/3 (ledger), none running (2026-11-20 12:35):**
+- `remote-promote-2c-root-daemon` (Luna, base d1ec381c contains 2d): 4 rounds, each ends after ~1-2 min with one partial
+  file (daemon 74 lines, untracked). Same codex/model/effort as 2d (whose rounds ran ~20 min). Stopped resuming; operator
+  decision: keep nudging Luna round by round, or switch model.
+- `remote-promote-2e-cve-pin-branch` (Luna): rounds 1-3 lost to long-line truncation (23 spec lines > 400 chars; fixed
+  with `fold -s -w 160`); round 4 wrote services-git.yaml only. Same operator decision.
+- `dirused-m9b-stop-delete-start` (agy Flash): test bug traced (1 GiB default /minsize; `/crit 0%` unparsed; /fromlist
+  rejects /minsize and /crit). Flash round 5 fixed the first two; Claude fixed the /fromlist args (ced1c01). Windows CI
+  then exit 1 instead of 3 at line 357 (step 1); Claude pushed 20b0949 making the assertion print stderr; CI pending.
+  PR wilddog64/dirused#39. Ledger VIOLATION = P3 false positive; closes via PR. Agy resume 4 replayed round 3 (no work).
 - Web-console part C QUEUED: shares `Makefile` + `scripts/etc/machine/not-installed.list` with 2c (one dispatch per
   file) and WIP is full; start after 2c lands.
 
@@ -36,7 +34,7 @@ last 5 progress lines). Any edit to this section must also bump the header times
 1. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): diagnosis.md + correction.md printed to the operator
    2026-11-20 11:05 (files: session 628c342a scratchpad `e8root/v1.44.1/e8-toy-stall.run/stall-20261117T030605Z/`).
    Quality ACCEPTED by operator 2026-11-20 11:15; only the Console comparison of $0.052646 remains -> then LIVE-VERIFIED.
-2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): 3 intents (E1-E3) listed to operator 2026-11-20 12:40,
+2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): 3 intents (E1-E3) listed to operator 2026-11-20 12:20,
    awaiting approval -> record `**Intent approved:**` -> Luna dispatch when a slot frees.
 3. Web-console part A E11–E14 (`docs/plans/v1.45.0-web-console-a-console-sshd.md` lines 722-775): operator at the keyboard
    with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,
@@ -46,7 +44,7 @@ last 5 progress lines). Any edit to this section must also bump the header times
 **Next dispatches (operator go given 2026-11-20 for C and remote-promote):** web-console C after 2c; 2b after 2c.
 (Fast-line close-out trimmed v1.45.0; see roadmap.)
 
-**Live checks owed:** web-console part A E11–E14; child C E8 judgement; remote-promote 2d E11; travel bundle E2/E3 (P2 temp-file prerequisite already LIVE-VERIFIED; steps given to operator 12:40);
+**Live checks owed:** web-console part A E11–E14; child C E8 judgement; remote-promote 2d E11; travel bundle E2/E3 (P2 temp-file prerequisite already LIVE-VERIFIED; steps given to operator 12:20);
 test-all E3.
 
 **Captured this session (P3, grooming):** `docs/bugs/2026-11-19-web-console-sshd-no-set-euo-pipefail.md` (also: its BATS
