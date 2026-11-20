@@ -21,6 +21,9 @@ lists `m8src` (215 K tokens) next to k3d-manager, dirused, other and lib-foundat
 
 ## Fix direction (for triage)
 
-The repo label appears to come from the session's `cwd` basename (not confirmed in code). Map a `cwd` under a Claude
+Confirmed in code: `bin/k3dm-dispatch-metrics:680-684` labels a codex session by `_worktree_repo(cwd)` (dispatch
+worktrees) and otherwise by `Path(cwd).name`, so any non-worktree `cwd` becomes its directory name. "other" in the
+same panel is `_worktree_repo` returning "other" (a dispatch worktree whose `.git` is not a linked-worktree file,
+`:612-645`) or a name failing `[A-Za-z0-9._-]{1,64}` (`:683`). Map a `cwd` under a Claude
 scratchpad (`/private/tmp/claude-*/…/scratchpad/`) to `other`, or have review runs on scratch copies pass the source
 repo name; or start such runs from a directory named after the repo.
