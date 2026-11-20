@@ -42,7 +42,7 @@ file is 555 s, the slowest; GitHub SSH keepalive now in dotfiles `ssh/m4-air/con
 `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`. M4 lacks `gemini-cli-api-key` (operator-
 supplied; machine-setup exits 1 until added).
 
-**Other open:** dirused E2 read-only run on the jump box (operator; v0.0.23), then M9b spec — tracked outside k3d-manager
+**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b spec next — tracked outside k3d-manager
 releases. MEMORY.md over budget (compressing 2026-11-20). Triage due at grooming.
 
 ## Grooming 2026-11-22 agenda
@@ -82,3 +82,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20 07:31: operator ran /hermes-auth 07:29 PST (24h). Handoff written; operator /clear next. Next session: child B E9/E10, child C E8 judgement, web-console A E11-E14.
 - 2026-11-20 ~08:00: E9 staging incident: smartcd made `cd && export` skip the overrides, so toy `e9-toy-approve` started in the production root with the real Codex (gpt-6.1-terra); killed after ~15 s (143), worktree clean; abandoned (operator "go 0"); usage 45.9K in / 247 out in the production ledger. P3 filed: docs/bugs/2026-11-20-toy-dispatch-staged-in-production-root-real-codex.md. Finding: the stall watcher never calls the drain (child A N3; wiring = stall-recovery plan part 1, not written), so E9/E10 run the drain by hand; the watcher-driven half stays owed. Next: operator "go E9" (steps listed in session; all overrides inline).
 - 2026-11-20 ~08:05: E9 card d1-9593afc1 posted (toy e9-approve, scratch root), but the drain cannot see clicks: Cloudflare 403 error 1010 on Python's default User-Agent (custom UA 200, wrong token 401). M4 drain token re-copied from M5 (works). P1 (operator) spec docs/bugs/2026-11-20-hermes-approvals-drain-blocked-by-cloudflare-user-agent.md; dispatch to Flash (gemini-3.8-flash-medium) after intent approval. Card left to expire 09:40 PST; E9 reruns on a fresh card after the fix lands. M5 Hermes approvals likely broken by the same path.
+- 2026-11-20 ~08:15: dirused M9a E2 LIVE-VERIFIED (operator, jump box, v0.0.23): 2 held Tomcat85 redirect logs 'would delete after stopping Tomcat85', 11-03 log not held (plain would delete; spec expectation wrong, behaviour right), savelist/fromlist round trip same 3 rows. Plan Status fixed (offline VERIFIED 11-19 never recorded). Note for M9b: held file size from directory metadata was stale (117G -> 138G). Next: M9b spec.

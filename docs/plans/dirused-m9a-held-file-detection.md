@@ -1,6 +1,6 @@
 # dirused M9a: /purge finds files Tomcat holds and says which service it would stop (read-only)
 
-**Status:** LANDED — dirused@b4538997 (auto: land 2026-11-19; verify pending); 11-19 — rev 2, split from M9 rev 1 after Fable (FIX) + Astra (REWORK) blind reviews, adjudicated 2026-11-19
+**Status:** LIVE-VERIFIED 2026-11-20 — E2 by operator on the jump box (v0.0.23, see Live evidence); VERIFIED 2026-11-19 (Sonnet verifier from Acceptance, mutants red except Windows-only N1/N2 covered by E1W; Windows CI green on PR #36, merged 2ca49a2, tag v0.0.23); LANDED dirused@b4538997; rev 2, split from M9 rev 1 after Fable (FIX) + Astra (REWORK) blind reviews, adjudicated 2026-11-19
 **Parent:** `docs/plans/dirused-m9-purge-stop-service-for-locked-files.md` (adjudication table, M9b outline)
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Repo / branch:** wilddog64/dirused / `m9a-held-file-detection` (from main 1eb1455, v0.0.22)
@@ -243,3 +243,21 @@ interface:
   - "held files: N (Tomcat: <service> on <host>, root <root>: K file(s), <size>; other: M)"
   - "in-use check failed for N file(s): <error>"
 ```
+
+## Live evidence
+
+**E2, operator, office jump box, 2026-11-20 ~16:09Z, dirused v0.0.23 (list header `# tool version=0.0.23`), read-only, no /confirm.**
+
+- `dirused \\us03p02ffm01\d$\tomcat /largest /purge`: `tomcat85-stderr.2026-11-04.log` 117G and `tomcat85-stdout.2026-11-04.log` 7.2G
+  `[would delete after stopping Tomcat85]`; `tomcat85-stderr.2026-11-03.log` 9.8G `[would delete]`; no `id mismatch`;
+  `held files: 2 (Tomcat: Tomcat85 on us03p02ffm01, root D:\Tomcat\Tomcat: 2 file(s), 123.9 GB; other: 0)`. (M1, M2)
+- Same with `/savelist m9a.txt`: 3 rows saved (volume serial 945305AB, file IDs ...44, ...3D, ...43), 156.1 GB. (M6)
+- `dirused /fromlist m9a.txt /purge`: the same 3 rows and statuses, held files 2, `0 skipped`. (M5)
+- Different from what E2 expected, and correct: the spec expected the 11-03 stderr log to be held. Tomcat holds only the current
+  redirect logs, so 11-03 is not held and is an ordinary `would delete` (age rule met). The service is shown in SCM case `Tomcat85`.
+- Seen, not a defect of M9a: between the two runs (a few minutes apart) the 11-04 stderr went from 117G (last write 11-18) to 138G
+  (11-20), while disk used stayed 158G. The first scan read stale directory metadata for a held file. This is the "stale directory
+  time" case D1 exempts. M9b should re-read size and time from an open handle before reporting bytes it would free.
+- M3 (other held reasons) was not exercised live: no non-Tomcat held file on ffm01. Covered offline by E1.
+- Claude's step list gave `/fromlist` without `/purge`; dirused correctly refused (`/fromlist requires /purge`); rerun with `/purge`.
+
