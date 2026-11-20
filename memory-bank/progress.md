@@ -80,3 +80,4 @@
 - 2026-11-20 13:38: dirused PR #39 merged a2d0508 (operator, 21:37Z). M9b dispatch closed via abandon (land blocked by false VIOLATION bug; reason records landed via PR). WIP 2/3 (2c, 2e quota-stopped). Next: main CI, tag v0.0.26.
 - 2026-11-20 13:50: dirused main CI green on a2d0508; tag v0.0.26 pushed at a2d0508 (operator go); release build running.
 - 2026-11-20 13:52: dirused v0.0.26 released (pre-release, win-x64/arm64 zips + .sha256, run 44823783100). Waiting on operator M9b E2 live check after 19:00 PT.
+- 2026-11-20 14:01: operator deferred dirused M9b E2 to Monday 2026-11-23 (no daytime prod Tomcat stop). Note: /purge /confirm deletes non-held eligible logs before the Tomcat prompt; answering n only protects held files.

@@ -1,4 +1,4 @@
-## Current state 2026-11-20 13:52 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 14:01 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -52,7 +52,7 @@ file is 555 s, the slowest; GitHub SSH keepalive now in dotfiles `ssh/m4-air/con
 `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`. M4 lacks `gemini-cli-api-key` (operator-
 supplied; machine-setup exits 1 until added).
 
-**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b PR wilddog64/dirused#39 merged a2d0508 (operator); dispatch record closed (abandon, reason landed via PR); v0.0.26 released (run 44823783100; win-x64/arm64 zips + .sha256); waiting on operator E2 live check (jump box, after 19:00 PT: /purge preview then /purge /confirm y, Tomcat85 stop/delete/start, sc query RUNNING, app responds) — tracked outside k3d-manager
+**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b PR wilddog64/dirused#39 merged a2d0508 (operator); dispatch record closed (abandon, reason landed via PR); v0.0.26 released (run 44823783100; win-x64/arm64 zips + .sha256); M9b E2 live check deferred by operator to Monday 2026-11-23 (team in office; no daytime prod Tomcat stop). Daytime-safe partial: preview + /confirm answer Enter (held logs skipped: in use, not confirmed; non-held old logs ARE deleted in pass 1). Full stop/delete/start still needs an outage window — tracked outside k3d-manager
 releases. MEMORY.md over budget (compressing 2026-11-20). Triage due at grooming.
 
 ## Grooming 2026-11-22 agenda
