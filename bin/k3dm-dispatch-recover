@@ -257,7 +257,7 @@ def main():
                     else:
                         proposal["status"] = "resume_failed"
                         stderr = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else f"exit {result.returncode}"
-                        for secret in (drain_url, token):
+                        for secret in (drain_url, token, relay):
                             stderr = stderr.replace(secret, "[redacted]")
                         line = f"Dispatch {proposal['slug']} resume failed: {stderr} (requested by <@{approval['approved_by']}>)"
                 except (OSError, subprocess.SubprocessError) as error:

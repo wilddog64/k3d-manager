@@ -3,6 +3,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -171,3 +172,82 @@ def test_credentials_stay_out_of_argv_state_and_logs(monkeypatch, tmp_path, caps
         assert secret not in state_text and secret not in argv_text
         assert secret not in captured.out and secret not in captured.err
     assert used == [("https://relay.invalid/drain", "Bearer token-secret")]
+
+
+def test_resume_attempt_is_saved_before_process_and_retry_is_blocked(monkeypatch, tmp_path):
+    repo, root, run, stall, state, cards, summaries, calls = setup(monkeypatch, tmp_path)
+    recover.main()
+    proposal = next(iter(json.loads(state.read_text())["proposals"].values()))
+    approval = {"action_id": proposal["action_id"], "nonce": proposal["nonce"], "approved_by": "UAPPROVER"}
+    monkeypatch.setattr(recover, "fetch_approvals", lambda *a, **k: [approval])
+    real_run = subprocess.run
+    resume_calls = []
+
+    def fail_resume(argv, **kwargs):
+        if str(argv[0]).endswith("k3dm-codex-dispatch"):
+            resume_calls.append(argv)
+            saved = json.loads(state.read_text())
+            assert saved["proposals"][str(stall.resolve())]["status"] == "attempting"
+            raise subprocess.TimeoutExpired(argv, 300, stderr="simulated crash")
+        return real_run(argv, **kwargs)
+
+    monkeypatch.setattr(recover.subprocess, "run", fail_resume)
+    recover.main()
+    assert len(resume_calls) == 1
+    assert json.loads(state.read_text())["proposals"][str(stall.resolve())]["status"] == "resume_failed"
+    recover.main()
+    assert len(resume_calls) == 1
+    assert any("dropped stale" in line for line in summaries)
+
+
+def test_resume_stderr_redacts_relay_webhook_url(monkeypatch, tmp_path, capsys):
+    repo, root, run, stall, state, cards, summaries, calls = setup(monkeypatch, tmp_path)
+    recover.main()
+    proposal = next(iter(json.loads(state.read_text())["proposals"].values()))
+    approval = {"action_id": proposal["action_id"], "nonce": proposal["nonce"], "approved_by": "UAPPROVER"}
+    monkeypatch.setattr(recover, "fetch_approvals", lambda *a, **k: [approval])
+    real_run = subprocess.run
+    resume_calls = []
+
+    def failed_resume(argv, **kwargs):
+        if str(argv[0]).endswith("k3dm-codex-dispatch"):
+            resume_calls.append(argv)
+            return subprocess.CompletedProcess(argv, 1, "", "failed at https://webhook.invalid/x")
+        return real_run(argv, **kwargs)
+
+    monkeypatch.setattr(recover.subprocess, "run", failed_resume)
+    recover.main()
+    captured = capsys.readouterr()
+    assert len(resume_calls) == 1
+    assert "https://webhook.invalid/x" not in captured.out + captured.err
+    assert all("https://webhook.invalid/x" not in line for line in summaries)
+    assert "https://webhook.invalid/x" not in state.read_text()
+
+
+def test_hermes_setup_steps_remain_continuous():
+    guide = (ROOT / "docs/guides/hermes.md").read_text(encoding="utf-8")
+    setup_text = guide.split("Operator setup (run in Terminal.app):", 1)[1].split("`APPROVERS`", 1)[0]
+    assert re.findall(r"(?m)^([1-9])\. ", setup_text) == ["1", "2", "3", "4"]
+    recovery = "Dispatch recovery uses `d` action IDs"
+    step_four = setup_text.index("4. The LaunchAgent template")
+    assert setup_text.index(recovery) > step_four
+
+
+def test_non_exited_landed_and_violation_dispatches_refuse_resume(monkeypatch, tmp_path):
+    for state_kind in ("not_exited", "landed", "violation"):
+        case = tmp_path / state_kind
+        case.mkdir()
+        repo, root, run, stall, state, cards, summaries, calls = setup(monkeypatch, case)
+        if state_kind == "not_exited":
+            (run / "exit").unlink()
+        elif state_kind == "landed":
+            (run / "landed").touch()
+        else:
+            (run / "violation").touch()
+        recover.main()
+        proposal = next(iter(json.loads(state.read_text())["proposals"].values()))
+        approval = {"action_id": proposal["action_id"], "nonce": proposal["nonce"], "approved_by": "UAPPROVER"}
+        monkeypatch.setattr(recover, "fetch_approvals", lambda *a, **k: [approval])
+        recover.main()
+        assert calls == [], state_kind
+        assert any("dispatch is not exited cleanly" in line for line in summaries), state_kind
