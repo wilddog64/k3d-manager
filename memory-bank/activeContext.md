@@ -89,3 +89,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20: dirused PR #37 merged 2e62aed, tag v0.0.24 (CI green, Argon clean). Pending operator E2 on jump box. P1 E5 pending: E9 toy card + promote 9c3345ba after CI.
 - 2026-11-20: E9b staged: toy e9b-approve (scratchpad/e9b root, stub codex) card posted d1-a4a50fac, health probe passed (health_alert_at 0). Waiting on operator Approve, then Claude drains by hand.
 - 2026-11-20: child B E9 PASS (e9b-approve d1-a4a50fac: one resume, Slack confirm line, relay queue empty). P1 E5 part 1 done; part 2 = promote + M5 Hermes r approval. Next: E10 Deny on old e9-approve card.
+- 2026-11-20: child B E10 PASS (Deny d1-9593afc1: no resume, proposal stays proposed per spec :120, relay empty). Child B LIVE-VERIFIED. Toys e9-approve, e9b-approve abandoned in scratch roots. Open: P1 E5 part 2 (promote 72ab5903+, M5 Hermes r approval); dirused E2 (operator).

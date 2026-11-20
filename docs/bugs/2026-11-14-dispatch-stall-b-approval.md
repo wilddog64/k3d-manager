@@ -1,8 +1,9 @@
 # Bug (child B): approve a stalled-dispatch correction from Slack, then resume once
 
-**Status:** VERIFIED — 4c1a7b4c + c0c0dbfe on k3d-manager-v1.45.0 2026-11-20 (Luna; Sonnet Acceptance verifier PASS; Claude re-mutated gap guards); live E9/E10 pending
+**Status:** LIVE-VERIFIED 2026-11-20 (E9, E10) — VERIFIED 4c1a7b4c + c0c0dbfe on k3d-manager-v1.45.0 2026-11-20 (Luna; Sonnet Acceptance verifier PASS; Claude re-mutated gap guards); LIVE: E9 + E10 PASS 2026-11-20 (operator + Claude, M4)
+**Live evidence:** 2026-11-20 · run e9b-approve-d1-a4a50fac+e9-approve-d1-9593afc1 · env m4-air · scenario slack-approve-resumes-toy-once-deny-does-nothing · commit 970aeb23 · proves E9,E10
+**Fix commit:** 4c1a7b4c
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** live check — since 2026-11-20 (E9/E10, operator, after hub promote and M4 Keychain copies)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
@@ -265,4 +266,14 @@ root checked empty for the slug. First attempt (`e9-approve`, 15:40Z) was blocke
 - Second drain: no further resume (`resumes: 1`, one extra stub run). Authorised relay GET afterwards: 0 items.
 - Slack: "Dispatch e9b-approve resumed with the approved correction (by @wilddog64)".
 
-E9 PASS. E10 (Deny) next, on the 15:40Z `e9-approve` card.
+E9 PASS.
+
+## Live evidence: E10 (2026-11-20, M4, operator + Claude)
+
+- Operator pressed Deny on the 15:40Z card `d1-9593afc1` (toy `e9-approve`, scratch root `scratchpad/e9`); relay replaced the card:
+  "d1-9593afc1 denied by @wilddog64 — dismissed".
+- 16:42:52Z two drains by hand against that toy's state: rc 0 both; proposal still `proposed`, `resume_count` 0 (as specified at
+  `:120`: Deny writes no approval, the proposal waits for `expires_at`); `codex-dispatch status`: exited successfully, no `resumes`
+  line; no `prompt-2`/`codex-2` files (no resume ran). Authorised relay GET: 0 items.
+
+E10 PASS (N7 live). M2 (malformed id refusal) is covered offline by E2/E3; the live Deny path exercised the d-id branch only.
