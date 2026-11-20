@@ -52,3 +52,5 @@
 - 2026-11-20: dirused v0.0.25 released (win-x64/arm64 zips + .sha256). Waiting on operator E2 (jump box).
 - 2026-11-20: dirused v0.0.25 E2 steps 1-3 PASS (operator 09:16 PST): update 0.0.24->0.0.25, m9a3.txt v3, minsize=1GB, size col 138G/9.8G/8.5G beside exact bytes, /fromlist m9a3.txt /purge same 3 rows+statuses, 0 skipped. Outstanding: /fromlist m9a2.txt /purge (v2 replay) for both v0.0.24 and v0.0.25 E2.
 - 2026-11-20: dirused v0.0.24 and v0.0.25 LIVE-VERIFIED: /fromlist m9a2.txt (v2) on 0.0.25 reads, same 3 rows, 0 skipped; v3 E2 passed earlier. Both plans closed.
+- 2026-11-20: dirused M9b spec rev 1 written (docs/plans/dirused-m9b-stop-delete-start.md, v0.0.26, Flash, risk medium); /spec-review checklist fixes applied; Fable + Astra blind reviews running; dispatch waits on proof 6 (SEVERE lines, operator findstr), review adjudication, intent approval.
+- 2026-11-20: M9b spec rev 2: Fable + Astra blind reviews adjudicated (20 rows; 1056/STOP_PENDING, ProbeHeld hold-back, warning containment, ENUMERATE_DEPENDENTS fixed); operator dropped catalina/SEVERE check (stop+start by SCM state only), proof 6 dropped; waiting on intent approval then Flash dispatch.
