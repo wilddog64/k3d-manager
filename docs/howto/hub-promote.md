@@ -37,8 +37,20 @@ a checkout locked at the promoted commit; a pending reinstall is retried by the
 next `bin/k3dm-hub-deploy <ref>` run, including a rerun of the same ref. A changed
 template without a wired installer is listed as `unwired` in the summary and must
 be reinstalled with its own setup command. If a step fails, fix it and rerun the
-same command; an already-current `deploy/hub` ref continues with the
-remaining steps.
+same command; an already-current `deploy/hub` ref continues with the remaining
+steps. The command fetches the promoted ref as part of promotion, fast-forwards
+the local hub checkout under repo-sync's lock when it is clean and behind, then
+re-executes the promoted copy before applying anything. If the checkout is dirty,
+diverged, or cannot catch up before its wait expires, nothing is applied; fix the
+checkout or let repo-sync resolve it, then rerun the same command.
+
+The first promote that delivers this handoff still runs the old copy; it is the
+last one that requires a second `make hub-deploy REF=<sha>`. `k3dm-require-role`
+and `k3dm-hub-promote` also run from the pre-promote checkout, so changes to
+those scripts take effect one promote later. Stage 1 writes state before
+promotion, so stage 2's missing-state path is reachable only when called
+directly with its handoff environment variable. A `deploy/hub` move between
+promotion and `platform-ops` remains guarded by the existing pin check.
 
 The individual commands remain available as a manual fallback:
 

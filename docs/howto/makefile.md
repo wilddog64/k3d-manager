@@ -79,7 +79,7 @@ After a rebuild, generate the new target map and restore with:
 
 | Target | When to use |
 |---|---|
-| `make hub-deploy REF=<commit-ish>` | Everyday promote: moves `deploy/hub` (`hub-promote`) and runs the follow-up steps. See [hub promote](hub-promote.md) |
+| `make hub-deploy REF=<commit-ish>` | Everyday promote: moves `deploy/hub`, catches the clean checkout up under repo-sync's lock, then runs the promoted deploy copy and follow-up steps. See [hub promote](hub-promote.md) |
 | `make hub-promote REF=<commit-ish>` | Move `deploy/hub` only. The outage and intentional-discard overrides are in [hub promote](hub-promote.md) |
 | `make hub-promote-status` | Show what `deploy/hub` holds and any uncontained commits |
 | `make dev-hub-up` / `dev-hub-down` / `dev-hub-status` | Isolated development vCluster (hub role only). See [dev hub](dev-hub.md) |

@@ -51,6 +51,7 @@ if [[ "${CONFIRM_CAPTURE:-0}" == 1 && "$1" == promote ]]; then
 fi
 [[ "${PROMOTE_FAIL:-0}" == 0 ]] || exit "$PROMOTE_FAIL"
 if [[ -n "${PROMOTE_TO_SHA:-}" ]]; then
+  "$REAL_GIT" -C "$TEST_WORK" branch -f "$2" "$PROMOTE_TO_SHA" 2>/dev/null || :
   "$REAL_GIT" -C "$TEST_WORK" push --quiet origin "$PROMOTE_TO_SHA:refs/heads/deploy/hub"
 fi
 printf '%s\n' "${PROMOTE_OUTPUT:-promoted}"
@@ -67,6 +68,7 @@ if [[ -e "$state" ]]; then
   cat "$state" >> "$BATS_TEST_TMPDIR/state-snapshots"
 fi
 printf '%s\n' "$target" >> "$CALLS"
+if [[ "$target" == appsets-check ]]; then printf 'child-prev=%s\n' "${K3DM_HUB_DEPLOY_PREV:-unset}" >> "$CALLS"; fi
 [[ "${FAIL_STEP:-}" != "$target" ]] || exit "${FAIL_CODE:-23}"
 if [[ "$target" == install-* ]]; then
   [[ "$K3DM_REPO_SYNC_STATE_DIR" == "$BATS_TEST_TMPDIR/repo-sync" && "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
@@ -148,13 +150,27 @@ EOF
   printf 'changed\n' > "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
   "$REAL_GIT" -C "$WORK" commit -qam changed
   CHANGED_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  # The promoted commit runs this script as stage 2 and records the exact
+  # arguments and handoff value before entering the real implementation.
+  # shellcheck disable=SC2016
+  { sed -n '1p' "$WORK/bin/k3dm-hub-deploy"; printf 'printf "stage2 %%s prev=%%s\\n" "$*" "${K3DM_HUB_DEPLOY_PREV:-}" >> "$CALLS"\n'; sed -n '2,$p' "$WORK/bin/k3dm-hub-deploy"; } > "$WORK/bin/k3dm-hub-deploy.tmp"
+  mv "$WORK/bin/k3dm-hub-deploy.tmp" "$WORK/bin/k3dm-hub-deploy"
+  chmod +x "$WORK/bin/k3dm-hub-deploy"
+  "$REAL_GIT" -C "$WORK" add bin/k3dm-hub-deploy
+  "$REAL_GIT" -C "$WORK" commit -qm 'fixture promoted handoff'
+  CHANGED_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
   "$REAL_GIT" -C "$WORK" push --quiet origin "$CHANGED_SHA:refs/heads/fixture-changed"
+  "$REAL_GIT" -C "$WORK" branch fixture-changed "$CHANGED_SHA"
+  "$REAL_GIT" -C "$WORK" branch fixture-base "$BASE_SHA"
+  "$REAL_GIT" -C "$WORK" branch base "$BASE_SHA"
   "$REAL_GIT" -C "$WORK" checkout -qb other "$BASE_SHA"
   printf 'other\n' > "$WORK/other.txt"
   "$REAL_GIT" -C "$WORK" add other.txt
   "$REAL_GIT" -C "$WORK" commit -qm other
   OTHER_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  "$REAL_GIT" -C "$WORK" branch fixture-other "$OTHER_SHA"
   "$REAL_GIT" -C "$WORK" push --quiet origin "$OTHER_SHA:refs/heads/fixture-other"
+  "$REAL_GIT" -C "$WORK" checkout -q --detach "$BASE_SHA"
   export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
   [[ "$HOME" == "$BATS_TEST_TMPDIR/home" && "$K3DM_REPO_SYNC_STATE_DIR" == "$BATS_TEST_TMPDIR/repo-sync" ]]
   [[ -d "$WORK/.git" && "$(command -v make)" == "$BATS_TEST_TMPDIR/stubs/make" && "$(command -v launchctl)" == "$BATS_TEST_TMPDIR/stubs/launchctl" ]]
@@ -165,7 +181,59 @@ EOF
   run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" fixture-changed
   [ "$status" -eq 0 ]
   [[ "$output" == *'reapply ran; appsets-check ok; platform-ops ok; exporter rolled out'* ]]
-  [ "$(grep -E '^(promote|appsets-|platform-ops|rollout)' "$CALLS")" = $'promote promote fixture-changed\nappsets-reapply\nappsets-check\nplatform-ops\nrollout' ]
+  [[ "$output" == *"continuing with the promoted copy at ${CHANGED_SHA:0:7}"* ]]
+  grep -qx "stage2 $CHANGED_SHA prev=$BASE_SHA" "$CALLS"
+  [ "$(grep -c '^promote ' "$CALLS")" -eq 1 ]
+  [ "$(grep -cx appsets-check "$CALLS")" -eq 1 ]
+  [ "$(grep -cx platform-ops "$CALLS")" -eq 1 ]
+  [[ "$output" == *"${BASE_SHA:0:7}..${CHANGED_SHA:0:7}"* ]]
+}
+
+@test "M4: resolved promoted ref is bound before checkout catch-up" {
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" "$OTHER_SHA"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'not the promoted'*'superseded'* ]]
+  [ "$(grep -cx appsets-check "$CALLS" || true)" -eq 0 ]
+}
+
+@test "M5: direct stage 2 validates inputs and never promotes" {
+  run env K3DM_HUB_DEPLOY_PREV=bad "$WORK/bin/k3dm-hub-deploy" "$CHANGED_SHA"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'K3DM_HUB_DEPLOY_PREV must be a commit sha'* ]]
+  run env K3DM_HUB_DEPLOY_PREV="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" not-a-sha
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'K3DM_HUB_DEPLOY_PREV must be a commit sha'* ]]
+  "$REAL_GIT" -C "$WORK" push --quiet origin "$CHANGED_SHA:refs/heads/deploy/hub"
+  "$REAL_GIT" -C "$WORK" checkout -q --detach "$CHANGED_SHA"
+  run env K3DM_HUB_DEPLOY_PREV="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" "$CHANGED_SHA"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^promote ' "$CALLS" || true)" -eq 0 ]
+  grep -qx 'child-prev=unset' "$CALLS"
+  : > "$CALLS"
+  "$REAL_GIT" -C "$WORK" push --quiet origin "+$OTHER_SHA:refs/heads/deploy/hub"
+  run env K3DM_HUB_DEPLOY_PREV="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" "$CHANGED_SHA"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'before the promoted copy ran; superseded'* ]]
+  [ "$(grep -cx appsets-check "$CALLS" || true)" -eq 0 ]
+  "$REAL_GIT" -C "$WORK" push --quiet origin "+$CHANGED_SHA:refs/heads/deploy/hub"
+  "$REAL_GIT" -C "$WORK" checkout -q --detach "$BASE_SHA"
+  run env K3DM_HUB_DEPLOY_PREV="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" "$CHANGED_SHA"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'before the promoted copy ran; superseded'* ]]
+  [ "$(grep -cx appsets-check "$CALLS" || true)" -eq 0 ]
+}
+
+@test "M2: dirty checkout stops before apply and preserves appsets state" {
+  mkdir -p "$HOME/.local/share/k3d-manager/hub-deploy"
+  printf 'appsets %s\nlaunchd %s\n' "$BASE_SHA" "$BASE_SHA" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  printf 'dirty\n' >> "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" fixture-changed
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'nothing applied'*'stopped at checkout-catch-up'* ]]
+  [ "$(grep -cx appsets-check "$CALLS" || true)" -eq 0 ]
+  [ "$(grep -cx platform-ops "$CALLS" || true)" -eq 0 ]
+  grep -qx "appsets $BASE_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  [ ! -e "$K3DM_REPO_SYNC_STATE_DIR/lock" ]
 }
 
 @test "M2 and N2: unchanged ApplicationSets skip reapply" {
@@ -184,6 +252,24 @@ EOF
   [ "$status" -eq 0 ]
   [ "$(grep -c '^promote ' "$CALLS")" -eq 1 ]
   [[ "$output" == *'exporter rolled out'* ]]
+}
+
+@test "M3: promoted revision without handoff continues in the running copy" {
+  "$REAL_GIT" -C "$WORK" checkout -q fixture-changed
+  sed 's/K3DM_HUB_DEPLOY_PREV/OLD_STAGE_HANDOFF/g' "$WORK/bin/k3dm-hub-deploy" > "$WORK/bin/k3dm-hub-deploy.tmp"
+  mv "$WORK/bin/k3dm-hub-deploy.tmp" "$WORK/bin/k3dm-hub-deploy"
+  chmod +x "$WORK/bin/k3dm-hub-deploy"
+  "$REAL_GIT" -C "$WORK" add bin/k3dm-hub-deploy
+  "$REAL_GIT" -C "$WORK" commit -qm 'fixture revision without handoff'
+  no_handoff_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
+  "$REAL_GIT" -C "$WORK" push --quiet origin "$no_handoff_sha:refs/heads/deploy/hub"
+  : > "$CALLS"
+  "$REAL_GIT" -C "$WORK" checkout -q --detach "$BASE_SHA"
+  run "$WORK/bin/k3dm-hub-deploy" "$no_handoff_sha"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'promoted copy has no handoff; continuing with the running copy'* ]]
+  [ "$(grep -cx appsets-check "$CALLS")" -eq 1 ]
+  [ "$(grep -c '^stage2 ' "$CALLS" || true)" -eq 0 ]
 }
 
 @test "M4: failure stops at the failing step and preserves its exit code" {
@@ -209,6 +295,7 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" == *'confirmation requires a TTY'* ]]
   [ "$(grep -cx rollout "$CALLS" || true)" -eq 0 ]
+  # shellcheck disable=SC2016
   grep -q 'k3dm-hub-promote.*promote.*"\$ref"' "$WORK/bin/k3dm-hub-deploy"
   grep -q "confirmation requires a TTY" "$REPO/bin/k3dm-hub-promote"
   grep -q 'answer.*promote' "$REPO/bin/k3dm-hub-promote"
@@ -216,6 +303,7 @@ EOF
 
 @test "promoter's confirmation details appear before its prompt and stdin reaches it" {
   [[ "$(cat "$FIXTURE_ROOT")" == fixture ]]
+  # shellcheck disable=SC2016
   run env CONFIRM_CAPTURE=1 bash -c 'exec "$1" fixture-base 2>&1' _ "$WORK/bin/k3dm-hub-deploy" <<< promote
   [ "$status" -eq 0 ]
   shown_line="$(grep -n '^SHOWN old\.\.new$' <<< "$output" | cut -d: -f1)"
@@ -231,6 +319,7 @@ EOF
   [[ "$(cat "$FIXTURE_ROOT")" == fixture ]]
   run "$REAL_MAKE" --no-print-directory -C "$WORK" -n hub-deploy REF=release
   [ "$status" -eq 0 ]
+  # shellcheck disable=SC2016
   [[ "$output" == *'bin/k3dm-hub-deploy "$REF"'* ]]
   grep -q '^\.PHONY:.*hub-deploy' "$WORK/Makefile"
   [[ "$output" == *'usage: make hub-deploy REF='* ]] || grep -q 'hub-deploy REF=\.\.\.' "$WORK/Makefile"
@@ -300,10 +389,10 @@ install_fixture() {
   install_fixture
   printf 'dirty\n' >> "$WORK/scripts/etc/argocd/applicationsets/test.yaml"
   run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
-  [ "$status" -eq 0 ]
-  [[ "$output" == *'pending; rerun bin/k3dm-hub-deploy <ref>'* ]]
-  [[ "$output" != *'make install-'* ]]
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'nothing applied'*'checkout-catch-up'* ]]
   [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
+  [ "$(grep -cx appsets-check "$CALLS" || true)" -eq 0 ]
   "$REAL_GIT" -C "$WORK" checkout -- scripts/etc/argocd/applicationsets/test.yaml
   run "$WORK/bin/k3dm-hub-deploy" changed
   [ "$status" -eq 0 ]
@@ -400,7 +489,8 @@ install_fixture() {
   install_fixture
   mkdir -p "$K3DM_REPO_SYNC_STATE_DIR/lock"
   run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'checkout-catch-up'* ]]
   [ -d "$K3DM_REPO_SYNC_STATE_DIR/lock" ]
   [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
   printf '99999999\n' > "$K3DM_REPO_SYNC_STATE_DIR/lock/pid"
@@ -440,6 +530,7 @@ install_fixture() {
   install_fixture
   env PROMOTE_TO_SHA="$CHANGED_SHA" LATE_INSTALL=1 "$WORK/bin/k3dm-hub-deploy" changed > "$BATS_TEST_TMPDIR/first-output" 2>&1 &
   deploy_pid=$!
+  # shellcheck disable=SC2034
   for unused in {1..100}; do
     [[ ! -e "$BATS_TEST_TMPDIR/installer-ready" ]] || break
     sleep 0.1
@@ -472,6 +563,7 @@ install_fixture() {
 @test "P1 unrelated child does not keep run lock after deploy is killed" {
   env SLEEP_CHILD=1 "$WORK/bin/k3dm-hub-deploy" base > "$BATS_TEST_TMPDIR/first-output" 2>&1 &
   deploy_pid=$!
+  # shellcheck disable=SC2034
   for unused in {1..100}; do
     [[ ! -e "$BATS_TEST_TMPDIR/sleeper-ready" ]] || break
     sleep 0.1
@@ -588,8 +680,8 @@ install_fixture() {
   "$REAL_GIT" -C "$WORK" checkout -qb original "$BASE_SHA"
   run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" changed
   [ "$status" -eq 0 ]
-  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
-  [[ "$output" == *'hub checkout is not at '* ]]
+  [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 1 ]
+  [ "$("$REAL_GIT" -C "$WORK" rev-parse HEAD)" = "$CHANGED_SHA" ]
   "$REAL_GIT" -C "$WORK" checkout -q changed
   run "$WORK/bin/k3dm-hub-deploy" changed
   [ "$status" -eq 0 ]
@@ -599,11 +691,11 @@ install_fixture() {
   "$REAL_GIT" -C "$WORK" commit -qm revert-template
   ahead_sha="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
   printf 'pending sandbox-reaper\n' >> "$HOME/.local/share/k3d-manager/hub-deploy/state"
-  run "$WORK/bin/k3dm-hub-deploy" changed
-  [ "$status" -eq 0 ]
+  run "$WORK/bin/k3dm-hub-deploy" "$CHANGED_SHA"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'checkout-catch-up'* ]]
   [ "$(grep -cx install-sandbox-reaper "$CALLS" || true)" -eq 0 ]
-  [[ "$output" == *'hub checkout is not at '* ]]
-  run env PROMOTE_TO_SHA="$ahead_sha" "$WORK/bin/k3dm-hub-deploy" revert
+  run env PROMOTE_TO_SHA="$ahead_sha" "$WORK/bin/k3dm-hub-deploy" "$ahead_sha"
   [ "$status" -eq 0 ]
   grep -qx install-sandbox-reaper "$CALLS"
 }

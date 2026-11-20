@@ -15,7 +15,17 @@ stop() {
 retry_hint() { printf 'hub-deploy: launchd %s %s; pending; rerun bin/k3dm-hub-deploy <ref>\n' "$1" "$2" >&2; }
 [[ $# == 1 && -n "$1" ]] || die 'usage: k3dm-hub-deploy <commit-ish>'
 ref="$1"
+stage2=0
+if [[ -n "${K3DM_HUB_DEPLOY_PREV+x}" ]]; then
+  prev="$K3DM_HUB_DEPLOY_PREV"
+  unset K3DM_HUB_DEPLOY_PREV
+  [[ "$prev" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ && "$ref" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || die 'K3DM_HUB_DEPLOY_PREV must be a commit sha'
+  stage2=1
+fi
 if _run_command --soft -- "$REPO_ROOT/bin/k3dm-require-role" hub; then :; else code=$?; stop require-role "$code"; fi
+if [[ "$stage2" == 1 ]]; then
+  _run_command --soft -- git -C "$REPO_ROOT" cat-file -e "$prev^{commit}" 9>&- || die 'K3DM_HUB_DEPLOY_PREV must be a commit sha'
+fi
 STATE_DIR="$HOME/.local/share/k3d-manager/hub-deploy"
 umask 077
 if _run_command --soft -- mkdir -p "$STATE_DIR" && _run_command --soft -- chmod 0700 "$STATE_DIR"; then :; else stop state-dir 1; fi
@@ -66,7 +76,8 @@ valid_state() {
   done < "$STATE_DIR/state"
   [[ -n "$appsets" && -n "$launchd" ]]
 }
-if old="$(remote_sha)"; then :; else code=$?; stop read-deploy-hub "$code"; fi
+if [[ "$stage2" == 1 ]]; then old="$prev"
+elif old="$(remote_sha)"; then :; else code=$?; stop read-deploy-hub "$code"; fi
 pending=()
 if valid_state; then :
 elif [[ ! -e "$STATE_DIR/state" && "$(_run_command --soft -- ls -A "$STATE_DIR" 9>&-)" == run.lock ]]; then
@@ -78,8 +89,76 @@ else
   printf 'hub-deploy: state unreadable; full launchd reconcile and appsets reapply owed\n'
   write_state || stop state-write 1
 fi
-if _run_command --soft -- "$REPO_ROOT/bin/k3dm-hub-promote" promote "$ref" 9>&-; then :; else code=$?; stop promote "$code"; fi
-if new="$(remote_sha)"; then :; else code=$?; stop read-promoted-ref "$code"; fi
+RS_DIR="${K3DM_REPO_SYNC_STATE_DIR:-$HOME/.local/share/k3d-manager/repo-sync}"
+RS_STALE=$((2 * ${K3DM_REPO_SYNC_TIMEOUT:-60} + 60))
+owned=0
+release_lock() { if [[ "$owned" == 1 && -r "$RS_DIR/lock/pid" && "$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)" == "$$" ]]; then _run_command --soft -- rm -rf "$RS_DIR/lock" 9>&-; fi; owned=0; }
+checkout_ok() {
+  local head dirty
+  head="$(_run_command --soft -- git -C "$REPO_ROOT" rev-parse HEAD 9>&-)" || return 1
+  dirty="$(_run_command --soft -- git -C "$REPO_ROOT" status --porcelain --untracked-files=no 9>&-)" || return 1
+  [[ "$head" == "$new" && -z "$dirty" ]]
+}
+lock_stamp() { if [[ "$(_run_command --soft -- uname -s 9>&-)" == Darwin ]]; then _run_command --soft -- /usr/bin/stat -f %m "$1" 9>&-; else _run_command --soft -- /usr/bin/stat -c %Y "$1" 9>&-; fi; }
+take_lock() {
+  local pid mtime now err
+  _run_command --soft -- mkdir -p "$RS_DIR" 9>&- || return 1
+  if ! _run_command --soft --quiet -- mkdir "$RS_DIR/lock" 9>&- 2>/dev/null; then
+    mtime="$(lock_stamp "$RS_DIR/lock")" || return 1; now="$(_run_command --soft -- date +%s 9>&-)"
+    pid=''; [[ ! -r "$RS_DIR/lock/pid" ]] || pid="$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)"
+    err=''; if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then err="$(kill -0 "$pid" 2>&1)" || :; fi
+    if (( now - mtime > RS_STALE )) || [[ "$err" == *'No such process'* || "$err" == *'no such process'* ]]; then _run_command --soft -- rm -rf "$RS_DIR/lock" 9>&-; else return 1; fi
+    _run_command --soft --quiet -- mkdir "$RS_DIR/lock" 9>&- 2>/dev/null || return 1
+  fi
+  owned=1
+  printf '%s\n' "$$" > "$RS_DIR/lock/pid" || return 1
+  [[ "$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)" == "$$" ]]
+}
+
+if [[ "$stage2" == 0 ]]; then
+  if _run_command --soft -- "$REPO_ROOT/bin/k3dm-hub-promote" promote "$ref" 9>&-; then :; else code=$?; stop promote "$code"; fi
+  if new="$(remote_sha)"; then :; else code=$?; stop read-promoted-ref "$code"; fi
+  if want="$(_run_command --soft -- git -C "$REPO_ROOT" rev-parse --verify "$ref^{commit}" 9>&-)"; then :; else stop resolve-promoted-ref 1; fi
+  if [[ "$new" != "$want" ]]; then
+    printf 'hub-deploy: deploy/hub is %s, not the promoted %s; superseded\n' "${new:0:7}" "${want:0:7}" >&2
+    stop superseded 1
+  fi
+  trap release_lock EXIT
+  deadline=$(( $(_run_command --soft -- date +%s 9>&-) + ${K3DM_HUB_DEPLOY_CHECKOUT_WAIT:-330} ))
+  caught_up=0
+  while :; do
+    if take_lock; then
+      if checkout_ok; then caught_up=1; release_lock; break
+      elif [[ -z "$(_run_command --soft -- git -C "$REPO_ROOT" status --porcelain --untracked-files=no 9>&-)" ]] &&
+           _run_command --soft -- git -C "$REPO_ROOT" merge-base --is-ancestor HEAD "$new" 9>&-; then
+        _run_command --soft -- git -C "$REPO_ROOT" merge --ff-only --quiet "$new" 9>&- || :
+        if checkout_ok; then caught_up=1; fi
+      fi
+    fi
+    release_lock
+    [[ "$caught_up" == 0 ]] || break
+    now="$(_run_command --soft -- date +%s 9>&-)"; (( now < deadline )) || break
+    delay=$((deadline-now)); (( delay <= 10 )) || delay=10
+    _run_command --soft -- sleep "$delay" 9>&-
+  done
+  if [[ "$caught_up" != 1 ]]; then
+    printf 'hub-deploy: hub checkout not at %s with a clean tracked tree; nothing applied\n' "${new:0:7}" >&2
+    stop checkout-catch-up 1
+  fi
+  if ! _run_command --soft -- git -C "$REPO_ROOT" grep -q K3DM_HUB_DEPLOY_PREV "$new" -- bin/k3dm-hub-deploy 9>&-; then
+    printf 'hub-deploy: promoted copy has no handoff; continuing with the running copy\n'
+  elif [[ -x "$REPO_ROOT/bin/k3dm-hub-deploy" ]]; then
+    printf 'hub-deploy: continuing with the promoted copy at %s\n' "${new:0:7}"
+    exec env K3DM_HUB_DEPLOY_PREV="$old" "$REPO_ROOT/bin/k3dm-hub-deploy" "$new"
+  else stop handoff 1
+  fi
+else
+  if new="$(remote_sha)"; then :; else code=$?; stop read-deploy-hub "$code"; fi
+  if [[ "$new" != "$ref" ]] || ! checkout_ok; then
+    printf 'hub-deploy: deploy/hub or the checkout moved from %s before the promoted copy ran; superseded\n' "${ref:0:7}" >&2
+    stop superseded 1
+  fi
+fi
 reapply=skipped
 if [[ "$appsets" == full ]]; then
   printf 'appsets reapply owed after lost state\n'; reapply=ran
@@ -141,33 +220,8 @@ for name in "${candidates[@]}"; do
   ready+=("$name"); pending+=("$name")
 done
 launchd="$new"; write_state || stop state-write 1
-RS_DIR="${K3DM_REPO_SYNC_STATE_DIR:-$HOME/.local/share/k3d-manager/repo-sync}"
-RS_STALE=$((2 * ${K3DM_REPO_SYNC_TIMEOUT:-60} + 60))
-owned=0
-release_lock() { if [[ "$owned" == 1 && -r "$RS_DIR/lock/pid" && "$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)" == "$$" ]]; then _run_command --soft -- rm -rf "$RS_DIR/lock" 9>&-; fi; owned=0; }
 trap release_lock EXIT
-checkout_ok() {
-  local head dirty
-  head="$(_run_command --soft -- git -C "$REPO_ROOT" rev-parse HEAD 9>&-)" || return 1
-  dirty="$(_run_command --soft -- git -C "$REPO_ROOT" status --porcelain --untracked-files=no 9>&-)" || return 1
-  [[ "$head" == "$new" && -z "$dirty" ]]
-}
-lock_stamp() { if [[ "$(_run_command --soft -- uname -s 9>&-)" == Darwin ]]; then _run_command --soft -- /usr/bin/stat -f %m "$1" 9>&-; else _run_command --soft -- /usr/bin/stat -c %Y "$1" 9>&-; fi; }
 plist_stamp() { if [[ "$(_run_command --soft -- uname -s 9>&-)" == Darwin ]]; then _run_command --soft -- /usr/bin/stat -f '%Fm %i' "$1" 9>&-; else _run_command --soft -- /usr/bin/stat -c '%.9Y %i' "$1" 9>&-; fi; }
-take_lock() {
-  local pid mtime now err
-  _run_command --soft -- mkdir -p "$RS_DIR" 9>&- || return 1
-  if ! _run_command --soft --quiet -- mkdir "$RS_DIR/lock" 9>&- 2>/dev/null; then
-    mtime="$(lock_stamp "$RS_DIR/lock")" || return 1; now="$(_run_command --soft -- date +%s 9>&-)"
-    pid=''; [[ ! -r "$RS_DIR/lock/pid" ]] || pid="$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)"
-    err=''; if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then err="$(kill -0 "$pid" 2>&1)" || :; fi
-    if (( now - mtime > RS_STALE )) || [[ "$err" == *'No such process'* || "$err" == *'no such process'* ]]; then _run_command --soft -- rm -rf "$RS_DIR/lock" 9>&-; else return 1; fi
-    _run_command --soft --quiet -- mkdir "$RS_DIR/lock" 9>&- 2>/dev/null || return 1
-  fi
-  owned=1
-  printf '%s\n' "$$" > "$RS_DIR/lock/pid" || return 1
-  [[ "$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)" == "$$" ]]
-}
 ran=0
 if ((${#ready[@]})); then
   if [[ "${K3DM_AGENT_LOAD:-}" == 0 ]]; then
