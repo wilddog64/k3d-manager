@@ -623,3 +623,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-18 23:5xZ: plan 5 child C prerequisite MET: Anthropic API key on m4-air (Keychain k3dm-anthropic-api-key/k3dm, matches M5, API probe HTTP 200; operator ran k3dm-copy-anthropic-key --probe). Remaining child C prerequisites: live captures E1-E4 + fixtures committed; claude version pin re-check.
 
 - 2026-11-19: promote-to-dashboard lag bug: hub evidence (Argo CD v3.5.5, deploy/hub, automated sync 6.3 min after promote, 180s+60s reconcile, 21 apps on deploy/hub); operator lowered to P3, stays for grooming 2026-11-22 (a00a885d, 265b36c3).
+- 2026-11-19: CAPTURED docs/bugs/2026-11-19-tokens-by-repo-labels-scratchpad-dir-as-repo.md (P3): m8src = Astra review cwd (dirused M8 scratch copy). Web-console captures running on M4 (C6 both Macs done; C6 live/C11/C12/C17 in progress, scratch /private/tmp/k3dm-captures-2026-11-19).
