@@ -1,0 +1,44 @@
+## before 03:42:35
+	path = /Library/LaunchDaemons/com.k3d-manager.capture-totpd.plist
+	state = running
+	program = /Library/Developer/CommandLineTools/usr/bin/python3
+	runs = 1
+	pid = 90709
+	last exit code = (never exited)
+		state = active
+		state = active
+## send EXIT1 on admin.sock (root) 03:42:35
+EXITING 1
+## +0.5s 03:42:35
+	path = /Library/LaunchDaemons/com.k3d-manager.capture-totpd.plist
+	state = running
+	program = /Library/Developer/CommandLineTools/usr/bin/python3
+	runs = 2
+	pid = 7021
+	last exit code = 1
+		state = active
+		state = active
+## +5.5s 03:42:40
+	path = /Library/LaunchDaemons/com.k3d-manager.capture-totpd.plist
+	state = running
+	program = /Library/Developer/CommandLineTools/usr/bin/python3
+	runs = 2
+	pid = 7021
+	last exit code = 1
+		state = active
+		state = active
+## +15.5s 03:42:50
+	path = /Library/LaunchDaemons/com.k3d-manager.capture-totpd.plist
+	state = running
+	program = /Library/Developer/CommandLineTools/usr/bin/python3
+	runs = 2
+	pid = 7021
+	last exit code = 1
+		state = active
+		state = active
+## root connects to run/totp.sock after restart 03:42:50
+SOCKET totp
+LOCAL_PEERCRED version=0 uid=0
+LOCAL_PEERPID 8269
+ADMIT no a: peer uid 0 != 501
+CHAIN reject: a: peer uid 0 != 501

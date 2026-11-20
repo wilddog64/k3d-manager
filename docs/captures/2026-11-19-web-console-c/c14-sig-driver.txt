@@ -1,0 +1,3 @@
+## sig-term-client client-output='READY\r\r\n' client-status=65280
+## sig-hup-client client-output='READY\r\r\n' client-status=65280
+## sig-kill-client client-output='READY\r\r\n' client-status=9
