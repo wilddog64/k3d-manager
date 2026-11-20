@@ -7,6 +7,8 @@ and plan Status lines in `docs/plans/v1.45.0-*.md`.
 **Branch:** `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `9d7973b6` (promoted 2026-11-20 07:21 PST,
 tag hub-promote/20261120T152130Z); commits after it are docs-only, no promote needed.
 
+**E9 approach (2026-11-20):** drain run by hand on a staged exited toy in a scratch root (overrides inline, never after `cd &&`); watcher->drain wiring owed to stall-recovery part 1.
+
 **NEXT SESSION — operator agreed 2026-11-20 to do all three live checks, in this order:**
 1. Child B E9/E10 (`docs/bugs/2026-11-14-dispatch-stall-b-approval.md`). Operator ran `/hermes-auth` 2026-11-20 07:29 PST
    (Slack: "Re-authenticated for 24h") -> valid until ~2026-11-21 07:29 PST; if later, ask for a fresh `/hermes-auth`.
@@ -78,3 +80,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20 07:23: promote 3d5fd9ef -> 9d7973b6 done by operator (tag hub-promote/20261120T152130Z; appsets-check ok, platform-ops ok, exporter rolled out). hub-deploy self-update E2 LIVE-VERIFIED from the pane. ArgoCD hub-grafana-dashboards still on 3d5fd9ef at 15:23Z (waiting on its poll) before checking the velocity tile.
 - 2026-11-20 07:26: ArgoCD hub-grafana-dashboards synced 9d7973b6 on its own at 15:25:11Z (no refresh needed, ~3.5 min after promote). Velocity tile live: panel 34 Releases / 7 days, Prometheus count = 3 (v1.44.0, v1.44.1, v1.44.2); operator screenshot shows it.
 - 2026-11-20 07:31: operator ran /hermes-auth 07:29 PST (24h). Handoff written; operator /clear next. Next session: child B E9/E10, child C E8 judgement, web-console A E11-E14.
+- 2026-11-20 ~08:00: E9 staging incident: smartcd made `cd && export` skip the overrides, so toy `e9-toy-approve` started in the production root with the real Codex (gpt-6.1-terra); killed after ~15 s (143), worktree clean; abandoned (operator "go 0"); usage 45.9K in / 247 out in the production ledger. P3 filed: docs/bugs/2026-11-20-toy-dispatch-staged-in-production-root-real-codex.md. Finding: the stall watcher never calls the drain (child A N3; wiring = stall-recovery plan part 1, not written), so E9/E10 run the drain by hand; the watcher-driven half stays owed. Next: operator "go E9" (steps listed in session; all overrides inline).
