@@ -1,11 +1,12 @@
 # Bug: the approvals drain is blocked by Cloudflare (Python's default User-Agent), so every Slack Approve is silently lost
 
-**Status:** VERIFIED 2026-11-20 — LANDED 970aeb23 on k3d-manager-v1.45.0 (Flash; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, pre-fix 3 assertion reds, mutants a–e red); E4 live passed (Claude, m4-air, 16:29Z); E5 pending promote
+**Status:** LIVE-VERIFIED 2026-11-20 — E5 part 2 PASS on the M5 after `make hub-deploy REF=5209b6b6` (operator): hub HEAD 5209b6b6, Hermes launchd job has APPROVAL_DRAIN_URL, drain token present, deployed `fetch_approvals` request (HERMES_USER_AGENT) → http 200 ua k3dm-hermes/1 items 0; Hermes log `"approvals": []` on each run. Real `r` card not pressed (none pending); the Approve→drain path was proven end to end by E5 part 1. Earlier: VERIFIED 2026-11-20 — LANDED 970aeb23 on k3d-manager-v1.45.0 (Flash; Sonnet verifier from Acceptance: M1–M4, N1–N3 pass, pre-fix 3 assertion reds, mutants a–e red); E4 live passed (Claude, m4-air, 16:29Z); E5 pending promote
 **Priority:** P1 (operator, 2026-11-20: "approve P1, and dispatch to Flash") — blocks the v1.45.0 release PR
 **Introduced by:** pre-existing (`scripts/lib/hermes/approvals.py`, v1.33.0 4b6ce874; Cloudflare UA block first recorded 2026-11-13)
 **Should have been caught by:** spec (v1.44.0 `docs/plans/v1.44.0-hermes-slack-config-sensors.md` found the rule, capture 3b, but fixed only the sensors; child B `docs/bugs/2026-11-14-dispatch-stall-b-approval.md` reused `approvals.py` without the header)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-20
+**Fix commit:** 970aeb23
+**Live evidence:** 2026-11-20 · run operator-m5-drain-probe-deployed-code-after-promote-5209b6b6 · env m5 · scenario hermes-approvals-drain-http-200-with-hermes-user-agent · commit 970aeb23 · proves E5
 **Approval:** operator 2026-11-20 ("approve P1, and dispatch to Flash"; "go ahead with (a)": spec + dispatch, not a direct edit)
 **Intent approved:** operator, 2026-11-20
 **Intent approval note:** ("intents approve")
@@ -106,3 +107,5 @@ drain token present, 64 chars, never printed; probe `e4_probe.py` imports the la
 
 E5 part 1 PASS 2026-11-20 16:34Z: child B E9 on fresh card `d1-a4a50fac` resumed the toy once (evidence in child B doc). Still open: `make hub-deploy REF=970aeb23` and a Hermes
 `r` approval drained on the M5.
+
+E5 part 2 PASS 2026-11-20 (operator, M5, after hub-deploy 5209b6b6): `git rev-parse` 5209b6b6; `launchctl print ... | grep -c APPROVAL_DRAIN_URL` 1; probe through deployed code: `token present True`, `http 200 ua k3dm-hermes/1 items 0`. A Hermes `"approvals": []` log line alone could not tell an empty queue from a swallowed 403 (`approvals.py:36-39`), hence the direct probe.
