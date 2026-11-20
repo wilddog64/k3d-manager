@@ -36,3 +36,4 @@
 - 2026-11-20 ~08:00: E9 toy staging hit the production root with the real Codex (smartcd `cd &&` skipped the export); stopped in ~15 s, abandoned; P3 docs/bugs/2026-11-20-toy-dispatch-staged-in-production-root-real-codex.md. Watcher does not call the drain yet (stall-recovery part 1).
 - 2026-11-20 ~08:05: P1 filed: approvals drain blocked by Cloudflare UA (1010); blocks E9 and Hermes Slack approvals; spec ready, Flash dispatch pending intent approval.
 - 2026-11-20 ~08:15: dirused M9a LIVE-VERIFIED (E2, operator); M9b spec next (outside k3d-manager releases).
+- 2026-11-20 ~08:25: dirused list-local-time spec written (v0.0.24); intent approval pending; M9b waits on SEVERE proof.
