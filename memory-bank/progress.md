@@ -39,3 +39,4 @@
 - 2026-11-20 ~08:25: dirused list-local-time spec written (v0.0.24); intent approval pending; M9b waits on SEVERE proof.
 - 2026-11-20 ~08:35: dirused list-local-time dispatched (Flash). WIP 2/3.
 - 2026-11-20: P1 approvals UA LANDED 970aeb23 (Sonnet verifier all pass); E4 live passed on M4 (no-UA 403 1010 vs UA 200; fetch_approvals empty queue). Pending E5: E9 fresh toy card + promote 970aeb23 for M5 Hermes. dirused list-local-time LANDED aa41dc0 (169/169, verifier mutants a-g red; CHANGELOG moved under Unreleased), PR wilddog64/dirused#37, Argon blind review running.
+- 2026-11-20: dirused PR #37 merged 2e62aed, tag v0.0.24 (CI green, Argon clean). Pending operator E2 on jump box. P1 E5 pending: E9 toy card + promote 9c3345ba after CI.
