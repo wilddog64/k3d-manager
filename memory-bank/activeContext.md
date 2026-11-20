@@ -1,4 +1,4 @@
-## Current state 2026-11-20 14:22 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 14:34 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -35,7 +35,7 @@ last 5 progress lines). Any edit to this section must also bump the header times
    2026-11-20 11:05 (files: session 628c342a scratchpad `e8root/v1.44.1/e8-toy-stall.run/stall-20261117T030605Z/`).
    Quality ACCEPTED by operator 2026-11-20 11:15; only the Console comparison of $0.052646 remains -> then LIVE-VERIFIED.
 2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): 3 intents (E1-E3) listed to operator 2026-11-20 12:20,
-   awaiting approval -> record `**Intent approved:**` -> Luna dispatch when a slot frees.
+   APPROVED by operator 14:34 (recorded in spec). Dispatch blocked: Makefile shared with paused 2c (one dispatch per file) and Codex quota until 2026-11-24 07:32.
 3. Web-console part A E11–E14 (`docs/plans/v1.45.0-web-console-a-console-sshd.md` lines 722-775): operator at the keyboard
    with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,
    expired) and the part B scratch sshd enabled control, captures P2-P5, then reads redacted output. Order E11 -> E12 ->
