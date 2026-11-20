@@ -1,6 +1,6 @@
 # dirused M9a: /purge finds files Tomcat holds and says which service it would stop (read-only)
 
-**Status:** DRAFT rev 2 — split from M9 rev 1 after Fable (FIX) + Astra (REWORK) blind reviews, adjudicated 2026-11-19
+**Status:** DISPATCHED 2026-11-19 — rev 2, split from M9 rev 1 after Fable (FIX) + Astra (REWORK) blind reviews, adjudicated 2026-11-19
 **Parent:** `docs/plans/dirused-m9-purge-stop-service-for-locked-files.md` (adjudication table, M9b outline)
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Repo / branch:** wilddog64/dirused / `m9a-held-file-detection` (from main 1eb1455, v0.0.22)
@@ -9,7 +9,7 @@
 check stricter (scan-row identity, §6).
 **Implementer:** Flash (`--agent agy --model gemini-3.8-flash-medium`, operator 2026-11-19). **Verifier:** Claude.
 **Filed:** 2026-11-19
-**Intent approved:** pending
+**Intent approved:** yes (operator "intents approved"), 2026-11-19
 
 ## Why
 
