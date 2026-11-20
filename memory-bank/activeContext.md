@@ -1,4 +1,4 @@
-## Current state 2026-11-20 12:38 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 13:38 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -52,7 +52,7 @@ file is 555 s, the slowest; GitHub SSH keepalive now in dotfiles `ssh/m4-air/con
 `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`. M4 lacks `gemini-cli-api-key` (operator-
 supplied; machine-setup exits 1 until added).
 
-**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b PR wilddog64/dirused#39 all CI green at 741dfc5 (push+PR × portable+windows, Windows 90/90); blind Argon review done earlier (4 accepted); waiting on operator merge go — tracked outside k3d-manager
+**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b PR wilddog64/dirused#39 merged a2d0508 (operator); dispatch record closed (abandon, reason landed via PR); tag v0.0.26 after main CI, then operator E-checks on jump box — tracked outside k3d-manager
 releases. MEMORY.md over budget (compressing 2026-11-20). Triage due at grooming.
 
 ## Grooming 2026-11-22 agenda
