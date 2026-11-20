@@ -1,7 +1,6 @@
 """Offline contract tests for the remote promotion mover."""
 import inspect
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -314,7 +313,7 @@ def test_e3_m3_first_parent_walk_is_limited_to_twenty_and_ignores_side_parent(re
     chain = [repo["new"]]
     for index in range(20):
         chain.append(commit_file(repo, "chain", "{}\n".format(index), "chain {}".format(index)))
-    side = git(repo["git"], repo["work"], "branch", "side", repo["old"])
+    git(repo["git"], repo["work"], "branch", "side", repo["old"])
     git(repo["git"], repo["work"], "checkout", "-q", "side")
     side_commit = commit_file(repo, "side-only", "green\n", "side green")
     git(repo["git"], repo["work"], "checkout", "-q", "main")
@@ -1074,7 +1073,7 @@ def test_e10_m13_deadline_before_fifth_walk_lookup_prevents_authorize(repo):
         def __init__(self):
             self.calls = 0
         def get_all(self, path, list_key, budget):
-            timeout = budget()
+            budget()
             self.calls += 1
             if self.calls == 4:
                 now["value"] = deadline - 0.5
