@@ -1,4 +1,4 @@
-## Current state 2026-11-20 14:34 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 14:50 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -33,7 +33,7 @@ last 5 progress lines). Any edit to this section must also bump the header times
 **NEXT (operator):**
 1. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): diagnosis.md + correction.md printed to the operator
    2026-11-20 11:05 (files: session 628c342a scratchpad `e8root/v1.44.1/e8-toy-stall.run/stall-20261117T030605Z/`).
-   Quality ACCEPTED by operator 2026-11-20 11:15; only the Console comparison of $0.052646 remains -> then LIVE-VERIFIED.
+   LIVE-VERIFIED 2026-11-20 14:50 (Console $0.08 month = E1-E4 ~$0.03 + E9 $0.0015 + E8 $0.052646). Done.
 2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): 3 intents (E1-E3) listed to operator 2026-11-20 12:20,
    APPROVED by operator 14:34 (recorded in spec). Dispatch blocked: Makefile shared with paused 2c (one dispatch per file) and Codex quota until 2026-11-24 07:32.
 3. Web-console part A E11–E14 (`docs/plans/v1.45.0-web-console-a-console-sshd.md` lines 722-775): operator at the keyboard
@@ -44,7 +44,7 @@ last 5 progress lines). Any edit to this section must also bump the header times
 **Next dispatches (operator go given 2026-11-20 for C and remote-promote):** web-console C after 2c; 2b after 2c.
 (Fast-line close-out trimmed v1.45.0; see roadmap.)
 
-**Live checks owed:** web-console part A E11–E14; child C E8 judgement; remote-promote 2d E11; travel bundle E2/E3 (P2 temp-file prerequisite already LIVE-VERIFIED; steps given to operator 12:20);
+**Live checks owed:** web-console part A E11–E14; remote-promote 2d E11; travel bundle E3 (E2 LIVE-VERIFIED 14:50); travel bundle rev 2 add-laptop E5 (next laptop enroll);
 test-all E3.
 
 **Captured this session (P3, grooming):** `docs/bugs/2026-11-19-web-console-sshd-no-set-euo-pipefail.md` (also: its BATS

@@ -1,8 +1,9 @@
 # Bug (child C): headless Claude diagnosis of a stalled dispatch, paid by the API credit
 
-**Status:** LANDED — e05a08ed on k3d-manager-v1.45.0 2026-11-18 (Flash worker, Claude verified and landed); E8 live run by Claude on the M4 passed, operator judges the correction
+**Status:** LIVE-VERIFIED — e05a08ed on k3d-manager-v1.45.0 2026-11-18 (Flash worker, Claude verified and landed); E8 live run by Claude on the M4 passed, correction accepted by operator, Console spend matched 2026-11-20
+**Live evidence:** 2026-11-19 · run e8-toy-stall-20261117T030605Z · env m4-air · scenario stall-diagnosis-copy-console-spend-matched · commit e05a08ed · proves E8
+**Fix commit:** e05a08ed
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** operator decision — since 2026-11-20 (correction judged good; compare $0.052646 with the Anthropic Console)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet 2026-11-14; reworked by Claude 2026-11-18 (tool-less single turn, from 2.1.328 captures); revised after Fable + Astra blind review 2026-11-18
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` part 2 (operator, 2026-11-14: "go with your recommendation")
@@ -386,3 +387,6 @@ not in backticks: the dispatch scope gate reads every backticked string under th
 - 2026-11-20 11:15 PST, E8 judgement: Claude printed diagnosis.md + correction.md (no secret markers) to the operator;
   operator accepted the restart correction ("go ahead to restart task", "go with your correction"). No real restart
   run: the toy agent is a freeze stub and spec A is already LIVE-VERIFIED. Remaining: Console spend comparison.
+- 2026-11-20 14:49 PST, E8 Console: operator screenshot of the Anthropic Console: spend this month $0.08, credits
+  $99.92 of $100. Recorded Claude API spend this month: child C E1-E4 captures ~$0.03 + E9 argv capture $0.0015 +
+  E8 $0.052646 = ~$0.084, which rounds to the Console's $0.08. LIVE-VERIFIED.
