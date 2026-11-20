@@ -1,5 +1,6 @@
 # Progress — v1.44.1 (older entries: `memory-bank/archive/progress-2026-11-17.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 
+- 2026-11-19: 2a spec amended (pre-read approve refusals carry kept); plan-status + 2a sent back with corrections (verifier coverage gaps). Trial: Sonnet caught plan-status test gaps Claude missed.
 - 2026-11-19: restart: 2a resume 5 actually finished (107 tests, mutants red); handoff's 'spec contradiction' was run 1's stale message. Verifying all 3.
 
 - 2026-11-18: dirused M7 merged 19e66d0 (PR #30), v0.0.17 tagged; M8 dispatched.
