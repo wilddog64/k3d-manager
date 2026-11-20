@@ -22,3 +22,10 @@
 - (a) Accept the explicit-rc design. Record it as an exception in the spec, and add a test that recreates the plist after
   the stop so mutant H turns red.
 - (b) Refactor for `-e` in a later release, making each intended non-zero return explicit (`|| rc=$?`).
+
+## Also: the BATS file is the slowest test file in the repo
+
+3. `scripts/tests/bin/web_console_sshd.bats` takes 555–563 s for 56 tests (pre-push fast gate, m4-air, 2026-11-20).
+   It was long enough to make GitHub drop the idle SSH connection while pushing. The operator's `~/.ssh/config` now has
+   `ServerAliveInterval 30` for `github.com` (2026-11-20). Speeding the file up belongs to the same follow-up. Find the
+   per-test cost (stub sshd start-up, waits) first, and don't remove the file from the gate.
