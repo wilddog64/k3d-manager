@@ -1,48 +1,41 @@
-## Current state 2026-11-20 07:31 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 11:05 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
 and plan Status lines in `docs/plans/v1.45.0-*.md`.
 
-**Branch:** `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `9d7973b6` (promoted 2026-11-20 07:21 PST,
-tag hub-promote/20261120T152130Z); commits after it are docs-only, no promote needed.
+**Branch:** `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `5209b6b6` (promoted 2026-11-20 09:55 PST,
+tag hub-promote/20261120T175509Z); 7 docs-only commits after it, no promote needed.
 
-**E9 approach (2026-11-20):** drain run by hand on a staged exited toy in a scratch root (overrides inline, never after `cd &&`); watcher->drain wiring owed to stall-recovery part 1.
+**Done today:** child B E9 + E10 LIVE-VERIFIED (72ab5903, 92fd27f7) after the P1 hermes approvals UA fix (970aeb23,
+LIVE-VERIFIED on M5). dirused list local time (v0.0.24) and human sizes (v0.0.25) LIVE-VERIFIED.
 
-**NEXT SESSION — operator agreed 2026-11-20 to do all three live checks, in this order:**
-1. Child B E9/E10 (`docs/bugs/2026-11-14-dispatch-stall-b-approval.md`). Operator ran `/hermes-auth` 2026-11-20 07:29 PST
-   (Slack: "Re-authenticated for 24h") -> valid until ~2026-11-21 07:29 PST; if later, ask for a fresh `/hermes-auth`.
-   Claude stages a toy stalled dispatch so the stall watcher posts a card in #grafana-notification; operator presses
-   Approve -> check resumed once (status running, resumes incremented, Slack confirm line) = E9. Second toy stall,
-   operator presses Deny -> stays exited, authorised drain GET empty = E10. No card has been posted yet (none staged).
-2. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): Claude already ran it on the M4 2026-11-19T03:12:49Z
-   (PASS). Owed: print diagnosis.md + correction.md (M4 scratch root of that run) for the operator to judge, and the
-   operator compares $0.052646 with the Anthropic Console. Then mark LIVE-VERIFIED.
+**Dispatch WIP 1/3:** `dirused-m9b-stop-delete-start` (Flash) correction round 3 running (worker pid 17889, agy 17912;
+prompt scratchpad m9b-correction-3.md): Argon #1 throwing Stop must not abort, #2 finally QueryState, #4 M2 redirected
+input. On exit: Claude reruns portable tests + targeted mutants, commits in dirused worktree, then PR + Windows CI.
+
+**NEXT (operator):**
+1. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): diagnosis.md + correction.md printed to the operator
+   2026-11-20 11:05 (files: session 628c342a scratchpad `e8root/v1.44.1/e8-toy-stall.run/stall-20261117T030605Z/`).
+   Operator judges quality and compares $0.052646 with the Anthropic Console -> then LIVE-VERIFIED.
+2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): operator intent approval -> Luna dispatch.
 3. Web-console part A E11–E14 (`docs/plans/v1.45.0-web-console-a-console-sshd.md` lines 722-775): operator at the keyboard
    with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,
    expired) and the part B scratch sshd enabled control, captures P2-P5, then reads redacted output. Order E11 -> E12 ->
-   E13 -> E14 (E14 revoke last; uninstall removes the test CA). Also fix that plan's stale Status ("verify pending",
-   verify is recorded).
+   E13 -> E14 (E14 revoke last; uninstall removes the test CA). Plan Status fixed to "verify recorded" 2026-11-20.
 
-**Dispatch WIP 0/3:**
-- `remote-promote-2d-mover` VERIFIED b42cb927 + 2c6a4cc5, promoted in 9d7973b6; E11 live still owed.
-- Next dispatches, each needs an operator go: web-console part C (`docs/plans/v1.45.0-web-console-c-totp-gate.md`), then
-  remote-promote 2e (Makefile; file-disjoint otherwise). 2c then 2b follow 2d.
+**Next dispatches, each needs an operator go:** web-console part C (`docs/plans/v1.45.0-web-console-c-totp-gate.md`),
+then remote-promote 2e (Makefile). 2c then 2b follow 2d. (Fast-line close-out trimmed v1.45.0; see roadmap.)
 
-**Live checks owed:**
-- Child B E9/E10: relay deployed by operator from the M4 2026-11-20 (version f02af9db, `[rd]` action IDs); M4 Keychain has
-  drain token + slack webhook (pre-existing, not re-exported this run — if the drain gets 401/403, refresh from M5 with
-  `security add-generic-password -U … -w`). M5 Hermes now has the `d` handling (promote 9d7973b6). `/hermes-auth` done
-  2026-11-20 07:29 PST. Remaining: stage toy stalls, Approve (E9) / Deny (E10) — see NEXT SESSION above.
-- Web-console part A E11–E14 (operator); child C E8 (M4); travel bundle E2/E3; test-all E3. Done 2026-11-20 after promote
-  9d7973b6: hub-deploy self-update E2 LIVE-VERIFIED, velocity tile live (3 = v1.44.0/1/2).
+**Live checks owed:** web-console part A E11–E14; child C E8 judgement; remote-promote 2d E11; travel bundle E2/E3;
+test-all E3.
 
 **Captured this session (P3, grooming):** `docs/bugs/2026-11-19-web-console-sshd-no-set-euo-pipefail.md` (also: its BATS
 file is 555 s, the slowest; GitHub SSH keepalive now in dotfiles `ssh/m4-air/config`),
 `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`. M4 lacks `gemini-cli-api-key` (operator-
 supplied; machine-setup exits 1 until added).
 
-**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b spec next — tracked outside k3d-manager
+**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b correction round 3 running — tracked outside k3d-manager
 releases. MEMORY.md over budget (compressing 2026-11-20). Triage due at grooming.
 
 ## Grooming 2026-11-22 agenda
