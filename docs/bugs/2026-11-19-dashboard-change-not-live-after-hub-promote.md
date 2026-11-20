@@ -23,12 +23,19 @@ browser reload, the change appeared (operator screenshot).
 Recurrence: the same lag was seen on 2026-10-16 (commit e7c1beae unsynced for 8 min after a push; noted in Claude's
 memory, never filed).
 
-## What is not known (for triage)
+## Hub evidence (read-only, hub pane work:1.0, 2026-11-20T02:21Z, Argo CD v3.5.5 in namespace cicd)
 
-- How long the operator waited between the promote and looking. Not measured.
-- Which ref `cicd/hub-grafana-dashboards` tracks today (`deploy/hub` or the release branch) and its reconciliation
-  interval. Read with `kubectl -n cicd get application hub-grafana-dashboards -o jsonpath='{.spec.sources[*].targetRevision} {.status.sync.revisions}'`
-  and `argocd-cm` `timeout.reconciliation`.
+- `cicd/hub-grafana-dashboards` tracks `deploy/hub` (repo wilddog64/k3d-manager), automated sync with prune and
+  selfHeal; synced revision 3d5fd9ef.
+- Its last sync started 2026-11-20T02:16:05Z, `initiatedBy: {"automated":true}`, finished 02:16:06Z. The promote tag is
+  02:09:45Z, so Argo CD synced the change on its own about 6.3 minutes after the promote.
+- `argocd-cm`: `timeout.reconciliation` 180s, `timeout.reconciliation.jitter` 60s; `argocd-cmd-params-cm` sets no cache
+  or reconciliation keys (repo-server defaults).
+- 21 applications in `cicd` track `deploy/hub` (all hub and ubuntu-hostinger apps), so every promote has the same lag.
+
+So the change is not stuck: it lands within one or two reconcile cycles (about 3-7 minutes), and the operator looked
+inside that window. Not measured: when the manual hard refresh ran relative to 02:16:05Z, and whether the repo-server
+revision cache adds to the delay (not proven; no upstream source read).
 
 ## Fix direction (for triage)
 
