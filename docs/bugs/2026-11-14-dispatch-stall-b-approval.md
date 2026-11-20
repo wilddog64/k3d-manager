@@ -1,8 +1,8 @@
 # Bug (child B): approve a stalled-dispatch correction from Slack, then resume once
 
-**Status:** OPEN
+**Status:** VERIFIED — 4c1a7b4c + c0c0dbfe on k3d-manager-v1.45.0 2026-11-20 (Luna; Sonnet Acceptance verifier PASS; Claude re-mutated gap guards); live E9/E10 pending
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** fix running — since 2026-11-20 (Luna, dispatch-stall-b-approval)
+**Waiting on:** live check — since 2026-11-20 (E9/E10, operator, after hub promote and M4 Keychain copies)
 **Triage:** carry → v1.45.0 (`dispatch-stall-recovery` scope) — operator grooming 2026-11-15 ("Accept as shown")
 **Approval:** drafted by Sonnet for Claude review 2026-11-14
 **Release:** v1.45.0 plan 5 `dispatch-stall-recovery` (operator, 2026-11-14: "go with your recommendation"); Fable review findings on the parent apply
