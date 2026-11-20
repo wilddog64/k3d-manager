@@ -1,28 +1,37 @@
-## Current state 2026-11-20 ~06:40 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 07:31 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
 and plan Status lines in `docs/plans/v1.45.0-*.md`.
 
-**Branch:** `k3d-manager-v1.45.0`; origin at `776dcea0` (CI was in progress); local commits `9fdebf66`, `30fea88a` and this
-compression not yet pushed (batched until 2d lands). Hub `deploy/hub` = `3d5fd9ef`; promote after 2d lands and CI is green
-(operator runs `make hub-deploy REF=<sha>` in their tmux; K3dmPromoteWaiting/DeployPending alerts are the expected nudge).
+**Branch:** `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `9d7973b6` (promoted 2026-11-20 07:21 PST,
+tag hub-promote/20261120T152130Z); commits after it are docs-only, no promote needed.
 
-**Dispatch WIP 1/3:**
-- `remote-promote-2d-mover` VERIFIED b42cb927 + 2c6a4cc5 (6 verifier gaps closed, Claude re-ran mutants). WIP 0/3.
-  (M9 absent tag after real update must be push_unknown [Claude reproduced], M9 `!` flag with exit 0, M10 fresh
-  already_spent must not note_refusal, M5 merge-ancestor, M1 `--no-tags`, M13 min(default, remaining)). Correction
-  resume 4 (tests only, prompt in session scratchpad `2d-resume4.md`) running, pid 81277. Next: verify each gap mutant is red,
-  record verify (pre-fix = be8bff34^, delete-module rc 2), land, push, give promote SHA.
+**NEXT SESSION — operator agreed 2026-11-20 to do all three live checks, in this order:**
+1. Child B E9/E10 (`docs/bugs/2026-11-14-dispatch-stall-b-approval.md`). Operator ran `/hermes-auth` 2026-11-20 07:29 PST
+   (Slack: "Re-authenticated for 24h") -> valid until ~2026-11-21 07:29 PST; if later, ask for a fresh `/hermes-auth`.
+   Claude stages a toy stalled dispatch so the stall watcher posts a card in #grafana-notification; operator presses
+   Approve -> check resumed once (status running, resumes incremented, Slack confirm line) = E9. Second toy stall,
+   operator presses Deny -> stays exited, authorised drain GET empty = E10. No card has been posted yet (none staged).
+2. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): Claude already ran it on the M4 2026-11-19T03:12:49Z
+   (PASS). Owed: print diagnosis.md + correction.md (M4 scratch root of that run) for the operator to judge, and the
+   operator compares $0.052646 with the Anthropic Console. Then mark LIVE-VERIFIED.
+3. Web-console part A E11–E14 (`docs/plans/v1.45.0-web-console-a-console-sshd.md` lines 722-775): operator at the keyboard
+   with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,
+   expired) and the part B scratch sshd enabled control, captures P2-P5, then reads redacted output. Order E11 -> E12 ->
+   E13 -> E14 (E14 revoke last; uninstall removes the test CA). Also fix that plan's stale Status ("verify pending",
+   verify is recorded).
+
+**Dispatch WIP 0/3:**
+- `remote-promote-2d-mover` VERIFIED b42cb927 + 2c6a4cc5, promoted in 9d7973b6; E11 live still owed.
 - Next dispatches, each needs an operator go: web-console part C (`docs/plans/v1.45.0-web-console-c-totp-gate.md`), then
   remote-promote 2e (Makefile; file-disjoint otherwise). 2c then 2b follow 2d.
 
 **Live checks owed:**
 - Child B E9/E10: relay deployed by operator from the M4 2026-11-20 (version f02af9db, `[rd]` action IDs); M4 Keychain has
   drain token + slack webhook (pre-existing, not re-exported this run — if the drain gets 401/403, refresh from M5 with
-  `security add-generic-password -U … -w`). No webhook/Hermes restart needed (M5 Hermes ignores `d` IDs until promote).
-  Remaining: operator `/hermes-auth` (24h), then Claude stages a toy stalled dispatch; Approve resumes once (E9), Deny
-  leaves it exited and the relay queue empty (E10).
+  `security add-generic-password -U … -w`). M5 Hermes now has the `d` handling (promote 9d7973b6). `/hermes-auth` done
+  2026-11-20 07:29 PST. Remaining: stage toy stalls, Approve (E9) / Deny (E10) — see NEXT SESSION above.
 - Web-console part A E11–E14 (operator); child C E8 (M4); travel bundle E2/E3; test-all E3. Done 2026-11-20 after promote
   9d7973b6: hub-deploy self-update E2 LIVE-VERIFIED, velocity tile live (3 = v1.44.0/1/2).
 
@@ -68,3 +77,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20 06:49: CI green on 9d7973b6 (7/7). Promote SHA given to operator: 9d7973b62d04063c4af905da3909567fbcbaf596. Docs-only commits pushed after.
 - 2026-11-20 07:23: promote 3d5fd9ef -> 9d7973b6 done by operator (tag hub-promote/20261120T152130Z; appsets-check ok, platform-ops ok, exporter rolled out). hub-deploy self-update E2 LIVE-VERIFIED from the pane. ArgoCD hub-grafana-dashboards still on 3d5fd9ef at 15:23Z (waiting on its poll) before checking the velocity tile.
 - 2026-11-20 07:26: ArgoCD hub-grafana-dashboards synced 9d7973b6 on its own at 15:25:11Z (no refresh needed, ~3.5 min after promote). Velocity tile live: panel 34 Releases / 7 days, Prometheus count = 3 (v1.44.0, v1.44.1, v1.44.2); operator screenshot shows it.
+- 2026-11-20 07:31: operator ran /hermes-auth 07:29 PST (24h). Handoff written; operator /clear next. Next session: child B E9/E10, child C E8 judgement, web-console A E11-E14.
