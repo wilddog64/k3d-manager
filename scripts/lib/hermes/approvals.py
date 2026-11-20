@@ -12,6 +12,7 @@ import urllib.request
 
 APPROVAL_DRAIN_SERVICE = "k3dm-hermes-approval-drain-token"
 ACTION_ID_RE = re.compile(r"^r[0-9]+-[0-9a-f]{8}$")
+DISPATCH_ACTION_ID_RE = re.compile(r"^d[0-9]+-[0-9a-f]{8}$")
 NONCE_RE = re.compile(r"^[0-9a-f]{16}$")
 SLACK_USER_RE = re.compile(r"^[A-Z0-9]{2,32}$")
 
@@ -20,7 +21,7 @@ def _usable(drain_url, token):
     return bool(token) and str(drain_url).startswith("https://")
 
 
-def fetch_approvals(drain_url, token, opener=urllib.request.urlopen, timeout=10):
+def fetch_approvals(drain_url, token, opener=urllib.request.urlopen, timeout=10, id_pattern=ACTION_ID_RE):
     """Return well-formed approvals from the relay; fail closed to [] on any error."""
     if not _usable(drain_url, token):
         return []
@@ -35,14 +36,14 @@ def fetch_approvals(drain_url, token, opener=urllib.request.urlopen, timeout=10)
         return []
     return [item for item in items
             if isinstance(item, dict)
-            and ACTION_ID_RE.match(str(item.get("action_id", "")))
+            and id_pattern.match(str(item.get("action_id", "")))
             and NONCE_RE.match(str(item.get("nonce", "")))
             and SLACK_USER_RE.match(str(item.get("approved_by", "")))]
 
 
-def delete_approval(drain_url, token, action_id, opener=urllib.request.urlopen, timeout=10):
+def delete_approval(drain_url, token, action_id, opener=urllib.request.urlopen, timeout=10, id_pattern=ACTION_ID_RE):
     """Best-effort removal of a processed approval; return success."""
-    if not _usable(drain_url, token) or not ACTION_ID_RE.match(str(action_id)):
+    if not _usable(drain_url, token) or not id_pattern.match(str(action_id)):
         return False
     url = f"{drain_url.rstrip('/')}/{urllib.parse.quote(action_id)}"
     request = urllib.request.Request(url, method="DELETE",

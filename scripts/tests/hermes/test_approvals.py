@@ -217,3 +217,22 @@ def test_approval_module_never_executes():
     source = (ROOT / "scripts/lib/hermes/approvals.py").read_text()
     assert "runner(" not in source and "subprocess" not in source
     assert approvals.ACTION_ID_RE.fullmatch("r10-0123abcd")
+
+
+def test_dispatch_id_pattern_is_opt_in_for_fetch_and_delete():
+    r_item = valid_item()
+    d_item = {**valid_item(), "action_id": "d1-0123abcd"}
+    calls = []
+    body = json.dumps([r_item, d_item]).encode()
+    assert approvals.fetch_approvals("https://relay", "tok", fake_opener(calls, body)) == [r_item]
+    assert approvals.fetch_approvals("https://relay", "tok", fake_opener(calls, body),
+                                     id_pattern=approvals.DISPATCH_ACTION_ID_RE) == [d_item]
+    deleted = []
+    opener = fake_opener(deleted)
+    assert not approvals.delete_approval("https://relay", "tok", d_item["action_id"], opener)
+    assert approvals.delete_approval("https://relay", "tok", r_item["action_id"], opener)
+    assert not approvals.delete_approval("https://relay", "tok", r_item["action_id"], opener,
+                                         id_pattern=approvals.DISPATCH_ACTION_ID_RE)
+    assert approvals.delete_approval("https://relay", "tok", d_item["action_id"], opener,
+                                     id_pattern=approvals.DISPATCH_ACTION_ID_RE)
+    assert len(deleted) == 2

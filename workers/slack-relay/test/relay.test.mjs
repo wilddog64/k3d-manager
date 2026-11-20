@@ -549,3 +549,29 @@ test('/cluster-diagnose accepts namespace pod order as describe-pod', async () =
     slack_user_id: 'UOP1',
   })
 })
+
+test('d action id approval is stored and listed by drain', async () => {
+  const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1')
+  const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+  const dValue = 'd1-0123abcd|0123456789abcdef'
+  await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', dValue)))
+  const stored = JSON.parse(await kv.get('approval:d1-0123abcd'))
+  assert.equal(stored.nonce, '0123456789abcdef')
+  assert.equal(kv.puts.at(-1).opts.expirationTtl, 3600)
+  const listed = await worker.dispatch(new Request('https://relay.test/hermes/approvals', { headers: { Authorization: `Bearer ${token}` } }))
+  assert.equal((await listed.json())[0].action_id, 'd1-0123abcd')
+})
+
+test('d action id rejects malformed, unauthorized and unauthenticated clicks', async () => {
+  for (const malformed of ['0123abcd|0123456789abcdef', 'x1-0123abcd|0123456789abcdef', 'd1-0123ABCd|0123456789abcdef', 'd1-123abcd|0123456789abcdef', 'd1-0123abcdx|0123456789abcdef', 'd1-0123abcd-extra|0123456789abcdef']) {
+    const kv = fakeKv(); const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', malformed)))
+    assert.equal(kv.puts.length, 0, malformed); assert.equal(worker.fetches.length, 0, malformed)
+  }
+  for (const [user, reauth] of [['UOTHER', true], ['UAPPROVER1', false]]) {
+    const kv = fakeKv(); if (reauth) await kv.put('reauth:UAPPROVER1', '1')
+    const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody(user, 'hermes_approve', 'd1-0123abcd|0123456789abcdef')))
+    assert.equal(await kv.get('approval:d1-0123abcd'), null)
+  }
+})

@@ -1,7 +1,7 @@
 const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
 const REAUTH_TTL_SECONDS   = 86400
-const HERMES_ACTION_ID_RE  = /^r[0-9]+-[0-9a-f]{8}$/
+const HERMES_ACTION_ID_RE  = /^[rd][0-9]+-[0-9a-f]{8}$/
 const HERMES_NONCE_RE      = /^[0-9a-f]{16}$/
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
