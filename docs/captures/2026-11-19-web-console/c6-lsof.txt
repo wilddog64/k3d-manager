@@ -1,0 +1,3 @@
+## lsof -nP -p 59966 -a -i
+COMMAND   PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+sshd    59966 root    6u  IPv4 0x8fb457264714f983      0t0  TCP 127.0.0.1:42723 (LISTEN)

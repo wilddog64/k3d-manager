@@ -1,0 +1,13 @@
+## C11 login 1 (marker: SetEnv ZDOTDIR=<R>/zdot-marker)
+ENTRY cmd='info'
+ENTRY ZDOTDIR='/private/var/db/k3dm-capture-2026-11-19/zdot-marker'
+ENTRY isolated=1 no_site=1
+ENTRY argv=['/private/var/db/k3dm-capture-2026-11-19/entry']
+ENTRY self: 63094 63093   501 /Library/Develop /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python -IS /private/var/db/k3dm-capture-2026-11-19/entry
+ENTRY parent: 63093 63090   501 sshd-session: <login> sshd-session: <login>@notty
+ENTRY grandparent: 63090 62856     0 sshd-session: <login> sshd-session: <login> [priv]
+ENTRY great: 62856     1     0 sshd: /usr/sbin/ sshd: /usr/sbin/sshd -D -e -f /private/var/db/k3dm-capture-2026-11-19/marker.conf [listener] 0 of 3-10 startups
+ENTRY SSH_AUTH_SOCK set=False
+ENTRY tty=False TERM=None
+ssh rc=0
+marker after login 1: PRESENT
