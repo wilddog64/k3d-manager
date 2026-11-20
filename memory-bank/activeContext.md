@@ -1,4 +1,4 @@
-## Current state 2026-11-20 11:40 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 12:05 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
@@ -14,6 +14,9 @@ LIVE-VERIFIED on M5). dirused list local time (v0.0.24) and human sizes (v0.0.25
 3 mutants red, rerun in scratch) and committed 61e8516; PR wilddog64/dirused#39 open, Windows CI next, then merge gate.
 Ledger shows "VIOLATION: agent committed" = false positive (Claude's own between-round commits; captured P3
 `docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md`); no `land`, closes via PR.
+
+**M4 disk (2026-11-20):** manual cleanup 195 -> 202 GB free (5.5 GB old Claude scratch dirs, 2.9 GB brew cleanup); kept
+628c342a (E8 evidence). Auto-cleanup = ideas.md row 74 (findings appended); monitoring already exists (v1.42.0 sensor).
 
 **Handoff guard (2026-11-20, operator "go with your recommendation"):** `.claude/hooks/handoff-on-clear.sh` now appends a
 computed Live state block (commits since the START HERE header line last changed, dirty tree, open dispatches, hub ref,
