@@ -1,7 +1,7 @@
 # Bug: a promoted dashboard change is not live until Argo CD is hard-refreshed by hand
 
 **Status:** OPEN — captured 2026-11-19 by Claude
-**Priority:** P2
+**Priority:** P3 (lowered 2026-11-19 by operator: Argo CD syncs on its own in 3-7 min; see Hub evidence)
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown
