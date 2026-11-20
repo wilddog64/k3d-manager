@@ -1,4 +1,4 @@
-## Current state 2026-11-20 12:33 PST — v1.45.0 open — START HERE
+## Current state 2026-11-20 12:38 PST — v1.45.0 open — START HERE
 
 Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
 Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
