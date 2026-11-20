@@ -1,0 +1,24 @@
+# web-console-sshd: new bin script has no `set -euo pipefail`; one revoke mutant survives
+
+**Status:** OPEN
+**Priority:** P3
+**Introduced by:** `6b34bd55` (v1.45.0 plan 4, web-console part A)
+**Should have been caught by:** spec
+**Introducing change reviewed:** no
+**Waiting on:** operator decision — since 2026-11-19
+**Prior art:** not run (find-similar-docs vector store unavailable: cluster context missing); exact-slug glob found no match
+
+## Symptom
+
+1. `bin/k3dm-web-console-sshd` (new in part A) has no `set -euo pipefail`. CLAUDE.md Code Style requires it on all new bash
+   scripts. The script tracks return codes explicitly instead. Adding the line on a copy turned 17 of 56 tests in
+   `scripts/tests/bin/web_console_sshd.bats` red (Claude, 2026-11-19, scratch copy), so this needs a refactor, not a one-line fix.
+   The spec (`docs/plans/v1.45.0-web-console-a-console-sshd.md`) did not mention the rule, so the worker never had to meet it.
+2. The independent verifier's mutant H survived: deleting revoke's final `[[ ! -e "$plist" ]] || rc=1` left all N13 tests green.
+   A failed `mv` already sets `rc=1`, so only a plist that reappears after the stop is uncovered. Rated low.
+
+## Fix options (operator decision)
+
+- (a) Accept the explicit-rc design. Record it as an exception in the spec, and add a test that recreates the plist after
+  the stop so mutant H turns red.
+- (b) Refactor for `-e` in a later release, making each intended non-zero return explicit (`|| rc=$?`).
