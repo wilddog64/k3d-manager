@@ -143,7 +143,7 @@ whenever the bug moves, and only write what you can support: leave it out rather
 <a id="status-first-word"></a>
 ### Status first word
 
-**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified, and `LIVE-VERIFIED` once live evidence is recorded; anything still open starts `OPEN`. The pre-commit hook refuses an `OPEN` Status that says the fix landed.
+**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified, and `LIVE-VERIFIED` once live evidence is recorded; anything still open starts `OPEN`. The pre-commit hook refuses an `OPEN` Status that says the fix landed. Land writes a plan's Status as `LANDED`; pre-commit refuses a `DRAFT` plan with approved intent.
 
 <a id="acceptance-block"></a>
 ### Acceptance block

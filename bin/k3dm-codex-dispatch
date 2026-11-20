@@ -1549,7 +1549,83 @@ _dispatch_land() {
   git -C "$repo_path" worktree remove "$task"
   git -C "$repo_path" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
   git -C "$repo_path" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
+  _dispatch_mark_plan_landed "$run" "$land_commit" "$repo_path" || true
   echo "landed: $slug"; echo "push: git -C $repo_path push origin $target && make hub-sync"
+}
+
+_dispatch_mark_plan_landed() {
+  local run="$1" land_commit="$2" repo_path="$3"
+  local spec git_dir role spec_path repo_name ref date_value state
+  local slug version
+  slug="${run##*/}"; version="$(basename "$(dirname "$run")")"
+  slug="${slug%.run}"
+  (( ${review_pending:-0} == 0 )) || return 0
+  spec="$(<"$run/spec")"
+  [[ "$spec" == docs/plans/*.md && "${spec#docs/plans/}" != */* ]] || return 0
+  role="$(jq -r --arg slug "$slug" --arg version "$version" 'select(.slug==$slug and .version==$version and (.event=="start" or .event=="link")) | .role // empty' "$_dispatch_worktree_root/ledger.jsonl" 2>/dev/null | tail -n 1)"
+  [[ "$role" != review && "$role" != verify ]] || return 0
+  spec_path="$_dispatch_repo_root/$spec"
+  if ! git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1; then
+    echo "land: plan status not updated (spec not tracked in $_dispatch_repo_root); set it by hand"
+    return 0
+  fi
+  if ! git -C "$_dispatch_repo_root" diff --quiet -- "$spec" ||
+     ! git -C "$_dispatch_repo_root" diff --cached --quiet -- "$spec"; then
+    echo "land: plan status not updated (spec has local changes); set it by hand"
+    return 0
+  fi
+  git_dir="$(git -C "$_dispatch_repo_root" rev-parse --path-format=absolute --git-dir 2>/dev/null)" || return 0
+  for state in MERGE_HEAD CHERRY_PICK_HEAD rebase-merge rebase-apply; do
+    if [[ -e "$git_dir/$state" ]]; then
+      echo "land: plan status not updated (repository operation in progress); set it by hand"
+      return 0
+    fi
+  done
+  repo_name="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
+  ref="${land_commit:0:8}"
+  [[ "$repo_name" == k3d-manager ]] || ref="$repo_name@$ref"
+  date_value="$(date +%F)"
+  local status_result
+  status_result="$(python3 - "$spec_path" "$ref" "$date_value" <<'PYPLAN'
+import re, sys
+from pathlib import Path
+p, ref, date = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+text = p.read_text(encoding="utf-8")
+header_end = re.search(r"(?m)^## ", text)
+limit = header_end.start() if header_end else len(text)
+match = re.search(r"(?m)^\*\*Status:\*\*\s*(.*)$", text[:limit])
+if not match:
+    print("none")
+    raise SystemExit(0)
+value = match.group(1)
+pattern = re.compile(r"^(DRAFT|PLANNED|PLAN|PROPOSED|READY|APPROVED|IN PROGRESS|IN-PROGRESS|DISPATCHED|QUEUED)(\s+(?:rev\s*)?v?\d+)?\s*([—–:.-]\s*)?", re.I)
+auto = re.match(r"^LANDED — .*?\(auto: land [^)]+\)(.*)$", value, re.I)
+if auto:
+    remainder = auto.group(1).lstrip(" ;—–:.-")
+elif pattern.match(value):
+    remainder = value[pattern.match(value).end():].strip()
+else:
+    print("left " + (value.split()[0] if value.split() else ""))
+    raise SystemExit(0)
+new = f"LANDED — {ref} (auto: land {date}; verify pending)"
+if remainder:
+    new += "; " + remainder
+text = text[:match.start(1)] + new + text[match.end(1):]
+p.write_text(text, encoding="utf-8")
+print("updated")
+PYPLAN
+)" || return 0
+  case "$status_result" in
+    none) return 0 ;;
+    left\ *) echo "land: plan status left as ${status_result#left }"; return 0 ;;
+    updated) ;;
+  esac
+  if ! git -C "$_dispatch_repo_root" commit -q --only -m "docs(plans): $slug landed $ref" -- "$spec"; then
+    git -C "$_dispatch_repo_root" checkout -- "$spec" >/dev/null 2>&1 || true
+    echo "land: plan status not updated (commit failed); set it by hand"
+    return 0
+  fi
+  echo "land: plan status set LANDED in $spec"
 }
 
 _dispatch_handoff() {
