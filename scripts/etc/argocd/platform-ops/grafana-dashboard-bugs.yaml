@@ -2963,6 +2963,45 @@ data:
           }
         },
         {
+          "id": 34,
+          "type": "stat",
+          "title": "Releases / 7 days",
+          "description": "Release tags shipped in the 7 days before each point (rolling). The trend shows whether the pace is speeding up or slowing down; Median gap is the typical spacing.",
+          "gridPos": {
+            "x": 20,
+            "y": 11,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count(k3dm_release_shipped_timestamp_seconds{repo=\"$repo\"} > time() - 7 * 86400)"
+            }
+          ],
+          "options": {
+            "graphMode": "area",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "0",
+              "decimals": 0,
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
           "id": 108,
           "type": "stat",
           "title": "Undeclared plan overlaps",

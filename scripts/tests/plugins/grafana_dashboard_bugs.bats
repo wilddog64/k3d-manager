@@ -55,7 +55,7 @@ import json, re, sys
 d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d["panels"]
 tiles={p["id"]:p for p in panels}
-assert len(tiles)==len(panels)==41
+assert len(tiles)==len(panels)==42
 assert 32 not in tiles
 assert not any(p.get("title") in {"Target forecast (earliest)","Target forecast (latest)","Remaining releases"} for p in panels)
 assert not any(p["type"]=="table" and 10 <= p["gridPos"]["y"] < 15 for p in panels)
@@ -113,6 +113,24 @@ for panel in panels:
   for y in range(pos["y"],pos["y"]+pos["h"]):
    assert (x,y) not in cells,(panel["id"],x,y)
    cells.add((x,y))
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release velocity tile counts tags shipped in the last 7 days beside Target state" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+p={panel["id"]:panel for panel in d["panels"]}
+v=p[34]
+assert v["type"]=="stat" and v["title"]=="Releases / 7 days"
+assert v["gridPos"]=={"x":20,"y":11,"w":4,"h":4},v["gridPos"]
+t=v["targets"][0]
+assert t["expr"]=='count(k3dm_release_shipped_timestamp_seconds{repo="$repo"} > time() - 7 * 86400)',t["expr"]
+assert not t.get("instant")
+assert v["options"]["graphMode"]=="area"
+assert v["fieldConfig"]["defaults"]["noValue"]=="0"
+assert "Median gap" in v["description"]
 PY
   [ "${status}" -eq 0 ]
 }
