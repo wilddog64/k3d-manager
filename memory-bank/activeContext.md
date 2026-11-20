@@ -9,7 +9,7 @@ compression not yet pushed (batched until 2d lands). Hub `deploy/hub` = `3d5fd9e
 (operator runs `make hub-deploy REF=<sha>` in their tmux; K3dmPromoteWaiting/DeployPending alerts are the expected nudge).
 
 **Dispatch WIP 1/3:**
-- `remote-promote-2d-mover` (Luna): be8bff34 committed by Claude; Sonnet verifier 54 mutants, 47 killed, 6 real gaps
+- `remote-promote-2d-mover` VERIFIED b42cb927 + 2c6a4cc5 (6 verifier gaps closed, Claude re-ran mutants). WIP 0/3.
   (M9 absent tag after real update must be push_unknown [Claude reproduced], M9 `!` flag with exit 0, M10 fresh
   already_spent must not note_refusal, M5 merge-ancestor, M1 `--no-tags`, M13 min(default, remaining)). Correction
   resume 4 (tests only, prompt in session scratchpad `2d-resume4.md`) running, pid 81277. Next: verify each gap mutant is red,
@@ -59,3 +59,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Log
 - 2026-11-20 06:50: memory-bank compressed (operator ask): activeContext 165K -> ~8K, progress 81K -> ~4K; verbatim copies in archive/*-2026-11-20.md. 2d correction 412e59be (91 tests); Claude reran 6 gap mutants, all killed.
+- 2026-11-20 07:00: 2d LANDED b42cb927 + 2c6a4cc5, VERIFIED (verify recorded). WIP 0/3. Push then promote after CI green.
