@@ -1,7 +1,7 @@
 # Bug fix: land writes the plan's Status; pre-commit refuses a DRAFT plan with approved intent
 
 **Filed:** 2026-11-19
-**Status:** READY rev 2 — Argon blind review (rev 1: FIX, 3 blockers, 4 majors, 2 minors) all taken, 2026-11-19; operator "file one and go with your suggestion"
+**Status:** VERIFIED — ffe30f17, 2026-11-19 (Sonnet Acceptance verifier + Claude: 38 bats + 11 pytest, pre-fix 6 red, 6/6 mutants red). Offline-only; first live use is the next land after a promote.
 **Bug:** `docs/bugs/2026-11-19-plan-status-goes-stale-after-review-and-land.md` (P3)
 **Branch:** `k3d-manager-v1.45.0` (operator promoted it out of the P3 batch; lands with the open release)
 **Risk:** low-medium — touches `land`; the new write happens only after a successful merge and never blocks the land
