@@ -81,3 +81,4 @@
 - 2026-11-20 13:50: dirused main CI green on a2d0508; tag v0.0.26 pushed at a2d0508 (operator go); release build running.
 - 2026-11-20 13:52: dirused v0.0.26 released (pre-release, win-x64/arm64 zips + .sha256, run 44823783100). Waiting on operator M9b E2 live check after 19:00 PT.
 - 2026-11-20 14:01: operator deferred dirused M9b E2 to Monday 2026-11-23 (no daytime prod Tomcat stop). Note: /purge /confirm deletes non-held eligible logs before the Tomcat prompt; answering n only protects held files.
+- 2026-11-20 14:22: travel bundle E2 in progress: operator enrolled M4, added recipient + publish FORCE=1 + password-bundle-install on M5 (no errors); M4 password-bundle-show decrypts (generated_at 2026-11-20T22:17:59Z). Waiting on operator match/no-match vs M5 show-service-passwords. Idea raised: one hub target password-bundle-add-laptop (add+publish FORCE=1+install); operator to choose ideas row vs v1.45.0 exception.
