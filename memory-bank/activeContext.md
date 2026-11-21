@@ -1,65 +1,92 @@
-## Current state 2026-11-20 15:43 PST — v1.45.0 open — START HERE
+## Handoff — 2026-11-20 16:56 PST — web-console P3 bug, priv_open fix spec, Codex quota panels — START HERE
 
-**Resume here after /clear (15:43):**
-- priv_open fix spec READY after Fable review (commit 29c28ad3): `docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md`. Waiting on operator **go** to dispatch to Flash (agy) — 3rd of 3 open dispatches (2c, 2e paused on Codex quota).
-- New P2 (operator set, 2026-11-20): `docs/bugs/2026-11-20-codex-quota-panels-no-data-on-premium-limit-record.md` — exporter takes newest rate_limits record even when limit_id=premium (null limits). Needs a fix spec (Acceptance + intents) in the doc; dispatch would be 4th open → wait for a land or operator approval to exceed WIP. Claude quota export fine (dry-run: 5h 5%, 7d 11%). Codex: weekly 100% until Tue 11-24 07:32 PST.
-- Web-console E11-E14 rerun after the priv_open fix lands; script kept at scratchpad wc/wc-live.sh (certs expire 22:59 tonight — regenerate).
-- tmux: leftover session 20261119035136 killed; root scratch dir removed.
+**Objective (this session):**
+- Run web-console part A live checks E11–E14 on the M4.
+- They stopped at the P3 prerequisite on a real bug.
+- The session turned into: file that bug, write and review its fix spec, and diagnose the Codex quota panels showing "No data".
 
-Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-20.md` (compressed 2026-11-20, operator ask).
-Source of truth for open work: `docs/bugs/` `**Waiting on:**` lines, the dispatch ledger (`bin/k3dm-codex-dispatch open`),
-and plan Status lines in `docs/plans/v1.45.0-*.md`.
+**Evidence:**
+- **The P3 run (m4-air, tmux work:1.1, 2026-11-20 15:09, checkout 388a660f clean).**
+  - P3a PASS: a cold piped `_wc_priv` gave rc 1 with no prompt and no hang.
+  - P3b FAIL: `_wc_priv_open` returned 0 while `sudo -n -v` showed no ticket.
+  - Root cause: `bin/install-sudoers.sh:39` grants `%admin NOPASSWD: /usr/bin/true` (`sudo -n -l` on m4-air), and the
+    ticket check probes `/usr/bin/true`.
+  - P5/E11+ not run. Nothing installed (launchctl rc 113, no 42722/42723 listener). The root scratch dir has been
+    removed.
+- **Codex quota panels.** `~/.codex/sessions` files carry `rate_limits` records with `limit_id` `codex` (numbers) and
+  `premium` (`primary`/`secondary` null), both present since at least 2026-11-02.
+  - The newest record, at 20:37:48Z, is a `premium` one. `bin/k3dm-dispatch-metrics:703-706,2147-2163` takes the
+    newest record regardless, so it writes the timestamp but no ratios.
+  - `--dry-run` (prints only, no push) shows the Claude quota exported fine (5h 5%, 7d 11%).
+  - Codex, from the last `codex` record: 5h 82% (window reset 15:22); weekly 100% until Tue 11-24 07:32 PST.
 
-**Branch:** `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `5209b6b6` (promoted 2026-11-20 09:55 PST,
-tag hub-promote/20261120T175509Z); 7 docs-only commits after it, no promote needed.
+**Decisions (operator, 2026-11-20):**
+- Stop E11–E14 until the priv_open fix lands, then rerun all of them.
+- P2 bugs are Claude's to finish with no grooming wait ("I thought P3 bugs are waiting for grooming not P2").
+- priv_open intents E1–E4 approved and sent to Fable ("intents approve and send to Fable for review").
+- Dispatch target for priv_open: Flash.
+- The Codex quota panels bug is P2 ("it original has data but now disappear. I need to know claude and codex quota").
+- Leftover tmux session `20261119035136` killed on request. The groups `work` and `20261119040239` remain.
 
-**Done today:** child B E9 + E10 LIVE-VERIFIED (72ab5903, 92fd27f7) after the P1 hermes approvals UA fix (970aeb23,
-LIVE-VERIFIED on M5). dirused list local time (v0.0.24) and human sizes (v0.0.25) LIVE-VERIFIED.
+**Changed files (all pushed; last commit 1d2c935f or later):**
+- `docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md` — new. Fix spec revised after Fable
+  (NEEDS FIXES: 2 blockers, 5 should-fix, all verified in code and adopted). Commit 29c28ad3.
+- `docs/bugs/2026-11-20-codex-quota-panels-no-data-on-premium-limit-record.md` — new, P2. Symptom, cause and fix
+  direction only. No Acceptance yet.
+- `docs/plans/v1.45.0-web-console-a-console-sshd.md` — Status notes that the run stopped at P3.
+- Memory: `reference_sudo_true_is_nopasswd_never_a_ticket_check.md`, indexed in `hub_ref_git_tooling.md`.
 
-**Dispatch WIP 3/3 (ledger), none running (2026-11-20 12:35):**
-- `remote-promote-2c-root-daemon` (Luna, base d1ec381c contains 2d): 4 rounds, each ends after ~1-2 min with one partial
-  file (daemon 74 lines, untracked). Same codex/model/effort as 2d (whose rounds ran ~20 min). Operator chose Astra 12:29:
-  resumed on gpt-6.2-astra (resume 5, prompt scratchpad 2c-astra.md), running.
-- `remote-promote-2e-cve-pin-branch` (Luna): rounds 1-3 lost to long-line truncation (23 spec lines > 400 chars; fixed
-  with `fold -s -w 160`); round 4 wrote services-git.yaml only. Resumed on gpt-6.2-astra 12:29 (resume 5), running.
-- `dirused-m9b-stop-delete-start` (agy Flash): test bug traced (1 GiB default /minsize; `/crit 0%` unparsed; /fromlist
-  rejects /minsize and /crit). Flash round 5 fixed the first two; Claude fixed the /fromlist args (ced1c01). Windows CI
-  then exit 1 instead of 3 at line 357 (step 1); Claude pushed 20b0949 making the assertion print stderr; stderr showed `/warn must be below /crit`; 61b7268 uses /warn 1 /crit 2; CI pending.
-  PR wilddog64/dirused#39. Ledger VIOLATION = P3 false positive; closes via PR. Agy resume 4 replayed round 3 (no work).
-- Web-console part C QUEUED: shares `Makefile` + `scripts/etc/machine/not-installed.list` with 2c (one dispatch per
-  file) and WIP is full; start after 2c lands.
+**Open questions for the operator:**
+- **"go"** to dispatch the priv_open fix to Flash. The WIP ledger is 2/3 (2c and 2e, both stopped on Codex quota),
+  so this fits without exceeding the limit. No file overlap with 2c or 2e.
+- **2e:** finish it now with a non-Codex agent, or wait for the Codex reset? Undecided since 12:38.
 
-**M4 disk (2026-11-20):** manual cleanup 195 -> 202 GB free (5.5 GB old Claude scratch dirs, 2.9 GB brew cleanup); kept
-628c342a (E8 evidence). Auto-cleanup = ideas.md row 74 (findings appended); monitoring already exists (v1.42.0 sensor).
+**Verification status:**
+- priv_open bug: OPEN, `Waiting on: dispatch`. Fix not written. E4 (live) is mandatory before LIVE-VERIFIED.
+- Codex quota bug: OPEN, `Waiting on: dispatch`, but it needs its fix spec first.
 
-**Handoff guard (2026-11-20, operator "go with your recommendation"):** `.claude/hooks/handoff-on-clear.sh` now appends a
-computed Live state block (commits since the START HERE header line last changed, dirty tree, open dispatches, hub ref,
-last 5 progress lines). Any edit to this section must also bump the header timestamp, or the hook reports STALE.
+**Next, in order:**
+1. **priv_open fix → Flash.** On "go":
+   - `bin/k3dm-codex-dispatch start --spec docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md --agent agy`
+     with the Flash model per `feedback_model_tiering_argon_flash_luna.md`; the intent gate is satisfied.
+   - Watch the exit. Verify: SHA on origin, E1/E2 red on 8faebd87, full `web_console_sshd.bats`, scope.
+   - Then land.
+2. **Codex quota fix spec.**
+   - Add Fix, Contract readers (`:703`, `:2941`, dashboard panels, BATS/pytest fixtures), Acceptance and intents to the
+     bug doc. Use a fixture built from the two real record shapes, session ids removed. Get the operator's intent
+     approval, then an Argon review (low risk).
+   - Dispatch to Flash when a WIP slot frees, or earlier with the operator's OK to exceed. Not on any file 2c or 2e
+     touches: `bin/k3dm-dispatch-metrics` is free.
+3. **Web-console E11–E14 rerun** after item 1 lands, with the operator at the M4 and Claude in tmux.
+   - Script: `/private/tmp/claude-501/-Users-cliang-src-gitrepo-personal-k3d-manager/ad83d2ff-4f5d-48d2-af46-ce0ef3e2616a/scratchpad/wc/wc-live.sh`
+     and `client.sh`. Remove the keeper loop, and expect one password prompt.
+   - The throwaway certs expire 2026-11-20 22:59. Regenerate ca1, ca2, user and the 4 certs.
+   - Then the M5 E11.
+4. **2c resume after the Codex reset, 11-24 07:32.** Partial uncommitted work is in its worktree (`Makefile`,
+   `not-installed.list`, daemon/client/authority). Then the dispatches that share `Makefile` with 2c: APP=none rev 5
+   (intents approved), travel bundle rev 2 add-laptop (intents approved), web-console C, 2b.
+5. **2e:** per the operator's answer (partial work in `.github/actions/setup/action.yml` and `bin/cluster-preflight`).
+6. **Live checks owed:** remote-promote 2d E11; travel bundle E3; rev 2 E5 at the next laptop enroll; test-all E3;
+   dirused M9b E2 on Monday 11-23 (operator in office).
+7. **Grooming Sun 11-22** (agenda below). Triage is due. Captured P3s: `2026-11-19-web-console-sshd-no-set-euo-pipefail`
+   and `2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy`.
+   - Follow-up idea for `docs/ideas.md`: lib-foundation's `sudo -n true` probes have the same "passwordless ≠ ticket"
+     blind spot. Audit upstream.
 
-**NEXT (operator):**
-1. Child C E8 (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`): diagnosis.md + correction.md printed to the operator
-   2026-11-20 11:05 (files: session 628c342a scratchpad `e8root/v1.44.1/e8-toy-stall.run/stall-20261117T030605Z/`).
-   LIVE-VERIFIED 2026-11-20 14:50 (Console $0.08 month = E1-E4 ~$0.03 + E9 $0.0015 + E8 $0.052646). Done.
-2. APP=none rev 5 (`docs/plans/v1.45.0-make-up-app-none.md`): 3 intents (E1-E3) listed to operator 2026-11-20 12:20,
-   APPROVED by operator 14:34 (recorded in spec). Dispatch blocked: Makefile shared with paused 2c (one dispatch per file) and Codex quota until 2026-11-24 07:32.
-3. Web-console part A E11–E14 BLOCKED 2026-11-20 15:12 by new bug `docs/bugs/2026-11-20-web-console-priv-open-passes-via-nopasswd-true.md` (P2 proposed; `_wc_priv_open` checks with sudo /usr/bin/true, NOPASSWD in k3d-manager sudoers). Operator: stop until the fix lands; rerun all E11-E14 after. Fix spec written in the bug doc (P2, Claude-owned, intents E1-E4 approved 2026-11-20, scope adds _wc_revoke headless check); Fable spec review NEEDS FIXES (2 blockers: E2 harness unbuildable via WC_BIN; E1 stub unfaithful) - all findings verified and adopted in the spec 15:33; open call now /bin/sleep 0, confirm _wc_priv_ticket (id -u == 0). Next: dispatch to Flash (agy) on operator go. Run script kept at scratchpad wc/wc-live.sh (fixed ls/stat, P3b trace). Was: operator at the keyboard
-   with sudo, M4 then M5, ~30-45 min. Claude first prepares the throwaway CA + certs (good, other-CA, wrong principal,
-   expired) and the part B scratch sshd enabled control, captures P2-P5, then reads redacted output. Order E11 -> E12 ->
-   E13 -> E14 (E14 revoke last; uninstall removes the test CA). Plan Status fixed to "verify recorded" 2026-11-20.
+**Session hygiene:** iTerm got sluggish after an 8 h session (the claude CLI was at 45% CPU). The operator ran `/clear`
+here. MEMORY.md is over budget, so compress it at the next release cut.
 
-**Next dispatches (operator go given 2026-11-20 for C and remote-promote):** web-console C after 2c; 2b after 2c.
-(Fast-line close-out trimmed v1.45.0; see roadmap.)
-
-**Live checks owed:** web-console part A E11–E14; remote-promote 2d E11; travel bundle E3 (E2 LIVE-VERIFIED 14:50); travel bundle rev 2 add-laptop E5 (next laptop enroll);
-test-all E3.
-
-**Captured this session (P3, grooming):** `docs/bugs/2026-11-19-web-console-sshd-no-set-euo-pipefail.md` (also: its BATS
-file is 555 s, the slowest; GitHub SSH keepalive now in dotfiles `ssh/m4-air/config`),
-`docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`. M4 lacks `gemini-cli-api-key` (operator-
-supplied; machine-setup exits 1 until added).
-
-**Other open:** dirused M9a E2 LIVE-VERIFIED 2026-11-20; M9b PR wilddog64/dirused#39 merged a2d0508 (operator); dispatch record closed (abandon, reason landed via PR); v0.0.26 released (run 44823783100; win-x64/arm64 zips + .sha256); M9b E2 live check deferred by operator to Monday 2026-11-23 (team in office; no daytime prod Tomcat stop). Daytime-safe partial: preview + /confirm answer Enter (held logs skipped: in use, not confirmed; non-held old logs ARE deleted in pass 1). Full stop/delete/start still needs an outage window — tracked outside k3d-manager
-releases. MEMORY.md over budget (compressing 2026-11-20). Triage due at grooming.
+**Standing facts:**
+- **Branch:** `k3d-manager-v1.45.0`, everything pushed.
+- **Hub:** `deploy/hub` = `5209b6b6` (promoted 2026-11-20 09:55 PST). Only docs commits since then, so no promote is
+  needed.
+- **Handoff guard:** `.claude/hooks/handoff-on-clear.sh` appends a computed Live state. Bump this header's timestamp
+  on any edit, or it reports STALE.
+- **M4:** lacks `gemini-cli-api-key` (operator-supplied; machine-setup exits 1 until it is added). Disk: 202 GB free.
+- **dirused:** v0.0.26 released; PR #39 merged a2d0508.
+- **Older handoffs and logs:** `memory-bank/archive/activeContext-2026-11-20.md`.
+- **Source of truth for open work:** `docs/bugs/` Waiting-on lines, `bin/k3dm-codex-dispatch open`, and the plan
+  Status lines.
 
 ## Grooming 2026-11-22 agenda
 - Pull `docs/plans/v1.51.0-bug-count-query-translation.md` forward into the next open minor, displacing a not-started plan (operator 2026-11-17 "sounds good"); triage `docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md` with it.
