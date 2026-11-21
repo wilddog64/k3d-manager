@@ -112,3 +112,4 @@
 - 2026-11-21 04:00Z: Spec written docs/plans/v1.45.0-plan-quotas-beside-fable.md (cap exception, operator; intents pending, agy Flash). 2e resume at 19:39 refused by Codex 5h limit (timer bug: GNU date); re-timer to 22:06. Captured P3 host-disk Free panel always red; m4 disk 58% / 197G free, fine.
 - 2026-11-21: plan-quotas-beside-fable intents approved (operator); dispatching to agy gemini-3.8-flash-medium. ~/.codex git gc freed 3.4G (3.5G -> 132M, unreachable loose blobs only, nothing pushed).
 - 2026-11-21: DISPATCHED plan-quotas-beside-fable to agy gemini-3.8-flash-medium (worktree task/v1.45.0/plan-quotas-beside-fable). WIP: 2c, 2e (exited, not landed), plan-quotas = 3.
+- 2026-11-21: plan-quotas worker (agy Flash) exit 0; committed d70a2e99 on task branch (52/52; pre-fix red; mutants leave51/nooverride/premium/y90 red). Spec rev 1.1 N1 wording. Independent Sonnet verifier running.
