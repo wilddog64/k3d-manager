@@ -1,11 +1,12 @@
 # Bug: Agent Activity "All Codex activity" panels float up, so API prices sits under Untracked by repo instead of beside Unpriced
 
-**Status:** OPEN — fix spec written 2026-11-21
+**Status:** VERIFIED — landed 83344176 (2026-11-21); E1 offline PASS (bats 54/54, pre-fix red on 55/56/57/83 moves, 3 mutants red), independent Sonnet verifier M1-M3, N1-N2 PASS from Acceptance; E3 read. E2 live pending `make hub-deploy`
+**Fix commit:** 83344176
 **Priority:** P3 (cosmetic: every panel shows its data; the layout differs from the stored and tested one)
 **Introduced by:** bd5e4828 (plan-quotas-beside-fable rev 1 removed panels 50–52 and 113–115 from the Codex row's top band)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** no (independent Sonnet verifier from Acceptance only; no Argon or Fable review recorded in the spec)
-**Waiting on:** fix running — since 2026-11-21
+**Waiting on:** live check — since 2026-11-21
 **Prior art:** exact-slug glob none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-21); `ls docs/bugs | grep -iE 'float|codex-row|activity.*layout|gridpos|compact'` found only kine-compaction and image-tag docs — read titles, different root cause
 **Approval:** operator, 2026-11-21: "go with you suggestion" — file as a P3 bug and fix inside v1.45.0 (it corrects a layout this release broke), no triage wait; dispatch to Codex. The daily-bar feature asked at the same time went to `docs/ideas.md`.
 **Intent approved:** operator, 2026-11-21
@@ -121,3 +122,12 @@ evidence:
 
 - `bats scripts/tests/plugins/agent_dispatch_dashboard.bats` green; `git diff --check` clean.
 - Commit on the task branch, push, report the SHA.
+
+## Verification (Claude, 2026-11-21)
+
+- Worker (Codex) could not commit from its sandbox; Claude committed da1f2922 on the task branch, landed as 83344176 (land test: dashboard suite + affected gates PASS).
+- Pre-fix: the new compaction test is red on the base Activity file with moves (55,26,20), (56,26,20), (57,26,20), (83,38,32); tests 43, 48, 54 also red.
+- Mutants, each red: 58 back to x0 y38 (overlap and Codex API cost tests, 54); 54-57 at y27 (53, 54, overlap); 58 unit changed (17, 54). Round-trip control green.
+- Independent Sonnet verifier from Acceptance only: M1, M2, M3, N1 (positive control reproduced), N2 PASS; Agent Cost unchanged; rows below shifted by exactly 6.
+- Nit (not blocking): test 54 pins a SHA-256 of all Activity panel content, so any future legitimate Activity edit must update that hash.
+- E2: after `make hub-deploy`, operator screenshot of /d/k3dm-agent-activity row "All Codex activity".
