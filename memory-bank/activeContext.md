@@ -191,3 +191,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-21: 2e LANDED 5ac4801b+968850ae (rev 5.1 missed reader appset_values_ref_default.bats, operator approved --allow-out-of-scope). Pending: independent verifier, hub-deploy, live. Unblocks 2c H.21. Hermes e2e 02:08 PASS 89/102 = 13 skipped, 0 failed.
 - 2026-11-21: captured P3 docs/bugs/2026-11-21-hermes-e2e-pass-line-hides-skipped.md (operator: PASS 89/102 cannot tell skipped vs failed).
 - 2026-11-21: web-console C dispatched to agy gemini-3.8-flash-medium (operator go + v5 intent re-approval). WIP 2: 2c (Astra resume 8), C.
+- 2026-11-21: ideas.md +4 rows from mattpocock/skills (live-check wizards, decision-frontier grilling, feedback-loop-first bugfix, agent-doc pruning); nothing installed.
