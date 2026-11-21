@@ -130,12 +130,13 @@ def test_stall_recovery_cli_dry_run_uses_only_asserted_scratch_targets(tmp_path,
     ledger = root / "ledger.jsonl"
     home.mkdir()
     root.mkdir()
-    rows = [event(1794614401, "stall_detected", stall="stall-cli", reason="silent", silent_s=60),
-            event(1794614402, "stall_diagnosis", stall="stall-cli", status="ok", cost_usd=0.42),
-            event(1794614403, "stall_proposal", stall="stall-cli"),
-            event(1794614404, "stall_decision", stall="stall-cli", decision="approved"),
-            event(1794614405, "stall_resume", stall="stall-cli", rc=0),
-            event(1794614406, "land")]
+    base = int(time.time()) - 3600
+    rows = [event(base + 1, "stall_detected", stall="stall-cli", reason="silent", silent_s=60),
+            event(base + 2, "stall_diagnosis", stall="stall-cli", status="ok", cost_usd=0.42),
+            event(base + 3, "stall_proposal", stall="stall-cli"),
+            event(base + 4, "stall_decision", stall="stall-cli", decision="approved"),
+            event(base + 5, "stall_resume", stall="stall-cli", rc=0),
+            event(base + 6, "land")]
     ledger.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
     monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
