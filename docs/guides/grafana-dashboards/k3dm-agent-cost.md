@@ -176,3 +176,7 @@ setting has no effect on the observed compaction behavior. Cache rebuilds counts
 write more than 50,000 cache tokens, grouped by compaction, idle gap, or other cause, and shows the
 estimated write cost at the configured Claude model rates. These measures are available for time
 windows.
+
+## Plan quotas
+
+The **Plan quotas** row groups subscription limits and reset times for Fable, Claude and Codex. **Fable weekly limit**, **Claude weekly limit**, **Claude 5h limit**, **Codex weekly limit** and **Codex 5h limit** display used ratio as a gauge with green, yellow and red threshold steps beside a neutral grey gauge showing the time until the limit resets. Below the gauges, **Claude quota reading age** and **Codex quota reading age** report how recently the exported cache or session file updated.

@@ -7,6 +7,10 @@
 - **Bug metrics for registered projects.** The scanner publishes each project's bug inventory, verification and open history from its clone or legacy k3d-manager docs, with fetch and scan freshness metrics.
 - **Encrypted travel password bundle.** Enrolled laptops can decrypt service passwords delivered through a shared folder; the hub republishes on changes and alerts when publishing is stale.
 
+### Changed
+
+- **Plan quotas beside Fable.** Codex and Claude weekly and 5-hour limits moved from Agent Activity to Agent Cost as gauge pairs beside Fable with neutral reset-time gauges, and quota reading age stats sit below them.
+
 ### Fixed
 
 - **Codex quota panels keep real Codex numbers when newest record is `premium`.** The session reader ignores rate-limit records with `limit_id: "premium"` or null limits so they do not blank the 5h and weekly quota panels or drop quota-efficiency observations.

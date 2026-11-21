@@ -370,8 +370,8 @@ all_ids=[p["id"] for d in new for p in d["panels"]]
 all_ids += [p["id"] for d in new for row in d["panels"] if row.get("type")=="row" for p in row.get("panels",[])]
 assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106,123,124}|set(range(42,49))|set(range(125,134))
-assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,116,117,118,119,120,121,122}
-assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,50,51,52,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122}
+assert set(p["id"] for p in new[2]["panels"])=={33,53,83,99,100,102}|set(range(35,40))|{49}|set(range(54,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
@@ -388,7 +388,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133):
+    if panel["id"] in (14,15,24,34,47,50,51,52,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -882,7 +882,7 @@ text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split(
 by_title={p["title"]:p for p in d["panels"]}
 titles=["Claude + Codex at API prices","Claude + Codex per live-verified spec","API run rate / month","API vs replaced plans"]
 row=next(p for p in d["panels"] if p["title"]=="Whole system at API prices")
-assert row["type"]=="row" and row["gridPos"]["y"]>=max(p["gridPos"]["y"]+p["gridPos"]["h"] for p in d["panels"] if p["id"] not in range(94,99) and p["id"] not in range(107,113) and p["id"] not in range(120,123))
+assert row["type"]=="row" and row["gridPos"]["y"]>=max(p["gridPos"]["y"]+p["gridPos"]["h"] for p in d["panels"] if p["id"] not in range(94,99) and p["id"] not in range(107,113) and p["id"] not in range(120,123) and p["id"] not in (50,51,52,113,114,115))
 for title in titles:
     p=by_title[title]
     assert p["type"]=="stat" and p["gridPos"]["y"]>row["gridPos"]["y"]
@@ -1095,7 +1095,7 @@ assert panel["type"]=="stat" and panel["targets"][0]["expr"]=='k3dm_agy_source_p
 assert panel["targets"][1]["expr"]=='k3dm_agy_source_present{source="none"}'
 assert [target["refId"] for target in panel["targets"]]==["A","B"]
 assert panel["options"]["textMode"]=="name"
-assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":66}
+assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":60}
 assert "host" in panel["targets"][0]["legendFormat"] and "source" in panel["targets"][0]["legendFormat"]
 assert "interactive and print" in panel["description"] and "not combined" in panel["description"]
 warning=panel["fieldConfig"]["overrides"][0]
@@ -1304,43 +1304,106 @@ PY
   [[ "$output" == *ok* ]]
 }
 
-@test "agent activity: Claude quota panels exist, query quota metrics, and do not overlap" {
-  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
-import json, sys
-text = open(sys.argv[1]).read()
-d = json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n", 1)[1].splitlines()))
-panels = {p.get("title"): p for p in d["panels"]}
+@test "agent cost: plan quotas row holds Claude and Codex gauge pairs and reading age stats" {
+  run python3 - "${AGENT_DASHBOARD_DIR}" <<'PY'
+import json, re, sys
+from pathlib import Path
 
-assert "Claude weekly quota used" in panels, "missing Claude weekly quota used panel"
-assert "Claude 5h quota used" in panels, "missing Claude 5h quota used panel"
-assert "Claude quota reading age" in panels, "missing Claude quota reading age panel"
+base = Path(sys.argv[1])
+def load(filename, key):
+    text = (base / filename).read_text()
+    return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n", 1)[1].splitlines()))
 
-weekly = panels["Claude weekly quota used"]
-assert weekly["type"] == "stat"
-assert weekly["targets"][0]["expr"] == 'k3dm_claude_quota_used_ratio{limit="seven_day"}'
-assert weekly["fieldConfig"]["defaults"]["unit"] == "percentunit"
-assert "Claude Code status line cache" in weekly["description"]
-assert "only updates while Claude Code runs on the machine the exporter runs on" in weekly["description"]
+cost = load("grafana-dashboard-agent-cost.yaml", "agent-cost.json")
+act = load("grafana-dashboard-agent-activity.yaml", "agent-activity.json")
+panels = {p.get("id"): p for p in cost["panels"]}
 
-five_h = panels["Claude 5h quota used"]
-assert five_h["type"] == "stat"
-assert five_h["targets"][0]["expr"] == 'k3dm_claude_quota_used_ratio{limit="five_hour"}'
-assert five_h["fieldConfig"]["defaults"]["unit"] == "percentunit"
-assert five_h["fieldConfig"]["defaults"]["thresholds"] == weekly["fieldConfig"]["defaults"]["thresholds"]
+# Row 120 is titled 'Plan quotas'
+row120 = panels.get(120)
+assert row120 is not None and row120.get("type") == "row" and row120.get("title") == "Plan quotas"
 
-age = panels["Claude quota reading age"]
-assert age["type"] == "stat"
-assert age["targets"][0]["expr"] == 'time() - k3dm_claude_quota_sample_timestamp_seconds'
-assert age["fieldConfig"]["defaults"]["unit"] == "s"
+# Panels 121 and 122 keep their content and gridPos
+assert panels[121]["gridPos"] == {"h": 8, "w": 18, "x": 0, "y": 75}
+assert panels[122]["gridPos"] == {"h": 8, "w": 6, "x": 18, "y": 75}
 
-all_ids = [p["id"] for p in d["panels"]]
-assert len(all_ids) == len(set(all_ids)), "duplicate panel ids found"
+# Gauges: 113, 114, 50, 51 at y=83, h=8, w=6
+expected_gauges = {
+    113: ("Claude weekly limit", 0, 83, 'k3dm_claude_quota_used_ratio{limit="seven_day"}', 'k3dm_claude_quota_resets_at_seconds{limit="seven_day"} * 1000'),
+    114: ("Claude 5h limit", 6, 83, 'k3dm_claude_quota_used_ratio{limit="five_hour"}', 'k3dm_claude_quota_resets_at_seconds{limit="five_hour"} * 1000'),
+    50: ("Codex weekly limit", 12, 83, 'k3dm_codex_quota_used_ratio{limit="secondary"}', 'k3dm_codex_quota_resets_at_seconds{limit="secondary"} * 1000'),
+    51: ("Codex 5h limit", 18, 83, 'k3dm_codex_quota_used_ratio{limit="primary"}', 'k3dm_codex_quota_resets_at_seconds{limit="primary"} * 1000'),
+}
 
-for i, left in enumerate(d["panels"]):
-    a = left["gridPos"]
-    for right in d["panels"][i + 1:]:
-        b = right["gridPos"]
-        assert not (a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]), (left["id"], right["id"])
+fable = panels[122]
+fable_defaults = fable["fieldConfig"]["defaults"]
+
+for pid, (title, x, y, used_expr, reset_expr) in expected_gauges.items():
+    p = panels.get(pid)
+    assert p is not None, f"missing panel {pid}"
+    assert p["type"] == "gauge", f"panel {pid} must be gauge"
+    assert p["title"] == title, f"panel {pid} title {p['title']} != {title}"
+    assert p["gridPos"] == {"h": 8, "w": 6, "x": x, "y": y}, f"panel {pid} gridPos {p['gridPos']}"
+    assert len(p["targets"]) == 2, f"panel {pid} targets count != 2"
+    assert p["targets"][0]["instant"] is True and p["targets"][0]["legendFormat"] == "used"
+    assert p["targets"][0]["expr"] == used_expr, f"panel {pid} used expr {p['targets'][0]['expr']} != {used_expr}"
+    assert p["targets"][1]["instant"] is True and p["targets"][1]["legendFormat"] == "resets at"
+    assert p["targets"][1]["expr"] == reset_expr, f"panel {pid} reset expr {p['targets'][1]['expr']} != {reset_expr}"
+    # N3: limit="premium" or no limit label forbidden
+    assert 'limit="premium"' not in p["targets"][0]["expr"] and 'limit=' in p["targets"][0]["expr"]
+    # Defaults and overrides match panel 122
+    defaults = p["fieldConfig"]["defaults"]
+    assert defaults["unit"] == "percentunit" and defaults["min"] == 0 and defaults["max"] == 1
+    assert defaults["thresholds"] == fable_defaults["thresholds"]
+    # N2: 'resets at' override with unit dateTimeFromNow and fixed colour #8e8e8e
+    overrides = p["fieldConfig"].get("overrides", [])
+    reset_override = next((o for o in overrides if o.get("matcher", {}).get("options") == "resets at"), None)
+    assert reset_override is not None, f"panel {pid} missing resets at override"
+    props = {prop["id"]: prop["value"] for prop in reset_override.get("properties", [])}
+    assert props.get("unit") == "dateTimeFromNow", f"panel {pid} reset override unit != dateTimeFromNow"
+    assert props.get("color", {}).get("fixedColor") == "#8e8e8e", f"panel {pid} reset color != #8e8e8e"
+    assert [s.get("color") for s in props.get("thresholds", {}).get("steps", [])] == ["#8e8e8e"], f"panel {pid} reset threshold step != #8e8e8e"
+
+# Descriptions
+assert "Claude Code status line cache" in panels[113]["description"]
+assert "only updates while Claude Code runs on the machine the exporter runs on" in panels[113]["description"]
+assert "Codex session file" in panels[50]["description"]
+
+# Stats: 115 and 52 at y=91, h=4, w=12
+expected_stats = {
+    115: ("Claude quota reading age", 0, 91, "time() - k3dm_claude_quota_sample_timestamp_seconds"),
+    52: ("Codex quota reading age", 12, 91, "time() - k3dm_codex_quota_sample_timestamp_seconds"),
+}
+for pid, (title, x, y, expr) in expected_stats.items():
+    p = panels.get(pid)
+    assert p is not None, f"missing panel {pid}"
+    assert p["type"] == "stat", f"panel {pid} must be stat"
+    assert p["title"] == title, f"panel {pid} title {p['title']} != {title}"
+    assert p["gridPos"] == {"h": 4, "w": 12, "x": x, "y": y}, f"panel {pid} gridPos {p['gridPos']}"
+    assert p["fieldConfig"]["defaults"]["unit"] == "s"
+    assert p["targets"][0]["expr"] == expr
+
+# N1: Agent Activity has no panel querying quota metrics
+quota_pat = re.compile(r"k3dm_(codex|claude)_quota_(used_ratio|resets_at_seconds|sample_timestamp_seconds)")
+act_quota = [p["id"] for p in act["panels"] if any(quota_pat.search(t.get("expr", "")) for t in p.get("targets", []))]
+assert len(act_quota) == 0, f"Agent Activity still has quota panels: {act_quota}"
+
+# Paired: Agent Cost has six such panels plus 122 = 7 panels
+cost_quota = [p["id"] for p in cost["panels"] if any(quota_pat.search(t.get("expr", "")) for t in p.get("targets", []))]
+assert set(cost_quota) == {50, 51, 52, 113, 114, 115, 122}, f"Agent Cost quota panels {cost_quota} != expected"
+
+# M3: Agent Activity remaining panels do not overlap, keep row and order, leave no empty band under row 49
+act_panels = act["panels"]
+act_by_id = {p["id"]: p for p in act_panels}
+row49 = act_by_id[49]
+assert row49["gridPos"]["y"] == 19 and row49["gridPos"]["h"] == 1
+# panel 53 starts directly under row 49 at y=20
+assert act_by_id[53]["gridPos"] == {"h": 6, "w": 6, "x": 0, "y": 20}
+# panels 54-57 share y=26 and h=12
+for pid in (54, 55, 56, 57):
+    assert act_by_id[pid]["gridPos"]["y"] == 26 and act_by_id[pid]["gridPos"]["h"] == 12
+# row 49 description or title says plan quotas are on Agent Cost
+desc_or_title = (row49.get("description") or "") + (row49.get("title") or "")
+assert "plan quotas are on Agent Cost" in desc_or_title or "Plan quotas are on Agent Cost" in desc_or_title
 
 print("ok")
 PY
@@ -1369,12 +1432,12 @@ PY
   [[ "$output" == *ok* ]]
 }
 
-@test "agent cost: Fable row has daily tokens on own axis and weekly limit gauge" {
+@test "agent cost: Plan quotas row has daily tokens on own axis and weekly limit gauge" {
   run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-cost.yaml" <<'PY'
 import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))["panels"]
-fable_row=next((p for p in panels if p.get("type")=="row" and p.get("title")=="Fable"),None)
-assert fable_row is not None, "Fable row not found"
+fable_row=next((p for p in panels if p.get("type")=="row" and p.get("title")=="Plan quotas"),None)
+assert fable_row is not None, "Plan quotas row not found"
 daily=next((p for p in panels if "fable" in p.get("title","").lower() and any("k3dm_dispatch_claude_daily_tokens" in t.get("expr","") for t in p.get("targets",[]))),None)
 assert daily is not None, "Fable daily tokens panel not found"
 assert any('model=~"claude-fable-.*"' in t.get("expr","") for t in daily["targets"])
