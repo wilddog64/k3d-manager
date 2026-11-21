@@ -219,3 +219,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-21: stale branch cleanup (operator go): 17 merged origin branches and 47 local branches deleted, 2 dead worktrees pruned; restore bundle ~/.local/share/k3d-manager/branch-archive-2026-11-21.bundle (64 refs, verified). Kept: main, v1.45.0, deploy/hub, cve-pins/hub, cloud-requests, open dependabot wrangler PR 158, unmerged bug/2026-11-05-istio-ambient-retired-cluster, 2c and web-console C task branches.
 
 - 2026-11-21: filed P3 docs/bugs/2026-11-21-password-bundle-keychain-and-input-errors-give-no-next-step.md (locked Keychain rc 36 on show/enroll, vague NAME/KEY error, stale enroll hint); fix in v1.45.0 per operator; Intent approved pending, then dispatch (WIP 2 of 3, file not shared).
+
+- 2026-11-21: docs/ideas.md row 105 (non-macOS service-password access) WSL part extended: OS-picked identity backend (age -p identity file off macOS), Linuxbrew install with apt fallback, audit macOS-only calls.
