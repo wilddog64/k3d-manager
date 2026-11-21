@@ -1,70 +1,39 @@
-## Handoff — 2026-11-21 12:20 PST (20:20Z) — memory compressed before /clear; 2c and web-console C wait for Claude — START HERE
+## Handoff — 2026-11-21 12:25 PST (20:25Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
-**Session update 2026-11-21 11:55 PST:**
-- 2c: all 12 resume-8 items verified present in the wip; rebased onto release head → task HEAD `4adcb0e2` (backup tag
-  `backup/2c-pre-rebase-419b34c1`); Makefile merge additive; pytest 89/89, bats 9/9, shellcheck clean. Independent Sonnet
-  verifier done: 14/14 must_not red on mutants, pre-fix reds match; gap N1 (env guard is a literal grep, two env mutants
-  green). Correction resume 9 (Codex astra, test-only AST scan + hostile-env main()) running.
-- web-console C: static gates pass, suites green (14 pytest, 7 bats), but coverage is far short of E2-E8 (no real-pty/
-  scratch-tmux gate tests, E8 installer fixture absent, no mutants). Operator chose Codex astra: Flash run committed
-  `567faa63` (tag `backup/web-console-c-flash-run1`), agy slug abandoned, plan gained `## Handover (run 2, Codex)` (`d17e565b`),
-  new dispatch `web-console-c-totp-gate-r2` (gpt-6.2-astra). Run 1 stopped on a real spec hole (uninstall 7.2 vs 7.6/M9 when
-  bootout fails); spec fixed `790afd26`; resume 2 applied the Flash draft and stopped on part A exit-3 (CA missing) row count: spec
-  now refuses it (`d9599ad0`); resume 3 (one full review pass) found 7 more, incl. Claude's own d9599ad0 row-count bug; all resolved in
-  `## v6 changes` (`0f07641a`); resume 4 running to completion. Codex cannot commit: Claude commits on exit.
-- Intents approved (operator 2026-11-21): password-bundle Keychain P3 and red-team gate (`20a6580f`). P3 dispatched as
-  `password-bundle-keychain-next-step` (Codex astra). WIP 3 of 3: 2c (verifier running), C-r2, P3.
+**Session update 2026-11-21 12:25 PST:**
+- 2c LANDED `c17eae59` (plan LANDED `32f05e79`, pushed). Resume 9 N1 fix verified by Claude: pytest 90/90, bats 9/9;
+  env-socket mutant red in `test_main_reads_no_environment` (scratch copy). First land failed on an unrelated race,
+  captured P3 `docs/bugs/2026-11-21-hub-deploy-bats-catch-up-test-races-git-index-lock.md` (`0c999bbe`); retry green.
+- Password-bundle Keychain P3 LANDED `3971fa3f`. Verified: bats 15/15; mutants red (password on argv → 15, any rc
+  diagnosed → 14, unlocked still unlocks → 13, one invalid message → 4,11); 7 tests red on pre-fix plugin.
+- web-console C r2: resume 4 hit Codex usage limit 12:08 mid-evidence (empty last-message-4). Partial tree (11 files)
+  uncommitted in the r2 worktree; backup `/private/tmp/claude-501/-Users-cliang-src-gitrepo-personal-k3d-manager/517093b8-70e9-4015-947e-2c827b62535f/scratchpad/c-r2-resume4-partial.tgz`.
+  Spec contract = `## v6 changes` (`0f07641a`). Resume 5 after 12:35: "continue resume 4 to the end".
+- Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
-- Branch `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `42176488` (2026-11-21 08:16 PST); commits after it
-  that matter on the hub: travel bundle rev 2 `39a24a59` (needs a hub-deploy for `make password-bundle-add-laptop`).
-- Open dispatches 2 of 3 (`bin/k3dm-codex-dispatch open`): `remote-promote-2c-root-daemon` (wip `419b34c1` on its task
-  branch, Codex resume-8 partial) and `web-console-c-totp-gate` (agy Flash exited 0, uncommitted in its worktree).
-- Quotas 2026-11-21: Codex 5h 0.04 / weekly 0.22 (resets 11-24 07:32 PST); Fable weekly 0.08 (resets 11-26 21:59Z);
-  Claude weekly 0.15. Warn the operator at 0.80.
-- Travel bundle: m2-air enrolled 2026-11-21 via add-recipient + `FORCE=1` publish on the M5 (recipients m4-air, m2-air);
-  `password-bundle-show` PASS on m2-air; on m4-air it failed `security` rc 36 over SSH (locked Keychain or item ACL),
-  operator to unlock and retry. Rev 2 E5 stays pending (needs `add-laptop` after a hub-deploy).
-- Stale branches cleaned (restore bundle `~/.local/share/k3d-manager/branch-archive-2026-11-21.bundle`, 64 refs).
+- Branch `k3d-manager-v1.45.0` pushed. Hub `deploy/hub` = `42176488`; not yet on the hub: travel bundle rev 2 `39a24a59`,
+  2c `c17eae59`, P3 `3971fa3f`.
+- Quotas: Codex 5h exhausted until 12:35 PST (weekly 0.22 earlier); Fable weekly 0.08; Claude weekly 0.15. Warn at 0.80.
+- Travel bundle: m2-air PASS; m4-air rc 36 → now gets the unlock prompt (P3); operator retry pending.
 
 **Waiting on the operator:**
-- Intent approval (E1-E3) for `docs/bugs/2026-11-21-password-bundle-keychain-and-input-errors-give-no-next-step.md`
-  (P3, fix in v1.45.0 per operator; only `password_bundle.sh` + bats; fits WIP as 3rd). Then dispatch to Codex.
-- Intent approval for `docs/plans/v1.45.0-red-team-gate.md` (runs after 2c, 2b, web-console C land).
-- `make hub-sync` after the rev 2 land was refused by the permission classifier: operator runs it or allows it.
-- m4-air `make password-bundle-show` result after `security unlock-keychain`.
+- `make hub-sync` then `make hub-deploy REF=<release head>` (rev 2, 2c, P3 onto the hub).
+- m4-air `make password-bundle-show` retry (should now prompt to unlock the Keychain).
 
-**Next, in order (each task: spec → worktree → command → verify checklist):**
+**Next, in order:**
 
-1. **web-console C (TOTP gate) — verify and land.**
-   - Spec: `docs/plans/v1.45.0-web-console-c-totp-gate.md`. Worktree:
-     `/Users/cliang/.local/share/k3d-manager/worktrees/v1.45.0/web-console-c-totp-gate` (base `01393a7b`).
-   - State: agy Flash exited 0, nothing committed. Diff = 3 modified (`Makefile`, `not-installed.list`,
-     `web_console_common.sh`) + 8 new (`bin/k3dm-web-console-totp`, howto, totp plist tmpl, gate/totpctl/totpd `.py`,
-     `test_web_console_totp.py`, `web_console_totp.bats`). Worker claims pytest 2490 passed, shellcheck clean: unverified.
-   - Checklist: diff vs spec Files and every Acceptance id (expect test gaps: only 14 pytest + 7 bats); run both suites +
-     shellcheck + `git diff --check` + `_agent_audit`; each must_not red on base `01393a7b` (mutants); if gaps, send a
-     correction resume, else Claude commits on the task branch; independent Sonnet verifier from Acceptance only; then
-     `bin/k3dm-codex-dispatch land --slug web-console-c-totp-gate --test '<suites>'`; push; record VERIFIED.
-2. **2c root daemon — finish, rebase, verify, land.**
-   - Spec: `docs/plans/v1.45.0-remote-promote-2c-root-daemon.md`. Worktree:
-     `/Users/cliang/.local/share/k3d-manager/worktrees/v1.45.0/remote-promote-2c-root-daemon` at wip `419b34c1` (clean).
-   - Correction resume 8 items to check in `419b34c1`: ACL `ls -lde` checks, sudo priming, status rc, ditto `--noacl`,
-     interactive bootout (prompt: `/Users/cliang/.local/share/k3d-manager/worktrees/v1.45.0/remote-promote-2c-root-daemon.run/pending-resume-8.md`). Missing items → resume Codex on
-     `gpt-6.2-astra` (Codex weekly 0.22, fine).
-   - Then rebase onto the release head (Makefile overlap with rev 2 `39a24a59`); earlier review: Sonnet M1-M22 PASS, N2/N6
-     PARTIAL; Fable S1-S5 should-fix. Same checklist as item 1; land; record.
-3. **Password-bundle Keychain P3 — dispatch on intent approval.**
-   - Spec: `docs/bugs/2026-11-21-password-bundle-keychain-and-input-errors-give-no-next-step.md` (Files: plugin, its bats,
-     howto, CHANGELOG; no overlap with 2c or C). Ask the operator to approve E1-E3 intents, write `**Intent approved:**`,
-     push, then `bin/k3dm-codex-dispatch start --spec <that doc> --agent codex`. Verify: mutants listed in E1; N1
-     password absent from stub argv log.
-4. **Then:** 2b (`docs/plans/v1.45.0-remote-promote-2b-promote-wiring.md`) and web-console B
-   (`docs/plans/v1.45.0-web-console-b-captures.md`) after 2c lands (shared Makefile; WIP ≤ 3, one dispatch per file); then
-   red-team gate (`docs/plans/v1.45.0-red-team-gate.md`, intents pending, quota gate inside); then the release PR
-   (Copilot capped until 12-01, so Argon reviews it).
+1. **web-console C r2 — resume 5, verify, land.** Worktree
+   `/Users/cliang/.local/share/k3d-manager/worktrees/v1.45.0/web-console-c-totp-gate-r2`; spec
+   `docs/plans/v1.45.0-web-console-c-totp-gate.md` (Handover run 2 + v6 changes). Verify every E1-E11 item and mutant,
+   independent verifier from Acceptance only, Claude commits, `land --slug web-console-c-totp-gate-r2`.
+2. **2b and web-console B** (`docs/plans/v1.45.0-remote-promote-2b-promote-wiring.md`,
+   `docs/plans/v1.45.0-web-console-b-captures.md`) — 2c has landed, so both can dispatch now (WIP ≤ 3, one per file;
+   check file overlap with C r2: Makefile).
+3. **Red-team gate** (`docs/plans/v1.45.0-red-team-gate.md`, intents approved) after 2b, B, C land; then the release PR
+   (Copilot capped until 12-01, Argon reviews).
 5. **Live checks owed (operator):** 2d E11; travel bundle E3 (next real rotation) and rev 2 E5 (first `add-laptop` after a
    hub-deploy); test-all E3; dispatch-stall C E8 and B E9/E10; dirused M9b E2 Mon 11-23 (office); web-console part A E12
    forwarding control; m4-air password-bundle-show after unlock.
