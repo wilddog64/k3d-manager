@@ -8,7 +8,8 @@
 **Waiting on:** dispatch — since 2026-11-20
 **Prior art:** `docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md` (exact-slug glob none; `make find-similar-docs` unavailable, no cluster context; found by `grep -il "usr/bin/true"`) — read, different root cause: that bug added the `NOPASSWD: /usr/bin/true` rule on purpose so headless `sudo -n true` probes pass
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait ("I thought P3 bugs are waiting for grooming not P2"); dispatch to Flash, Fable reviews the spec first ("intents approve and send to Fable for review"). Target branch `k3d-manager-v1.45.0`; part A is unreleased, so this is a fix inside v1.45.0, not a patch release.
-**Intent approved:** operator, 2026-11-20 ("intents approve and send to Fable for review"; E1–E4). The approval came before Claude showed the text, so Claude showed the intents in the same session.
+**Intent approved:** operator, 2026-11-20
+**Intent note:** "intents approve and send to Fable for review" (E1–E4). The approval came before Claude showed the text, so Claude showed the intents in the same session.
 
 ## Symptom
 

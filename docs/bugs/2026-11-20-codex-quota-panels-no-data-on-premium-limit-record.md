@@ -5,10 +5,10 @@
 **Introduced by:** pre-existing (the exporter assumes one rate-limit record shape)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-20 (intent approval E1–E4, then Argon spec review, then dispatch to Flash)
+**Waiting on:** investigation — since 2026-11-20 (Argon spec review, then dispatch to Flash when a WIP slot frees)
 **Prior art:** exact-slug glob none; `make find-similar-docs` not run (unavailable on the M4 today, see the 2026-11-20 priv_open bug); grep for `rate_limits|k3dm_codex_quota` hit `docs/bugs/2026-11-07-claude-plan-quota-not-exported.md` and `docs/bugs/2026-11-14-quota-efficiency-panels-compare-only-last-two-readings.md` — titles read, different root cause (Claude quota export; panel comparison window)
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait; dispatch to Flash. Target branch `k3d-manager-v1.45.0` (fix inside the open release, not a patch release).
-**Intent approved:** pending (E1–E4 below)
+**Intent approved:** operator, 2026-11-20
 
 ## Symptom
 
