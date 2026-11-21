@@ -1,0 +1,100 @@
+Server listening on 127.0.0.1 port 42722.
+Connection from 127.0.0.1 port 50409 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50409 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50409 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18031
+Received disconnect from 127.0.0.1 port 50409:11: disconnected by user
+Disconnected from user <login> 127.0.0.1 port 50409
+Connection from 127.0.0.1 port 50424 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50424 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50424 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18059
+refused local port forward: originator 127.0.0.1 port 50432, target 127.0.0.1 port 22
+Received disconnect from 127.0.0.1 port 50424:11: disconnected by user
+Disconnected from user <login> 127.0.0.1 port 50424
+Connection from 127.0.0.1 port 50440 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50440 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50440 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18101
+refused local port forward: originator 127.0.0.1 port 50445, target 127.0.0.1 port 22
+Received disconnect from 127.0.0.1 port 50440:11: disconnected by user
+Disconnected from user <login> 127.0.0.1 port 50440
+Connection from 127.0.0.1 port 50451 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50451 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50451 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18177
+Connection closed by 127.0.0.1 port 50451
+Transferred: sent 3692, received 4308 bytes
+Closing connection to 127.0.0.1 port 50451
+Connection from 127.0.0.1 port 50469 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50469 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50469 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18214
+refused streamlocal port forward: originator 127.0.0.1 port 50476, target /var/run/mDNSResponder
+Received disconnect from 127.0.0.1 port 50469:11: disconnected by user
+Disconnected from user <login> 127.0.0.1 port 50469
+Connection from 127.0.0.1 port 50481 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50481 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50481 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18247
+Starting session: forced-command (config) '/Library/PrivilegedHelperTools/k3dm-web-console/forced-command' on ttys003 for <login> from 127.0.0.1 port 50481 id 0
+Close session: user <login> from 127.0.0.1 port 50481 id 0
+Received disconnect from 127.0.0.1 port 50481:11: disconnected by user
+Disconnected from user <login> 127.0.0.1 port 50481
+Connection from 127.0.0.1 port 50484 on 127.0.0.1 port 42722
+Connection closed by authenticating user <login> 127.0.0.1 port 50484 [preauth]
+srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 1 seconds for penalty: connections without attempting authentication
+Connection from 127.0.0.1 port 50747 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50747 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50747 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18901
+refused local port forward: originator 127.0.0.1 port 65535, target 127.0.0.1 port 22
+Connection closed by 127.0.0.1 port 50747
+Transferred: sent 3664, received 4332 bytes
+Closing connection to 127.0.0.1 port 50747
+Connection from 127.0.0.1 port 50749 on 127.0.0.1 port 42722
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Postponed publickey for <login> from 127.0.0.1 port 50749 ssh2 [preauth]
+Accepted certificate ID "wc-live-good" (serial 0) signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU via /etc/k3dm-web-console/access_ca.pub
+Accepted publickey for <login> from 127.0.0.1 port 50749 ssh2: ED25519-CERT SHA256:/qJSqqnS/7KBpkB7zv5jBrakdnLpwEOiiZzq0wQMoHU ID wc-live-good (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+User child is on pid 18908
+subsystem request for sftp by user <login> failed, subsystem not found
+Connection closed by 127.0.0.1 port 50749
+Close session: user <login> from 127.0.0.1 port 50749 id 0
+Transferred: sent 3668, received 4328 bytes
+Closing connection to 127.0.0.1 port 50749
+Connection from 127.0.0.1 port 50792 on 127.0.0.1 port 42722
+Failed publickey for <login> from 127.0.0.1 port 50792 ssh2: ED25519 SHA256:gPbGrOhzmqsnt7ZnKPngmLks9rGBvNIKqWf8uUfl63Y
+Connection closed by authenticating user <login> 127.0.0.1 port 50792 [preauth]
+srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 5 seconds for penalty: failed authentication
+Connection from 127.0.0.1 port 50844 on 127.0.0.1 port 42722
+Failed publickey for <login> from 127.0.0.1 port 50844 ssh2: ED25519-CERT SHA256:ln1l0bDJ1S2jGWRNSwVCF2sUB2eCcwiu3kOfKp9jU8g ID wc-live-wrongca (serial 0) CA ED25519 SHA256:3B1aAhbYfjcTtXWpIGNfaMquF7dpp7hwhHxDZOhErSg
+Failed publickey for <login> from 127.0.0.1 port 50844 ssh2: ED25519 SHA256:ln1l0bDJ1S2jGWRNSwVCF2sUB2eCcwiu3kOfKp9jU8g
+Connection closed by authenticating user <login> 127.0.0.1 port 50844 [preauth]
+srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 5 seconds for penalty: failed authentication
+Connection from 127.0.0.1 port 50896 on 127.0.0.1 port 42722
+Refusing certificate ID "wc-live-wrongprinc" serial=0 signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU: Certificate invalid: name is not a listed principal
+Failed publickey for <login> from 127.0.0.1 port 50896 ssh2: ED25519-CERT SHA256:/TXmpdc2OHElcAwk0Ubk6MuO9ev80wD1HQyoTgnCvT4 ID wc-live-wrongprinc (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+Failed publickey for <login> from 127.0.0.1 port 50896 ssh2: ED25519 SHA256:/TXmpdc2OHElcAwk0Ubk6MuO9ev80wD1HQyoTgnCvT4
+Connection closed by authenticating user <login> 127.0.0.1 port 50896 [preauth]
+srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 5 seconds for penalty: failed authentication
+Connection from 127.0.0.1 port 50936 on 127.0.0.1 port 42722
+Refusing certificate ID "wc-live-expired" serial=0 signed by ED25519 CA SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU: Certificate invalid: expired
+Failed publickey for <login> from 127.0.0.1 port 50936 ssh2: ED25519-CERT SHA256:MIWTnJk766IebmzgimQNqCBzuzQXT9UJ9sNWyn9QGYw ID wc-live-expired (serial 0) CA ED25519 SHA256:2oFWfnIcy6U7bBzXVh6djy6iOCt3jeitn2YPzrxy7PU
+Failed publickey for <login> from 127.0.0.1 port 50936 ssh2: ED25519 SHA256:MIWTnJk766IebmzgimQNqCBzuzQXT9UJ9sNWyn9QGYw
+Connection closed by authenticating user <login> 127.0.0.1 port 50936 [preauth]
+srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 5 seconds for penalty: failed authentication
