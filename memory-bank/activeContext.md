@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 15:20 PST (23:20Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 15:35 PST (23:35Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -31,6 +31,9 @@
   file, security), G25, G35, B18 + 4 impl-vs-contract notes (tmux env 6 keys vs five, uninstall two commits vs one,
   --tmux symlink unresolved, E2 case 1 sequential) queued in `resume-7.md` for after Luna exits. Not run: B27 B30 B33
   B36 B39 G8 → Claude runs them on the final tree. D13 was a no-op mutant (ignore).
+- Luna resume 6 done 15:04: 19/23 killed; equivalents D13, G9b, D40 accepted by Claude; D27 challenged (pending-slot
+  test). pytest 137; bats 29/30 (test 11 order-dependent leak). Resume 7 RUNNING (C3/G25/G35/B18, 4 contract notes,
+  bats leak, D27). After it: Claude reruns full mutant table + 6 unrun, commits, lands.
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
