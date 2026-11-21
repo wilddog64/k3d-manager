@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 14:30 PST (22:30Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 14:45 PST (22:45Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -18,6 +18,12 @@
   bug doc `af2cc5d9` → Waiting on operator decision, grooming 11-22. Stale bugs closed `0e08dac4`. All pushed.
 - agy quota question answered: token sums per pool from conversation DBs are buildable; % needs calibration from the
   agy panel or an operator-approved probe; fold into `docs/plans/argon-bug-classifier.md` at grooming.
+- Operator applied the LAST Codex reset credit (none left); asked to split remaining C work across Flash and Luna.
+  Independent verifier mutant table so far: 126/168 run, 103 red, 23 GREEN survivors (D4b D11b D13 D27 D18 D30 D31
+  D31b D31c D40 D44 G9b G20 G20c G27 G40 C10 B11 B11b B14 B22 B25b B34). Flash (gemini-3.8-flash-medium, ad hoc,
+  read-only, snapshot copy `scratchpad/flash-audit/tree`) writing AUDIT.md: acceptance-id → test coverage + howto drift.
+  Next: when verifier + Flash finish, one `resume --slug web-console-c-totp-gate-r2 --model gpt-6-luna` with all
+  survivors + Flash gaps (children cannot branch off the uncommitted r2 tree; dispatcher bases on the release branch).
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
