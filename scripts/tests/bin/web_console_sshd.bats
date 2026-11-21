@@ -114,9 +114,11 @@ wc_library() {
   [ "$status" = 37 ]
   [ -z "$output" ]
   grep -Fxq fixture-sentinel "$SCRATCH/calls"
+  local before; before="$(cat "$SCRATCH/calls")"
   run _wc_priv_open </dev/null
   [ "$status" = 10 ]
   [[ "$output" = *"an interactive terminal is required"* ]]
+  [ "$(cat "$SCRATCH/calls")" = "$before" ]
 }
 
 @test "[M3] [N7] production main resets command lookup before privilege use" {
@@ -353,7 +355,11 @@ if tool in {'install','mv','rm','mkdir','touch','tee','mktemp','cp','kill'}:
             die(99)
 if fail(tool): die(1)
 if tool == 'uname': print(get('platform', 'Darwin'))
-elif tool == 'id': print(get('login','someone') if args == ['-un'] else 'someone:*:501:20::0:0:Fixture:/redacted:' + get('shell','/bin/zsh'))
+elif tool == 'id':
+    if args == ['-u']:
+        if get('ticket') == 'closed': die(1)
+        print('0')
+    else: print(get('login','someone') if args == ['-un'] else 'someone:*:501:20::0:0:Fixture:/redacted:' + get('shell','/bin/zsh'))
 elif tool == 'date':
     print(time.strftime('%Y%m%dT%H%M%SZ',time.gmtime()) if '-u' in args else int(time.time()))
 elif tool == 'git':
@@ -471,7 +477,6 @@ elif tool=='yq':
         enabled=config.get('warp-routing',{}).get('enabled') or config.get('originRequest',{}).get('bastionMode')
         print('true' if enabled or any(r.get('originRequest',{}).get('bastionMode') for r in rules) else 'false')
     else: print('\n'.join(str(r['service']) for r in rules))
-elif tool=='true' and get('ticket')=='closed': die(1)
 elif tool not in ('true','touch','plutil','sleep','kill'): die(2)
 PY
   chmod +x "$root/shim"
@@ -916,6 +921,11 @@ for line in (lib+script).splitlines():
         if '/usr/bin/tee ' in line: assert re.search(r'(?<!2)>/dev/null',line), line
         if '/usr/sbin/sshd ' not in line: assert '2>/dev/null' in line, line
     assert not re.search(r'^\s*(?:command\s+)?sudo\s',line),line
+sudoers=(repo/'bin/install-sudoers.sh').read_text()
+for line in sudoers.splitlines():
+    if 'NOPASSWD' in line:
+        assert '/bin/sleep' not in line, line
+        assert '/usr/bin/id' not in line, line
 PY
   _WC_JOURNAL=/x
   wc_library
@@ -942,8 +952,8 @@ SH
   run wc_pty_run "$child" "$REPO"
   [ "$status" = 10 ]
   [[ "$output" = *'ticket not usable from a pipe'* && "$output" = *'caller-alive=10'* ]]
-  [ "$(head -1 "$WC_TICKET_CALLS")" = /usr/bin/true ]
-  [ "$(tail -1 "$WC_TICKET_CALLS")" = '-n /usr/bin/true' ]
+  [ "$(head -1 "$WC_TICKET_CALLS")" = "/bin/sleep 0" ]
+  [ "$(tail -1 "$WC_TICKET_CALLS")" = '-n /usr/bin/id -u' ]
 }
 
 @test "[M6] [N8] fallback never hides a busy or part-C-mismatched port" {
@@ -1588,4 +1598,122 @@ JOURNAL
   [ "$status" = 5 ]; [[ "$output" = *'previous generation restored'* ]]
   [ ! -e "$journal" ]; [ ! -e "$root$plist_path" ]; [ ! -e "$root/job" ]
   run grep 'priv .*launchctl bootstrap' "$root/calls.log"; [ "$status" = 1 ]
+}
+
+@test "[bug-2026-11-20] [E1] tty opens ticket under sudoers with NOPASSWD /usr/bin/true" {
+  local child="$SCRATCH/check-ticket-nopasswd"
+  cat > "$child" <<'SH'
+#!/bin/bash
+source "$1/scripts/lib/system.sh"
+source "$1/scripts/lib/web_console_common.sh"
+sudo() {
+  printf '%s\n' "$*" >> "$WC_TICKET_CALLS"
+  if [[ "${1-}" = /usr/bin/true || "${2-}" = /usr/bin/true ]]; then
+    return 0
+  fi
+  if [[ "${1-}" = -n ]]; then
+    if [[ ! -f "$WC_TICKET_FILE" ]]; then
+      printf 'sudo: a password is required\n' >&2
+      return 1
+    fi
+    if [[ "${2-}" = /usr/bin/id && "${3-}" = -u ]]; then
+      printf '%s\n' "${WC_STUB_UID:-0}"
+      return 0
+    fi
+    return 0
+  fi
+  if [[ -n "${WC_STUB_DENY-}" ]]; then
+    return 1
+  fi
+  touch "$WC_TICKET_FILE"
+  return 0
+}
+[ "$(type -t sudo)" = function ] || exit 98
+[ ! -e "$WC_TICKET_FILE" ] || exit 97
+_wc_priv_open
+rc=$?
+printf 'caller-alive=%s\n' "$rc"
+exit "$rc"
+SH
+  chmod +x "$child"
+  export WC_TICKET_FILE="$SCRATCH/ticket"
+  export WC_TICKET_CALLS="$SCRATCH/ticket-calls"
+
+  # Case A: no ticket -> opens ticket and confirms it via sudo -n
+  rm -f "$WC_TICKET_FILE" "$WC_TICKET_CALLS"
+  run wc_pty_run "$child" "$REPO"
+  [ "$status" = 0 ]
+  [[ "$output" = *'caller-alive=0'* ]]
+  [ -f "$WC_TICKET_FILE" ]
+  grep -Fxq -- "-n /usr/bin/id -u" "$WC_TICKET_CALLS"
+  awk '/^-n \/usr\/bin\/id -u$/ { if (found_non_n) { exit 0 } else { exit 1 } } !/^-n/ && !/\/usr\/bin\/true/ { found_non_n=1 } END { if (!NR) exit 1 }' "$WC_TICKET_CALLS"
+
+  # Case B: positive control WC_STUB_DENY=1 -> rc 10
+  rm -f "$WC_TICKET_FILE" "$WC_TICKET_CALLS"
+  export WC_STUB_DENY=1
+  run wc_pty_run "$child" "$REPO"
+  [ "$status" = 10 ]
+  [[ "$output" = *'caller-alive=10'* ]]
+  unset WC_STUB_DENY
+
+  # Case C: WC_STUB_UID=501 -> rc 10 (uid must be exactly 0)
+  rm -f "$WC_TICKET_FILE" "$WC_TICKET_CALLS"
+  export WC_STUB_UID=501
+  run wc_pty_run "$child" "$REPO"
+  [ "$status" = 10 ]
+  [[ "$output" = *'caller-alive=10'* ]]
+  unset WC_STUB_UID
+}
+
+@test "[bug-2026-11-20] [E2] headless revoke stops without ticket under NOPASSWD /usr/bin/true" {
+  local WC_BIN="$REPO/bin/k3dm-web-console-sshd"
+  source "$REPO/scripts/lib/system.sh"
+  source "$WC_BIN"
+  wc_library
+  local sentinel_log="$SCRATCH/sentinel.log"
+  export WC_TICKET_FILE="$SCRATCH/ticket"
+  export WC_TICKET_CALLS="$SCRATCH/ticket-calls"
+
+  sudo() {
+    printf '%s\n' "$*" >> "$WC_TICKET_CALLS"
+    if [[ "${1-}" = /usr/bin/true || "${2-}" = /usr/bin/true ]]; then
+      return 0
+    fi
+    if [[ "${1-}" = -n ]]; then
+      if [[ ! -f "$WC_TICKET_FILE" ]]; then
+        printf 'sudo: a password is required\n' >&2
+        return 1
+      fi
+      if [[ "${2-}" = /usr/bin/id && "${3-}" = -u ]]; then
+        printf '%s\n' "${WC_STUB_UID:-0}"
+        return 0
+      fi
+      return 0
+    fi
+    if [[ -n "${WC_STUB_DENY-}" ]]; then
+      return 1
+    fi
+    touch "$WC_TICKET_FILE"
+    return 0
+  }
+
+  [ "$(type -t sudo)" = function ]
+  [ ! -e "$WC_TICKET_FILE" ]
+
+  _wc_port_lookup() { printf '%s\n' port_lookup >> "$sentinel_log"; echo "42722 test"; }
+  _wc_revoke_mark() { printf '%s\n' revoke_mark >> "$sentinel_log"; return 0; }
+  _wc_stop() { printf '%s\n' stop >> "$sentinel_log"; return 0; }
+
+  # Case 1: no ticket file -> exits 10 with message and no sentinels logged
+  rm -f "$sentinel_log" "$WC_TICKET_FILE" "$WC_TICKET_CALLS"
+  run _wc_revoke </dev/null
+  [ "$status" = 10 ]
+  [[ "$output" = *"revoke needs an open sudo ticket or a terminal"* ]]
+  [ ! -s "$sentinel_log" ]
+
+  # Case 2: positive control with ticket file -> check passes and reaches sentinels
+  touch "$WC_TICKET_FILE"
+  run _wc_revoke </dev/null
+  [ "$status" = 0 ]
+  grep -Fxq port_lookup "$sentinel_log"
 }

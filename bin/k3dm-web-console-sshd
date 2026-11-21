@@ -372,7 +372,7 @@ function _wc_revoke() {
   local port source plist="$_WC_PREFIX$_WC_LAUNCHD_DIR/${_WC_LABEL}.plist" rc=0
   (( $# == 0 )) || return 2
   if [[ -t 0 && -t 1 ]]; then _wc_priv_open || return 10
-  elif ! _wc_priv /usr/bin/true </dev/null 2>/dev/null; then
+  elif ! _wc_priv_ticket; then
     _wc_message 'revoke needs an open sudo ticket or a terminal'; return 10
   fi
   read -r port source < <(_wc_port_lookup)

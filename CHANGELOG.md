@@ -10,6 +10,7 @@
 ### Fixed
 
 - **Codex quota panels keep real Codex numbers when newest record is `premium`.** The session reader ignores rate-limit records with `limit_id: "premium"` or null limits so they do not blank the 5h and weekly quota panels or drop quota-efficiency observations.
+- **Web console sudo ticket check probes non-NOPASSWD commands.** `_wc_priv_open` and headless `_wc_revoke` verify sudo credentials with `/bin/sleep 0` and `/usr/bin/id -u` so hosts with k3d-manager's `NOPASSWD: /usr/bin/true` sudoers rule prompt for passwords at startup rather than proceeding without a ticket.
 - **Dispatch metrics single-flight push, retries, and stale alert.** Ledger-event pushes route through the single-flight scheduler (`bin/k3dm-codex-dispatch schedule-metrics`), `bin/k3dm-dispatch-metrics` retries failed pushes with backoff up to 30s timeout, a 15-minute LaunchAgent (`com.k3d-manager.dispatch-metrics`) re-pushes metrics periodically, and `DispatchMetricsStale` alerts when metrics have not reached the hub for over 90 minutes while the M4 is reachable.
 
 ## [1.44.2] - 2026-11-17

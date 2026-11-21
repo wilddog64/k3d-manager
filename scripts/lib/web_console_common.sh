@@ -51,11 +51,15 @@ function _wc_priv_open() {
     _wc_message 'an interactive terminal is required for the password prompt'
     return 10
   fi
-  _wc_priv /usr/bin/true 2>/dev/null || return 10
-  _wc_priv /usr/bin/true </dev/null 2>/dev/null || {
+  _wc_priv /bin/sleep 0 2>/dev/null || return 10
+  _wc_priv_ticket || {
     _wc_message 'cached admin ticket not usable from a pipe; timestamp_timeout must be greater than 0'
     return 10
   }
+}
+
+function _wc_priv_ticket() {
+  local out; out=$(_wc_priv /usr/bin/id -u </dev/null 2>/dev/null) && [[ "$out" = 0 ]] || return 10
 }
 
 function _wc_untrusted() {
