@@ -180,6 +180,10 @@ def test_conf_rejects_non_github_repo():
         with pytest.raises(ValueError):
             d.parse_config(raw.replace(b"git@github.com:a/b.git", url))
 
+    for url, slug in ((b"file:///x/y.git", b"x/y"), (b"/x/y.git", b"x/y"), (b"ssh://git@github.com/a/b.git", b"a/b")):
+        with pytest.raises(ValueError):
+            d.parse_config(raw.replace(b"git@github.com:a/b.git", url).replace(b"repo_slug=a/b", b"repo_slug=" + slug))
+
 
 def test_reset_state_keeps_creds_and_mirror(root):
     base = d.under(root, d.ROOT)
@@ -521,6 +525,19 @@ def test_probe_operations_on_bare_origin(root, monkeypatch):
     assert [r[-1] for r in rows] == ["new", "forced", "new", "fast-forward", "forced", "deleted", "deleted"]
     assert all("--atomic" not in argv and len([a for a in argv if ":refs/" in a]) == 1 for argv in calls)
     assert local("ls-remote", origin) == ""
+    calls.clear()
+
+    def lost_observation(argv, **kwargs):
+        if "ls-remote" in argv and len(calls) == 1:
+            raise subprocess.CalledProcessError(128, argv)
+        return recording(argv, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", lost_observation)
+    rc, rows = probe()
+    assert rc == 1 and rows[0][4] == "inconclusive"
+    assert len(calls) == 7 and [r[2:5] for r in rows[-2:]] == [["delete", "accepted", "accepted"]] * 2
+    assert local("ls-remote", origin) == ""
+    monkeypatch.setattr(subprocess, "run", recording)
     hook = origin / "hooks/pre-receive"
     hook.write_text("#!/bin/sh\nexit 1\n")
     hook.chmod(0o755)
@@ -1146,3 +1163,32 @@ def test_client_timeouts_and_empty_reply(root, monkeypatch, operation, wait):
         assert client.run(cmd, io.StringIO(), out, io.StringIO()) == 75
         assert json.loads(out.getvalue())["code"] == "unreachable"
         assert limits[0] == 5 and wait - 1 < limits[1] <= wait
+
+
+def test_integrity_refuses_acl(root, monkeypatch):
+    target = root / "installed"
+    target.touch()
+    d.integrity(root, os.getuid(), ["/installed"])
+    if sys.platform == "darwin":
+        d.subprocess.run(["/bin/chmod", "+a", "everyone allow read", str(target)], check=True)
+    else:
+        monkeypatch.setattr(os, "listxattr", lambda *args, **kwargs: ["system.posix_acl_access"])
+    with pytest.raises(SystemExit) as failure:
+        d.integrity(root, os.getuid(), ["/installed"])
+    assert failure.value.code == 78
+
+
+def test_multiline_mover_error_is_valid_reply(root):
+    error = (
+        "fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists. "
+        + "x" * 1024
+    )
+
+    def failed_mover(*args):
+        raise hub_approval.Unknown("lookup_failed", error)
+
+    request = dict(op="promote", id="p1-1234abcd", sha="a" * 40)
+    (reply,) = session(root, [request], mover_factory=failed_mover)
+    assert reply["code"] == "lookup_failed" and reply["message"] == " ".join(error.split())[:1024]
+    client = load("client", REPO / "bin/k3dm-promote-client")
+    assert client.valid(reply, request)

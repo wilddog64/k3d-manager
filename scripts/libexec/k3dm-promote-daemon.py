@@ -50,12 +50,24 @@ def under(root, path):
     return Path(root) / path.lstrip("/")
 
 
+def has_acl(path):
+    if sys.platform == "darwin":
+        # Darwin does not expose file ACLs through Python's listxattr.
+        listing = subprocess.run(
+            ["/bin/ls", "-lde", str(path)], check=True, stdout=subprocess.PIPE, env={"LC_ALL": "C"}
+        ).stdout
+        return len(listing.splitlines()) > 1
+    return bool(
+        {"system.posix_acl_access", "system.posix_acl_default"}.intersection(os.listxattr(path, follow_symlinks=False))
+    )
+
+
 def integrity(root, owner_uid, chain):
     for name in chain:
         path = under(root, name)
         try:
             info = path.lstat()
-            if info.st_uid != owner_uid:
+            if info.st_uid != owner_uid or has_acl(path):
                 raise ValueError
             # On Linux symlink permission bits are fixed at 0777. Darwin
             # exposes the actual link mode of the pinned CLT interpreter.
@@ -66,7 +78,7 @@ def integrity(root, owner_uid, chain):
                     raise ValueError
             elif stat.S_ISLNK(info.st_mode):
                 raise ValueError
-        except (OSError, ValueError):
+        except (OSError, ValueError, subprocess.SubprocessError):
             print(path, file=sys.stderr)
             raise SystemExit(78)
 
@@ -275,7 +287,10 @@ def serve(
         fs.chown(path, config["operator_uid"], config["operator_gid"])
         server.listen(8)
         while True:
-            conn, _ = server.accept()
+            try:
+                conn, _ = server.accept()
+            except ConnectionAbortedError:
+                continue
             with conn:
                 try:
                     if peer_uid(conn) != config["operator_uid"]:
@@ -307,6 +322,7 @@ def serve(
                         else:
                             result = getattr(engine, op)(**req)
                     except (hub_approval.Refused, hub_approval.Unknown) as exc:
+                        exc.message = " ".join(exc.message.split())[:1024]
                         result = exc
                     except (OSError, ValueError):
                         result = hub_approval.Unknown("io")
@@ -355,7 +371,12 @@ def command(argv):
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        env={"PATH": "/usr/bin:/bin", "HOME": "/var/empty"},
+        env={
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/var/empty",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+        },
     ).stdout
 
 
@@ -481,6 +502,7 @@ def probe_deploy_key(root, config, tty_in, tty_out, git=GIT, clock=None):
             env={
                 "PATH": "/usr/bin:/bin",
                 "HOME": "/var/empty",
+                "GIT_CONFIG_GLOBAL": "/dev/null",
                 "GIT_CONFIG_NOSYSTEM": "1",
                 "GIT_SSH_COMMAND": ssh(root),
                 "LC_ALL": "C",
@@ -495,27 +517,28 @@ def probe_deploy_key(root, config, tty_in, tty_out, git=GIT, clock=None):
     def refs(*names):
         return {ref: sha for sha, ref in (line.split() for line in run("ls-remote", url, *names).stdout.splitlines())}
 
-    existing = refs(branch, tag)
+    try:
+        existing = refs(branch, tag)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 1
     if existing:
         print(existing, file=tty_out)
         return 1
-    ok = True
-    for kind, op, before, target in (
-        ("branch", "create", "absent", s),
-        ("branch", "force", s, p),
-        ("tag", "create", "absent", s),
-        ("branch", "update", p, s),
-        ("tag", "update", s, p),
-        ("branch", "delete", s, "absent"),
-        ("tag", "delete", p, "absent"),
-    ):
+
+    def observe(ref):
+        try:
+            return refs(ref).get(ref, "absent")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return "unknown"
+
+    def step(kind, op, before, target):
         ref = branch if kind == "branch" else tag
-        pre = refs(ref).get(ref, "absent")
+        pre = observe(ref)
         force = ["--force"] if OPS_WORD[kind, op] == "forced" else []
         result = run(
             "push", "--porcelain", *force, url, ("" if target == "absent" else target) + ":" + ref, check=False
         )
-        post = refs(ref).get(ref, "absent")
+        post = observe(ref)
         word = "other"
         for line in result.stdout.splitlines():
             parts = line.split("\t")
@@ -525,10 +548,30 @@ def probe_deploy_key(root, config, tty_in, tty_out, git=GIT, clock=None):
                     word = "remote-rejected"
         observed = classify(kind, op, pre, before, post, target, result.returncode, word)
         print("|".join(("deploy-key", kind, op, "accepted", observed, pre, post, word)), file=tty_out, flush=True)
-        ok &= observed == "accepted"
-        if (kind, op) == ("tag", "create"):
-            ask(tty_in, tty_out, f"Hold rows now. B={branch} T={tag} S={s} P={p} Q={q}. Press Enter to continue.")
-    remaining = refs(branch, tag)
+        return observed == "accepted"
+
+    ok = True
+    try:
+        for row in (
+            ("branch", "create", "absent", s),
+            ("branch", "force", s, p),
+            ("tag", "create", "absent", s),
+            ("branch", "update", p, s),
+            ("tag", "update", s, p),
+        ):
+            ok &= step(*row)
+            if row[:2] == ("tag", "create"):
+                ask(tty_in, tty_out, f"Hold rows now. B={branch} T={tag} S={s} P={p} Q={q}. Press Enter to continue.")
+    finally:
+        for kind, before in (("branch", s), ("tag", p)):
+            try:
+                ok &= step(kind, "delete", before, "absent")
+            except (OSError, ValueError, subprocess.SubprocessError):
+                ok = False
+    try:
+        remaining = refs(branch, tag)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 1
     if remaining:
         print(remaining, file=tty_out)
     return int(not ok or bool(remaining))

@@ -27,9 +27,10 @@ action=${1:-}
 shift || true
 case "$action" in
     status)
-        "$repo/bin/k3dm-promote-client" status
+        rc=0
+        "$repo/bin/k3dm-promote-client" status || rc=$?
         _run_command --soft -- /bin/launchctl print "system/$label" || true
-        exit ;;
+        exit "$rc" ;;
     enrol)
         [[ -z ${TMUX+x} && -z ${STY+x} && -t 0 ]] || die 'Use the physical console outside tmux or screen.'
         case "$*" in
@@ -41,11 +42,12 @@ case "$action" in
         exit ;;
     ruleset-verified)
         [[ $# == 1 && $1 == PROBE_FILE=?* ]] || die 'Expected PROBE_FILE=path'
+        priv /usr/bin/true
         priv "$py" -IS "$daemon" mark-ruleset < "${1#PROBE_FILE=}"
         exit ;;
     probe-deploy-key) priv "$py" -IS "$daemon" probe-deploy-key; exit ;;
     uninstall)
-        priv /bin/launchctl bootout "system/$label"
+        _run_command --interactive-sudo --soft -- /bin/launchctl bootout "system/$label" || true
         priv /bin/rm -f "$plist"
         priv /bin/rm -rf "$lib"
         exit ;;
@@ -85,12 +87,15 @@ if ((!plan)); then
 fi
 # Check parents before installing into them. stat reports a symlink's own metadata.
 check_existing() {
-    local path=$1 mode=${2:-} actual uid gid bits kind
+    local path=$1 mode=${2:-} actual uid gid bits kind listing
     if ((plan)); then
+        priv /bin/ls -lde "$path"
         priv /usr/bin/stat -f '%u %g %Lp %HT' "$path"
         if [[ $path == "$py" || $path == "$frame/python3" ]]; then priv /usr/bin/readlink "$path"; fi
         return
     fi
+    listing=$(priv /bin/ls -lde "$path")
+    [[ $listing != *$'\n'* ]] || die "ACL: $path"
     actual=$(priv /usr/bin/stat -f '%u %g %Lp %HT' "$path")
     read -r uid gid bits kind <<< "$actual"
     [[ $uid == 0 && $bits =~ ^[0-7]+$ ]] || die "Unsafe owner: $path"
@@ -111,17 +116,21 @@ exists() {
     priv /bin/sh -c 'if test -e "$1" || test -L "$1"; then echo present; fi' sh "$1"
 }
 ensure_dir() {
-    local path=$1 mode=$2
+    local path=$1 mode=$2 state
     if ((plan)); then
         exists "$path"
         check_existing "$path" "$mode"
         priv /usr/bin/install -d -m "$mode" -o root -g wheel "$path"
-    elif [[ $(exists "$path") == present ]]; then
-        check_existing "$path" "$mode"
     else
-        priv /usr/bin/install -d -m "$mode" -o root -g wheel "$path"
+        state=$(exists "$path")
+        if [[ $state == present ]]; then
+            check_existing "$path" "$mode"
+        else
+            priv /usr/bin/install -d -m "$mode" -o root -g wheel "$path"
+        fi
     fi
 }
+priv /usr/bin/true
 clt=/Library/Developer/CommandLineTools
 frame=$clt/Library/Frameworks/Python3.framework/Versions/3.9/bin
 for path in /Library /Library/LaunchDaemons /Library/Developer "$clt" "$clt/usr" "$clt/usr/bin" "$py" "$clt/Library" \
@@ -139,7 +148,7 @@ if ((!plan)); then
     cleanup() { priv /bin/rm -rf -- "$stage"; /bin/rm -rf -- "$tmp"; }
     trap cleanup EXIT
 fi
-priv /usr/bin/ditto "$tmp" "$stage"
+priv /usr/bin/ditto --noacl --noextattr "$tmp" "$stage"
 # The copied tree must contain only directories and independent regular files.
 # Reject aliases before any recursive ownership change or execution from staging.
 priv "$py" -IS -c 'import os, stat, sys
@@ -150,6 +159,7 @@ for parent, dirs, files in os.walk(root):
         if not (stat.S_ISDIR(st.st_mode) or (stat.S_ISREG(st.st_mode) and st.st_nlink == 1)):
             sys.exit("unsafe staged entry: " + name)' "$stage"
 priv /usr/sbin/chown -R 0:0 "$stage"
+priv /bin/chmod -RN "$stage"
 priv /bin/chmod -R go-w "$stage"
 cd /
 for i in "${!sources[@]}"; do
@@ -162,8 +172,13 @@ for i in "${!sources[@]}"; do
 done
 priv "$py" -IS "$stage/k3dm-promote-daemon.py" render-check "$stage"
 for file in "$daemon" "$lib/hub_approval.py" "$lib/promote_mover.py" "$conf/promote.conf" "$plist"; do
-    if ((plan)); then exists "$file"; fi
-    if ((plan)) || [[ $(exists "$file") == present ]]; then
+    if ((plan)); then
+        exists "$file"
+        state=present
+    else
+        state=$(exists "$file")
+    fi
+    if [[ $state == present ]]; then
         check_existing "$file"
     fi
 done
@@ -174,6 +189,7 @@ for name in k3dm-promote-daemon.py hub_approval.py promote_mover.py; do
 done
 priv /usr/bin/install -m 644 -o root -g wheel "$stage/rendered/promote.conf" "$conf/promote.conf"
 priv /usr/bin/install -m 644 -o root -g wheel "$stage/rendered/$label.plist" "$plist"
+priv /bin/chmod -RN "$daemon" "$lib/hub_approval.py" "$lib/promote_mover.py" "$conf/promote.conf" "$plist"
 if ((plan)); then
     priv /bin/launchctl bootstrap system "$plist"
     priv /bin/launchctl kickstart -k "system/$label"

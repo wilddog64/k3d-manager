@@ -49,6 +49,7 @@ _run_command() {
         esac
         return
     fi
+    echo "$prog $BASH_SUBSHELL" >> "$ops.priv"
     local args=()
     for arg in "$@"; do
         case "$arg" in
@@ -58,6 +59,9 @@ _run_command() {
     done
     set -- "${args[@]}"
     case "$prog" in
+        */true)
+            if [[ -n ${probe_input:-} ]]; then [[ -z $(cat) ]]; fi ;;
+        */ls) echo 'drwxr-xr-x  6 root  wheel  192 Nov 15 13:14 /usr/local' ;;
         */stat)
             # stat -f "%u %g %Lp %HT" on /usr/local and CLT python3, m4-air, 2026-11-20.
             dest=$3
@@ -75,14 +79,36 @@ _run_command() {
             [[ $dest == "$fake/"* ]] || return 99
             if [[ $1 == -d ]]; then mkdir -p "$dest"; chmod "$3" "$dest"; else cp "$7" "$dest"; chmod "$2" "$dest"; fi ;;
         */ditto)
+            if [[ $1 == --noacl && $2 == --noextattr ]]; then shift 2; fi
             cp -R "$1/." "$2/"
             case "${damage:-none}" in
+                acl)
+                    touch "$2/acl-injected"
+                    if [[ $(uname -s) == Darwin ]]; then
+                        /bin/chmod +a "everyone allow read" "$2/hub_approval.py"
+                        /bin/ls -lde "$2/hub_approval.py" | grep -q 'everyone allow read'
+                    fi ;;
                 blob) echo '#' >> "$2/hub_approval.py" ;;
                 render) echo '#' >> "$2/rendered/promote.conf" ;;
             esac ;;
-        */chown|*/chmod|*/launchctl) return 0 ;;
-        */env) git hash-object --no-filters "${!#}" ;;
-        */python3) python3 "$@" ;;
+        */chmod)
+            if [[ $1 == -RN ]]; then
+                for dest in "${@:2}"; do
+                    [[ $dest == "$fake/"* ]] || return 99
+                    if [[ $(uname -s) == Darwin ]]; then /bin/chmod -RN "$dest"; fi
+                    if [[ -d $dest ]]; then rm -f "$dest/acl-injected"; fi
+                done
+            fi ;;
+        */chown|*/launchctl) return 0 ;;
+        */env)
+            dest=${!#}
+            [[ ! -e ${dest%/*}/acl-injected ]] || return 99
+            if [[ $(uname -s) == Darwin && $(/bin/ls -lde "$dest") == *$'\n'* ]]; then return 99; fi
+            git hash-object --no-filters "$dest" ;;
+        */python3)
+            if [[ ${!#} == mark-ruleset ]]; then
+                [[ $(cat) == evidence ]]
+            else python3 "$@"; fi ;;
         *) return 99 ;;
     esac
 }
@@ -123,6 +149,7 @@ STUB
 import ast
 import pathlib
 import plistlib
+import runpy
 import sys
 
 allowed = {"/usr/bin", "/bin", "/usr/sbin", "/Library/Developer/CommandLineTools/usr/bin", "/usr/local/libexec/k3dm-promote"}
@@ -133,6 +160,9 @@ with open(sys.argv[2], "rb") as stream:
     program = plistlib.load(stream)["ProgramArguments"]
 check(program[0])
 assert program[1:] == ["-IS", "/usr/local/libexec/k3dm-promote/k3dm-promote-daemon.py", "serve"]
+tools = runpy.run_path(sys.argv[1])
+assert tools["GIT"] == "/Library/Developer/CommandLineTools/usr/bin/git"
+assert tools["PY"] == program[0] == "/Library/Developer/CommandLineTools/usr/bin/python3"
 tree = ast.parse(pathlib.Path(sys.argv[1]).read_text())
 for node in ast.walk(tree):
     if isinstance(node, ast.Call) and ast.unparse(node.func) in {"subprocess.run", "subprocess.Popen", "subprocess.call", "subprocess.check_output", "command"}:
@@ -241,4 +271,27 @@ with left, right:
         pass
     assert json.loads(right.recv(4096))["data"] == dict(daemon="ok", configured=False, pending=0, state="ok", ruleset="not asserted", audit=[])
 PYCHECK
+}
+
+@test "install strips staged and installed ACLs" {
+    scratch
+    run env damage=acl "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+    [[ $status == 0 ]]
+    grep -q '^/usr/bin/ditto --noacl --noextattr ' "$ops"
+    grep -q '^/bin/chmod -RN /var/db/k3dm-promote/staging' "$ops"
+    grep -q '^/bin/chmod -RN .*hub_approval.py .*promote_mover.py .*promote.conf .*plist$' "$ops"
+    grep -q 'launchctl bootstrap' "$ops"
+}
+
+@test "install and ruleset verification prime sudo before capture or redirection" {
+    scratch
+    "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+    [[ $(head -1 "$ops.priv") == '/usr/bin/true 0' ]]
+    : > "$ops.priv"
+    echo evidence > "$tree/probe"
+    export probe_input="$tree/probe"
+    run "$tree/bin/k3dm-promote-authority" ruleset-verified "PROBE_FILE=$tree/probe" </dev/null
+    [[ $(head -1 "$ops.priv") == '/usr/bin/true 0' ]]
+    [[ $status == 0 ]]
+    grep -q 'mark-ruleset' "$ops"
 }
