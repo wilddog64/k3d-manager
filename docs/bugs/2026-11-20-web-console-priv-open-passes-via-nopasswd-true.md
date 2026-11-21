@@ -212,3 +212,10 @@ has to be audited upstream first.
   NOPASSWD line -> the static test red.
 - Land: rebased onto 0fa1ed80 (CHANGELOG conflict with the Codex quota entry; kept both lines); the land gate ran the full suite green.
 - Owed: E4 live on m4-air (operator at the tty, Claude reading the pane), then rerun web-console E11-E14 with regenerated throwaway certs.
+- Live E4 part 1 PASS (m4-air, 2026-11-21 03:17Z, operator in tmux work:1.1, Claude reading the pane; main checkout 9f637a48,
+  installed blobs bin 6a60abcf and lib cf0b1fc6 = post-fix): after sudo -k, make install-web-console-sshd with a throwaway CA
+  showed exactly one `Password:` prompt and no "a password is required" line; make web-console-sshd-check C1-C7 and C10 PASS,
+  C8 WARN, C9 INFO. Two "Unable to load host key" lines are first-install noise, captured as
+  docs/bugs/2026-11-21-web-console-first-install-host-key-warning-noise.md (P3).
+- E11 M4 reads PASS: one LISTEN 127.0.0.1.42722 owned by sshd:77091 = launchctl pid, uid 0; root:wheel, no ACL; log 0600.
+  Still owed for LIVE-VERIFIED: E11 LAN Remote Login from the M5, E12-E14, uninstall PURGE=1.
