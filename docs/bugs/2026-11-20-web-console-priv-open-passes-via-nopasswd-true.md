@@ -1,11 +1,12 @@
 # Bug: `_wc_priv_open` reports a sudo ticket that does not exist on Macs with k3d-manager's sudoers
 
-**Status:** VERIFIED — landed 0f39c31a on k3d-manager-v1.45.0 (2026-11-21); offline E1-E3 pass; live E4 on m4-air owed
+**Status:** LIVE-VERIFIED — landed 0f39c31a; offline E1-E3 and live E4 pass (m4-air, 2026-11-21)
+**Fix commit:** 0f39c31a
+**Live evidence:** 2026-11-21 · run m4-tmux-0317Z-0331Z · env m4-air · scenario web-console-install-revoke-after-sudo-k · commit 9f637a48 · proves E4
 **Priority:** P2 (Claude-owned per the P2/P3 split; install fails partway on a Mac with k3d-manager's sudoers, workaround: `sudo -v` first)
 **Introduced by:** 8faebd87 (web-console part A)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** live check — since 2026-11-21
 **Prior art:** `docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md` (exact-slug glob none; `make find-similar-docs` unavailable, no cluster context; found by `grep -il "usr/bin/true"`) — read, different root cause: that bug added the `NOPASSWD: /usr/bin/true` rule on purpose so headless `sudo -n true` probes pass
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait ("I thought P3 bugs are waiting for grooming not P2"); dispatch to Flash, Fable reviews the spec first ("intents approve and send to Fable for review"). Target branch `k3d-manager-v1.45.0`; part A is unreleased, so this is a fix inside v1.45.0, not a patch release.
 **Intent approved:** operator, 2026-11-20
@@ -218,4 +219,14 @@ has to be audited upstream first.
   C8 WARN, C9 INFO. Two "Unable to load host key" lines are first-install noise, captured as
   docs/bugs/2026-11-21-web-console-first-install-host-key-warning-noise.md (P3).
 - E11 M4 reads PASS: one LISTEN 127.0.0.1.42722 owned by sshd:77091 = launchctl pid, uid 0; root:wheel, no ACL; log 0600.
-  Still owed for LIVE-VERIFIED: E11 LAN Remote Login from the M5, E12-E14, uninstall PURGE=1.
+- E11 rest PASS: new LAN Remote Login from the M5 (ttys005, fe80::831…) during the test.
+- E12 credential cases PASS (client side, fresh connections to 127.0.0.1:42722): cert from the throwaway CA accepted (forced
+  command `console gate not installed`, rc 1); wrong-CA cert, plain key, wrong principal, expired cert and password each
+  refused (`Permission denied (publickey)`; password: server offers only publickey). Back-to-back failures tripped
+  OpenSSH PerSourcePenalties (`Not allowed at this time`); the password case was rerun after it expired.
+- E14 PASS: held `ssh -N` (pid 85271) cut by `make revoke-web-console-sshd` (one `Password:` prompt, port source installed);
+  afterwards no row on 42722, fresh connect refused, no console plist, launchd.plist.revoked and revoked present,
+  `launchctl print` rc 113 `Could not find service`, M5 session still ESTABLISHED, `tmux has-session -t =work` ok.
+  Second revoke rc=0; `make uninstall-web-console-sshd PURGE=1` rc=0; no /etc/k3dm-web-console, helper dir, plist or .prev left.
+- Deferred to the full part A live session (they do not exercise the changed code): E12 forwarding cases with the part B
+  enabled control, E13 ZDOTDIR capture.

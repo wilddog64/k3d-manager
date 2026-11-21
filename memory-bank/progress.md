@@ -107,3 +107,4 @@
 - 2026-11-21: Codex quota bug LIVE-VERIFIED (operator Grafana screenshot: weekly 16%, 5h 100%). Owed: priv_open E4 + web-console E11-E14 (operator at M4 tty).
 - 2026-11-21 03:20Z: priv_open live E4 part 1 PASS (one prompt, check green); E11 M4 reads PASS; console sshd INSTALLED on m4-air with throwaway CA (scratchpad web-console-ca/) — must end with uninstall PURGE=1. Captured P3 host-key warning noise.
 - 2026-11-21: E12 credential cases PASS (good cert accepted, wrong CA/plain key/wrong principal/expired/password refused; PerSourcePenalties seen). Ideas row: iPad access to service passwords. Waiting: operator revoke for E14, then uninstall PURGE=1.
+- 2026-11-21 03:35Z: priv_open LIVE-VERIFIED (E4: install one prompt, E11, E12 creds, E14 revoke, uninstall PURGE=1 clean on m4-air). Console sshd removed. Deferred: part A E12 forwarding control + E13. Next: 2e resume on gpt-6-luna after 22:04 PST, then 2c.
