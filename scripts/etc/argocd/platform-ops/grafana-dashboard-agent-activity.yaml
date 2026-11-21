@@ -404,7 +404,7 @@ data:
           "description": "Codex sessions detected minus those associated with a dispatch record (by session id). Untracked work has no verification, landing or rework data.",
           "gridPos": {
             "h": 6,
-            "w": 6,
+            "w": 8,
             "x": 0,
             "y": 20
           },
@@ -663,9 +663,9 @@ data:
           "description": "Estimated API list-price cost for priced sessions only in the selected window. Unpriced sessions are shown beside this total.",
           "gridPos": {
             "h": 6,
-            "w": 6,
-            "x": 0,
-            "y": 38
+            "w": 8,
+            "x": 8,
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -706,7 +706,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 44
+            "y": 38
           }
         },
         {
@@ -723,7 +723,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 45
+            "y": 39
           },
           "datasource": {
             "type": "prometheus",
@@ -769,7 +769,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 45
+            "y": 39
           },
           "datasource": {
             "type": "prometheus",
@@ -815,7 +815,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 45
+            "y": 39
           },
           "datasource": {
             "type": "prometheus",
@@ -861,7 +861,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 45
+            "y": 39
           },
           "datasource": {
             "type": "prometheus",
@@ -902,7 +902,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 51
+            "y": 45
           }
         },
         {
@@ -919,7 +919,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 52
+            "y": 46
           },
           "datasource": {
             "type": "prometheus",
@@ -965,7 +965,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 52
+            "y": 46
           },
           "datasource": {
             "type": "prometheus",
@@ -1011,7 +1011,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 52
+            "y": 46
           },
           "datasource": {
             "type": "prometheus",
@@ -1052,7 +1052,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 52
+            "y": 46
           },
           "datasource": {
             "type": "prometheus",
@@ -1103,7 +1103,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 60
+            "y": 54
           },
           "datasource": {
             "type": "prometheus",
@@ -1159,7 +1159,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 60
+            "y": 54
           },
           "datasource": {
             "type": "prometheus",
@@ -1200,7 +1200,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 60
+            "y": 54
           },
           "datasource": {
             "type": "prometheus",
@@ -1269,9 +1269,9 @@ data:
           "description": "Sessions excluded from the API-price total because their model has no published rate or usage counts are missing.",
           "gridPos": {
             "h": 6,
-            "w": 6,
-            "x": 6,
-            "y": 38
+            "w": 8,
+            "x": 16,
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",

@@ -1095,7 +1095,7 @@ assert panel["type"]=="stat" and panel["targets"][0]["expr"]=='k3dm_agy_source_p
 assert panel["targets"][1]["expr"]=='k3dm_agy_source_present{source="none"}'
 assert [target["refId"] for target in panel["targets"]]==["A","B"]
 assert panel["options"]["textMode"]=="name"
-assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":60}
+assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":54}
 assert "host" in panel["targets"][0]["legendFormat"] and "source" in panel["targets"][0]["legendFormat"]
 assert "interactive and print" in panel["description"] and "not combined" in panel["description"]
 warning=panel["fieldConfig"]["overrides"][0]
@@ -1397,7 +1397,7 @@ act_by_id = {p["id"]: p for p in act_panels}
 row49 = act_by_id[49]
 assert row49["gridPos"]["y"] == 19 and row49["gridPos"]["h"] == 1
 # panel 53 starts directly under row 49 at y=20
-assert act_by_id[53]["gridPos"] == {"h": 6, "w": 6, "x": 0, "y": 20}
+assert act_by_id[53]["gridPos"] == {"h": 6, "w": 8, "x": 0, "y": 20}
 # panels 54-57 share y=26 and h=12
 for pid in (54, 55, 56, 57):
     assert act_by_id[pid]["gridPos"]["y"] == 26 and act_by_id[pid]["gridPos"]["h"] == 12
@@ -1485,4 +1485,51 @@ print("ok")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
+}
+
+@test "agent cost and activity: stored panels do not move under vertical compaction" {
+  run python3 - "$AGENT_DASHBOARD_DIR" <<'PY'
+import json, sys
+from pathlib import Path
+for name in ('cost', 'activity'):
+    path = Path(sys.argv[1]) / f'grafana-dashboard-agent-{name}.yaml'
+    text = path.read_text().split(f'  agent-{name}.json: |\n', 1)[1]
+    panels = json.loads('\n'.join(line[4:] for line in text.splitlines()))['panels']
+    placed, moves = [], []
+    for panel in sorted(panels, key=lambda p: (p['gridPos']['y'], p['gridPos']['x'])):
+        pos = dict(panel['gridPos'])
+        original_y = pos['y']
+        while pos['y'] > 0 and not any(
+            pos['x'] < other['x'] + other['w'] and other['x'] < pos['x'] + pos['w']
+            and pos['y'] - 1 < other['y'] + other['h'] and other['y'] < pos['y'] - 1 + pos['h']
+            for other in placed
+        ):
+            pos['y'] -= 1
+        if pos['y'] != original_y:
+            moves.append((panel['id'], original_y, pos['y']))
+        placed.append(pos)
+    assert not moves, f'{name} panels moved: {moves}'
+print('ok')
+PY
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "agent activity: Codex layout and non-position panel fields match the contract" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text().split('  agent-activity.json: |\n', 1)[1]
+panels = json.loads('\n'.join(line[4:] for line in text.splitlines()))['panels']
+# SHA-256 of all panel fields except gridPos on the dispatched base commit.
+content = [{k: v for k, v in panel.items() if k != 'gridPos'} for panel in panels]
+digest = hashlib.sha256(json.dumps(content, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+assert digest == '0c9000fd40a49743831a416aca47f0e9e6674280b3882bf23d8e819b69cc1d7f', 'panel content changed'
+by_id = {panel['id']: panel for panel in panels}
+for pid, x in ((53, 0), (58, 8), (83, 16)):
+    assert by_id[pid]['gridPos'] == {'h': 6, 'w': 8, 'x': x, 'y': 20}, (pid, by_id[pid]['gridPos'])
+for pid, x in ((54, 0), (55, 6), (56, 12), (57, 18)):
+    assert by_id[pid]['gridPos'] == {'h': 12, 'w': 6, 'x': x, 'y': 26}, (pid, by_id[pid]['gridPos'])
+print('ok')
+PY
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
