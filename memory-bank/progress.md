@@ -119,3 +119,4 @@
 - 2026-11-20: 2c committed 11132fb2 (task branch, unpushed). Sonnet verifier: M1-M22 PASS, N2/N6 PARTIAL (test gaps). Fable: no blockers, S1-S5 should-fix. Correction resume 8 on Astra running. 2e 5edfe567 push fails in pre-push fast gate; re-running gate to find red.
 - 2026-11-21: 2e LANDED 5ac4801b+968850ae (rev 5.1 missed reader appset_values_ref_default.bats, operator approved --allow-out-of-scope). Pending: independent verifier, hub-deploy, live. Unblocks 2c H.21. Hermes e2e 02:08 PASS 89/102 = 13 skipped, 0 failed.
 - 2026-11-21: captured P3 docs/bugs/2026-11-21-hermes-e2e-pass-line-hides-skipped.md (operator: PASS 89/102 cannot tell skipped vs failed).
+- 2026-11-21: web-console C dispatched to agy gemini-3.8-flash-medium (operator go + v5 intent re-approval). WIP 2: 2c (Astra resume 8), C.
