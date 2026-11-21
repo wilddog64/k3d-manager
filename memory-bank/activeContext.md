@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 14:20 PST (22:20Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 14:30 PST (22:30Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -29,6 +29,10 @@
 **Waiting on the operator:**
 - `make hub-sync` then `make hub-deploy REF=<release head>` (rev 2, 2c, P3 onto the hub).
 - m4-air `make password-bundle-show` retry (should now prompt to unlock the Keychain).
+- **agy quota calibration (operator 2026-11-21: "I will paste info when I am home"):** operator pastes the agy
+  Models & Quota panel (Gemini pool and Claude/GPT-OSS pool: 5h % and weekly %, with time). When it arrives: copy
+  conversation DBs to scratchpad, sum tokens per pool over the last 5h/7d at that time, record pairs in
+  `docs/plans/argon-bug-classifier.md` as calibration evidence (estimated limit per pool). No process probe without a go.
 
 **Next, in order:**
 
