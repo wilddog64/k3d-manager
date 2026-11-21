@@ -1,11 +1,12 @@
 # Bug: `test_stall_recovery_cli_dry_run_uses_only_asserted_scratch_targets` fails on every run since 2026-11-21 00:00 UTC
 
-**Status:** VERIFIED — landed 17815a2a on k3d-manager-v1.45.0 (2026-11-21); offline E1-E3 pass; CI run on the landing push owed (E4)
+**Status:** LIVE-VERIFIED — landed 17815a2a; E1-E3 offline and E4 CI pass (2026-11-21)
+**Fix commit:** 17815a2a
+**Live evidence:** 2026-11-21 · run 44853540849 · env github-actions · scenario ci-test-python · commit 0fa1ed80 · proves E4
 **Priority:** P1 (operator, 2026-11-20: "yes P1 is right"); test-only, but it fails on every run, so CI cannot go green on any push and no promote or merge can pass the gate
 **Introduced by:** 46ec5b36 (Release v1.44.0)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-21
 **Prior art:** exact-slug glob none; grep for the test name and `1794614401` in docs/bugs and docs/issues none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4)
 **Approval:** operator, 2026-11-20: dispatch to Flash ("send to Flash"). P1, so it may exceed the WIP limit. Target branch `k3d-manager-v1.45.0`.
 **Intent approved:** operator, 2026-11-20
@@ -103,4 +104,4 @@ interface:
 - E1: the test passes on the fix; pre-fix red reproduced on a2b66a01 (2026-11-21 01:21Z). No 10-digit epoch left in the test body.
 - E2: positive control in a scratch copy (base = now - 8*86400) fails at the window="7d" clean_approvals assertion; zero assert lines changed.
 - E3: full test_dispatch_metrics.py 225 passed in the worktree; git diff --check clean; only the test file changed.
-- E4 (live): pending: CI on the push containing 17815a2a and d4d0f5d8.
+- E4 (live): PASS. CI run 44853540849 on 0fa1ed80 (contains 17815a2a and d4d0f5d8): test-python and lint completed success.

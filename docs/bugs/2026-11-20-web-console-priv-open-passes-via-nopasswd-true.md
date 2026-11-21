@@ -1,11 +1,11 @@
 # Bug: `_wc_priv_open` reports a sudo ticket that does not exist on Macs with k3d-manager's sudoers
 
-**Status:** OPEN — captured 2026-11-20 during the web-console part A live check (E11 prerequisite P3); fix spec below, revised after Fable review 2026-11-20
+**Status:** VERIFIED — landed 0f39c31a on k3d-manager-v1.45.0 (2026-11-21); offline E1-E3 pass; live E4 on m4-air owed
 **Priority:** P2 (Claude-owned per the P2/P3 split; install fails partway on a Mac with k3d-manager's sudoers, workaround: `sudo -v` first)
 **Introduced by:** 8faebd87 (web-console part A)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** dispatch — since 2026-11-20
+**Waiting on:** live check — since 2026-11-21
 **Prior art:** `docs/bugs/2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md` (exact-slug glob none; `make find-similar-docs` unavailable, no cluster context; found by `grep -il "usr/bin/true"`) — read, different root cause: that bug added the `NOPASSWD: /usr/bin/true` rule on purpose so headless `sudo -n true` probes pass
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait ("I thought P3 bugs are waiting for grooming not P2"); dispatch to Flash, Fable reviews the spec first ("intents approve and send to Fable for review"). Target branch `k3d-manager-v1.45.0`; part A is unreleased, so this is a fix inside v1.45.0, not a patch release.
 **Intent approved:** operator, 2026-11-20
@@ -201,3 +201,14 @@ Out of scope, a follow-up row for `docs/ideas.md`: lib-foundation's own `sudo -n
 (`scripts/lib/foundation/scripts/lib/system.sh`, `_run_command_resolve_sudo`, the `require_sudo` path) are defeated by
 the same rule. They answer "may run passwordless" rather than "is a ticket open"; whether any caller needs the latter
 has to be audited upstream first.
+
+## Verification (Claude, 2026-11-21)
+
+- Worker: Flash (agy gemini-3.8-flash-medium). Scope: CHANGELOG.md, bin/k3dm-web-console-sshd, scripts/lib/web_console_common.sh,
+  scripts/tests/bin/web_console_sshd.bats, matching ## Files. The code diff matches ## Fix 1-3 line for line.
+- Independent verifier (Sonnet, Acceptance only): VERDICT PASS. web_console_sshd.bats 58/58, shellcheck -S error clean, diff --check clean.
+  Pre-fix (both files from HEAD, new tests kept): [M3] ticket test, E1 and E2 all red. Mutants: uid `= 0` check dropped -> E1 red;
+  open/confirm back to /usr/bin/true -> M3, E1, E2 red; headless revoke skips the ticket check -> E2 red; /bin/sleep added to the
+  NOPASSWD line -> the static test red.
+- Land: rebased onto 0fa1ed80 (CHANGELOG conflict with the Codex quota entry; kept both lines); the land gate ran the full suite green.
+- Owed: E4 live on m4-air (operator at the tty, Claude reading the pane), then rerun web-console E11-E14 with regenerated throwaway certs.
