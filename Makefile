@@ -2470,3 +2470,13 @@ password-bundle-install:
 ## Remove the password bundle schedule
 password-bundle-uninstall:
 	@./scripts/k3d-manager password_bundle_uninstall
+
+.PHONY: promote-authority-install promote-authority-enrol promote-authority-status
+promote-authority-install:
+	@bin/k3dm-promote-authority install "OPERATOR_IDS=$$OPERATOR_IDS" "INSTALL_REF=$$INSTALL_REF"
+
+promote-authority-enrol:
+	@bin/k3dm-promote-authority enrol
+
+promote-authority-status:
+	@bin/k3dm-promote-authority status
