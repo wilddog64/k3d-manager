@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 12:25 PST (20:25Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 14:20 PST (22:20Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -14,6 +14,10 @@
   Tree now pytest 126 / bats 25 green, mutant table and final gates not done; backup
   `/private/tmp/claude-501/-Users-cliang-src-gitrepo-personal-k3d-manager/517093b8-70e9-4015-947e-2c827b62535f/scratchpad/c-r2-resume5-partial.tgz`. Independent Sonnet verifier (Acceptance only, scratch
   copy, no sudo) running now; its gaps go into resume 6 at 17:36 with the mutant table.
+- Offline test-all P2 rechecked by Claude (no dispatch needed): C3/C4 fixed, C1/C2 latent (env masks them);
+  bug doc `af2cc5d9` → Waiting on operator decision, grooming 11-22. Stale bugs closed `0e08dac4`. All pushed.
+- agy quota question answered: token sums per pool from conversation DBs are buildable; % needs calibration from the
+  agy panel or an operator-approved probe; fold into `docs/plans/argon-bug-classifier.md` at grooming.
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
@@ -56,6 +60,7 @@ agy/Codex report green suites they did not run; worker cd failures can delete un
   symlink (ask before changing).
 
 ## Grooming 2026-11-22 agenda
+- Offline test-all P2 (`2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`): close C3/C4; C1/C2 → one P3 or close. agy usage reader + calibrated % gauge into argon-bug-classifier plan. hub_deploy.bats race P3: v1.45.0 or later (10-P3 cap).
 - Pull `docs/plans/v1.51.0-bug-count-query-translation.md` forward into the next open minor, displacing a not-started plan (operator 2026-11-17 "sounds good"); triage `docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md` with it.
 - Ideas rows 2026-11-17 (Task Forest): dispatch-ledger reconcile + review-child folding; one "needs you" view.
 - Ideas rows 2026-11-16/17: Claude-API reviewer, Claude-API Hermes writer.
