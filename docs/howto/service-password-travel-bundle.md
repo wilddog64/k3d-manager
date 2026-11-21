@@ -1,6 +1,6 @@
 # Service passwords while travelling
 
-Install `age` on the hub and laptop. On the laptop, run `make password-bundle-enroll` and copy its public key. On the hub, run `make password-bundle-add-recipient NAME=<laptop> KEY=<public-key>`, then `make password-bundle-publish FORCE=1` to include the new key even if the passwords have not changed. Run `make password-bundle-install` on the hub after the dependency in the plan is fixed. It publishes every 15 minutes when passwords change.
+Install `age` on the hub and laptop. On the laptop, run `make password-bundle-enroll` and copy its public key. On the hub, run `make password-bundle-add-laptop NAME=<laptop> KEY=<public-key>` after the install dependency in the plan is fixed. Alternatively, run the three steps manually: `make password-bundle-add-recipient NAME=<laptop> KEY=<public-key>`, `make password-bundle-publish FORCE=1`, and `make password-bundle-install`. The schedule publishes every 15 minutes when passwords change.
 
 The default delivery folder is iCloud Drive's `k3dm/password-bundle` folder. Set `K3DM_PASSWORD_BUNDLE_DIR` on both machines to use another shared folder outside a git work tree. On the laptop, run `make password-bundle-show`; it reports when the bundle was generated and warns when it is older than 24 hours.
 

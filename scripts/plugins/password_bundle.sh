@@ -46,6 +46,12 @@ function password_bundle_add_recipient() { (
   _run_command --no-exit -- mv -f -- "$tmp" "$PB_STATE/recipients"
 ) }
 
+function password_bundle_add_laptop() {
+  password_bundle_add_recipient || return $?
+  FORCE=1 password_bundle_publish || return $?
+  password_bundle_install
+}
+
 function password_bundle_remove_recipient() { (
   set +x
   local name="${NAME:-}" tmp

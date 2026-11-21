@@ -2437,7 +2437,7 @@ machine-secrets-import:
 	@test -n "$(FILE)" || { echo 'Usage: make machine-secrets-import FILE=<file> [FORCE=1]' >&2; exit 2; }
 	@if [ "$(FORCE)" = 1 ]; then bin/k3dm-machine-secrets import --in "$(FILE)" --force; else bin/k3dm-machine-secrets import --in "$(FILE)"; fi
 
-.PHONY: password-bundle-enroll password-bundle-add-recipient password-bundle-remove-recipient password-bundle-publish password-bundle-show password-bundle-install password-bundle-uninstall
+.PHONY: password-bundle-enroll password-bundle-add-recipient password-bundle-add-laptop password-bundle-remove-recipient password-bundle-publish password-bundle-show password-bundle-install password-bundle-uninstall
 
 ## Enroll this laptop for encrypted service password delivery
 password-bundle-enroll:
@@ -2446,6 +2446,10 @@ password-bundle-enroll:
 ## Add a laptop recipient: NAME=<name> KEY=<age public key>
 password-bundle-add-recipient:
 	@./scripts/k3d-manager password_bundle_add_recipient
+
+## Add a laptop and publish for it: NAME=<name> KEY=<age public key>
+password-bundle-add-laptop:
+	@./scripts/k3d-manager password_bundle_add_laptop
 
 ## Remove a laptop recipient and republish: NAME=<name>
 password-bundle-remove-recipient:

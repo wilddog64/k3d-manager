@@ -153,3 +153,40 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
   [ "$status" -eq 0 ]
   [[ "$output" == *password-sentinel* ]]
 }
+
+@test 'M6 add-laptop forces publication for the new identity and installs the schedule' {
+  add one "$KEY1"
+  password_bundle_publish
+  export K3DM_AGENT_LOAD=0
+  run "$REAL_MAKE" -s -C "$SCRIPT_DIR/.." password-bundle-add-laptop NAME=two KEY="$KEY2"
+  [ "$status" -eq 0 ]
+  rg -q "^two $KEY2$" "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients"
+  run bash -c 'printf "%s\n" "$TEST_ID2" | age -d -i /dev/stdin "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age"'
+  [ "$status" -eq 0 ]; [ "$output" = password-sentinel ]
+  [ -f "$HOME/Library/LaunchAgents/com.k3d-manager.password-bundle.plist" ]
+}
+
+@test 'N6 failed publication does not install the schedule' {
+  add one "$KEY1"
+  export K3DM_AGENT_LOAD=0 TEST_FAIL=1
+  run "$REAL_MAKE" -s -C "$SCRIPT_DIR/.." password-bundle-add-laptop NAME=two KEY="$KEY2"
+  [ "$status" -ne 0 ]
+  rg -q "^two $KEY2$" "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients"
+  [ ! -e "$HOME/Library/LaunchAgents/com.k3d-manager.password-bundle.plist" ]
+}
+
+@test 'N7 invalid name or key changes nothing and does not install the schedule' {
+  add one "$KEY1"
+  password_bundle_publish
+  before="$(shasum -a 256 "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age")"
+  recipients="$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")"
+  export K3DM_AGENT_LOAD=0
+  for pair in "BAD:$KEY2" 'two:bad'; do
+    run "$REAL_MAKE" -s -C "$SCRIPT_DIR/.." password-bundle-add-laptop NAME="${pair%%:*}" KEY="${pair#*:}"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'Invalid recipient name or key.'* ]]
+    [ "$recipients" = "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")" ]
+    [ "$before" = "$(shasum -a 256 "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age")" ]
+    [ ! -e "$HOME/Library/LaunchAgents/com.k3d-manager.password-bundle.plist" ]
+  done
+}
