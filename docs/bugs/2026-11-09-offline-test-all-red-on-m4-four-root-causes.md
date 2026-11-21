@@ -4,7 +4,7 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Offline `make test-all` is degraded on the M4 with 35 failing cases across four root causes (including an unstubbed test attempting to act on the live host's launchctl agent), though mitigated by the tripwire, CI, and…); Claude proposed P2. Agreed.
 **Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** operator decision — since 2026-11-21 (recheck below: nothing reproduces on the M4)
 **Introduced by:** unknown (four root causes, each with its own origin; see the table)
 **Should have been caught by:** unknown
 **Prior art:** `docs/bugs/2026-10-28-offline-test-all-grep-guard-and-e2e-dispatch-regressions.md` (found by grep, not
@@ -67,6 +67,19 @@ The order is by risk, not size: C3 first (real-host reach), then C1 (largest cou
 3. After all four land, Claude runs the integration check below. The parent closes only on that result.
 
 Rework is tracked against the trial baseline of 0.66.
+
+## Recheck 2026-11-21 (Claude, M4, read-only plus tripwire-guarded runs)
+
+| Child | Reproduces? | Evidence |
+|---|---|---|
+| C1 | No, but the cause is latent | `python3` is now `~/.pyenv/shims/python3` with PyYAML; host `make test` 2026-11-21 12:05 had 0 `not ok` (incl. `vectordb_rules.bats`). 18 `lib/`+`plugins/` bats files still call bare `python3 -`, so a PyYAML-less first `python3` would bring it back. |
+| C2 | No, but the cause is latent | `promtool` is now local (`~/.local/bin/promtool`); `test_dashboard_queries.py`, `test_dispatch_metrics.py`, `test_orbstack_metrics.py` all passed in host `make test-pytest` 2026-11-21. Without a local promtool the docker fallback would still hit the tripwire. |
+| C3 | No, fixed | `cluster_status_app_cluster_registration.bats` now sets `HOME="${BATS_TEST_TMPDIR}/home"` (`:6`, v1.44.0 `46ec5b36`); under `scripts/tests/tripwire.sh` 0 calls blocked. |
+| C4 | No, fixed | the "real throwaway keychain round trip" test is gone from `machine_secrets.bats`; tripwire run of both files: 29/29 ok, 0 blocked. |
+
+Proposal for grooming: close C3 and C4; re-scope C1 and C2 as one P3 test-hygiene child (tests pick a python with PyYAML
+and skip with a clear message when neither promtool nor an allowed fallback exists), or close if the operator accepts the
+environment as the fix.
 
 ## Acceptance
 
