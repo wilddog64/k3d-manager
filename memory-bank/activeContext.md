@@ -1,4 +1,4 @@
-## Handoff — 2026-11-20 16:56 PST — web-console P3 bug, priv_open fix spec, Codex quota panels — START HERE
+## Handoff — 2026-11-20 17:40 PST — web-console P3 bug, priv_open fix spec, Codex quota panels — START HERE
 
 **Objective (this session):**
 - Run web-console part A live checks E11–E14 on the M4.
@@ -43,7 +43,7 @@
 
 **Verification status:**
 - priv_open bug: OPEN, `Waiting on: dispatch`. Fix not written. E4 (live) is mandatory before LIVE-VERIFIED.
-- Codex quota bug: OPEN, `Waiting on: dispatch`, but it needs its fix spec first.
+- Codex quota bug: OPEN, `Waiting on: operator decision`. Fix spec, Contract readers and Acceptance (E1–E4) written 2026-11-20 17:40; needs intent approval, then an Argon review, then Flash.
 
 **Next, in order:**
 1. **priv_open fix → Flash.** On "go":
@@ -158,3 +158,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20: APP=none spec rev 4 written (Fable r3 + Astra r3 both HOLD, adjudicated): bare path moved out of bin/cluster-up into new bin/acg-up-nodes, picked by a Make conditional on $(origin APP)$(APP) (probed GNU Make 3.81: env APP ignored, value reaches recipe via env), so observability/platform-ops never run; bin/k3dm-up-app-check validates APP and refuses K3DM_RESUME after a bare run (bare-nodes marker); refuses over a recorded-active k3s-aws; no checkpoints; watcher/SSH failures fail the run; DRY_RUN makes no calls; cluster-up/down/refresh/lifecycle.py untouched. Next: short blind re-review + operator intent approval, then Luna dispatch.
 - 2026-11-20: M9b correction round 2 (Flash) exited 0; Claude verified in scratch copy: base 213/213 green; mutants red: m05 (1056 handler off) -> M5_AfterStopTimeout_..., Stop-throws owned-stays-false -> StopThrows_QueryStateStopped_..., owned-always-true -> StopThrows_QueryStateRunning_..., reclass skip and key-only skip -> M7_... (expects failed: in use (held by a different service)). Next: commit, blind Argon review, PR, Windows CI. APP=none rev 4 committed 4f6a994d; Fable blind re-review running.
 - 2026-11-20: M9b blind Argon review: CHANGES (4); Claude accepted #1 (throwing Stop aborts the run, rows null), #2 (finally pre-wait QueryState can throw past StartServiceW, spec step 10), #4 (M2 redirected-input test); rejected #3 (warning gated on control!=null: Program always passes control on Windows; spec section 8 keeps null-control M9a output). M9b round 2 committed 283eb4e in dirused worktree; correction round 3 resumed to Flash (resume 4, prompt scratchpad/m9b-correction-3.md). APP=none spec rev 5: Fable rev 4 re-review HOLD (no blocker, Make switch sound) - all 10 folded (_acg_ensure_sandbox_ttl copied, no sign-in step, marker first + N6, EXIT billable notice, uname/launchctl stubs, mkdir, Known limit for failed full build, readers lifecycle.py:257/365, Makefile:188/439, e2e.sh:176, hub_up.bats:115 + makefile_platform_ops.bats:6 layout constraint, .PHONY). Next: operator intent approval -> Luna dispatch.
+- 2026-11-20 17:40: resumed after /clear. Codex quota fix spec written (parse filter `_codex_quota_usable` at :703; both readers fixed by it; fixture from the real codex/premium shapes; live E4 needs no promote, since the M4 LaunchAgent runs from the checkout). Waiting on: intent approval; priv_open "go"; 2e decision.
