@@ -7,10 +7,11 @@
   dispatch-stall A and D; m5 PATH bug (zshdotfiles#4/#5).
 - **LANDED / VERIFIED, live owed:** travel bundle `ddd9329e` (E3) and rev 2 `39a24a59` (E5, needs hub-deploy);
   test-all metrics `64a8de5c` (E3); dispatch-stall C `e05a08ed` (E8) and B (E9/E10); remote-promote 2a VERIFIED, 2d (E11);
-  hub-deploy self-update `3b541f3b`; multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
-- **Open dispatches:** 2c root daemon (rebased `4adcb0e2`, resume-8 complete, verifier running), web-console C r2 (Codex astra, resumed after spec fix `790afd26`; agy run 1 abandoned, wip `567faa63`), password-bundle Keychain P3 (Codex astra, intents approved).
-- **Not started:** 2b promote wiring, web-console B, red-team gate (spec written, intents pending), password-bundle
-  Keychain P3 (filed, intents pending).
+  hub-deploy self-update `3b541f3b`; remote-promote 2c `c17eae59` (VERIFIED offline, hub-deploy owed); password-bundle
+  Keychain P3 `3971fa3f` (m4-air retry owed); multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
+- **Open dispatches:** web-console C r2 (Codex astra; resume 4 stopped on Codex usage limit 12:08, partial uncommitted; spec v6 `0f07641a`).
+- **Not started:** 2b promote wiring, web-console B (both unblocked by 2c), red-team gate (intents approved).
+- **Captured P3:** hub_deploy.bats catch-up test index.lock race (`0c999bbe`).
 - **v1.46.0:** plan 6 travel-bundle iPad SSH spec v1.1, intent approved (implementation in v1.46.0 only).
 
 ## Log
