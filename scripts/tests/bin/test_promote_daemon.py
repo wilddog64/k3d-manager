@@ -1,3 +1,4 @@
+import ast
 import base64
 import hashlib
 import hmac
@@ -7,8 +8,12 @@ import io
 import json
 import os
 import pty
-from contextlib import contextmanager
-from pathlib import Path
+from contextlib import contextmanager, nullcontext
+from pathlib import Path, PurePosixPath
+import plistlib
+import re
+import stat
+from types import SimpleNamespace
 import socket
 import sys
 import tempfile
@@ -151,16 +156,202 @@ def session(root, messages, uid=501, times=None, mover_factory=d.build_mover):
     return replies
 
 
+DAEMON = REPO / "scripts/libexec/k3dm-promote-daemon.py"
+CLIENT = REPO / "bin/k3dm-promote-client"
+
+
+def scan_startup_sources():
+    """Follow local imports, including imports inside bootstrap()."""
+    lib = REPO / "scripts/lib"
+    pending = [DAEMON, CLIENT]
+    checked = set()
+    forbidden = {"environ", "environb", "getenv", "putenv", "__import__", "importlib"}
+    while pending:
+        path = pending.pop()
+        if path in checked:
+            continue
+        checked.add(path)
+        tree = ast.parse(path.read_text(), filename=str(path))
+        # A len(sys.argv) comparison in main may check argument count.
+        arity_checks = {
+            call.args[0]
+            for fn in tree.body
+            if isinstance(fn, ast.FunctionDef) and fn.name == "main"
+            for guard in ast.walk(fn)
+            if isinstance(guard, ast.If) and isinstance(guard.test, ast.Compare)
+            for call in (guard.test.left, *guard.test.comparators)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == "len"
+            and len(call.args) == 1
+            and not call.keywords
+        }
+        for node in ast.walk(tree):
+            names = []
+            if isinstance(node, ast.Name):
+                names.append(node.id)
+            elif isinstance(node, ast.Attribute):
+                names.append(node.attr)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                base = (node.module or "") if isinstance(node, ast.ImportFrom) else ""
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    package = list(path.parent.relative_to(lib).parts)
+                    base = ".".join(package[: len(package) - node.level + 1] + ([base] if base else []))
+                for alias in node.names:
+                    parts = ([base] if base else []) + [alias.name]
+                    components = ".".join(parts).split(".")
+                    names.extend(components)
+                    names.append(alias.asname)
+                    for i in range(1, len(components) + 1):
+                        module = lib.joinpath(*components[:i])
+                        for candidate in (module.with_suffix(".py"), module / "__init__.py"):
+                            if candidate.is_file():
+                                pending.append(candidate)
+            # The daemon delegates argv parsing to argparse. Only the user-side
+            # client consumes argv directly (its documented --socket option).
+            if path != CLIENT and isinstance(node, ast.Attribute) and node.attr == "argv":
+                assert node in arity_checks, f"{path}:{node.lineno} reads argv"
+            if path != CLIENT and isinstance(node, ast.ImportFrom) and node.module == "sys":
+                assert all(alias.name not in {"argv", "*"} for alias in node.names)
+            assert not forbidden.intersection(names), f"{path.relative_to(REPO)}:{node.lineno} uses {names}"
+    assert {lib / "hub_approval.py", lib / "promote_mover.py"} <= checked
+
+
 def test_main_reads_no_environment(root, monkeypatch):
-    monkeypatch.setenv("K3DM_PROMOTE_ROOT", str(root))
-    seen = []
+    # agent-audit: allow assert-removed tautological CONF check and literal os.environ grep replaced by AST scan and hostile-env recorder (2c resume 9)
+    for key in (
+        "K3DM_PROMOTE_SOCK",
+        "K3DM_PROMOTE_SOCKET",
+        "K3DM_PROMOTE_RUN_DIR",
+        "K3DM_PROMOTE_CONF",
+        "K3DM_PROMOTE_ROOT",
+        "K3DM_PROMOTE_STATE_DIR",
+        "K3DM_PROMOTE_GIT",
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_RUNTIME_DIR",
+        "GIT_DIR",
+        "GIT_CONFIG",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+    ):
+        monkeypatch.setenv(key, str(root / key))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "0")
+    # Constants and RealFs defaults are evaluated when the module is imported.
+    daemon = load("hostile_startup", DAEMON)
+    seen = {}
+    assert daemon.CONF == "/etc/k3dm-promote/promote.conf"
+    assert daemon.GIT == "/Library/Developer/CommandLineTools/usr/bin/git"
+
+    class RecordingPath(PurePosixPath):
+        def lstat(self):
+            seen["rundir"] = str(self)
+            return SimpleNamespace(st_uid=0, st_gid=0, st_mode=stat.S_IFDIR | 0o755)
+
+        def exists(self):
+            return True
+
+        def unlink(self, **kwargs):
+            seen["unlink"] = str(self)
+
+    class Listener:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+        def bind(self, path):
+            seen["socket"] = path
+
+        def listen(self, backlog):
+            pass
+
+        def accept(self):
+            return nullcontext(None), None
+
+    def engine(state, *_):
+        seen["state"] = state
+        raise EndServe
+
+    def config(path):
+        seen["config"] = path
+        return CONFIG
+
+    serve = daemon.serve
+
+    def record_run(config, engine_factory):
+        serve(config, engine_factory, listener=Listener(), peer_uid=lambda _: CONFIG["operator_uid"])
+
     monkeypatch.setattr(sys, "argv", ["daemon", "serve"])
-    monkeypatch.setattr(d, "bootstrap", lambda *args: seen.append(args[0]))
-    monkeypatch.setattr(d, "load_config", lambda path: seen.append(path) or CONFIG)
-    monkeypatch.setattr(d, "serve", lambda *args: None)
-    assert d.main() == 0 and seen == ["/", d.CONF]
-    for path in (REPO / "scripts/libexec/k3dm-promote-daemon.py", REPO / "bin/k3dm-promote-client"):
-        assert "os.environ" not in path.read_text() and "os.getenv" not in path.read_text()
+    monkeypatch.setattr(daemon, "bootstrap", lambda base, *_: seen.update(base=base))
+    monkeypatch.setattr(daemon, "load_config", config)
+    monkeypatch.setattr(daemon, "Path", RecordingPath)
+    monkeypatch.setattr(daemon.RealFs, "chown", staticmethod(lambda *_: None))
+    monkeypatch.setattr(daemon, "serve", record_run)
+    monkeypatch.setattr(daemon, "read_request", lambda *_: ("status", {}))
+    monkeypatch.setattr(daemon, "secrets", lambda *_: (None, None))
+    monkeypatch.setattr(
+        daemon,
+        "hub_approval",
+        SimpleNamespace(
+            Engine=engine,
+            SystemClock=hub_approval.SystemClock,
+            Refused=hub_approval.Refused,
+            Unknown=hub_approval.Unknown,
+        ),
+        raising=False,
+    )
+    with pytest.raises(EndServe):
+        daemon.main()
+    assert seen == {
+        "base": "/",
+        "config": "/etc/k3dm-promote/promote.conf",
+        "rundir": "/var/run/k3dm-promote",
+        "unlink": "/var/run/k3dm-promote/sock",
+        "socket": "/var/run/k3dm-promote/sock",
+        "state": "/var/db/k3dm-promote/state",
+    }
+    for extra in (
+        [str(root)],
+        *([flag, str(root)] for flag in ("--socket", "--run-dir", "--config", "--state-root", "--git")),
+    ):
+        monkeypatch.setattr(sys, "argv", ["daemon", "serve", *extra])
+        with pytest.raises(SystemExit) as rejected:
+            daemon.main()
+        assert rejected.value.code == 2
+    scan_startup_sources()
+
+
+def test_authority_installed_paths_and_plist():
+    plist = REPO / "scripts/etc/launchd-daemons/com.k3d-manager.promote-authority.plist.tmpl"
+    assert "EnvironmentVariables" not in plistlib.loads(plist.read_bytes())
+    source = (REPO / "bin/k3dm-promote-authority").read_text()
+    paths = {
+        "py": "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "gitbin": "/Library/Developer/CommandLineTools/usr/bin/git",
+        "label": "com.k3d-manager.promote-authority",
+        "lib": "/usr/local/libexec/k3dm-promote",
+        "daemon": "$lib/k3dm-promote-daemon.py",
+        "base": "/var/db/k3dm-promote",
+        "conf": "/etc/k3dm-promote",
+        "plist": "/Library/LaunchDaemons/$label.plist",
+        "clt": "/Library/Developer/CommandLineTools",
+        "frame": "$clt/Library/Frameworks/Python3.framework/Versions/3.9/bin",
+    }
+    for name, expected in paths.items():
+        assert re.findall(rf"(?:^|[;\s]){name}=([^;\s]+)", source) == [expected], name
+    # Check expansions at use sites too. TMUX/STY are enrol guards only.
+    shell = source.replace("[[ -z ${TMUX+x} && -z ${STY+x} && -t 0 ]]", "")
+    inputs = set(re.findall(r"\$\{?!?([A-Za-z_][A-Za-z0-9_]*)", shell))
+    locals_used = set(
+        "action actual arg bits blob cmd commit file gid hashes ids kind listing mode name "
+        "path rc ref repo sources src stage state tmp uid".split()
+    )
+    assert inputs <= paths.keys() | locals_used | {"OPERATOR_IDS", "INSTALL_REF"}
 
 
 def test_wrong_peer_uid_never_reaches_engine(root):
