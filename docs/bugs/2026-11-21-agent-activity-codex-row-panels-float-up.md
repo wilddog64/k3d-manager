@@ -1,12 +1,12 @@
 # Bug: Agent Activity "All Codex activity" panels float up, so API prices sits under Untracked by repo instead of beside Unpriced
 
-**Status:** VERIFIED — landed 83344176 (2026-11-21); E1 offline PASS (bats 54/54, pre-fix red on 55/56/57/83 moves, 3 mutants red), independent Sonnet verifier M1-M3, N1-N2 PASS from Acceptance; E3 read. E2 live pending `make hub-deploy`
+**Status:** LIVE-VERIFIED — E2 PASS 2026-11-21 on deploy/hub 4217648 (ArgoCD sync 18:34:51Z; live ConfigMap equals 42176488, compaction simulation no moves; operator screenshot): [`docs/captures/2026-11-21-codex-row-float-up-e2/`](../captures/2026-11-21-codex-row-float-up-e2/README.md). Previously VERIFIED — landed 83344176; E1 offline PASS, independent Sonnet verifier PASS
 **Fix commit:** 83344176
+**Live evidence:** 2026-11-21 · run grafana-screenshot-1834Z · env hub-grafana · scenario agent-activity-codex-row-no-float-up · commit 83344176 · proves E2
 **Priority:** P3 (cosmetic: every panel shows its data; the layout differs from the stored and tested one)
 **Introduced by:** bd5e4828 (plan-quotas-beside-fable rev 1 removed panels 50–52 and 113–115 from the Codex row's top band)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** no (independent Sonnet verifier from Acceptance only; no Argon or Fable review recorded in the spec)
-**Waiting on:** live check — since 2026-11-21
 **Prior art:** exact-slug glob none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-21); `ls docs/bugs | grep -iE 'float|codex-row|activity.*layout|gridpos|compact'` found only kine-compaction and image-tag docs — read titles, different root cause
 **Approval:** operator, 2026-11-21: "go with you suggestion" — file as a P3 bug and fix inside v1.45.0 (it corrects a layout this release broke), no triage wait; dispatch to Codex. The daily-bar feature asked at the same time went to `docs/ideas.md`.
 **Intent approved:** operator, 2026-11-21
@@ -130,4 +130,4 @@ evidence:
 - Mutants, each red: 58 back to x0 y38 (overlap and Codex API cost tests, 54); 54-57 at y27 (53, 54, overlap); 58 unit changed (17, 54). Round-trip control green.
 - Independent Sonnet verifier from Acceptance only: M1, M2, M3, N1 (positive control reproduced), N2 PASS; Agent Cost unchanged; rows below shifted by exactly 6.
 - Nit (not blocking): test 54 pins a SHA-256 of all Activity panel content, so any future legitimate Activity edit must update that hash.
-- E2: after `make hub-deploy`, operator screenshot of /d/k3dm-agent-activity row "All Codex activity".
+- E2 PASS 2026-11-21: `make hub-deploy REF=42176488` (f06bddd3's CI had one test job cancelled by a later push); live ConfigMap equals the repo, no compaction moves, operator screenshot matches. A pre-existing "Value" bar in Sessions by mode was filed separately (`docs/bugs/2026-11-21-sessions-by-mode-value-bar-from-category-series.md`).
