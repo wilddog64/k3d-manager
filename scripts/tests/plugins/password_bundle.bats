@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
 
 setup() {
   export HOME="$BATS_TEST_TMPDIR/home" K3DM_PASSWORD_BUNDLE_STATE_DIR="$BATS_TEST_TMPDIR/state" K3DM_PASSWORD_BUNDLE_DIR="$BATS_TEST_TMPDIR/delivery" K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL=http://127.0.0.1:9
@@ -41,6 +42,26 @@ STUB
   cat > "$BATS_TEST_TMPDIR/bin/security" <<'STUB' 
 #!/bin/bash
 printf 'security' >> "$TEST_ARGV_LOG"; printf ' <%s>' "$@" >> "$TEST_ARGV_LOG"; printf '\n' >> "$TEST_ARGV_LOG"
+# Read-only capture: m4-air over SSH, 2026-11-08 (locked / unlocked).
+case "$1" in
+  show-keychain-info)
+    [[ "$2" == "${K3DM_PASSWORD_BUNDLE_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}" ]] || exit 1
+    if [[ "${TEST_LOCKED:-0}" == 1 && ! -f "$HOME/unlocked" ]]; then
+      echo 'security: SecKeychainCopySettings: User interaction is not allowed.' >&2; exit 36
+    fi
+    echo 'no-timeout' >&2; exit 0 ;;
+  unlock-keychain)
+    [[ "$#" == 2 && "$2" == "${K3DM_PASSWORD_BUNDLE_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}" ]] || exit 1
+    IFS= read -r supplied && [[ "$supplied" == "$TEST_UNLOCK_PASSWORD" ]] || exit 1
+    [[ "${TEST_REJECT_UNLOCK:-0}" == 0 ]] || exit 1
+    touch "$HOME/unlocked"; exit 0 ;;
+  find-generic-password)
+    if [[ -f "$HOME/unlocked" ]]; then
+      [[ "${TEST_RETRY_RC:-0}" == 0 ]] || exit "$TEST_RETRY_RC"
+    elif [[ "${TEST_READ_RC:-0}" != 0 ]]; then exit "$TEST_READ_RC"; fi ;;
+  -i) ;;
+  *) exit 1 ;;
+esac
 # Real read-only capture: m4-air, 2026-11-18, macOS 26.5.2, exit 44.
 if [[ "$1" == -i ]]; then
   IFS= read -r line
@@ -55,6 +76,7 @@ else
 fi
 STUB
   chmod +x "$BATS_TEST_TMPDIR/bin/"*
+  [[ "$(command -v security)" == "$BATS_TEST_TMPDIR/bin/security" ]]
   source "$SCRIPT_DIR/lib/system.sh"
   [[ ! -f "$SCRIPT_DIR/plugins/password_bundle.sh" ]] || source "$SCRIPT_DIR/plugins/password_bundle.sh"
 }
@@ -95,8 +117,12 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
 }
 @test 'N4 malformed recipients leave file unchanged; valid recipient is accepted' {
   add one "$KEY1"; before="$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")"
-  run add BAD "$KEY1"; [ "$status" -ne 0 ]
-  run add two bad; [ "$status" -ne 0 ]
+  run add BAD "$KEY1"; [ "$status" -ne 0 ]; [[ "$output" == *"Invalid NAME"* ]]
+  [ "$before" = "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")" ]
+  for key in "" "${KEY2%?}" bad; do
+    run add two "$key"; [ "$status" -ne 0 ]; [[ "$output" == *"Invalid KEY"* ]]
+    [ "$before" = "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")" ]
+  done
   [ "$before" = "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")" ]
 }
 @test 'N5 existing identity is protected; force permits enrolment' {
@@ -138,6 +164,8 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
   run env FORCE=0 bash -c 'source "$SCRIPT_DIR/lib/system.sh"; source "$SCRIPT_DIR/plugins/password_bundle.sh"; password_bundle_enroll'
   [ "$status" -eq 0 ]
   enrolled_key="${lines[0]}"
+  [[ "${lines[${#lines[@]}-1]}" == "On the hub: make password-bundle-add-laptop NAME=<laptop> KEY=$enrolled_key" ]]
+  [[ "$output" != *password-bundle-add-recipient* ]]
   add enrolled "$enrolled_key"
   password_bundle_publish
   run password_bundle_show
@@ -184,9 +212,133 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
   for pair in "BAD:$KEY2" 'two:bad'; do
     run "$REAL_MAKE" -s -C "$SCRIPT_DIR/.." password-bundle-add-laptop NAME="${pair%%:*}" KEY="${pair#*:}"
     [ "$status" -ne 0 ]
-    [[ "$output" == *'Invalid recipient name or key.'* ]]
+    if [[ "$pair" == BAD:* ]]; then expected="Invalid NAME"; else expected="Invalid KEY"; fi
+    [[ "$output" == *"$expected"* ]]
     [ "$recipients" = "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/recipients")" ]
     [ "$before" = "$(shasum -a 256 "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age")" ]
     [ ! -e "$HOME/Library/LaunchAgents/com.k3d-manager.password-bundle.plist" ]
   done
+}
+
+@test 'Keychain non-terminal locked read gives the manual unlock command' {
+  export TEST_READ_RC=36 TEST_LOCKED=1
+  for action in password_bundle_show password_bundle_enroll; do
+    : > "$TEST_ARGV_LOG"
+    run --separate-stderr "$action" </dev/null
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *'Login Keychain is locked; run: security unlock-keychain ~/Library/Keychains/login.keychain-db, then retry.'* ]]
+    rg -q '^security <show-keychain-info>' "$TEST_ARGV_LOG"
+    run rg -q '^security <unlock-keychain>' "$TEST_ARGV_LOG"
+    [ "$status" -eq 1 ]
+  done
+}
+
+@test 'Keychain item access denial directs the operator to Always Allow' {
+  export TEST_READ_RC=36
+  for action in password_bundle_show password_bundle_enroll; do
+    run --separate-stderr "$action" </dev/null
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *"run this command once in Terminal on this Mac's screen and choose Always Allow."* ]]
+    run rg -q '^security <unlock-keychain>' "$TEST_ARGV_LOG"
+    [ "$status" -eq 1 ]
+  done
+}
+
+@test 'Keychain only diagnoses rc 36' {
+  export TEST_LOCKED=1 TEST_READ_RC=36
+  run password_bundle_show </dev/null
+  rg -q '^security <show-keychain-info>' "$TEST_ARGV_LOG"
+  for TEST_READ_RC in 44 1; do
+    : > "$TEST_ARGV_LOG"
+    run password_bundle_show </dev/null
+    [ "$status" -eq 1 ]; [[ "$output" != *'unlock'* ]]
+    run password_bundle_enroll </dev/null
+    if [[ "$TEST_READ_RC" == 44 ]]; then [ "$status" -eq 0 ]; else
+      [ "$status" -eq 1 ]; [[ "$output" == *'Unable to read Keychain identity.'* ]]
+    fi
+    [[ "$output" != *'unlock'* ]]
+    run rg -q '^security <(show-keychain-info|unlock-keychain)>' "$TEST_ARGV_LOG"
+    [ "$status" -eq 1 ]
+  done
+}
+
+run_on_terminal() {
+  python3 - "$1" <<'PY'
+import errno
+import os
+import pty
+import select
+import signal
+import sys
+import time
+
+pid, terminal = pty.fork()
+if pid == 0:
+    os.execlp("bash", "bash", "-c", 'source "$SCRIPT_DIR/lib/system.sh"; '
+              'source "$SCRIPT_DIR/plugins/password_bundle.sh"; "$1"', "bash", sys.argv[1])
+
+deadline = time.monotonic() + 10
+transcript = bytearray()
+sent = False
+try:
+    while True:
+        timeout = max(0, deadline - time.monotonic())
+        if not select.select([terminal], [], [], timeout)[0]:
+            raise TimeoutError("Keychain command timed out")
+        try:
+            data = os.read(terminal, 4096)
+        except OSError as exc:
+            if exc.errno != errno.EIO:
+                raise
+            break
+        if not data:
+            break
+        transcript.extend(data)
+        if not sent and b"Login password for this Mac's keychain: " in transcript:
+            os.write(terminal, os.environ["TEST_UNLOCK_PASSWORD"].encode() + b"\n")
+            sent = True
+finally:
+    os.close(terminal)
+    if time.monotonic() >= deadline:
+        os.kill(pid, signal.SIGKILL)
+    _, status = os.waitpid(pid, 0)
+sys.stdout.buffer.write(transcript)
+sys.exit(os.waitstatus_to_exitcode(status))
+PY
+}
+
+@test 'Keychain terminal unlock retries once and keeps secrets off argv and terminal' {
+  seed
+  export TEST_READ_RC=36 TEST_LOCKED=1 TEST_UNLOCK_PASSWORD=' fixture passphrase '
+  for action in password_bundle_show password_bundle_enroll; do
+    : > "$TEST_ARGV_LOG"
+    rm -f "$HOME/unlocked"
+    run run_on_terminal "$action"
+    log="$(cat "$TEST_ARGV_LOG")"
+    [[ "$output$log" != *"$TEST_UNLOCK_PASSWORD"* && "$output$log" != *"$TEST_ID"* ]]
+    if [[ "$action" == password_bundle_show ]]; then
+      [ "$status" -eq 0 ]; [[ "$output" == *password-sentinel* ]]
+    else
+      [ "$status" -eq 1 ]; [[ "$output" == *'Identity already exists'* ]]
+    fi
+    [[ "$output" == *'Login Keychain is locked; unlocking it.'* ]]
+    [ "$(rg -c '^security <unlock-keychain>' "$TEST_ARGV_LOG")" = 1 ]
+    [ "$(rg -c '^security <find-generic-password>' "$TEST_ARGV_LOG")" = 2 ]
+  done
+
+  rm -f "$HOME/unlocked"
+  : > "$TEST_ARGV_LOG"
+  export TEST_RETRY_RC=36
+  run run_on_terminal password_bundle_show
+  [ "$status" -eq 1 ]; [[ "$output" == *'choose Always Allow.'* ]]
+  [ "$(rg -c '^security <unlock-keychain>' "$TEST_ARGV_LOG")" = 1 ]
+  [ "$(rg -c '^security <find-generic-password>' "$TEST_ARGV_LOG")" = 2 ]
+
+  rm -f "$HOME/unlocked"
+  : > "$TEST_ARGV_LOG"
+  export TEST_REJECT_UNLOCK=1
+  run run_on_terminal password_bundle_show
+  [ "$status" -eq 1 ]; [[ "$output" == *'Could not unlock the login Keychain.'* ]]
+  [ "$(rg -c '^security <unlock-keychain>' "$TEST_ARGV_LOG")" = 1 ]
+  [ "$(rg -c '^security <find-generic-password>' "$TEST_ARGV_LOG")" = 1 ]
 }

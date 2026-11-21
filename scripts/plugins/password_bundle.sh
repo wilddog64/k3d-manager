@@ -15,10 +15,65 @@ _password_bundle_metrics() {
   printf '%s\n' "$body" | _run_command --no-exit --quiet -- curl --fail -sS -X POST --data-binary @- "${K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-password-bundle}" >/dev/null 2>&1 || true
 }
 
+_password_bundle_read_identity() {
+  local -a command=(security find-generic-password -a identity -s k3dm-password-bundle-age -w)
+  if [[ "$1" == enroll ]]; then
+    _run_command --no-exit --quiet -- "${command[@]}" >/dev/null 2>&1
+  else
+    _run_command --no-exit -- "${command[@]}"
+  fi
+}
+
+_password_bundle_item_access_hint() {
+  echo "Keychain refused this read; run this command once in Terminal on this Mac's screen and choose Always Allow." >&2
+}
+
+_password_bundle_keychain_hint() {
+  local rc="$1" keychain="${K3DM_PASSWORD_BUNDLE_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}"
+  local info password unlock_rc=0
+  (( rc == 36 )) || return 1
+  info="$(_run_command --no-exit --quiet -- security show-keychain-info "$keychain" 2>&1)" || true
+  if [[ "$info" != *'User interaction is not allowed'* ]]; then
+    _password_bundle_item_access_hint
+    return 1
+  fi
+  if [[ ! -t 0 ]]; then
+    echo 'Login Keychain is locked; run: security unlock-keychain ~/Library/Keychains/login.keychain-db, then retry.' >&2
+    return 1
+  fi
+  echo 'Login Keychain is locked; unlocking it.' >&2
+  if IFS= read -r -s -p "Login password for this Mac's keychain: " password </dev/tty 2>/dev/tty; then
+    printf '\n' >/dev/tty
+    printf '%s\n' "$password" | _run_command --no-exit --quiet -- security unlock-keychain "$keychain" >/dev/null 2>&1 || unlock_rc=$?
+  else
+    unlock_rc=1
+  fi
+  unset password
+  if (( unlock_rc != 0 )); then
+    echo 'Could not unlock the login Keychain.' >&2
+    return 1
+  fi
+  return 0
+}
+
+_password_bundle_identity_with_retry() {
+  local mode="$1" rc
+  _password_bundle_read_identity "$mode" && return 0
+  rc=$?
+  (( rc != 44 )) || return 44
+  _password_bundle_keychain_hint "$rc" || return "$rc"
+
+  _password_bundle_read_identity "$mode" && return 0
+  rc=$?
+  if (( rc == 36 )); then _password_bundle_item_access_hint; fi
+  return "$rc"
+}
+
 function password_bundle_enroll() { (
   set +x
   local identity key rc=0
-  _run_command --no-exit --quiet -- security find-generic-password -a identity -s k3dm-password-bundle-age -w >/dev/null 2>&1 || rc=$?
+  _password_bundle_identity_with_retry enroll || rc=$?
+  (( rc != 36 )) || return 1
   if (( rc == 0 )) && [[ "${FORCE:-0}" != 1 ]]; then
     echo 'Identity already exists; use FORCE=1 to replace it.' >&2; return 1
   fi
@@ -26,13 +81,14 @@ function password_bundle_enroll() { (
   identity="$(_run_command --no-exit -- age-keygen 2>/dev/null)" || return 1
   key="$(printf '%s\n' "$identity" | _run_command --no-exit -- age-keygen -y)" || return 1
   printf 'add-generic-password -U -a identity -s k3dm-password-bundle-age -w %s\n' "${identity##*$'\n'}" | _run_command --no-exit -- security -i || return 1
-  printf '%s\nOn the hub: make password-bundle-add-recipient NAME=<laptop> KEY=%s\n' "$key" "$key"
+  printf '%s\nOn the hub: make password-bundle-add-laptop NAME=<laptop> KEY=%s\n' "$key" "$key"
 ) }
 
 function password_bundle_add_recipient() { (
   set +x
   local name="${NAME:-}" key="${KEY:-}" tmp
-  [[ "$name" =~ ^[a-z0-9-]{1,32}$ && "$key" =~ ^age1[02-9ac-hj-np-z]{58}$ ]] || { echo 'Invalid recipient name or key.' >&2; return 1; }
+  [[ "$name" =~ ^[a-z0-9-]{1,32}$ ]] || { echo 'Invalid NAME: use 1-32 lowercase letters, digits or hyphens.' >&2; return 1; }
+  [[ "$key" =~ ^age1[02-9ac-hj-np-z]{58}$ ]] || { echo 'Invalid KEY: pass the full age1... public key that password-bundle-enroll printed.' >&2; return 1; }
   _password_bundle_paths
   umask 077
   _run_command --no-exit -- mkdir -p -- "$PB_STATE" || return 1
@@ -107,7 +163,7 @@ function password_bundle_show() { (
   set +x
   local identity stamp epoch now
   _password_bundle_paths
-  identity="$(_run_command --no-exit -- security find-generic-password -a identity -s k3dm-password-bundle-age -w)" || return 1
+  identity="$(_password_bundle_identity_with_retry show)" || return 1
   [[ -r "$PB_DIR/service-passwords.meta" && -r "$PB_DIR/service-passwords.age" ]] || return 1
   stamp="$( _run_command --no-exit -- awk '/^generated_at: / {print $2; exit}' "$PB_DIR/service-passwords.meta")"
   [[ -n "$stamp" ]] || return 1

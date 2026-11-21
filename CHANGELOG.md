@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- Password bundle show and enroll now prompt to unlock a locked login Keychain in a terminal and explain how to allow item access. Enrollment prints the one-step hub command, and recipient errors identify the invalid NAME or KEY.
+
 - **Agent Activity Codex panels stay aligned.** Untracked sessions, API prices, and unpriced sessions now share the top band above the four activity panels.
 - **Codex quota panels keep real Codex numbers when newest record is `premium`.** The session reader ignores rate-limit records with `limit_id: "premium"` or null limits so they do not blank the 5h and weekly quota panels or drop quota-efficiency observations.
 - **Web console sudo ticket check probes non-NOPASSWD commands.** `_wc_priv_open` and headless `_wc_revoke` verify sudo credentials with `/bin/sleep 0` and `/usr/bin/id -u` so hosts with k3d-manager's `NOPASSWD: /usr/bin/true` sudoers rule prompt for passwords at startup rather than proceeding without a ticket.
