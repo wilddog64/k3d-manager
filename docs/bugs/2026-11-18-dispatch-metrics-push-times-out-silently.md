@@ -1,11 +1,10 @@
 # dispatch-metrics: pushes to the hub time out silently and the dispatch dashboards go stale
 
-**Status:** OPEN — captured 2026-11-18 during the Astra metrics live check
+**Status:** VERIFIED — 795e101e, 2026-11-18 (fix `docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md`, whose E5 and E6 passed live 2026-11-18; live evidence is recorded in the plan)
 **Priority:** P2 (operator, 2026-11-18: "reliablity is a higer bug (maybe P2)") — the Agent Dispatch and cost dashboards stop updating with no alert; workaround is a manual `make dispatch-metrics` on the M4
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-18 (spec `docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md`, Flash)
 **Prior art:** `docs/bugs/2026-10-05-nightly-test-metrics-push-failure-is-silent.md` (exact-slug review) — read, same class (silent push failure, fixed there with a staleness alert), different producer; `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md` — read, different root cause (tunnel auth; this tunnel has been up since 2026-11-15). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18
 **Approval:** operator, 2026-11-18: "should we either push metrics automtically from m4 to m5 ..." then the P2 call above
