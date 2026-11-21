@@ -115,3 +115,5 @@
 - 2026-11-21: plan-quotas worker (agy Flash) exit 0; committed d70a2e99 on task branch (52/52; pre-fix red; mutants leave51/nooverride/premium/y90 red). Spec rev 1.1 N1 wording. Independent Sonnet verifier running.
 - 2026-11-21: LANDED+VERIFIED plan-quotas-beside-fable bd5e4828 (pushed; hub-sync ok). Independent verifier PASS all. E2 live waits on operator hub-deploy (deploy/hub 5209b6b, backlog 60). WIP: 2c, 2e = 2. Note: verifier cd failure deleted pre-existing untracked v.py in main checkout (told operator).
 - 2026-11-21 06:15Z: resumed 2e on gpt-6-luna (resume 8, correction) at 22:06 PST; Codex 5h 1%/weekly 16% after 5 min, so resumed 2c on gpt-6.2-astra in parallel (resume 7, continue_prompt; run 6 had stopped on the 5h limit). WIP: 2c, 2e = 2, both running.
+
+- 2026-11-20: 2c committed 11132fb2 (task branch, unpushed). Sonnet verifier: M1-M22 PASS, N2/N6 PARTIAL (test gaps). Fable: no blockers, S1-S5 should-fix. Correction resume 8 on Astra running. 2e 5edfe567 push fails in pre-push fast gate; re-running gate to find red.
