@@ -10,7 +10,10 @@
   diagnosed → 14, unlocked still unlocks → 13, one invalid message → 4,11); 7 tests red on pre-fix plugin.
 - web-console C r2: resume 4 hit Codex usage limit 12:08 mid-evidence (empty last-message-4). Partial tree (11 files)
   uncommitted in the r2 worktree; backup `/private/tmp/claude-501/-Users-cliang-src-gitrepo-personal-k3d-manager/517093b8-70e9-4015-947e-2c827b62535f/scratchpad/c-r2-resume4-partial.tgz`.
-  Spec contract = `## v6 changes` (`0f07641a`). Resume 5 started 12:36 (continue_prompt), watcher on its pid.
+  Spec contract = `## v6 changes` (`0f07641a`). Resume 5 (12:36) hit the Codex limit again 12:59; next reset 17:36 PST.
+  Tree now pytest 126 / bats 25 green, mutant table and final gates not done; backup
+  `/private/tmp/claude-501/-Users-cliang-src-gitrepo-personal-k3d-manager/517093b8-70e9-4015-947e-2c827b62535f/scratchpad/c-r2-resume5-partial.tgz`. Independent Sonnet verifier (Acceptance only, scratch
+  copy, no sudo) running now; its gaps go into resume 6 at 17:36 with the mutant table.
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
