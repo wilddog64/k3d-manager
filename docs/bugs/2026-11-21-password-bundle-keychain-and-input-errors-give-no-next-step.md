@@ -5,10 +5,10 @@
 **Introduced by:** ddd9329e (v1.45.0 plan 2, password_bundle.sh first landed)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-21
+**Waiting on:** fix running — since 2026-11-21
 **Prior art:** exact-slug glob none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-21); grep `docs/bugs` for keychain found `2026-11-08-find-similar-docs-rc36-hint-skips-locked-keychain.md` (read, same rc-36 cause in a different tool; its capture is reused below) and `2026-10-30-machine-secrets-pull-fails-on-locked-local-keychain.md` (read, same cause; its LIVE-VERIFIED unlock pattern is reused below)
 **Approval:** operator, 2026-11-21: "go ahead to file it" (after Claude proposed filing one doc for the three messages and fixing inside v1.45.0, since plan 2 is a v1.45.0 feature)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-21
 **Filed:** 2026-11-21
 **Detected by:** operator, enrolling m2-air for the travel bundle, 2026-11-21
 **Branch:** `k3d-manager-v1.45.0`
