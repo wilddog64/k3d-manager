@@ -1,4 +1,4 @@
-## Handoff — 2026-11-20 18:05 PST — web-console P3 bug, priv_open fix spec, Codex quota panels — START HERE
+## Handoff — 2026-11-20 18:15 PST — web-console P3 bug, priv_open fix spec, Codex quota panels — START HERE
 
 **Objective (this session):**
 - Run web-console part A live checks E11–E14 on the M4.
@@ -161,3 +161,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-20 17:40: resumed after /clear. Codex quota fix spec written (parse filter `_codex_quota_usable` at :703; both readers fixed by it; fixture from the real codex/premium shapes; live E4 needs no promote, since the M4 LaunchAgent runs from the checkout). Waiting on: intent approval; priv_open "go"; 2e decision.
 - 2026-11-20 ~17:50: operator approved codex quota intents E1–E4, 'go' priv_open → Flash. priv_open dispatched (agy gemini-3.8-flash-medium) after fixing its Intent line (spec_intent.py:253 needs the line to end at the date). Argon review of codex quota spec: READY, 2 nits adopted.
 - 2026-11-20 ~18:00: operator applied Codex credit ('everything back to normal'); chose resume 2e on Codex (not Flash) and resume 2c now. Both resumed (Astra, continue_prompt). 2e partial also saved as local ref refs/wip/2e-codex-partial (13f99d21). WIP 3/3 (2c, 2e, priv_open). Codex quota fix waits for a slot or operator OK to exceed (P2).
+- 2026-11-20 18:15: codex quota fix dispatched to Flash as a 4th dispatch (operator OK to exceed WIP). Operator has ONE more Codex credit: tell the operator as soon as any Codex run hits the weekly quota, so they can apply it.
