@@ -8,7 +8,7 @@
 - **LANDED / VERIFIED, live owed:** travel bundle `ddd9329e` (E3) and rev 2 `39a24a59` (E5, needs hub-deploy);
   test-all metrics `64a8de5c` (E3); dispatch-stall C `e05a08ed` (E8) and B (E9/E10); remote-promote 2a VERIFIED, 2d (E11);
   hub-deploy self-update `3b541f3b`; multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
-- **Open dispatches:** 2c root daemon (wip `419b34c1`), web-console C (worker exited, uncommitted).
+- **Open dispatches:** 2c root daemon (rebased `4adcb0e2`, resume-8 complete, verifier running), web-console C (worker exited, uncommitted; test coverage far short of E2-E8, correction pending).
 - **Not started:** 2b promote wiring, web-console B, red-team gate (spec written, intents pending), password-bundle
   Keychain P3 (filed, intents pending).
 - **v1.46.0:** plan 6 travel-bundle iPad SSH spec v1.1, intent approved (implementation in v1.46.0 only).
