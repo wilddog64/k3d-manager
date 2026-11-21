@@ -43,6 +43,8 @@ Read the limits in Codex with `/status`, or from the newest `"limit_id":"codex"`
 
 ## Fix direction (for triage)
 
+Superseded by `## Fix` below: the single parse filter covers `:2941`, so no second filter is added there.
+
 - When parsing (`:703-706`), keep only records whose `limit_id` is `codex` or absent (older files), or whose
   primary or secondary limit is a dict. A record with both limits null should never replace a usable one.
 - Apply the same rule at `:2941`.
@@ -54,7 +56,9 @@ Read the limits in Codex with `/status`, or from the newest `"limit_id":"codex"`
 
 1. **Parse filter** (`bin/k3dm-dispatch-metrics:703-706`, inside the session-file reader). Replace the
    `if isinstance(limits, dict):` test with a call to a new module-level helper, `_codex_quota_usable(limits)`,
-   defined next to `_cost`. It returns True only when both hold:
+   defined next to `_cost`. It returns False unless `limits` is a dict (most `event_msg` lines have no
+   `rate_limits`, and an `AttributeError` is not caught by the reader's `except` at `:716`). Otherwise it returns
+   True only when both hold:
    - `limits.get("limit_id")` is missing, `None`, or the string `"codex"`. Files written before `limit_id` existed
      have no such key, and the existing tests use that shape (`test_dispatch_metrics.py:2210`, `:3712`).
    - `limits.get("primary")` or `limits.get("secondary")` is a dict.

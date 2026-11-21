@@ -90,5 +90,6 @@
 - 2026-11-20 15:33: Fable reviewed priv_open fix spec: NEEDS FIXES (2 blockers, 5 should-fix); every claim checked against code and adopted. Spec revised (Test design section, sleep-0 open, _wc_priv_ticket confirm, shim ticket knob move, static-test line shape, uid!=0 case, NOPASSWD static guard). Intent text unchanged.
 - 2026-11-20 15:37: filed docs/bugs/2026-11-20-codex-quota-panels-no-data-on-premium-limit-record.md (exporter picks newest rate_limits record even when limit_id=premium with null limits; Codex quota panels No data). P2 proposed, Waiting on operator decision.
 - 2026-11-20 17:40: codex quota fix spec + Acceptance E1–E4 written; waiting on intent approval, then Argon review, then Flash.
+- 2026-11-20 18:05: priv_open dispatched to Flash; codex quota spec Argon READY; 2c and 2e resumed on Codex after credit applied. WIP 3/3.
 - 2026-11-20 15:43: codex quota bug set P2 by operator (Waiting on dispatch); Claude quota export confirmed fine. Session state saved for /clear.
 - 2026-11-20 16:56: session handoff written at top of activeContext (six fields + Next 1-7); stale WIP 3/3 / Astra-running lines replaced (ledger 2/3, both quota-stopped).
