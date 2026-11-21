@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 14:45 PST (22:45Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 15:05 PST (23:05Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -24,6 +24,10 @@
   read-only, snapshot copy `scratchpad/flash-audit/tree`) writing AUDIT.md: acceptance-id → test coverage + howto drift.
   Next: when verifier + Flash finish, one `resume --slug web-console-c-totp-gate-r2 --model gpt-6-luna` with all
   survivors + Flash gaps (children cannot branch off the uncommitted r2 tree; dispatcher bases on the release branch).
+- Flash audit done (`scratchpad/flash-audit/tree/AUDIT.md`): 38 covered / 2 weak (M11, E9 doc greps) / 2 none
+  (E10, E11 are live, expected). Docs drift: #1 false; #2 (rotate-pending → purge advice) and #3 (exit 8 "naming
+  the path") real. Luna resume 6 RUNNING (`resume-6.md`): 23 survivors with exact mutation strings + 2 doc fixes.
+  Verifier still running (134/168); late survivors → resume 7.
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
