@@ -1,11 +1,11 @@
 # Bug: `test_stall_recovery_cli_dry_run_uses_only_asserted_scratch_targets` fails on every run since 2026-11-21 00:00 UTC
 
-**Status:** OPEN — captured 2026-11-20 (PST) while verifying dispatch 2e; reproduced on the release-branch HEAD with no 2e changes
+**Status:** VERIFIED — landed 17815a2a on k3d-manager-v1.45.0 (2026-11-21); offline E1-E3 pass; CI run on the landing push owed (E4)
 **Priority:** P1 (operator, 2026-11-20: "yes P1 is right"); test-only, but it fails on every run, so CI cannot go green on any push and no promote or merge can pass the gate
 **Introduced by:** 46ec5b36 (Release v1.44.0)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-20
+**Waiting on:** live check — since 2026-11-21
 **Prior art:** exact-slug glob none; grep for the test name and `1794614401` in docs/bugs and docs/issues none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4)
 **Approval:** operator, 2026-11-20: dispatch to Flash ("send to Flash"). P1, so it may exceed the WIP limit. Target branch `k3d-manager-v1.45.0`.
 **Intent approved:** operator, 2026-11-20
@@ -96,3 +96,11 @@ interface:
 
 - The test passes, and you show it failing on `a2b66a01`. Record the command and the output in your hand-off.
 - `scripts/tests/bin/test_dispatch_metrics.py` passes in full, and pinned ruff is clean. Do not commit.
+
+## Verification (Claude, 2026-11-21)
+
+- Worker: Flash (agy gemini-3.8-flash-medium), 1 run, diff exactly as ## Fix (base = int(time.time()) - 3600, six rows base+1..base+6).
+- E1: the test passes on the fix; pre-fix red reproduced on a2b66a01 (2026-11-21 01:21Z). No 10-digit epoch left in the test body.
+- E2: positive control in a scratch copy (base = now - 8*86400) fails at the window="7d" clean_approvals assertion; zero assert lines changed.
+- E3: full test_dispatch_metrics.py 225 passed in the worktree; git diff --check clean; only the test file changed.
+- E4 (live): pending: CI on the push containing 17815a2a and d4d0f5d8.

@@ -1,11 +1,11 @@
 # Bug: Codex quota panels show "No data" when the newest rate-limit record is a `premium` one
 
-**Status:** OPEN — captured 2026-11-20 from the operator's Agent activity dashboard screenshot, priority set by the operator
+**Status:** VERIFIED — landed d4d0f5d8 on k3d-manager-v1.45.0 (2026-11-21); offline E1-E3 and live dry-run E4 pass; dashboard screenshot owed
 **Priority:** P2 (operator, 2026-11-20: "this should be a P2 because it originally had data but now disappears. I need to know claude and codex quota, especially codex as I didn't open its cli"); the quota panels go blank while the reading-age panel still counts, workaround: Codex `/status` or the session file
 **Introduced by:** pre-existing (the exporter assumes one rate-limit record shape)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-20
+**Waiting on:** live check — since 2026-11-21
 **Prior art:** exact-slug glob none; `make find-similar-docs` not run (unavailable on the M4 today, see the 2026-11-20 priv_open bug); grep for `rate_limits|k3dm_codex_quota` hit `docs/bugs/2026-11-07-claude-plan-quota-not-exported.md` and `docs/bugs/2026-11-14-quota-efficiency-panels-compare-only-last-two-readings.md` — titles read, different root cause (Claude quota export; panel comparison window)
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait; dispatch to Flash. Operator OK to exceed the WIP limit as a 4th dispatch (2026-11-20, "go ahead to send codex quota fix to flash"). Target branch `k3d-manager-v1.45.0` (fix inside the open release, not a patch release).
 **Intent approved:** operator, 2026-11-20
@@ -165,3 +165,16 @@ interface:
 - The E1 and E2 tests exist and pass. Cases a, b and d, and E2, are shown red against `bin/k3dm-dispatch-metrics` at
   `10aafca6`. Record the command and the failing output in the commit message or the dispatch report.
 - `scripts/tests/bin/test_dispatch_metrics.py` passes in full, and pinned ruff is clean.
+
+## Verification (Claude, 2026-11-21)
+
+- Worker: Flash (agy gemini-3.8-flash-medium), 2 runs. Scope: CHANGELOG.md, bin/k3dm-dispatch-metrics, scripts/tests/bin/test_dispatch_metrics.py.
+- Pre-fix red (exporter from HEAD 0e63c968, new tests kept): cases a, b, d and E2 fail; c and e pass as positive controls.
+- Independent verifier (Sonnet, Acceptance only): first verdict FAIL on an N1 test gap (a null/null record with limit_id codex or no
+  limit_id was never tested; a helper that accepts null/null kept all tests green). Flash resume added cases f and g; Claude
+  checked both pass on the fix and fail on that mutant. 8/8 new tests pass; full file 233 passed after the date-test fix landed.
+- Lint: ruff is not installed on m4-air, so `make lint-python` did not run locally; CI runs it.
+- Live E4 (m4-air, 2026-11-21 02:00Z, main checkout at d4d0f5d8): newest Codex rate_limits record is limit_id "premium",
+  primary null. `bin/k3dm-dispatch-metrics --dry-run` prints `k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 1.0`
+  and `{limit="secondary",window_minutes="10080"} 0.16`, matching the real windows.
+- Owed: Grafana Codex quota panels screenshot after the next 15-minute LaunchAgent push (operator or Claude).
