@@ -701,7 +701,7 @@ def _session_files(codex_home, now, repo_by_worktree=None):
                                 if isinstance(model_value, str):
                                     model = model_value
                         limits = payload.get("rate_limits")
-                        if isinstance(limits, dict):
+                        if _codex_quota_usable(limits):
                             stamp = item.get("timestamp") or start
                             quota = (stamp, limits)
                     elif item.get("type") == "turn_context":
@@ -715,6 +715,15 @@ def _session_files(codex_home, now, repo_by_worktree=None):
                        "parent_thread_id": parent_thread_id}
         except (OSError, ValueError, TypeError):
             continue
+
+
+def _codex_quota_usable(limits):
+    if not isinstance(limits, dict):
+        return False
+    limit_id = limits.get("limit_id")
+    if limit_id is not None and limit_id != "codex":
+        return False
+    return isinstance(limits.get("primary"), dict) or isinstance(limits.get("secondary"), dict)
 
 
 def _cost(event, prices):

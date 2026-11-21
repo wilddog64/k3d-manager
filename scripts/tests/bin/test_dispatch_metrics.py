@@ -4330,3 +4330,319 @@ def test_push_retries_and_stubs(tmp_path, monkeypatch, capsys):
         server.shutdown()
         thread.join()
         server.server_close()
+
+
+def test_bug_2026_11_20_E1_case_a_one_file_codex_then_premium_null(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-a.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-a", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_b_two_files_codex_older_premium_newer(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    file_a = folder / "rollout-case-b-a.jsonl"
+    file_b = folder / "rollout-case-b-b.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    file_a.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-ba", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+    ]) + "\n")
+    file_b.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-bb", "timestamp": datetime.fromtimestamp(now - 25, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert file_a.is_file() and file_b.is_file()
+    assert (home / "sessions") in file_a.parents and (home / "sessions") in file_b.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_c_positive_control_codex_only(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-c.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-c", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_d_premium_with_numeric_limits_ignored(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-d.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": {"used_percent": 5.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 5.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-d", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    assert "0.05" not in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_e_no_limit_id_exported_as_before(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-e.jsonl"
+    record_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    no_limit_id_record = {
+        "primary": {"used_percent": 30.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 40.0, "window_minutes": 10080, "resets_at": now + 10080},
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-e", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": record_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": no_limit_id_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.3' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
+    expected_stamp = dispatch_metrics._timestamp(record_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E2_quota_observations_written_for_codex_record(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-e2.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-e2", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+
+    obs_file = tmp_path / "state" / "codex-quota-observations.jsonl"
+    assert obs_file.is_file()
+    rows = [json.loads(line) for line in obs_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert any(r.get("timestamp") == expected_stamp and r.get("used_percent") == 100.0 for r in rows)
+
+
+def test_bug_2026_11_20_E1_case_f_codex_then_newer_codex_with_null_limits(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-f.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    null_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    null_codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-f", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": null_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": null_codex_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_g_codex_then_newer_no_limit_id_with_null_limits(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-g.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    null_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    null_no_id_record = {
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-g", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": null_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": null_no_id_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
