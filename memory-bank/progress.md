@@ -93,3 +93,5 @@
 - 2026-11-20 18:05: priv_open dispatched to Flash; codex quota spec Argon READY; 2c and 2e resumed on Codex after credit applied. WIP 3/3.
 - 2026-11-20 15:43: codex quota bug set P2 by operator (Waiting on dispatch); Claude quota export confirmed fine. Session state saved for /clear.
 - 2026-11-20 16:56: session handoff written at top of activeContext (six fields + Next 1-7); stale WIP 3/3 / Astra-running lines replaced (ledger 2/3, both quota-stopped).
+- 2026-11-21 01:30Z: stall-recovery date test P1 (operator); intents E1-E4 approved; dispatched to Flash (agy gemini-3.8-flash-medium), spec c0b09a1c. P1 so over WIP.
+- 2026-11-21 01:30Z: 2c Codex exited 1 on the 5h usage limit (primary 100%, resets 22:04 PST; weekly 16%). Credit NOT needed; resume 2c after 22:04 PST. Tree has daemon/client/authority/tests; last full run had 2 not-ok bats (M4 code labels; ask-bash diagnostics) to check.
