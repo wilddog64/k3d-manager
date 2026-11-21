@@ -5,6 +5,32 @@ bats_require_minimum_version 1.5.0
 TEST_SYSTEM_CURL_BIN="$(command -v curl 2>/dev/null || true)"
 
 setup() {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  mkdir -p "$HOME"
+  export CVE_PIN_REPO_URL="file://${BATS_TEST_TMPDIR}/origin.git" GIT_WRITE_TOKEN=fixture-token
+  [[ "$CVE_PIN_REPO_URL" == "file://$BATS_TEST_TMPDIR/origin.git" ]]
+  git init --bare -q "$BATS_TEST_TMPDIR/origin.git"
+  local seed="$BATS_TEST_TMPDIR/seed"
+  git init -qb deploy/hub "$seed"
+  local kfile service
+  for kfile in "$BATS_TEST_DIRNAME"/../../../services/shopping-cart-*/kustomization.yaml; do
+    service="$(basename "$(dirname "$kfile")")"
+    mkdir -p "$seed/services/$service"
+    cp "$kfile" "$seed/services/$service/"
+  done
+  git -C "$seed" add services
+  git -C "$seed" -c user.name=fixture -c user.email=test@localhost commit -qm bases
+  git -C "$seed" push -q "$CVE_PIN_REPO_URL" HEAD:refs/heads/deploy/hub
+  git -C "$seed" switch -q --orphan cve-pins/hub
+  printf '%s\n' '{"v":1,"cvePins":{}}' > "$seed/pins.json"
+  git -C "$seed" add pins.json
+  git -C "$seed" -c user.name=fixture -c user.email=test@localhost commit -qm pins
+  git -C "$seed" push -q "$CVE_PIN_REPO_URL" HEAD:refs/heads/cve-pins/hub
+  pin_tip="$(git -C "$seed" rev-parse HEAD)"
+  scan_env=("GIT_ALLOW_PROTOCOL=file" "HOME=$HOME" "TMPDIR=$TMPDIR" "GIT_WRITE_TOKEN=$GIT_WRITE_TOKEN" "CVE_PIN_REPO_URL=$CVE_PIN_REPO_URL")
+  local key
+  for key in ${!K3DM_@}; do scan_env+=("$key=${!key}"); done
+
   export TEST_BIN_DIR="${BATS_TEST_TMPDIR}/bin"
   mkdir -p "${TEST_BIN_DIR}" "${BATS_TEST_TMPDIR}/scripts"
   export PATH="${TEST_BIN_DIR}:$PATH"
@@ -201,10 +227,10 @@ case "${_url}" in
     esac
     case "${_url}" in
       *"/manifests/latest")
-        _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"
+        _digest="${TEST_LATEST_DIGEST:-sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef}"
         ;;
       *"/manifests/${TEST_SHA_TAG:-sha-new}")
-        _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"
+        _digest="${TEST_LATEST_DIGEST:-sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef}"
         ;;
       *)
         _digest="sha256:olderdigest"
@@ -306,11 +332,11 @@ case "${_url}" in
     _tag="${_url##*/}"
     if [ "${TEST_MANIFEST_401:-0}" = 1 ]; then printf 401
     elif [ "${TEST_MANIFEST_404_WITH_DIGEST:-0}" = 1 ] && [ "${_tag}" = latest ]; then
-      printf 'HTTP/1.1 404 Not Found\r\nDocker-Content-Digest: sha256:deadbeef\r\n\r\n' >"${_headers}"
+      printf 'HTTP/1.1 404 Not Found\r\nDocker-Content-Digest: sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef\r\n\r\n' >"${_headers}"
       printf 404
     elif [ "${TEST_NO_LATEST_DIGEST:-0}" = 1 ] && [ "${_tag}" = latest ]; then printf 404
     else
-      if [ "${_tag}" = latest ] || [ "${_tag}" = "${TEST_SHA_TAG:-sha-new}" ] || [ "${_tag}" = sha-d50487355de33131eb8a8744a70ab168d3ff30e9 ]; then _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"; else _digest=sha256:abad1dea; fi
+      if [ "${_tag}" = latest ] || [ "${_tag}" = "${TEST_SHA_TAG:-sha-new}" ] || [ "${_tag}" = sha-d50487355de33131eb8a8744a70ab168d3ff30e9 ]; then _digest="${TEST_LATEST_DIGEST:-sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef}"; else _digest=sha256:abad1dea; fi
       printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\n\r\n' "${_digest}" >"${_headers}"
       printf 200
     fi
@@ -389,6 +415,10 @@ case "$*" in
   -n\ platform-ops\ patch\ configmap\ app-cve-scan-rebuild-state\ *)
     exit 0
     ;;
+  -n\ cicd\ get\ application\ *targetRevision*)
+    printf '%s' deploy/hub
+    exit 0
+    ;;
   -n\ cicd\ patch\ application\ *\ --type\ merge\ -p\ *)
     exit 0
     ;;
@@ -433,7 +463,18 @@ EOF
   chmod +x "${TEST_SCAN_SCRIPT}"
 }
 
+_assert_no_pin_write() {
+  [ "$(git --git-dir="$BATS_TEST_TMPDIR/origin.git" rev-parse cve-pins/hub)" = "$pin_tip" ]
+}
+
+_assert_pinned() {
+  git --git-dir="$BATS_TEST_TMPDIR/origin.git" show cve-pins/hub:pins.json |
+    jq -e --arg svc "$1" --arg d "$2" '.cvePins[$svc].digest == $d'
+  grep -q "annotate application ubuntu-hostinger-$1 argocd.argoproj.io/refresh=hard" "$KUBECTL_LOG"
+}
+
 _assert_no_candidate_promotion_or_rebuild() {
+  _assert_no_pin_write
   run grep -q 'patch application' "${KUBECTL_LOG}"
   [ "${status}" -eq 1 ]
   run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
@@ -451,7 +492,7 @@ _make_report_fixture() {
 _run_basket_candidate_scan() {
   _mode="$1"
   _severity="$2"
-  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="shopping-cart-basket" GH_TOKEN="${TEST_GH_TOKEN:-test-token}" TEST_TRIVY_MODE="${_mode}" \
@@ -466,7 +507,7 @@ _run_basket_candidate_scan() {
   export APP_SERVICES="shopping-cart-basket"
   export TEST_REPORT_ROWS=""
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -488,12 +529,12 @@ _run_basket_candidate_scan() {
   export APP_SERVICES="shopping-cart-order"
   export GH_TOKEN="test-token"
   export TEST_SHA_TAG="sha-order-new"
-  export TEST_LATEST_DIGEST="sha256:deadbeef"
+  export TEST_LATEST_DIGEST="sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
   export TEST_REPORT_ROWS="shopping-cart-apps order-report ghcr.io/wilddog64/shopping-cart-order sha-old 1 1"
   export TEST_REPORT_DETAILS_order_report="CRITICAL|CVE-1|2.0.0"
   export TEST_LATEST_CVES_shopping_cart_order=2
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -515,12 +556,13 @@ _run_basket_candidate_scan() {
   grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${CURL_LOG}"
   run grep -qF "${GH_TOKEN}" "${CURL_LOG}" "${WGET_LOG}"
   [ "$status" -eq 1 ]
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE: shopping-cart-order|' "${NOTIFY_LOG}"
 }
 
 @test "rebuild dispatched within the cooldown is skipped without notifying" {
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -532,7 +574,7 @@ _run_basket_candidate_scan() {
     APP_SERVICES="shopping-cart-order" \
     GH_TOKEN="test-token" \
     TEST_SHA_TAG="sha-order-new" \
-    TEST_LATEST_DIGEST="sha256:deadbeef" \
+    TEST_LATEST_DIGEST="sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" \
     TEST_REPORT_ROWS="shopping-cart-apps order-report ghcr.io/wilddog64/shopping-cart-order sha-old 1 1" \
     TEST_REPORT_DETAILS_order_report="CRITICAL|CVE-1|2.0.0" \
     TEST_LATEST_CVES_shopping_cart_order=2 \
@@ -548,7 +590,7 @@ _run_basket_candidate_scan() {
 }
 
 @test "rebuild dispatched after the cooldown expires dispatches and records the time" {
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -560,7 +602,7 @@ _run_basket_candidate_scan() {
     APP_SERVICES="shopping-cart-order" \
     GH_TOKEN="test-token" \
     TEST_SHA_TAG="sha-order-new" \
-    TEST_LATEST_DIGEST="sha256:deadbeef" \
+    TEST_LATEST_DIGEST="sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" \
     TEST_REPORT_ROWS="shopping-cart-apps order-report ghcr.io/wilddog64/shopping-cart-order sha-old 1 1" \
     TEST_REPORT_DETAILS_order_report="CRITICAL|CVE-1|2.0.0" \
     TEST_LATEST_CVES_shopping_cart_order=2 \
@@ -575,15 +617,15 @@ _run_basket_candidate_scan() {
   [ "${output}" -ge 1 ]
 }
 
-@test "vulnerable deployed image with clean latest promotes exact digest via application patch" {
+@test "vulnerable deployed image with clean latest promotes exact digest on the pin branch" {
   export APP_SERVICES="shopping-cart-basket"
   export TEST_SHA_TAG="sha-basket-new"
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_LATEST_CVES_shopping_cart_basket=0
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -600,8 +642,8 @@ _run_basket_candidate_scan() {
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"PROMOTION shopping-cart-basket: from ghcr.io/wilddog64/shopping-cart-basket:sha-old to ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef"* ]]
-  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  [[ "${output}" == *"PROMOTION shopping-cart-basket: pinned ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"* ]]
+  _assert_pinned shopping-cart-basket "$TEST_LATEST_DIGEST"
   grep -q 'annotate application ubuntu-hostinger-shopping-cart-basket argocd.argoproj.io/refresh=hard --overwrite' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE Promotion: shopping-cart-basket|' "${NOTIFY_LOG}"
 }
@@ -615,7 +657,7 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
 
-  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="${APP_SERVICES}" GH_OWNER="wilddog64" GH_TOKEN="${GH_TOKEN}" TEST_TRIVY_MODE="${TEST_TRIVY_MODE}" \
@@ -652,7 +694,7 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
 
-  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="${APP_SERVICES}" TEST_TRIVY_MODE="${TEST_TRIVY_MODE}" \
@@ -775,7 +817,7 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
 
-  run env -i PATH="${PATH}" TRIVY_BIN="missing-trivy-for-test" TRIVY_LOG="${TRIVY_LOG}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TRIVY_BIN="missing-trivy-for-test" TRIVY_LOG="${TRIVY_LOG}" \
     CURL_LOG="${CURL_LOG}" NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="${APP_SERVICES}" TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
@@ -791,9 +833,9 @@ _run_basket_candidate_scan() {
   export APP_SERVICES="shopping-cart-basket"
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="${APP_SERVICES}" TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
@@ -802,13 +844,14 @@ _run_basket_candidate_scan() {
 
   [ "${status}" -eq 0 ]
   [[ "${output}" != *"trivy error for"* ]]
-  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  _assert_pinned shopping-cart-basket "$TEST_LATEST_DIGEST"
 }
 
 @test "valid CRITICAL candidate finding retains rebuild behavior" {
   _run_basket_candidate_scan ok CRITICAL
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"immutable candidate ghcr.io/wilddog64/shopping-cart-basket:sha-new still vulnerable (1)"* ]]
+  _assert_no_pin_write
   run grep -q 'patch application' "${KUBECTL_LOG}"
   [ "${status}" -eq 1 ]
   run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
@@ -823,7 +866,7 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_REPORT_DETAILS_frontend_report="HIGH|CVE-3|1.2.0"
 
-  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="${APP_SERVICES}" TEST_TRIVY_MODE="${TEST_TRIVY_MODE}" \
@@ -837,7 +880,8 @@ _run_basket_candidate_scan() {
   [ "${status}" -eq 1 ]
   run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
   [ "${status}" -eq 1 ]
-  grep -q 'patch application ubuntu-hostinger-shopping-cart-frontend' "${KUBECTL_LOG}"
+  _assert_pinned shopping-cart-frontend sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+  git --git-dir="$BATS_TEST_TMPDIR/origin.git" show cve-pins/hub:pins.json | jq -e '.cvePins | has("shopping-cart-basket") | not'
 }
 
 @test "COSIGN_VERIFY=1: signed clean candidate is cosign-verified then promoted" {
@@ -846,9 +890,9 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_LATEST_CVES_shopping_cart_basket=0
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -869,9 +913,9 @@ _run_basket_candidate_scan() {
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  grep -q 'verify --key .* --insecure-ignore-tlog=true ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeef' "${COSIGN_LOG}"
-  [[ "${output}" == *"SIGGATE shopping-cart-basket: candidate ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef cosign-verified"* ]]
-  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  grep -q 'verify --key .* --insecure-ignore-tlog=true ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef' "${COSIGN_LOG}"
+  [[ "${output}" == *"SIGGATE shopping-cart-basket: candidate ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef cosign-verified"* ]]
+  _assert_pinned shopping-cart-basket "$TEST_LATEST_DIGEST"
 }
 
 @test "COSIGN_VERIFY=1: unsigned clean candidate is refused (no promotion)" {
@@ -880,9 +924,9 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_LATEST_CVES_shopping_cart_basket=0
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -905,6 +949,7 @@ _run_basket_candidate_scan() {
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"FAILED cosign verify — refusing to promote"* ]]
   grep -q 'warning|App CVE Promotion Blocked (unsigned): shopping-cart-basket|' "${NOTIFY_LOG}"
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
@@ -914,9 +959,9 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_LATEST_CVES_shopping_cart_basket=0
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -938,9 +983,9 @@ _run_basket_candidate_scan() {
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  grep -q 'verify-attestation --type vuln --key .* --insecure-ignore-tlog=true ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeef' "${COSIGN_LOG}"
-  [[ "${output}" == *"ATTESTGATE shopping-cart-basket: candidate ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef vuln-attestation verified"* ]]
-  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  grep -q 'verify-attestation --type vuln --key .* --insecure-ignore-tlog=true ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef' "${COSIGN_LOG}"
+  [[ "${output}" == *"ATTESTGATE shopping-cart-basket: candidate ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef vuln-attestation verified"* ]]
+  _assert_pinned shopping-cart-basket "$TEST_LATEST_DIGEST"
 }
 
 @test "COSIGN_VERIFY_ATTESTATION=1: signed but unattested candidate is refused (no promotion)" {
@@ -949,9 +994,9 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_LATEST_CVES_shopping_cart_basket=0
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -976,6 +1021,7 @@ _run_basket_candidate_scan() {
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"FAILED vuln-attestation verify — refusing to promote unattested image"* ]]
   grep -q 'warning|App CVE Promotion Blocked (unattested): shopping-cart-basket|' "${NOTIFY_LOG}"
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
@@ -985,9 +1031,9 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_ROWS="shopping-cart-apps basket-report wilddog64/shopping-cart-basket sha-old 1 0"
   export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
   export TEST_LATEST_CVES_shopping_cart_basket=0
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -1004,15 +1050,15 @@ _run_basket_candidate_scan() {
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"PROMOTION shopping-cart-basket: from ghcr.io/wilddog64/shopping-cart-basket:sha-old to ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef"* ]]
-  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  [[ "${output}" == *"PROMOTION shopping-cart-basket: pinned ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"* ]]
+  _assert_pinned shopping-cart-basket "$TEST_LATEST_DIGEST"
 }
 
 @test "digest resolution reads busybox-style indented lowercase headers" {
   export APP_SERVICES="shopping-cart-basket"
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     WGET_LOG="${WGET_LOG}" \
     TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" \
@@ -1028,7 +1074,7 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_DETAILS_frontend_report=""
   export TEST_LATEST_CVES_shopping_cart_frontend=0
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -1053,7 +1099,7 @@ _run_basket_candidate_scan() {
   export TEST_REPORT_DETAILS_payment_report=""
   export TEST_LATEST_CVES_shopping_cart_payment=0
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -1216,7 +1262,7 @@ PY
   export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
   export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -1235,18 +1281,19 @@ PY
   [[ "${output}" == *"failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-payment; reason=no-match — promotion skipped"* ]]
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-payment|' "${NOTIFY_LOG}"
   run ! grep -q 'actions/workflows' "${WGET_LOG}"
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
 }
 
 @test "rebuild dispatch failure notifies without failing the batch" {
   export APP_SERVICES="shopping-cart-order"
   export TEST_SHA_TAG="sha-order-new"
-  export TEST_LATEST_DIGEST="sha256:deadbeef"
+  export TEST_LATEST_DIGEST="sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
   export TEST_REPORT_ROWS="shopping-cart-apps order-report ghcr.io/wilddog64/shopping-cart-order sha-old 0 2"
   export TEST_REPORT_DETAILS_order_report="HIGH|CVE-3|3.1.4"
   export TEST_LATEST_CVES_shopping_cart_order=1
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -1264,13 +1311,14 @@ PY
 
   [ "${status}" -eq 0 ]
   grep -q 'warning|App CVE Rebuild Dispatch Failed: shopping-cart-order|' "${NOTIFY_LOG}"
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
 }
 
 @test "missing immutable sha candidate notifies without retrying the batch" {
   export APP_SERVICES="shopping-cart-product-catalog"
   export TEST_SHA_TAG="sha-catalog-new"
-  export TEST_LATEST_DIGEST="sha256:feedbeef"
+  export TEST_LATEST_DIGEST="sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef"
   export TEST_REPORT_ROWS="shopping-cart-apps product-catalog-report ghcr.io/wilddog64/shopping-cart-product-catalog sha-old 0 1"
   export TEST_REPORT_DETAILS_product_catalog_report="HIGH|CVE-4|9.9.9"
 
@@ -1313,7 +1361,7 @@ case "${_url}" in
     ;;
   https://ghcr.io/v2/*/manifests/latest)
     [ "${_spider}" = "true" ] || exit 1
-    printf '  docker-content-digest: sha256:feedbeef\r\n' >&2
+    printf '  docker-content-digest: sha256:feedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef\r\n' >&2
     printf '  HTTP/1.1 200 OK\r\n' >&2
     exit 0
     ;;
@@ -1329,7 +1377,7 @@ exit 1
 EOF
   chmod +x "${TEST_BIN_DIR}/wget"
 
-  run env -i \
+  run env -i "${scan_env[@]}" \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
@@ -1348,6 +1396,7 @@ EOF
   [[ "${output}" == *"failed to resolve immutable sha-* candidate"* ]]
   [[ "${output}" == *"reason=no-match"* ]]
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-product-catalog|' "${NOTIFY_LOG}"
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-product-catalog' "${KUBECTL_LOG}"
 }
 
@@ -1356,7 +1405,7 @@ EOF
   export GH_TOKEN="sentinel-ghcr-secret-value"
   export TEST_TOKEN_EMPTY=1
   if [ "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL+x}" != x ]; then
-    export K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL="http://pushgateway.test/metrics/job/test"
+    export K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL="http://127.0.0.1:9/metrics/job/test"
   fi
   export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
   export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
@@ -1375,6 +1424,7 @@ EOF
   [ "$status" -eq 1 ]
   run grep -qF "${GH_TOKEN}" "${WGET_LOG}"
   [ "$status" -eq 1 ]
+  _assert_no_pin_write
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
 }
 
@@ -1400,26 +1450,26 @@ EOF
 }
 
 @test "GHCR pagination resolves a matching sha tag from page two" {
-  run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" CURL_LOG="${CURL_LOG}" TEST_PAGINATED_TAGS=1 \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" CURL_LOG="${CURL_LOG}" TEST_PAGINATED_TAGS=1 \
     /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
     _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
   [ "${status}" -eq 0 ] || { cat "${CURL_LOG}"; printf '%s\n' "${output}"; return 1; }
-  [[ "${output}" == "sha-d50487355de33131eb8a8744a70ab168d3ff30e9|sha256:deadbeef" ]]
+  [[ "${output}" == "sha-d50487355de33131eb8a8744a70ab168d3ff30e9|sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" ]]
 }
 
 @test "single page GHCR tags retain existing candidate resolution (positive control)" {
-  run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" \
+  run env -i "${scan_env[@]}" PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" \
     /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
     _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
   [ "${status}" -eq 0 ]
-  [[ "${output}" == "sha-new|sha256:deadbeef" ]]
+  [[ "${output}" == "sha-new|sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" ]]
 }
 
 @test "GHCR pagination classifies errors on any page" {
   for _code in 401 403 503; do
     export TEST_PAGINATED_TAGS=1 TEST_TAGS_PAGE2_CODE="${_code}"
     : >"${CURL_LOG}"
-    run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" CURL_LOG="${CURL_LOG}" TEST_PAGINATED_TAGS=1 TEST_TAGS_PAGE2_CODE="${_code}" \
+    run env -i "${scan_env[@]}" PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" CURL_LOG="${CURL_LOG}" TEST_PAGINATED_TAGS=1 TEST_TAGS_PAGE2_CODE="${_code}" \
       /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
       _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
     [ "${status}" -eq 1 ]
@@ -1429,7 +1479,7 @@ EOF
 
 @test "GHCR pagination rejects foreign, out-of-repo and repeated Link targets" {
   for _mode in host path repeat; do
-    run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" TEST_PAGINATED_TAGS=1 TEST_LINK_MODE="${_mode}" \
+    run env -i "${scan_env[@]}" PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" TEST_PAGINATED_TAGS=1 TEST_LINK_MODE="${_mode}" \
       /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
       _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
     [ "${status}" -eq 1 ]
@@ -1501,7 +1551,7 @@ EOF
   export GH_TOKEN="sentinel-metric-secret"
   export TEST_TOKEN_EMPTY=1
   if [ "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL+x}" != x ]; then
-    export K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL="http://pushgateway.test/metrics/job/k3dm-app-cve-scan"
+    export K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL="http://127.0.0.1:9/metrics/job/k3dm-app-cve-scan"
   fi
   [ -n "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL:-}" ] || skip "task Pushgateway URL is empty"
   export TEST_REPORT_ROWS=$'shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0\nshopping-cart-apps product-catalog-report ghcr.io/wilddog64/shopping-cart-product-catalog sha-old 1 0'
@@ -1547,7 +1597,7 @@ import sys
 class Handler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.send_response(200)
-        self.send_header("Docker-Content-Digest", "sha256:deadbeef")
+        self.send_header("Docker-Content-Digest", "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
         self.end_headers()
 
     def log_message(self, *_args):
@@ -1591,7 +1641,7 @@ PY
   wait "${_server_pid}"
   [ "${status}" -eq 0 ]
   [ "${output}" = "200" ]
-  grep -q '^Docker-Content-Digest: sha256:deadbeef' "${_headers_file}"
+  grep -q '^Docker-Content-Digest: sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' "${_headers_file}"
 }
 
 @test "credential rotators and CVE scanner pin alpine/k8s image by tag and sha256 digest" {

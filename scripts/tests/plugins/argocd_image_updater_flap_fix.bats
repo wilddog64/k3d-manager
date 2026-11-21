@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
 
-@test "services-git ApplicationSet ignores kustomize image overrides via jqPathExpressions" {
+@test "services-git ApplicationSet reconciles kustomize images and keeps resource differences" {
   run grep -nF 'jqPathExpressions' scripts/etc/argocd/applicationsets/services-git.yaml
   [ "$status" -eq 0 ]
 
   run grep -nF '.spec.source.kustomize.images' scripts/etc/argocd/applicationsets/services-git.yaml
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
 
   run grep -nF '/spec/source/kustomize/images' scripts/etc/argocd/applicationsets/services-git.yaml
   [ "$status" -ne 0 ]

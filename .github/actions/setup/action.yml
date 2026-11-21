@@ -3,6 +3,11 @@ description: Install bats, shellcheck, and yamllint
 runs:
   using: composite
   steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: "1.27.4"
+        cache: false
+
     - name: Install apt packages
       shell: bash
       run: |

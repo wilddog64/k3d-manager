@@ -911,6 +911,7 @@ function _hostinger_reapply_gitops_applicationsets() {
     "hostinger-cve-inventory-reader.yaml"
   )
 
+  local pin_guard_failed=0
   for appset in "${appsets[@]}"; do
     local appset_path="${SCRIPT_DIR}/etc/argocd/applicationsets/${appset}"
     if [[ ! -f "${appset_path}" ]]; then
@@ -918,12 +919,26 @@ function _hostinger_reapply_gitops_applicationsets() {
       return 1
     fi
 
+    if [[ "$appset" == services-git.yaml ]]; then
+      local pin_lookup_rc=0
+      GIT_TERMINAL_PROMPT=0 _run_command --soft -- git ls-remote --exit-code https://github.com/wilddog64/k3d-manager refs/heads/cve-pins/hub >/dev/null || pin_lookup_rc=$?
+      if (( pin_lookup_rc != 0 )); then
+        if (( pin_lookup_rc == 2 )); then
+          _warn "[k3s-hostinger] Refusing to apply services-git.yaml: pin branch cve-pins/hub not found (exit $pin_lookup_rc)"
+        else
+          _warn "[k3s-hostinger] Refusing to apply services-git.yaml: pin branch lookup failed (rc $pin_lookup_rc)"
+        fi
+        pin_guard_failed=1
+        continue
+      fi
+    fi
     if ! envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME $AMBIENT_ISTIO_VERSION $AMBIENT_CNI_CONF_DIR $AMBIENT_CNI_BIN_DIR' < "${appset_path}" | "${hub_kubectl[@]}" apply -f - >/dev/null 2>&1; then
       _err "[k3s-hostinger] failed to reapply ApplicationSet ${appset}"
       return 1
     fi
   done
 
+  (( pin_guard_failed == 0 )) || return 1
   _info "[k3s-hostinger] reapplied data-git, services-git, platform-helm, and istio-ambient ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
   return 0
 }

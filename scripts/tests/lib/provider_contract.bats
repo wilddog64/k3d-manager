@@ -539,6 +539,9 @@ setup() {
     esac
   }
 
+  local lookup_rc=0
+  _warn() { echo "$*"; }
+  _run_command() { [[ "$*" == "--soft -- git ls-remote --exit-code https://github.com/wilddog64/k3d-manager refs/heads/cve-pins/hub" ]] || return 99; [ "${GIT_TERMINAL_PROMPT:-}" = 0 ] || return 98; return "$lookup_rc"; }
   run _hostinger_reapply_gitops_applicationsets
   [ "$status" -eq 0 ]
 
@@ -554,12 +557,28 @@ setup() {
   [[ "$output" == *"k3d-manager/role: app-cluster"* ]]
   [[ "$output" == *".spec.persistentVolumeClaimRetentionPolicy"* ]]
   [[ "$output" == *"name: services-git"* ]]
-  [[ "$output" == *".spec.source.kustomize.images"* ]]
+  [[ "$output" == *"revision: cve-pins/hub"* ]]
+  [[ "$output" == *"templatePatch:"* ]]
   [[ "$output" == *"name: platform-helm"* ]]
   [[ "$output" == *"name: '{{.name}}-platform'"* ]]
   [[ "$output" == *"name: istio-ambient"* ]]
   [[ "$output" == *"name: ztunnel"* ]]
   [[ "$output" == *"name: hostinger-cve-inventory-reader"* ]]
+  for lookup_rc in 2 128; do
+    : > "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+    run _hostinger_reapply_gitops_applicationsets
+    [ "$status" = 1 ]
+    if (( lookup_rc == 2 )); then
+      [[ "$output" == *"pin branch cve-pins/hub not found (exit 2)"* ]]
+    else
+      [[ "$output" == *"[k3s-hostinger] Refusing to apply services-git.yaml: pin branch lookup failed (rc $lookup_rc)"* ]]
+    fi
+    for other in data-git platform-helm istio-ambient hostinger-cve-inventory-reader; do
+      grep -q "name: $other" "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+    done
+    run grep -q 'name: services-git' "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+    [ "$status" = 1 ]
+  done
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {

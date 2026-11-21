@@ -109,12 +109,15 @@ deliberately for Enforce on a solo-operated fleet.
 
 The Hub CVE promoter (`scripts/etc/argocd/platform-ops/app-cve-scan.sh`, CronJob
 `app-cve-scan`) runs `cosign verify --key <our pub>` on a clean `sha-*` candidate
-digest **before** it pins that digest into the ArgoCD Application. An unverifiable
+digest **before** it writes that digest to `cve-pins/hub`. The `services-git` template applies the pin. An unverifiable
 candidate is not a promotable candidate: the promoter skips it, notifies
 (`App CVE Promotion Blocked (unsigned)`), and moves on — **fail-closed**. This keeps
 the promoter and Kyverno admission agreeing on what "signed" means (key-based,
 `--insecure-ignore-tlog=true`, mirroring the ClusterPolicy's `rekor.ignoreTlog: true`)
 so a promotion can never dead-end at admission on an unsigned image.
+
+Run `make app-cve-scan` after each `hub-promote` that changes a service image so
+the promoter can prune a stale CVE pin against the newly promoted base digest.
 
 The public key reaches the CronJob via an ESO `ExternalSecret`
 (`cosign-pub-externalsecret.yaml`) projecting Hub Vault `cosign/signing` → Secret
