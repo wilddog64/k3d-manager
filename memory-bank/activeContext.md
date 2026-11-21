@@ -1,15 +1,18 @@
-## Handoff — 2026-11-21 12:20 PST (20:20Z) — memory compressed before /clear; 2c and web-console C wait for Claude — START HERE
+## Handoff — 2026-11-21 11:55 PST (19:55Z) — memory compressed before /clear; 2c and web-console C wait for Claude — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
-**Session update 2026-11-21 12:05 PST:**
+**Session update 2026-11-21 11:55 PST:**
 - 2c: all 12 resume-8 items verified present in the wip; rebased onto release head → task HEAD `4adcb0e2` (backup tag
   `backup/2c-pre-rebase-419b34c1`); Makefile merge additive; pytest 89/89, bats 9/9, shellcheck clean. Independent Sonnet
   verifier (Acceptance only, mutants in scratch) running.
 - web-console C: static gates pass, suites green (14 pytest, 7 bats), but coverage is far short of E2-E8 (no real-pty/
   scratch-tmux gate tests, E8 installer fixture absent, no mutants). Operator chose Codex astra: Flash run committed
   `567faa63` (tag `backup/web-console-c-flash-run1`), agy slug abandoned, plan gained `## Handover (run 2, Codex)` (`d17e565b`),
-  new dispatch `web-console-c-totp-gate-r2` (gpt-6.2-astra) started 12:18 PST. Codex cannot commit: Claude commits on exit.
+  new dispatch `web-console-c-totp-gate-r2` (gpt-6.2-astra). Run 1 stopped on a real spec hole (uninstall 7.2 vs 7.6/M9 when
+  bootout fails); spec fixed `790afd26`, resumed (resume 2, clarification). Codex cannot commit: Claude commits on exit.
+- Intents approved (operator 2026-11-21): password-bundle Keychain P3 and red-team gate (`20a6580f`). P3 dispatched as
+  `password-bundle-keychain-next-step` (Codex astra). WIP 3 of 3: 2c (verifier running), C-r2, P3.
 
 **State at handoff:**
 - Branch `k3d-manager-v1.45.0`, everything pushed. Hub `deploy/hub` = `42176488` (2026-11-21 08:16 PST); commits after it
