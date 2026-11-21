@@ -1,1 +1,10 @@
-{"v":1,"cvePins":{}}
+{
+  "v": 1,
+  "cvePins": {
+    "shopping-cart-frontend": {
+      "digest": "sha256:97d0b172db3bfeaaabb8e4d75b6183369be87d080b2f3d564779b38b2f7fe18c",
+      "base": "sha256:97d0b172db3bfeaaabb8e4d75b6183369be87d080b2f3d564779b38b2f7fe18c",
+      "at": "2026-11-21T15:12:45Z"
+    }
+  }
+}
