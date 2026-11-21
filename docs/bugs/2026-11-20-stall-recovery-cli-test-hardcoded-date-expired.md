@@ -5,10 +5,10 @@
 **Introduced by:** 46ec5b36 (Release v1.44.0)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-20 (intent approval E1–E4, then dispatch to Flash)
+**Waiting on:** fix running — since 2026-11-20
 **Prior art:** exact-slug glob none; grep for the test name and `1794614401` in docs/bugs and docs/issues none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4)
 **Approval:** operator, 2026-11-20: dispatch to Flash ("send to Flash"). P1, so it may exceed the WIP limit. Target branch `k3d-manager-v1.45.0`.
-**Intent approved:** pending (E1–E4 below)
+**Intent approved:** operator, 2026-11-20
 
 ## Symptom
 
