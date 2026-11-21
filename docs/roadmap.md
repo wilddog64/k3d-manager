@@ -639,6 +639,8 @@ cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
 [`v1.46.0-bug-lifecycle-dashboard.md`](plans/v1.46.0-bug-lifecycle-dashboard.md) was folded into
 v1.43.0 and is superseded. v1.46.0 is at its five-plan cap.
 
+**v1.46.0 plan 6 (cap exception, operator 2026-11-21: "can we add iPad air ssh plan into v1.46.0 as an extra one. I consider it as part of travel bundle"):** `v1.46.0-travel-bundle-ipad-ssh.md` (spec to be written). The iPad Air reaches service passwords as a travel-bundle client without holding a decryption key: an iOS SSH client logs in to the M4's web-console sshd (v1.45.0 plan 4: part A console sshd, part B Cloudflare Access, part C TOTP gate) and runs `show-service-passwords` there. Depends on v1.45.0 plan 4 parts B and C landing and live-verifying; critical (internet-facing interactive path), so dispatch needs the operator's go. Source: `docs/ideas.md` row 2026-11-21 (service-password access from non-macOS devices).
+
 ### Candidate milestone — v1.47.0
 
 **Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.47.0`, cut from

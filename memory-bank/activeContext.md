@@ -192,3 +192,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-21: captured P3 docs/bugs/2026-11-21-hermes-e2e-pass-line-hides-skipped.md (operator: PASS 89/102 cannot tell skipped vs failed).
 - 2026-11-21: web-console C dispatched to agy gemini-3.8-flash-medium (operator go + v5 intent re-approval). WIP 2: 2c (Astra resume 8), C.
 - 2026-11-21: ideas.md +4 rows from mattpocock/skills (live-check wizards, decision-frontier grilling, feedback-loop-first bugfix, agent-doc pruning); nothing installed.
+- 2026-11-21: v1.46.0 plan 6 (cap exception, operator): travel-bundle iPad SSH via web-console (spec to be written; depends on v1.45.0 plan 4 B+C). Bug-lifecycle dashboard plan already SUPERSEDED (folded into v1.43.0); lifecycle metrics plan carries the Lifecycle row.
