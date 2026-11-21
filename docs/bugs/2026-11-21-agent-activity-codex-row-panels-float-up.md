@@ -5,7 +5,7 @@
 **Introduced by:** bd5e4828 (plan-quotas-beside-fable rev 1 removed panels 50–52 and 113–115 from the Codex row's top band)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** no (independent Sonnet verifier from Acceptance only; no Argon or Fable review recorded in the spec)
-**Waiting on:** dispatch — since 2026-11-21
+**Waiting on:** fix running — since 2026-11-21
 **Prior art:** exact-slug glob none; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-21); `ls docs/bugs | grep -iE 'float|codex-row|activity.*layout|gridpos|compact'` found only kine-compaction and image-tag docs — read titles, different root cause
 **Approval:** operator, 2026-11-21: "go with you suggestion" — file as a P3 bug and fix inside v1.45.0 (it corrects a layout this release broke), no triage wait; dispatch to Codex. The daily-bar feature asked at the same time went to `docs/ideas.md`.
 **Intent approved:** operator, 2026-11-21
