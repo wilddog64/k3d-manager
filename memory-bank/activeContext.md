@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 15:05 PST (23:05Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 15:20 PST (23:20Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -27,7 +27,10 @@
 - Flash audit done (`scratchpad/flash-audit/tree/AUDIT.md`): 38 covered / 2 weak (M11, E9 doc greps) / 2 none
   (E10, E11 are live, expected). Docs drift: #1 false; #2 (rotate-pending → purge advice) and #3 (exit 8 "naming
   the path") real. Luna resume 6 RUNNING (`resume-6.md`): 23 survivors with exact mutation strings + 2 doc fixes.
-  Verifier still running (134/168); late survivors → resume 7.
+  Verifier DONE: 162/168 run; clean tree 126 pytest / 25 bats; main checkout clean. Late survivors C3 (secret to temp
+  file, security), G25, G35, B18 + 4 impl-vs-contract notes (tmux env 6 keys vs five, uninstall two commits vs one,
+  --tmux symlink unresolved, E2 case 1 sequential) queued in `resume-7.md` for after Luna exits. Not run: B27 B30 B33
+  B36 B39 G8 → Claude runs them on the final tree. D13 was a no-op mutant (ignore).
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
