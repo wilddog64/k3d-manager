@@ -1,11 +1,12 @@
 # Bug: Codex quota panels show "No data" when the newest rate-limit record is a `premium` one
 
-**Status:** VERIFIED — landed d4d0f5d8 on k3d-manager-v1.45.0 (2026-11-21); offline E1-E3 and live dry-run E4 pass; dashboard screenshot owed
+**Status:** LIVE-VERIFIED — landed d4d0f5d8; offline E1-E3 and live E4 pass (2026-11-21)
+**Fix commit:** d4d0f5d8
+**Live evidence:** 2026-11-21 · run grafana-screenshot-0221Z · env hub-grafana · scenario codex-quota-panels-premium-newest · commit d4d0f5d8 · proves E4
 **Priority:** P2 (operator, 2026-11-20: "this should be a P2 because it originally had data but now disappears. I need to know claude and codex quota, especially codex as I didn't open its cli"); the quota panels go blank while the reading-age panel still counts, workaround: Codex `/status` or the session file
 **Introduced by:** pre-existing (the exporter assumes one rate-limit record shape)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-21
 **Prior art:** exact-slug glob none; `make find-similar-docs` not run (unavailable on the M4 today, see the 2026-11-20 priv_open bug); grep for `rate_limits|k3dm_codex_quota` hit `docs/bugs/2026-11-07-claude-plan-quota-not-exported.md` and `docs/bugs/2026-11-14-quota-efficiency-panels-compare-only-last-two-readings.md` — titles read, different root cause (Claude quota export; panel comparison window)
 **Approval:** operator, 2026-11-20: P2s are Claude's to finish, no grooming wait; dispatch to Flash. Operator OK to exceed the WIP limit as a 4th dispatch (2026-11-20, "go ahead to send codex quota fix to flash"). Target branch `k3d-manager-v1.45.0` (fix inside the open release, not a patch release).
 **Intent approved:** operator, 2026-11-20
@@ -177,4 +178,4 @@ interface:
 - Live E4 (m4-air, 2026-11-21 02:00Z, main checkout at d4d0f5d8): newest Codex rate_limits record is limit_id "premium",
   primary null. `bin/k3dm-dispatch-metrics --dry-run` prints `k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 1.0`
   and `{limit="secondary",window_minutes="10080"} 0.16`, matching the real windows.
-- Owed: Grafana Codex quota panels screenshot after the next 15-minute LaunchAgent push (operator or Claude).
+- Live E4 PASS (operator screenshot, hub Grafana, 2026-11-21): Codex weekly quota used 16%, Codex 5h quota used 100%, quota reading age 1.81 h (the age of the last real Codex record; no Codex runs since). Matches the dry run. The Codex active hours panel was empty in the same screenshot; not part of this bug.
