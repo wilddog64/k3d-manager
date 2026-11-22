@@ -136,6 +136,8 @@ M5 mutants go red. Two gaps:
   is `owner/bad"name`, one with `owner/has space`, and one with a 65-character name; each must report `other`. Pair them
   with a positive control.
 
+Intents E7 and E8 approved: operator, 2026-11-21 ("intents approved").
+
 ```yaml
 must:
   - M8: a second metrics run with no DB change copies and opens no conversation DB (count sqlite3.connect / copy calls), and reports the same labels as the first run
