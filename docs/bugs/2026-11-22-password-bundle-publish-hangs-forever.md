@@ -1,12 +1,12 @@
 # Bug: password-bundle publish can hang forever and silently stop every later run
 
-**Status:** OPEN â filed 2026-11-22
+**Status:** LANDED — `e3f2bcaf` 2026-11-22 (gpt-6-luna; verified offline by Claude)
 **Priority:** P2
 **Introduced by:** ddd9329e (travel bundle, v1.45.0 plan 2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running â since 2026-11-22
-**Prior art:** `docs/bugs/2026-11-22-test-all-failures-not-attributable-to-host.md` (slug grep, not scored) â read, different root cause; `make find-similar-docs` not run (vector store unreachable from m4-air).
+**Waiting on:** live check — since 2026-11-22 (E6 after `make hub-deploy`)
+**Prior art:** `docs/bugs/2026-11-22-test-all-failures-not-attributable-to-host.md` (slug grep, not scored) — read, different root cause; `make find-similar-docs` not run (vector store unreachable from m4-air).
 **Approval:** operator, 2026-11-22: "go ahead to file a P2 bug then dispatch to Luna" (dispatch without waiting for triage); Fable spec review requested by the operator, folded in (rev 2).
 **Intent approved:** operator, 2026-11-22
 Intents approved for rev 2, E1-E6 ("Approve, dispatch + investigate").
@@ -30,10 +30,10 @@ after it was skipped, and the stale alert (no successful publish for 2 h) fired.
 
 `launchctl kickstart -k` killed 88191 (last exit -15) and started PID 7460, which hung at once:
 
-- Process tree: `bash 7460` â `bash 7521` â `git 7524`, all state S, over 1:38 elapsed.
+- Process tree: `bash 7460` → `bash 7521` → `git 7524`, all state S, over 1:38 elapsed.
 - `git 7524` is `git -C "$HOME/Library/Mobile Documents/com~apple~CloudDocs/k3dm/password-bundle" rev-parse --is-inside-work-tree`
   (`scripts/plugins/password_bundle.sh:141`), Homebrew git 2.56.1, cwd the iCloud delivery folder.
-- `sample 7524`: `cmd_rev_parse` â `setup_git_directory_gently` â `strbuf_getcwd` â `__getcwd` â `open$NOCANCEL`
+- `sample 7524`: `cmd_rev_parse` → `setup_git_directory_gently` → `strbuf_getcwd` → `__getcwd` → `open$NOCANCEL`
   (blocked in the kernel).
 
 The same line returns at once from the operator's Terminal. When launchd runs the job, opening paths in iCloud Drive
