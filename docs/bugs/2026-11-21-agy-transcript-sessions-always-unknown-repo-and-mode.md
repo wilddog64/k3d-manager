@@ -3,7 +3,7 @@
 **Status:** OPEN — filed 2026-11-21; dispatched to Flash on operator instruction
 **Priority:** P3
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** fix running — since 2026-11-21
+**Waiting on:** fix running — since 2026-11-21 (resume 1 for review findings R1, R2)
 **Introduced by:** `b44f5efd` (fix for `docs/bugs/2026-11-04-agy-activity-no-data-local-ledger-coverage.md`, landed in v1.43.14)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
@@ -119,3 +119,30 @@ a real DB enters the repo); put a comment naming host `m4-air`, date 2026-11-21,
 sits under `tmp_path` (scratch HOME, `K3DM_AGY_BRAIN_DIR` pointed there). Pair the N1/N5 tests with a positive control (the
 same fixture with a good DB reports the real repo). Every `must_not` must be red on `b44f5efd`'s behaviour or on a naive
 reader (`SELECT *`, `?mode=ro` on the original path, label = full `owner/repo`).
+
+## Review findings (Claude, 2026-11-21, resume 1)
+
+Flash's run 1 meets E1–E5 (pytest 233/233). Mutation check in a scratch copy: N1, N2, N4 (full `owner/repo`), N5, M4 and
+M5 mutants go red. Two gaps:
+
+- **R1 (cost).** Every metrics run (15 min) copies the DB of every session in the 30 d window. On m4-air on 2026-11-21 that
+  was 300 DBs and 547 MB, about 50 GB of copying a day. Cache the result per session in
+  `~/.local/share/k3d-manager/agy-usage/repo-cache.json`, beside `--claude-cache`, with a new `--agy-repo-cache` argument.
+  The key is `session_id`, the value is `{repo, db_mtime_ns, db_size, wal_mtime_ns, wal_size}`. Copy and read the DB only
+  when the key is missing or one of those stat values changed. Drop entries for sessions outside the 30 d set. If the cache
+  is missing, corrupt or unwritable, rebuild it in memory and keep going. Write it atomically (temp file plus
+  `os.replace`, mode 0600). The file holds only bare repo names, never paths or owners.
+- **R2 (test gap).** With the `[A-Za-z0-9._-]{1,64}` allowlist removed, every test stays green. Add a fixture whose 1.3.1
+  is `owner/bad"name`, one with `owner/has space`, and one with a 65-character name; each must report `other`. Pair them
+  with a positive control.
+
+```yaml
+must:
+  - M8: a second metrics run with no DB change copies and opens no conversation DB (count sqlite3.connect / copy calls), and reports the same labels as the first run
+  - M9: changing one session's DB (mtime or size) makes only that session be re-read
+must_not:
+  - N6: put a repo label that fails [A-Za-z0-9._-]{1,64} into any series, or into the cache file
+evidence:
+  - E7: {proves: [M8, M9], offline: true, intent: "the metrics job reads agy's databases once and then only the ones that changed, instead of copying about half a gigabyte every 15 minutes"}
+  - E8: {proves: [N6], offline: true, intent: "a repo name with quotes, spaces or excess length shows as other and cannot break the metrics output"}
+```
