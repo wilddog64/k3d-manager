@@ -18,6 +18,8 @@
 
 ## Log
 
+- 2026-11-22: order CI spec Fable-reviewed and approved; Luna dispatched (`order-ci-workflow-dispatch`); 2b resume 4 verified 71/71, resume 5 running; restart-webhook P3 captured.
+
 - 2026-11-22: promoted aa920a6f + relay d6a3ac28; Hostinger-status LIVE-VERIFIED; reauth E2 partial; P2 filed hub-deploy-leaves-webhook-on-stale-code.
 - 2026-11-22: v1.46.0 cut to 5 (bounded-index, bug-lifecycle-metrics → backlog, operator); istio-ambient P3 → v1.46.0; CI green aa920a6f.
 - 2026-11-22: CI reds fixed `aa920a6f`; kagent idea; P2 filed: istio-ambient ApplicationSet targets retired ubuntu-k3s, Hostinger Istio unmanaged by Argo.

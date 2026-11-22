@@ -1,3 +1,15 @@
+## Update — 2026-11-22 ~15:30 PST — order CI fix dispatched; 2b resume 5 running
+
+- Order CI (`docs/bugs/2026-11-22-order-ci-missing-workflow-dispatch.md`): operator chose "Fix now", route
+  "Spec + Luna" (shopping-cart rule: no direct Claude edits). Fable spec review: needs changes, 5 should-fix + 2 nits,
+  all applied (`7cf17dce`). Intents approved by operator. Base branch `fix/cve-manual-rebuild` created on order origin
+  at `00c9fcd` (dispatcher refuses `--branch main`). Luna dispatched, slug `order-ci-workflow-dispatch`. Next: verify
+  E1/E2 in the worktree, push, normal PR, blind Argon review, operator merges, Claude checks E3. Do not `land` into
+  the order checkout (it is on `fix/automerge-app-token`).
+- 2b: Claude's independent run of resume 4 = `hub_promote.bats` 71/71, shellcheck 0. Resume 5 (E4, sudo/launchctl
+  guards, table) running; watcher armed.
+- Restart-webhook transient-error P3 filed (`d576c5c9`). E6 sampler still running to ~15:41.
+
 ## Handoff — 2026-11-22 14:47 PST — promoted aa920a6f; Hostinger LIVE-VERIFIED; E6 sampling — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
