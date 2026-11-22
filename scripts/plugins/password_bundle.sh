@@ -12,7 +12,7 @@ _password_bundle_metrics() {
   [[ -r "$PB_STATE/last-publish" ]] && read -r now < "$PB_STATE/last-publish"
   if [[ "$success" == 1 ]]; then now="$( _run_command --no-exit -- date +%s)"; printf '%s\n' "$now" > "$PB_STATE/last-publish"; fi
   body="$(printf 'k3dm_password_bundle_publish_success %s\nk3dm_password_bundle_last_publish_timestamp %s\nk3dm_password_bundle_last_change_timestamp %s\nk3dm_password_bundle_recipients %s\n' "$success" "$now" "$change" "$count")"
-  printf '%s\n' "$body" | _run_command --no-exit --quiet -- curl --fail -sS -X POST --data-binary @- "${K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-password-bundle}" >/dev/null 2>&1 || true
+  printf '%s\n' "$body" | _run_command --no-exit --quiet -- curl --max-time 10 --fail -sS -X POST --data-binary @- "${K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-password-bundle}" >/dev/null 2>&1 || true
 }
 
 _password_bundle_read_identity() {
@@ -123,7 +123,7 @@ function password_bundle_remove_recipient() { (
   FORCE=1 password_bundle_publish
 ) }
 
-function password_bundle_publish() { (
+function _password_bundle_publish_inner() { (
   set +x
   local payload hash old='' change=0 count=0 name key extra tmp meta stamp host
   local -a args=() names=()
@@ -157,6 +157,77 @@ function password_bundle_publish() { (
   printf '%s\n' "$hash" > "$PB_STATE/last.sha256"
   change="$( _run_command --no-exit -- date +%s)"; printf '%s\n' "$change" > "$PB_STATE/last-change"
   _password_bundle_metrics 1 "$change" "$count"
+) }
+
+function _password_bundle_cleanup_temps() {
+  _run_command --no-exit --quiet -- perl -e '
+    use strict; use warnings; use POSIX qw(:sys_wait_h);
+    my ($dir) = @ARGV;
+    my $pid = fork(); exit 0 unless defined $pid;
+    if ($pid == 0) {
+      setpgrp(0, 0) or exit 1;
+      unlink glob "$dir/.service-passwords.*.??????";
+      exit 0;
+    }
+    my $stage = 0;
+    local $SIG{ALRM} = sub {
+      if (!$stage++) { kill "TERM", -$pid; alarm 1; }
+      else { kill "KILL", -$pid; }
+    };
+    alarm 1;
+    while (waitpid($pid, 0) < 0 && $!{EINTR}) { }
+    alarm 0;
+    if ($stage) { kill "KILL", -$pid; waitpid($pid, 0); }
+    exit 0;
+  ' "$1" >/dev/null 2>&1 || true
+}
+
+function password_bundle_publish() { (
+  set +x
+  local change=0 count=0 limit plugin_path rc
+  _password_bundle_paths
+  [[ -r "$PB_STATE/last-change" ]] && read -r change < "$PB_STATE/last-change"
+  if [[ -r "$PB_STATE/recipients" ]]; then
+    while IFS= read -r _; do count=$((count + 1)); done < "$PB_STATE/recipients"
+  fi
+  limit="${K3DM_PASSWORD_BUNDLE_TIMEOUT:-300}"
+  if [[ ! "$limit" =~ ^[1-9][0-9]{0,4}$ ]]; then
+    echo 'Invalid K3DM_PASSWORD_BUNDLE_TIMEOUT; using 300 seconds.' >&2
+    limit=300
+  fi
+  plugin_path="${BASH_SOURCE[0]}"
+  _run_command --no-exit -- perl -e '
+    use strict; use warnings; use POSIX qw(:sys_wait_h);
+    my ($seconds, $plugin) = @ARGV;
+    my $pid = fork(); die "fork: $!" unless defined $pid;
+    if ($pid == 0) {
+      setpgrp(0, 0) or die "setpgrp: $!";
+      exec "bash", "-c", q{source "${1%/*}/../lib/system.sh"; source "$1"; _password_bundle_publish_inner}, "password-bundle", $plugin;
+      die "exec: $!";
+    }
+    my $timed_out = 0;
+    my $grace = 0;
+    local $SIG{ALRM} = sub {
+      if (!$grace) { $timed_out = 1; $grace = 1; kill "TERM", -$pid; alarm 5; }
+      else { kill "KILL", -$pid; }
+    };
+    local $SIG{TERM} = sub { $timed_out = 1; $grace = 1; kill "TERM", -$pid; alarm 5; };
+    alarm $seconds;
+    while (waitpid($pid, 0) < 0 && $!{EINTR}) { }
+    my $status = $?;
+    alarm 0;
+    if ($timed_out) { kill "KILL", -$pid; waitpid($pid, 0); exit 124; }
+    exit($status >> 8) if WIFEXITED($status);
+    exit(128 + WTERMSIG($status)) if WIFSIGNALED($status);
+    exit 1;
+  ' "$limit" "$plugin_path"
+  rc=$?
+  if (( rc == 124 )); then
+    _password_bundle_cleanup_temps "$PB_DIR"
+    _password_bundle_metrics 0 "$change" "$count"
+    return 1
+  fi
+  return "$rc"
 ) }
 
 function password_bundle_show() { (

@@ -1,11 +1,12 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
+export BATS_TEST_TIMEOUT=30
 
 setup() {
   export HOME="$BATS_TEST_TMPDIR/home" K3DM_PASSWORD_BUNDLE_STATE_DIR="$BATS_TEST_TMPDIR/state" K3DM_PASSWORD_BUNDLE_DIR="$BATS_TEST_TMPDIR/delivery" K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL=http://127.0.0.1:9
   [[ "$HOME" == "$BATS_TEST_TMPDIR/"* && "$K3DM_PASSWORD_BUNDLE_STATE_DIR" == "$BATS_TEST_TMPDIR/"* && "$K3DM_PASSWORD_BUNDLE_DIR" == "$BATS_TEST_TMPDIR/"* && "$K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
   mkdir -p "$HOME" "$K3DM_PASSWORD_BUNDLE_STATE_DIR" "$K3DM_PASSWORD_BUNDLE_DIR" "$BATS_TEST_TMPDIR/bin"
-  export REAL_MAKE="$(command -v make)" REAL_AGE="$(command -v age)" REAL_AGE_KEYGEN="$(command -v age-keygen)" REAL_MV="$(command -v mv)" TEST_ARGV_LOG="$BATS_TEST_TMPDIR/home/argv.log"
+  export REAL_MAKE="$(command -v make)" REAL_CURL="$(command -v curl)" REAL_AGE="$(command -v age)" REAL_AGE_KEYGEN="$(command -v age-keygen)" REAL_MV="$(command -v mv)" TEST_ARGV_LOG="$BATS_TEST_TMPDIR/home/argv.log"
   export PATH="$BATS_TEST_TMPDIR/bin:$PATH" SCRIPT_DIR="$BATS_TEST_DIRNAME/../.."
   export TEST_ID="$(age-keygen 2>/dev/null | tail -1)" TEST_ID2="$(age-keygen 2>/dev/null | tail -1)"
   KEY1="$(printf '%s\n' "$TEST_ID" | age-keygen -y)"; KEY2="$(printf '%s\n' "$TEST_ID2" | age-keygen -y)"
@@ -14,6 +15,14 @@ setup() {
 [[ "${TEST_FAIL:-0}" != 1 ]] || exit 1
 printf '%s\n' "${TEST_PASSWORD:-password-sentinel}"
 STUB
+  cat > "$BATS_TEST_TMPDIR/bin/curl" <<'STUB'
+#!/bin/bash
+[[ "$*" == *"--max-time 10"* ]] || exit 92
+[[ "${TEST_REAL_CURL:-0}" != 1 ]] || exec "$REAL_CURL" "$@"
+cat > "$TEST_PUSH_BODY"
+exit 0
+STUB
+  export TEST_PUSH_BODY="$BATS_TEST_TMPDIR/push-body"
   export TEST_REQUEST="$BATS_TEST_TMPDIR/request" TEST_RESPONSE="$BATS_TEST_TMPDIR/response"
   mkfifo "$TEST_REQUEST" "$TEST_RESPONSE"
   (
@@ -81,7 +90,16 @@ STUB
   [[ ! -f "$SCRIPT_DIR/plugins/password_bundle.sh" ]] || source "$SCRIPT_DIR/plugins/password_bundle.sh"
 }
 
-teardown() { kill "$TEST_SERVER_PID" 2>/dev/null || true; wait "$TEST_SERVER_PID" 2>/dev/null || true; }
+teardown() {
+  kill "$TEST_SERVER_PID" 2>/dev/null || true
+  wait "$TEST_SERVER_PID" 2>/dev/null || true
+  for pid_file in "${TEST_CHILD_TERM:-}" "${TEST_CHILD_NORMAL:-}"; do
+    if [[ -n "$pid_file" && -r "$pid_file" ]]; then
+      read -r child_pid < "$pid_file"
+      kill -KILL "$child_pid" 2>/dev/null || true
+    fi
+  done
+}
 
 add() { NAME="$1" KEY="$2" password_bundle_add_recipient; }
 as_mac_host() {
@@ -351,4 +369,170 @@ PY
   [ "$status" -eq 1 ]; [[ "$output" == *'Could not unlock the login Keychain.'* ]]
   [ "$(rg -c '^security <unlock-keychain>' "$TEST_ARGV_LOG")" = 1 ]
   [ "$(rg -c '^security <find-generic-password>' "$TEST_ARGV_LOG")" = 1 ]
+}
+
+
+@test 'M1 M2 N1 N2 N3 a hanging payload is bounded, reported, private, and reaped' {
+  add one "$KEY1"
+  printf 'unchanged-hash\n' > "$K3DM_PASSWORD_BUNDLE_STATE_DIR/last.sha256"
+  printf '12345\n' > "$K3DM_PASSWORD_BUNDLE_STATE_DIR/last-publish"
+  cat > "$BATS_TEST_TMPDIR/bin/make" <<'STUB'
+#!/bin/bash
+printf 'unique-payload-secret-marker\n'
+(trap '' TERM; exec sleep 3600) & echo "$!" > "$TEST_CHILD_TERM"
+(exec sleep 3600) & echo "$!" > "$TEST_CHILD_NORMAL"
+sleep 3600
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/make"
+  export TEST_CHILD_TERM="$BATS_TEST_TMPDIR/term-child.pid" TEST_CHILD_NORMAL="$BATS_TEST_TMPDIR/normal-child.pid" K3DM_PASSWORD_BUNDLE_TIMEOUT=2
+  before="$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/last-publish")"
+  start="$SECONDS"
+  perl - "$SCRIPT_DIR" <<'PERL' > "$BATS_TEST_TMPDIR/publish.stdout" 2> "$BATS_TEST_TMPDIR/publish.stderr" &
+use strict; use warnings; use POSIX qw(:sys_wait_h);
+my ($script_dir) = @ARGV;
+my $pid = fork(); die "fork: $!" unless defined $pid;
+if ($pid == 0) {
+  setpgrp(0, 0) or die "setpgrp: $!";
+  exec "bash", "-c", 'source "$1/lib/system.sh"; source "$1/plugins/password_bundle.sh"; password_bundle_publish', "publish-harness", $script_dir;
+  die "exec: $!";
+}
+my $timed_out = 0;
+local $SIG{ALRM} = sub { $timed_out = 1; kill "KILL", -$pid; };
+alarm 20;
+while (waitpid($pid, 0) < 0 && $!{EINTR}) { }
+my $status = $?;
+alarm 0;
+if ($timed_out) { kill "KILL", -$pid; waitpid($pid, 0); exit 124; }
+exit($status >> 8) if WIFEXITED($status);
+exit(128 + WTERMSIG($status)) if WIFSIGNALED($status);
+exit 1;
+PERL
+  publish_pid=$!
+  for _ in {1..20}; do
+    [ -s "$TEST_CHILD_TERM" ] && [ -s "$TEST_CHILD_NORMAL" ] && break
+    sleep 0.05
+  done
+  [ -s "$TEST_CHILD_TERM" ] && [ -s "$TEST_CHILD_NORMAL" ]
+  term_pid="$(cat "$TEST_CHILD_TERM")"; normal_pid="$(cat "$TEST_CHILD_NORMAL")"
+  kill -0 "$term_pid" 2>/dev/null && kill -0 "$normal_pid" 2>/dev/null
+  sleep 0.1
+  kill -0 "$term_pid" 2>/dev/null && kill -0 "$normal_pid" 2>/dev/null
+  if wait "$publish_pid"; then publish_status=0; else publish_status=$?; fi
+  elapsed=$((SECONDS - start))
+  [ "$publish_status" -ne 0 ] && [ "$elapsed" -le "$((K3DM_PASSWORD_BUNDLE_TIMEOUT + 13))" ] || { echo "publish rc=$publish_status elapsed=${elapsed}s" >&2; false; }
+  [ -s "$TEST_PUSH_BODY" ] && rg -q '^k3dm_password_bundle_publish_success 0$' "$TEST_PUSH_BODY"
+  [ "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/last-publish")" = "$before" ]
+  [ "$(cat "$K3DM_PASSWORD_BUNDLE_STATE_DIR/last.sha256")" = unchanged-hash ]
+  for pid in "$term_pid" "$normal_pid"; do
+    for _ in {1..20}; do
+      state="$(ps -o stat= -p "$pid" 2>/dev/null || true)"
+      [[ -z "$state" || "$state" == Z* ]] && break
+      sleep 0.1
+    done
+    [[ -z "$state" || "$state" == Z* ]]
+  done
+  [[ "$(cat "$BATS_TEST_TMPDIR/publish.stdout" "$BATS_TEST_TMPDIR/publish.stderr")" != *unique-payload-secret-marker* ]]
+  run rg -l --fixed-strings unique-payload-secret-marker "$K3DM_PASSWORD_BUNDLE_DIR" "$K3DM_PASSWORD_BUNDLE_STATE_DIR"
+  [ "$status" -eq 1 ]
+}
+
+@test 'E2 a hanging delivery git check is bounded and reported' {
+  add one "$KEY1"
+  cat > "$BATS_TEST_TMPDIR/bin/git" <<'STUB'
+#!/bin/bash
+sleep 3600
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/git"
+  export K3DM_PASSWORD_BUNDLE_TIMEOUT=2
+  start="$SECONDS"
+  run password_bundle_publish
+  [ "$status" -ne 0 ] && [ "$((SECONDS - start))" -le 22 ]
+  rg -q '^k3dm_password_bundle_publish_success 0$' "$TEST_PUSH_BODY"
+}
+
+@test 'M4 bounded publish works without timeout or gtimeout in PATH' {
+  add one "$KEY1"
+  export K3DM_PASSWORD_BUNDLE_TIMEOUT=2
+  cat > "$BATS_TEST_TMPDIR/bin/make" <<'STUB'
+#!/bin/bash
+sleep 3600
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/make"
+  mkdir "$BATS_TEST_TMPDIR/limited-bin"
+  for tool in bash cat chmod date git make mkdir mktemp mv perl rm shasum sleep; do
+    path="$(command -v "$tool")"
+    [[ -n "$path" ]] && ln -s "$path" "$BATS_TEST_TMPDIR/limited-bin/$tool"
+  done
+  ln -s "$BATS_TEST_TMPDIR/bin/curl" "$BATS_TEST_TMPDIR/limited-bin/curl"
+  run env PATH="$BATS_TEST_TMPDIR/limited-bin" bash -c 'command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1'
+  [ "$status" -ne 0 ]
+  run env PATH="$BATS_TEST_TMPDIR/limited-bin" bash -c 'source "$SCRIPT_DIR/lib/system.sh"; source "$SCRIPT_DIR/plugins/password_bundle.sh"; password_bundle_publish'
+  [ "$status" -ne 0 ]
+}
+
+@test 'M3 metrics push has a fixed curl deadline' {
+  add one "$KEY1"
+  cat > "$BATS_TEST_TMPDIR/listener.py" <<'PY'
+import socket, sys, time
+listener = socket.socket()
+listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+listener.bind(("127.0.0.1", 0))
+listener.listen(1)
+open(sys.argv[1], "w").write(str(listener.getsockname()[1]))
+connection, _ = listener.accept()
+open(sys.argv[2], "w").write("accepted")
+time.sleep(20)
+connection.close()
+PY
+  python3 "$BATS_TEST_TMPDIR/listener.py" "$BATS_TEST_TMPDIR/port" "$BATS_TEST_TMPDIR/accepted" &
+  listener_pid=$!
+  for _ in {1..50}; do [ -s "$BATS_TEST_TMPDIR/port" ] && break; sleep 0.1; done
+  port="$(cat "$BATS_TEST_TMPDIR/port")"
+  export K3DM_PASSWORD_BUNDLE_PUSHGATEWAY_URL="http://127.0.0.1:$port/metrics" TEST_REAL_CURL=1
+  start="$SECONDS"
+  run password_bundle_publish
+  elapsed=$((SECONDS - start))
+  kill "$listener_pid" 2>/dev/null || true
+  wait "$listener_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ] && [ "$elapsed" -le 15 ]
+  [ -f "$BATS_TEST_TMPDIR/accepted" ]
+}
+
+@test 'M5 M6 fast publish keeps default limit and leaves no watchdog' {
+  add one "$KEY1"
+  start="$SECONDS"
+  password_bundle_publish
+  [ "$((SECONDS - start))" -le 10 ]
+  rg -q '^k3dm_password_bundle_publish_success 1$' "$TEST_PUSH_BODY"
+  [ -s "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age" ]
+  [ -s "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.meta" ]
+}
+
+@test 'invalid timeout falls back to 300 seconds with one stderr line' {
+  add one "$KEY1"
+  export K3DM_PASSWORD_BUNDLE_TIMEOUT=0
+  run --separate-stderr password_bundle_publish
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$stderr" | rg -c '^Invalid K3DM_PASSWORD_BUNDLE_TIMEOUT; using 300 seconds\.$')" = 1 ]
+}
+
+
+@test 'N3 payload stays private when encryption hangs after capture' {
+  add one "$KEY1"
+  export K3DM_PASSWORD_BUNDLE_TIMEOUT=2
+  cat > "$BATS_TEST_TMPDIR/bin/make" <<'STUB'
+#!/bin/bash
+printf 'captured-payload-secret-marker\n'
+STUB
+  cat > "$BATS_TEST_TMPDIR/bin/age" <<'STUB'
+#!/bin/bash
+sleep 3600
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/make" "$BATS_TEST_TMPDIR/bin/age"
+  run --separate-stderr password_bundle_publish
+  [ "$status" -ne 0 ]
+  rg -q '^k3dm_password_bundle_publish_success 0$' "$TEST_PUSH_BODY"
+  [[ "$output$stderr" != *captured-payload-secret-marker* ]]
+  run rg -l --fixed-strings captured-payload-secret-marker "$K3DM_PASSWORD_BUNDLE_DIR" "$K3DM_PASSWORD_BUNDLE_STATE_DIR"
+  [ "$status" -eq 1 ]
 }
