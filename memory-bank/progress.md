@@ -17,6 +17,8 @@
 
 ## Log
 
+- 2026-11-21: autoCompactWindow 400000 trial for the 1M window (`1ab308ef`, operator approved); void if Observed compaction point stays near 167K. CLAUDE.md/rules.md 200K wording corrected.
+
 - 2026-11-21: agy repo/mode P3 landed `1e237612` (Flash 3 runs; Claude mutation check 16/16 red; audit marker for 17 unknown->print assert rewrites).
 
 - 2026-11-21: five bug statuses corrected + Fix commit headers (`b8f1b19b`); Fix-commit recurrence on 2026-10-25 doc (`a985b682`, operator decision); Linux CI red fixed: password-bundle M6/N6/N7 assumed a Mac host (`4b8561af`, P3 doc, CI pending).
