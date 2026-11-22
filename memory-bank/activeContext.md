@@ -13,7 +13,11 @@
 - Ideas: subagent split of tests/bugs/plans (`5602590d`); WIP>3 measurement (`77df6447`): workers run 31% of the time,
   exit->land 6-7 min at 1-2 open vs 16 at 3; decision: try 4 in v1.46.0 after cheaper verification (operator agreed).
 - `make up APP=none` carried out of v1.45.0 to next `/release-groom` (operator "go ahead for that", `93fe6b62`).
-- v1.45.0 remaining: 2b + B (dispatch next), red-team gate, release PR. C live checks owed per spec (hub-deploy).
+- 2b DISPATCHED to Luna 2026-11-22 (ledger ts 1795378529; worktree `.../v1.45.0/remote-promote-2b-promote-wiring`).
+  Approval `f12bcc16`: hub risk go; land may use `--allow-instruction-files` for `.github/copilot-instructions.md` only.
+  Open dispatches 1 of 3. Web-console B is operator-run captures (not a dispatch).
+- v1.45.0 remaining: 2b verify + land, B captures (operator), red-team gate, release PR. C live check owed:
+  operator `make hub-sync` + `make hub-deploy REF=0a95e8ea` (or later head), then Claude read-only check.
 
 **Session update 2026-11-21 12:25 PST:**
 - 2c LANDED `c17eae59` (plan LANDED `32f05e79`, pushed). Resume 9 N1 fix verified by Claude: pytest 90/90, bats 9/9;
