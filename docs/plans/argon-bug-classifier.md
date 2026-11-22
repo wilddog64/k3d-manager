@@ -53,8 +53,9 @@ discards anything else (the doc stays a candidate and counts as a failed attempt
 **Quota guard** (before every doc, not only at run start). agy has no quota command and Google's limits are not
 stored locally, so the guard measures our own use: open each `~/.gemini/antigravity-cli/conversations/*.db`
 read-only (`file:<path>?mode=ro` URI) and read `gen_metadata` (one protobuf blob per model call). Inferred field map
-(proven 2026-11-12 on the M4, `docs/ideas.md:58`): `1.21` model display name (`Gemini 4 Argon (Medium)`), `1.4.1`
-input, `1.4.2` cached input, `1.4.3` output. Sum output tokens of Argon rows over the last 5 h and 7 d. The job never
+(proven 2026-11-12 on the M4, `docs/ideas.md:58`; corrected 2026-11-21, see `## Quota calibration evidence`): `1.21`
+model display name (`Gemini 4 Argon (Medium)`), `1.4.2` input, `1.4.3` output. The reader itself now comes from
+`docs/plans/agy-quota-dashboard.md` child A; this job imports it. Sum output tokens of Argon rows over the last 5 h and 7 d. The job never
 selects, reads or prints the `steps` table's blobs (they hold prompt text). Rules:
 1. Skip the run (exit 0, `skipped_reason=budget`) when 5 h or 7 d output tokens plus the per-doc estimate would pass
    `K3DM_CLASSIFY_BUDGET_5H` or `K3DM_CLASSIFY_BUDGET_7D`. The budgets already hold back the operator headroom: they

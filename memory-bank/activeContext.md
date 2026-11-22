@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 16:40 PST (00:40Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 17:00 PST (01:00Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -81,6 +81,7 @@ agy/Codex report green suites they did not run; worker cd failures can delete un
   symlink (ask before changing).
 
 ## Grooming 2026-11-22 agenda
+- New DRAFT `docs/plans/agy-quota-dashboard.md` (parent + Luna reader child + Flash dashboard child): place in backlog, approve intents, answer its 4 open questions (esp. which machines run agy). Note Argon API rate rises 2026-12-01 (price file single-rate).
 - Offline test-all P2 (`2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`): close C3/C4; C1/C2 → one P3 or close. agy usage reader + calibrated % gauge into argon-bug-classifier plan. hub_deploy.bats race P3: v1.45.0 or later (10-P3 cap).
 - Pull `docs/plans/v1.51.0-bug-count-query-translation.md` forward into the next open minor, displacing a not-started plan (operator 2026-11-17 "sounds good"); triage `docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md` with it.
 - Ideas rows 2026-11-17 (Task Forest): dispatch-ledger reconcile + review-child folding; one "needs you" view.
