@@ -78,6 +78,29 @@ agy 5h (est.)", "… weekly (est.)", "Argon weekly limit (est.)"; each gauge pai
 `docs/howto/agent-cost-dashboard.md` or the existing Agent Cost how-to (one section: what is exact, what is estimated, how to add
 a calibration point). Panel descriptions say "estimate from N calibration points, newest <date>; the agy panel is the truth".
 
+## Revision 2026-11-21 (evening): better source, and Agent Activity scope
+
+**Source.** The brain transcripts (`~/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript_full.jsonl`,
+already read by `_agy_metrics`, `bin/k3dm-dispatch-metrics:2356`) carry per step `created_at`, `model` and
+`input_tokens`/`cache_read_tokens`/`output_tokens` (key census on the M4, 2026-11-21: 490 transcripts; models
+`gemini-3.8-flash-medium`, `gemini-4-argon-medium`). Per-step timestamps remove the state-file timing above, so child A reads
+the transcripts first and uses the conversation DBs only to fill in a missing model name. Caveat: 1,248 of 1,932 token rows in
+a sample of 80 transcripts have `model`; the rest take the session's last named model, else `unknown`. Keys `content`,
+`thinking`, `tool_calls` hold prompt and reply text and are never read (same rule as N1).
+
+**Agent Activity.** The row "All agy activity (including outside the dispatcher)" already exists
+(`grafana-dashboard-agent-activity.yaml:899-1220`: sessions, untracked, active hours, by mode, untracked by repo, tokens) and
+gets data (pushed 2026-11-21: 121 sessions/7 d, 18.7M input, 3.1M output, 476M cache read). But the transcript branch labels
+every session `mode="unknown",repo="unknown"` (`:2427`), so the by-mode and by-repo bars show one bar. Child A also fills:
+- `mode`: `interactive` when the conversation id is in `~/.gemini/antigravity-cli/history.jsonl` (keys `workspace`,
+  `conversationId`, `timestamp`, `type` only; `display` holds the typed prompt and is never read), else `exec`.
+- `repo`: dispatched sessions from the ledger (session = conversation id, already matched for `untracked`); interactive from
+  history `workspace`; untracked exec sessions `unknown` (history covers only 4 of 490 conversations, all interactive). Open
+  question 5: whether `trajectory_metadata_blob` in the conversation DB holds the workspace (schema seen, contents not read).
+- new `k3dm_agy_tokens_by_repo{window,repo,kind}` and `k3dm_agy_tokens_by_model{window,model,kind}`; child B adds
+  "agy tokens by repo" and "agy tokens by model" bar gauges beside the existing "agy tokens" stat, like Codex "Tokens by repo"
+  (`:555`). The existing series keep their names and labels (readers `:916-1220`).
+
 ## Contract readers
 
 | Contract | Writer | Readers | Change |
@@ -136,3 +159,5 @@ does not wait for A.
    agree within 10%, then monthly.
 4. Whether cache reads count against the limit: point 1 cannot tell (cache reads 1.75M in the 5 h window). A second point with
    a different cache share will.
+5. Repo for untracked exec runs (ad-hoc Flash audits): probe `trajectory_metadata_blob` for a workspace path (path-shaped
+   strings only, from a copy), or accept `unknown`.
