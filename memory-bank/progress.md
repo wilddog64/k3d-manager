@@ -17,6 +17,7 @@
 
 ## Log
 
+- 2026-11-22: P2 land instruction-check fix: Luna exited 0; Claude verify PASS under sandbox-exec (codex_dispatch.bats 6/6, scope 13/13, shellcheck clean; pre-fix red on tests 2,3,5; guard mutants N1/N3/N4/untracked-N2 red). Committed in worktree `fcf96e0d`. Land blocked: GitHub SSH publickey refused (no SSH agent socket on m4; keychain?), waiting on operator. P3 captured: unstaged tracked instruction edit untested. tech-articles draft mutants-across-vendors on branch `docs/mutants-across-vendors` (`14381bf`).
 - 2026-11-22: ideas row: automated mutation testing tool (mutmut for Python, in-repo bash mutator; sandbox-exec + watcher + restore check built in; mutation score to Prometheus beside CRAP).
 - 2026-11-22: P2 dispatcher fix (land instruction check after rebase) spec + Acceptance written, intents approved (`755895c9`), dispatched to gpt-6-luna as `dispatch-land-instruction-check-rebase` (WIP 2/3). C r2 lands after it, no override (its E2).
 - 2026-11-22: ideas row: CRAP score per function with Grafana dashboard (Python slice first, bash via kcov after proof).
