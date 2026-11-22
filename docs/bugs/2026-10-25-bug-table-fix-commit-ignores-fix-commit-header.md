@@ -118,3 +118,18 @@ interface:
 - Do NOT push to the real Pushgateway; tests use `http://127.0.0.1:9`.
 - Do NOT change or remove existing tests or assertions.
 - Do NOT modify files outside the Files list.
+
+## Recurrence (2026-11-21)
+
+**Waiting on:** operator decision — since 2026-11-21
+
+The table did what F2 says, but the header was missing. On 2026-11-21 (operator screenshots 37-39), four of five v1.45.0
+rows showed the docs commit that flipped Status (`baf72fd1`, `3fb20578`, `0e08dac4`, `81633972`) because their docs had
+no `**Fix commit:**` header. Claude added the headers in `b8f1b19b`. Count on `k3d-manager-v1.45.0` at that time: 57
+LANDED, 97 VERIFIED and 36 LIVE-VERIFIED bug docs have no `**Fix commit:**` header, so the column is unreliable for
+roughly half the fixed rows.
+
+The cause is that nothing requires the header. `scripts/check-bug-status.py` (run by `.githooks/pre-commit`) checks the
+Status word but not the header. Proposed fix, for triage: when a commit changes a doc's Status from `OPEN` to `LANDED`,
+`VERIFIED` or `LIVE-VERIFIED`, the pre-commit check refuses it unless the doc has a `**Fix commit:**` header that parses
+(`doc_fix_commit`). Existing docs are not backfilled. P3, test and tooling only.
