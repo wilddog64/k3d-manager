@@ -40,6 +40,15 @@ The same line returns at once from the operator's Terminal. When launchd runs th
 blocks in the kernel. Why (a missing privacy grant for the launchd-run bash, or the iCloud file provider stalled) is not
 yet known. Runs before 02:01 succeeded, so something changed around then.
 
+Narrowed down (Claude, m5-air, 04:44-04:47, read-only):
+
+- Homebrew bash 5.3.20 was installed Oct 30 and git 2.56.1 on Nov 18, so no upgrade happened near 02:00.
+- `log show` (last 3 h) has no TCC events naming bash, git or k3d, and no `bird`/`fileproviderd` errors.
+- The m5 screen is locked (`CGSSessionScreenIsLocked` true). From the SSH session, with the screen still locked, the
+  same `git -C ... rev-parse --is-inside-work-tree` returns at once (rc 128, not a repo: the expected pass). So the
+  lock alone does not block it; the block is specific to the launchd job. Open hypothesis: a privacy prompt or grant
+  for the launchd-run process waiting on the locked screen. Next check: the operator unlocks m5 and looks for a dialog.
+
 ### Why nothing recovers
 
 Nothing in the publish path is time-limited:
