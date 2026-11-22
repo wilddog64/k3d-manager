@@ -1,6 +1,6 @@
 ## Update — 2026-11-22 ~15:20 PST — order PR #109 ready to merge; 2b resume 6 running
 
-- Order PR #109 (`227bbdbe`): Claude E1/E2 pass with red controls, blind Argon no findings, CI green (publish skipped on the PR). Waiting on the operator's merge, then E3.
+- Order PR #109 (`227bbdbe`): Claude E1/E2 pass with red controls, blind Argon no findings, CI green (publish skipped on the PR). Operator merged 2026-11-22 23:07Z (`428e60de`); bug LANDED; E3 owed after the 01:00 PT scan (dispatch run on main, build-push success, promote commit, no FAILED line).
 - 2b resume 5: 120/124. Rulings: 120 = script gap (`stop` must pass 75 at run-lock, promote, read-deploy-hub, read-promoted-ref per Behaviour 7); 116 test snapshot; 118 fixture needs `+` refspec; 34 G regression broken by the new guards. Resume 6 (correction) running, watcher armed.
 
 ## Update — 2026-11-22 ~15:30 PST — order CI fix dispatched; 2b resume 5 running

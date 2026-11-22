@@ -1,12 +1,12 @@
 # Bug: order CI cannot accept the scanner's rebuild dispatch
 
-**Status:** OPEN — captured 2026-11-22; triaged 2026-11-22 (operator: fix now, spec + Luna)
+**Status:** LANDED — order PR #109 merged 2026-11-22 23:07Z (`428e60de`); E3 live check owed (next app-cve-scan, 01:00 PT)
 **Priority:** P2
 **Introduced by:** pre-existing (order's `ci.yml` has never had a `workflow_dispatch` trigger)
 **Should have been caught by:** spec — the 2026-10-27 product-catalog fix covered one repository and did not check the other app repositories
 **Introducing change reviewed:** unknown
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Automated CVE rebuild dispatches for `shopping-cart-order` always fail and wipe its build cache because `.github/workflows/ci.yml` lacks `workflow_dispatch`, requiring a manual push to `main`.)
-**Waiting on:** operator decision — since 2026-11-22 (merge order PR #109)
+**Waiting on:** scheduled run — since 2026-11-22 (app-cve-scan 01:00 PT dispatches the rebuild)
 **Triage:** patch → fix now in `wilddog64/shopping-cart-order` (operator 2026-11-22: "Fix now"; route "Spec + Luna"). The optional k3d-manager scanner part (Fix direction 2) carries to v1.46.0 as P3.
 **Spec reviewed:** Fable 2026-11-22 (needs changes: 5 should-fix, 2 nits, all applied)
 **Intent approved:** operator, 2026-11-22
