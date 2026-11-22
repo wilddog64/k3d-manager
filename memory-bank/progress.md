@@ -12,7 +12,7 @@
 - **Open dispatches:** web-console C r2 (168-mutant rerun: 158 red, G8 hang, 5 survivors; guarded B27 reached real sudo prompt again 2026-11-22, killed, no harm; Luna resume 8 running: suite-local sudo/launchctl stubs + B27/B34/B39/G9b/D40/G8 tests); agy-repo-mode P3 LANDED `1e237612` (244/244; mutants all red after resume 2 added WAL/size/cache-allowlist tests); live E6-E8 owed after hub-deploy.
 - **Not started:** 2b promote wiring, web-console B (both unblocked by 2c), red-team gate (intents approved).
 - **2026-11-22:** C r2 LANDED `1026dbe2`/`c79c8ec0` (P2 instruction-check LIVE-VERIFIED by it); app-cve-scan PAT fixed (classic, exp 2027-02-20); captured order
-  workflow_dispatch P2, auth hint P3, test 187 P3; make-up-app-none carried out to grooming (`93fe6b62`). 2b dispatched to Luna (`f12bcc16` approval).
+  workflow_dispatch P2, auth hint P3, test 187 P3; make-up-app-none carried out to grooming (`93fe6b62`). 2b dispatched to Luna (`f12bcc16` approval). Hermes correlator and reauth P3s dispatched to Luna (3 of 3 open).
 - **Rechecked 2026-11-21:** offline test-all P2, C1-C4 none reproduce (`af2cc5d9`), to grooming.
 - **Captured P3:** hub_deploy.bats catch-up test index.lock race (`0c999bbe`).
 - **v1.46.0:** plan 6 travel-bundle iPad SSH spec v1.1, intent approved; plan 7 Tailscale break-glass (moved from v1.48.0 2026-11-22, scope revision owed). Both cap exceptions.

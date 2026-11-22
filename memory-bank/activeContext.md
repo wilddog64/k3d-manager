@@ -15,7 +15,11 @@
 - `make up APP=none` carried out of v1.45.0 to next `/release-groom` (operator "go ahead for that", `93fe6b62`).
 - 2b DISPATCHED to Luna 2026-11-22 (ledger ts 1795378529; worktree `.../v1.45.0/remote-promote-2b-promote-wiring`).
   Approval `f12bcc16`: hub risk go; land may use `--allow-instruction-files` for `.github/copilot-instructions.md` only.
-  Open dispatches 1 of 3. Web-console B is operator-run captures (not a dispatch).
+  Open dispatches 3 of 3 (2026-11-22): 2b; `2026-11-08-hermes-resolved-message-names-no-sensors` (Luna, correlator.py);
+  `2026-11-09-hermes-reauth-lasts-24h-and-is-reusable` (Luna, slack-relay index.js; E2 intent approved `ea602bdc`).
+  Queued behind reauth (same index.js): `2026-11-08-slack-hostinger-status-duplicates-cluster-status`.
+  Worker deploy + Hermes E2 live checks are the operator's. Web-console B is operator-run captures (not a dispatch).
+  Triage overdue: 101 OPEN bugs waiting on operator decision.
 - v1.45.0 remaining: 2b verify + land, B captures (operator), red-team gate, release PR. C live check owed:
   operator `make hub-sync` + `make hub-deploy REF=0a95e8ea` (or later head), then Claude read-only check.
 
