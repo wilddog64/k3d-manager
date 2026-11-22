@@ -17,6 +17,7 @@
 
 ## Log
 
+- 2026-11-22: ideas row: automated mutation testing tool (mutmut for Python, in-repo bash mutator; sandbox-exec + watcher + restore check built in; mutation score to Prometheus beside CRAP).
 - 2026-11-22: P2 dispatcher fix (land instruction check after rebase) spec + Acceptance written, intents approved (`755895c9`), dispatched to gpt-6-luna as `dispatch-land-instruction-check-rebase` (WIP 2/3). C r2 lands after it, no override (its E2).
 - 2026-11-22: ideas row: CRAP score per function with Grafana dashboard (Python slice first, bash via kcov after proof).
 - 2026-11-22: C r2 land attempts: scope exception recorded in spec (`2d9db6ab`, operator "go ahead"); rebase conflict in not-installed.list (2c promote-authority lines vs totp lines) resolved keeping both, task now `d85926d4`; land then refused for instruction files from the release branch's own `1ab308ef` (dispatcher diffs from dispatch base, not merge-base). P2 captured. Land waiting on operator decision for --allow-instruction-files.
