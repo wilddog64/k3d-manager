@@ -8,6 +8,7 @@
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Automated CVE rebuild dispatches for `shopping-cart-order` always fail and wipe its build cache because `.github/workflows/ci.yml` lacks `workflow_dispatch`, requiring a manual push to `main`.)
 **Waiting on:** operator decision — since 2026-11-22 (intent approval for the Acceptance below)
 **Triage:** patch → fix now in `wilddog64/shopping-cart-order` (operator 2026-11-22: "Fix now"; route "Spec + Luna"). The optional k3d-manager scanner part (Fix direction 2) carries to v1.46.0 as P3.
+**Spec reviewed:** Fable 2026-11-22 (needs changes: 5 should-fix, 2 nits, all applied)
 **Intent approved:** pending
 **Prior art:** `docs/bugs/2026-10-27-product-catalog-ci-missing-workflow-dispatch.md` (exact-slug grep, not scored) — read, same root cause in another repository; new doc because the fix lands in `wilddog64/shopping-cart-order`
 **Filed:** 2026-11-22
@@ -65,6 +66,10 @@ In `wilddog64/shopping-cart-order`, branch `fix/cve-manual-rebuild` from `origin
 Change nothing else: not the `uses:` pin, permissions, secrets, other jobs or any other file. Commit on the branch;
 do not push and do not open a PR (Claude does both after verification).
 
+The local checkout is on `fix/automerge-app-token`, with its own work. Do not switch, stash or touch it. Work in a
+separate `git worktree add` from `origin/main`, as the product-catalog precedent did. The local product-catalog
+`origin/main` predates its fix, so read the precedent with `gh api repos/wilddog64/shopping-cart-product-catalog/contents/.github/workflows/ci.yml`.
+
 ## Files
 
 - `.github/workflows/ci.yml` (in `wilddog64/shopping-cart-order`)
@@ -74,7 +79,12 @@ do not push and do not open a PR (Claude does both after verification).
 - Writer of the dispatch: `scripts/etc/argocd/platform-ops/app-cve-scan.sh` `_build_workflow_for_service` maps
   `shopping-cart-order` to `ci.yml` and POSTs `actions/workflows/ci.yml/dispatches` with `{"ref":"main"}`; unchanged.
 - Reader: GitHub Actions on order `main`; `publish` calls `shopping-cart-infra` `build-push-deploy.yml` at the pinned
-  SHA; unchanged.
+  SHA (`542bb011`); unchanged. That workflow has no `event_name`/`ref` condition (Fable review 2026-11-22).
+- Writes a dispatch run now also makes (unchanged behaviour, new trigger):
+  - GHCR `ghcr.io/wilddog64/shopping-cart-order:latest` and `:sha-<head>` (reusable workflow 101-103). The scanner's
+    candidate-image lookup reads them (`app-cve-scan.sh` ~440-450).
+  - A `[skip ci]` promote commit to `k8s/base/kustomization.yaml` on order `main` via `PROMOTER_SSH_KEY` (reusable
+    169-200). ArgoCD reads it.
 
 ## Acceptance
 
@@ -88,23 +98,25 @@ must_not:
   - id: N1
     text: "no file other than .github/workflows/ci.yml changes, and no other line of ci.yml changes"
   - id: N2
-    text: "publish never runs for pull_request events (its if: still requires refs/heads/main and push or workflow_dispatch)"
+    text: "publish never runs for pull_request events or for a workflow_dispatch from a ref other than main"
+  - id: N3
+    text: "a workflow_dispatch event on main is not rejected by the workflow and does not skip publish"
 evidence:
   - id: E1
-    proves: [M1, M2, N2]
+    proves: [M1, M2, N2, N3]
     kind: offline
     intent: "You will see that order's CI now accepts a manual or scanner-triggered run, and that only main pushes and those runs publish an image, never a pull request."
-    how: "python3 with PyYAML (or yq) parses ci.yml on the branch: the on: keys (note PyYAML reads the key on as True) are exactly push, pull_request, workflow_dispatch; push and pull_request equal origin/main's; jobs.publish.if equals the M2 string. The same check run on origin/main (00c9fcd) fails M1 and M2."
+    how: "actionlint .github/workflows/ci.yml exits 0. python3 with PyYAML parses ci.yml (PyYAML reads the key on as True): the on: keys are exactly push, pull_request, workflow_dispatch; push and pull_request equal origin/main's. jobs.publish.if is evaluated as a truth table over (event, ref): (push, refs/heads/main) true; (workflow_dispatch, refs/heads/main) true; (pull_request, refs/pull/1/merge) false; (workflow_dispatch, refs/heads/other) false. Red controls: the same check on origin/main (00c9fcd) fails M1 and N3, and a mutant that drops the github.ref clause fails N2."
   - id: E2
     proves: [N1]
     kind: offline
     intent: "You will see the change is two lines in one file and nothing else in order's CI moved."
-    how: "git diff --name-only origin/main...fix/cve-manual-rebuild is exactly .github/workflows/ci.yml; git diff --numstat shows at most 2 added, 1 removed; every other line byte-identical."
+    how: "git diff --name-only origin/main...fix/cve-manual-rebuild is exactly .github/workflows/ci.yml; git diff --numstat shows exactly 2 added, 1 removed; every other line byte-identical."
   - id: E3
     proves: [M1, M2]
     kind: live
     intent: "After you merge, order gets rebuilt automatically: the next CVE scan (or one manual run) starts an order build on main that pushes a new image, and the scan log no longer says the order rebuild failed."
-    how: "Claude, read-only after the operator merges: gh api repos/wilddog64/shopping-cart-order/actions/runs?event=workflow_dispatch shows a run on main whose publish job succeeded; the next app-cve-scan log on the hub has no 'shopping-cart-order: rebuild dispatch FAILED' line."
+    how: "Claude, read-only after the operator merges: gh api repos/wilddog64/shopping-cart-order/actions/runs?event=workflow_dispatch shows a run on main; actions/runs/<id>/jobs shows 'Build, Scan & Push / build-push' concluded success; a new 'ci: update shopping-cart-order to sha-<dispatched head>' commit is on main (or the sha-<head> tag exists in GHCR); the next app-cve-scan log on the hub has no 'shopping-cart-order: rebuild dispatch FAILED' line. Residual risk: build runs mvn verify with failBuildOnCVSS 9 (pom.xml:196), so a high-CVSS dependency can skip publish for an unrelated reason; if so, record it as a separate bug, not a failure of this fix."
 interface:
   - "wilddog64/shopping-cart-order .github/workflows/ci.yml (on:, jobs.publish.if)"
   - "scripts/etc/argocd/platform-ops/app-cve-scan.sh dispatch POST (unchanged)"
