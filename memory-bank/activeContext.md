@@ -80,6 +80,9 @@ agy/Codex report green suites they did not run; worker cd failures can delete un
   agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; M2 `~/.ssh/config` is a copy, not a
   symlink (ask before changing).
 
+## Web-console C land condition (2026-11-21)
+- Mutant B27 (bare `sudo` in installer) reached real /usr/bin/sudo during bats: suite has no sudo stub. Killed 2 prompts (no password, nothing ran as root). Before land: add a failing sudo/launchctl stub to `web_console_totp.bats` setup (and pytest if it shells out), so a regression can never reach real sudo. Harness now guarded; 39 remaining mutants + B27 rerunning.
+
 ## Grooming 2026-11-22 agenda
 - P3 `docs/bugs/2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md` filed and dispatched to Flash on operator instruction, intents explicitly approved 2026-11-21 (repo from conversation DB `trajectory_metadata_blob` field 1.3.1, mode from history.jsonl); plan agy-quota-dashboard now reuses its reader.
 - New DRAFT `docs/plans/agy-quota-dashboard.md` (parent + Luna reader child + Flash dashboard child): place in backlog, approve intents, answer its 5 open questions (esp. which machines run agy). Revised same evening: brain transcripts carry per-step time+model+tokens; Agent Activity agy row exists but repo/mode are always `unknown` — plan now fills them and adds tokens by repo/model. Note Argon API rate rises 2026-12-01 (price file single-rate).
