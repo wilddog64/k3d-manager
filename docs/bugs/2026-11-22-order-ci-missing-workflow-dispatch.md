@@ -6,10 +6,10 @@
 **Should have been caught by:** spec — the 2026-10-27 product-catalog fix covered one repository and did not check the other app repositories
 **Introducing change reviewed:** unknown
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Automated CVE rebuild dispatches for `shopping-cart-order` always fail and wipe its build cache because `.github/workflows/ci.yml` lacks `workflow_dispatch`, requiring a manual push to `main`.)
-**Waiting on:** operator decision — since 2026-11-22 (intent approval for the Acceptance below)
+**Waiting on:** fix running — since 2026-11-22
 **Triage:** patch → fix now in `wilddog64/shopping-cart-order` (operator 2026-11-22: "Fix now"; route "Spec + Luna"). The optional k3d-manager scanner part (Fix direction 2) carries to v1.46.0 as P3.
 **Spec reviewed:** Fable 2026-11-22 (needs changes: 5 should-fix, 2 nits, all applied)
-**Intent approved:** pending
+**Intent approved:** operator 2026-11-22 (E1-E3 as shown after the Fable review; dispatch Luna)
 **Prior art:** `docs/bugs/2026-10-27-product-catalog-ci-missing-workflow-dispatch.md` (exact-slug grep, not scored) — read, same root cause in another repository; new doc because the fix lands in `wilddog64/shopping-cart-order`
 **Filed:** 2026-11-22
 **Detected by:** Claude, reading the manual `app-cve-scan-manual` job log on the m5 hub after the scanner PAT was replaced
@@ -105,7 +105,7 @@ evidence:
   - id: E1
     proves: [M1, M2, N2, N3]
     kind: offline
-    intent: "You will see that order's CI now accepts a manual or scanner-triggered run, and that only main pushes and those runs publish an image, never a pull request."
+    intent: "You will see that order's CI now accepts a manual or scanner-triggered run, and that only main pushes and those runs publish an image, never a pull request or a run from another branch."
     how: "actionlint .github/workflows/ci.yml exits 0. python3 with PyYAML parses ci.yml (PyYAML reads the key on as True): the on: keys are exactly push, pull_request, workflow_dispatch; push and pull_request equal origin/main's. jobs.publish.if is evaluated as a truth table over (event, ref): (push, refs/heads/main) true; (workflow_dispatch, refs/heads/main) true; (pull_request, refs/pull/1/merge) false; (workflow_dispatch, refs/heads/other) false. Red controls: the same check on origin/main (00c9fcd) fails M1 and N3, and a mutant that drops the github.ref clause fails N2."
   - id: E2
     proves: [N1]
@@ -115,7 +115,7 @@ evidence:
   - id: E3
     proves: [M1, M2]
     kind: live
-    intent: "After you merge, order gets rebuilt automatically: the next CVE scan (or one manual run) starts an order build on main that pushes a new image, and the scan log no longer says the order rebuild failed."
+    intent: "After you merge, order gets rebuilt automatically: the next CVE scan (or one manual run) starts an order build on main that pushes a new image and promote commit, and the scan log no longer says the order rebuild failed."
     how: "Claude, read-only after the operator merges: gh api repos/wilddog64/shopping-cart-order/actions/runs?event=workflow_dispatch shows a run on main; actions/runs/<id>/jobs shows 'Build, Scan & Push / build-push' concluded success; a new 'ci: update shopping-cart-order to sha-<dispatched head>' commit is on main (or the sha-<head> tag exists in GHCR); the next app-cve-scan log on the hub has no 'shopping-cart-order: rebuild dispatch FAILED' line. Residual risk: build runs mvn verify with failBuildOnCVSS 9 (pom.xml:196), so a high-CVSS dependency can skip publish for an unrelated reason; if so, record it as a separate bug, not a failure of this fix."
 interface:
   - "wilddog64/shopping-cart-order .github/workflows/ci.yml (on:, jobs.publish.if)"
