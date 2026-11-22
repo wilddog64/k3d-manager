@@ -17,6 +17,7 @@
 
 ## Log
 
+- 2026-11-22: C r2 Claude verification PASS under sandbox-exec + watcher: totp bats 34/34, sshd bats 58/58, pytest 142; mutants G8 (22 s, no stuck proc), G9b, B27, B34, B39 RED; D40 equivalent. Worktree committed `a2de8299`. Land refused: scripts/tests/bin/web_console_sshd.bats not in spec file list (test-only: sudo/launchctl guard stubs, scratch ZDOTDIR, git stub split). `--allow-out-of-scope` rerun blocked by auto-mode classifier; waiting on operator decision.
 - 2026-11-22: C r2 resume 9 exited 0 (no root sudo seen). Luna: pytest 142, totp bats 34, sshd bats 58; G8 mutant red in 20 s under sandbox-exec, no new stuck process. D40: no test added; Claude confirmed equivalent mutant (both handlers load state only after a full line, then close; one load per connection). Claude verification running under sandbox-exec + watcher.
 - 2026-11-22: Tailscale break-glass spec moved v1.48.0 plan 5 -> v1.46.0 plan 7 (cap exception, operator: "put tailscale in v1.46.0 side by side with iPad SSH plan"); spec only, scope revision owed (m5 hub, iPad client, Screen Sharing). v1.48.0 now 4/5.
 - 2026-11-22: ideas rows: iPad-only travel GUI path (Screen Sharing over Tailscale, pulls forward v1.48.0 break-glass) and agent host disk (reclaim m4 before any m2 move). Operator: all Macs clamshelled, always on; goal is travel with iPad only.
