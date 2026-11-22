@@ -1,11 +1,13 @@
 # Stale ACG sandbox ApplicationSet `istio-ambient` (`ubuntu-k3s`) left on the hub; stale-sandbox sweep misses ArgoCD
 
 **Status:** OPEN — filed 2026-11-22
-**Priority:** P3 (proposed after operator context 2026-11-22; was P2 — operator decides; P2 again if Hostinger Istio is meant to be Argo-managed)
+**Priority:** P3 (operator 2026-11-22: "not hurting anything but annoy"; must be scheduled, not left in the pile)
 **Introduced by:** unknown (ApplicationSet created 2026-10-30 14:18, the hub rebuild; `scripts/etc/argocd/vars.sh:68` defaults `ARGOCD_APP_CLUSTER_NAME` to `ubuntu-k3s`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-22
+**Waiting on:** dispatch — since 2026-11-22
+**Triage:** carry → v1.46.0 (operator 2026-11-22: schedule the fix)
+**Branch:** k3d-manager-v1.46.0
 **Prior art:** docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md (exact-slug pass; vector pass unavailable: no `k3d-k3d-cluster` context on M4) — read, different root cause (that was four stale Applications on a dead endpoint; the ApplicationSet then rendered `ubuntu-hostinger`)
 
 ## Symptom
