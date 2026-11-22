@@ -53,7 +53,7 @@
 
 **Next, in order:**
 
-1. **web-console C r2 — resume 10 (correction) running, then verify, land.** Worktree
+1. **web-console C r2 — resume 11 (correction) running, then verify, land.** Resume 10 fix (test 238) verified red/green. Full land set 2026-11-22: machine_setup test 187 (`tty_machine` timeout) fails pre-existing under sandbox-exec (`ps: Operation not permitted` in `tty_limited`, also on base 1055db70) → bug doc owed; landing with it excluded needs operator go (asked). With 187 excluded: bats 238/238 green, pytest 2 red (N6/N7 + M10 scan all of `scripts/libexec`, hit 2c's `k3dm-promote-daemon.py`) → resume 11 scopes the scan to C's 3 files. Worktree
    `/Users/cliang/.local/share/k3d-manager/worktrees/v1.45.0/web-console-c-totp-gate-r2`; spec
    `docs/plans/v1.45.0-web-console-c-totp-gate.md`. 2026-11-22 land red: hub_deploy.bats test 238 needs
    `web-console-totp` in its template list. Verify with the land's full `--test` set (totp, sshd, machine_setup,
