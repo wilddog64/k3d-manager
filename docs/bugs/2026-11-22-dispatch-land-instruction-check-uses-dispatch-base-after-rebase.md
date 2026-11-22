@@ -1,11 +1,11 @@
 # `land` refuses a rebased task for instruction-file changes that came from the release branch
 
-**Status:** OPEN — spec written 2026-11-22; dispatch approved by the operator
+**Status:** LANDED — `ffc6f3ed` (2026-11-22); E1 verified offline by Claude; E2 live owed (C r2 land)
 **Priority:** P2
 **Introduced by:** `0959fc6a` (instruction-file refusal, `docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-22
+**Waiting on:** live check — since 2026-11-22
 **Approval:** operator, 2026-11-22 ("P2 should dispatch now")
 **Intent approved:** operator, 2026-11-22
 **Intent note:** E1 and E2 approved in session ("Approve, dispatch to Luna")
