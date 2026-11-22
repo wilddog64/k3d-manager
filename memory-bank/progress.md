@@ -18,6 +18,7 @@
 
 ## Log
 
+- 2026-11-22: 2b resume 2 incomplete (E1-E4 thin, guards/table missing); resume 3 narrowed to E1+E3.
 - 2026-11-22: Hostinger-status slash-command retirement P3 dispatched to Luna (2 of 3 open).
 - 2026-11-22: Hermes reauth P3 LANDED `e1972118`, VERIFIED offline (resume 2 fixed M4 test gap); E2 after deploy-worker.
 - 2026-11-22: Hermes correlator P3 LANDED `f99f59f4`, VERIFIED offline; Classified lines `7ababe12`, 3a/3b drafts `2b15ede0`.

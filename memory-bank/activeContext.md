@@ -1,4 +1,4 @@
-## Handoff — 2026-11-22 12:58 PST — grooming in progress; 2 dispatches running — START HERE
+## Handoff — 2026-11-22 13:11 PST — grooming in progress; 2 dispatches running — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
@@ -8,7 +8,9 @@
 - `2026-11-09-hermes-reauth-lasts-24h-and-is-reusable` (slack-relay index.js; E2 intent approved `ea602bdc`).
 - reauth P3 LANDED `e1972118`, VERIFIED (54 green; pre-fix 4 red; M4 mutant red after resume 2); E2 live after
   `make deploy-worker`. Ask operator: approve E2 intent wording '10-minute reauth' in the reauth-reply bug.
-- 2b exited 0 but self-reported incomplete (no E1-E5/E7 tests, no pre-fix/mutant table): resume 2 (continue) running.
+- 2b: resume 2 still incomplete (E5 4 tests + E7 2 done; E1 and E2 one test each; E3, E4, guards, table missing).
+  It found and fixed a Makefile `$_got` escaping defect (M10). Resume 3 = E1+E3 only in hub_promote.bats; resume 4
+  planned = E4 + sudo/launchctl guards + base/mutant table. Review the Makefile change at verify.
 - `2026-11-08-slack-hostinger-status-duplicates-cluster-status` dispatched to Luna 2026-11-22 (index.js free after reauth).
 - On each exit: verify from git (not the worker's report), must_not red on old code, full land `--test` set under
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit
