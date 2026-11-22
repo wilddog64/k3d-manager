@@ -43,5 +43,7 @@ install-password-bundle|not installed by setup: the operator runs make password-
 password-bundle|not installed by setup until docs/bugs/2026-11-18-show-service-passwords-argocd-temp-files-no-trap.md is fixed; then the operator runs make password-bundle-install on the hub
 install-web-console-sshd|not installed by setup: operator-run once with a password; adds a root LaunchDaemon (docs/plans/v1.45.0-web-console-a-console-sshd.md)
 web-console-sshd|system LaunchDaemon installed once by make install-web-console-sshd
+install-web-console-totp|not installed by setup: operator-run once with a password and an authenticator app (docs/plans/v1.45.0-web-console-c-totp-gate.md)
+web-console-totp|system LaunchDaemon installed once by make install-web-console-totp
 promote-authority-install|operator-run: root LaunchDaemon, installed by the operator with sudo, never by machine setup
 promote-authority|operator-run: system LaunchDaemon installed by promote-authority-install

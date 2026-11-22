@@ -160,7 +160,7 @@ install-test-metrics:
 	  fi; \
 	fi
 
-.PHONY: install-web-console-sshd uninstall-web-console-sshd revoke-web-console-sshd web-console-sshd-check
+.PHONY: install-web-console-sshd uninstall-web-console-sshd revoke-web-console-sshd web-console-sshd-check install-web-console-totp uninstall-web-console-totp web-console-totp-enroll web-console-totp-rotate web-console-totp-status
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-host test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
@@ -644,6 +644,21 @@ revoke-web-console-sshd:
 
 web-console-sshd-check:
 	bin/k3dm-web-console-sshd check
+
+install-web-console-totp:
+	bin/k3dm-web-console-totp install $${TMUX:+--tmux "$$TMUX"} $${DRY_RUN:+--dry-run}
+
+uninstall-web-console-totp:
+	@case "$${PURGE_SECRET-}" in ""|0) set -- ;; 1) set -- --purge-secret ;; *) echo "PURGE_SECRET must be 1 or unset" >&2; exit 2 ;; esac; bin/k3dm-web-console-totp uninstall "$$@"
+
+web-console-totp-enroll:
+	bin/k3dm-web-console-totp enroll
+
+web-console-totp-rotate:
+	bin/k3dm-web-console-totp rotate
+
+web-console-totp-status:
+	bin/k3dm-web-console-totp status
 
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
@@ -2392,6 +2407,11 @@ help:
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
 	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
+	@echo "    make install-web-console-totp     Install the TOTP gate daemon and forced-command"
+	@echo "    make uninstall-web-console-totp   Remove the TOTP gate (PURGE_SECRET=1 removes state)"
+	@echo "    make web-console-totp-enroll      Enrol TOTP secret on interactive terminal"
+	@echo "    make web-console-totp-rotate      Rotate TOTP secret on interactive terminal"
+	@echo "    make web-console-totp-status      Show TOTP enrolment status"
 	@echo "    make install-web-console-sshd     Install the loopback console daemon (CA_FILE=path, AFTER_REVOKE=1)"
 	@echo "    make web-console-sshd-check       Check the installed daemon and listener"
 	@echo "    make revoke-web-console-sshd      Stop the daemon and its sessions"

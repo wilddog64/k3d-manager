@@ -3,15 +3,39 @@
 # consume the dynamically scoped process arrays defined by these tests.
 # shellcheck disable=SC1090,SC1091,SC2329,SC2030,SC2031
 
+_assert_guard_path() {
+  local path="$1" resolved
+  resolved=$(PATH="$path" /bin/sh -c 'command -v sudo; command -v launchctl') || return 1
+  [ "$resolved" = "$GUARD_BIN/sudo
+$GUARD_BIN/launchctl" ]
+}
+
 setup() {
   REPO="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/wc-test.XXXXXX")"
   [ -d "$SCRATCH" ]
+  GUARD_BIN="$SCRATCH/guard-bin"
+  GUARD_HITS="$SCRATCH/guard-hits"
+  mkdir "$GUARD_BIN"
+  : > "$GUARD_HITS"
+  printf '#!/bin/sh\nprintf "sudo %%s\\n" "$*" >> %q\nexit 97\n' "$GUARD_HITS" > "$GUARD_BIN/sudo"
+  printf '#!/bin/sh\nprintf "launchctl %%s\\n" "$*" >> %q\nexit 97\n' "$GUARD_HITS" > "$GUARD_BIN/launchctl"
+  chmod 755 "$GUARD_BIN/sudo" "$GUARD_BIN/launchctl"
+  export GUARD_BIN GUARD_HITS PATH="$GUARD_BIN:$PATH"
+  [ "$(command -v sudo)" = "$GUARD_BIN/sudo" ]
+  [ "$(command -v launchctl)" = "$GUARD_BIN/launchctl" ]
   export HOME="$SCRATCH"
+  [ "$HOME" = "$SCRATCH" ]
 }
 
 teardown() {
+  local rc=0
+  if [ -s "$GUARD_HITS" ]; then
+    cat "$GUARD_HITS"
+    rc=1
+  fi
   rm -rf -- "$SCRATCH"
+  [ "$rc" = 0 ]
 }
 
 @test "[M1] [N1] [N2] [N3] [N4] configuration template has exactly the prescribed lines" {
@@ -125,7 +149,8 @@ wc_library() {
   source "$REPO/bin/k3dm-web-console-sshd"
   sudo() { return 91; }
   [ "$(type -t sudo)" = function ]
-  PATH="$SCRATCH"
+  PATH="$GUARD_BIN:$SCRATCH"
+  _assert_guard_path "$PATH"
   _wc_main_env
   [ "$PATH" = /usr/bin:/bin:/usr/sbin:/sbin ]
   [ "$(type -t sudo)" = file ]
@@ -148,21 +173,23 @@ wc_library() {
   [ -x /bin/zsh ]
   [ "$HOME" = "$SCRATCH" ]
   local file target="$REPO/scripts/libexec/k3dm-console-forced-command"
+  mkdir "$SCRATCH/empty-zdot"
+  _assert_guard_path "$GUARD_BIN:/usr/bin:/bin"
   [ -x "$target" ]
   for file in .zshenv .zprofile .zshrc .zlogin; do
     printf ': > "$HOME/seen%s"\n' "$file" > "$HOME/$file"
   done
-  run env -i HOME="$HOME" ZDOTDIR=/var/empty PATH=/usr/bin:/bin /bin/zsh -c 'exec "$1"' entry "$target"
+  run env -i HOME="$HOME" ZDOTDIR="$SCRATCH/empty-zdot" PATH="$GUARD_BIN:/usr/bin:/bin" /bin/zsh -c 'exec "$1"' entry "$target"
   [ "$status" = 1 ]
   [ "$output" = 'console gate not installed' ]
   for file in .zshenv .zprofile .zshrc .zlogin; do [ ! -e "$HOME/seen$file" ]; done
-  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -c 'exec "$1"' entry "$target"
+  run env -i HOME="$HOME" PATH="$GUARD_BIN:/usr/bin:/bin" /bin/zsh -c 'exec "$1"' entry "$target"
   [ "$status" = 1 ]
   [ -f "$HOME/seen.zshenv" ]
   rm "$HOME/seen.zshenv"
   mkdir "$SCRATCH/zdot"
   printf ': > "$HOME/seen-zdot"\n' > "$SCRATCH/zdot/.zshenv"
-  run env -i HOME="$HOME" ZDOTDIR="$SCRATCH/zdot" PATH=/usr/bin:/bin /bin/zsh -c 'exec "$1"' entry "$target"
+  run env -i HOME="$HOME" ZDOTDIR="$SCRATCH/zdot" PATH="$GUARD_BIN:/usr/bin:/bin" /bin/zsh -c 'exec "$1"' entry "$target"
   [ "$status" = 1 ]
   [ -f "$HOME/seen-zdot" ]
   [ ! -e "$HOME/seen.zshenv" ]
@@ -363,7 +390,8 @@ elif tool == 'id':
 elif tool == 'date':
     print(time.strftime('%Y%m%dT%H%M%SZ',time.gmtime()) if '-u' in args else int(time.time()))
 elif tool == 'git':
-    if args[0] in ('ls-files','diff'): die(1 if fail('sources') or get('changed-source','__none__') in args else 0)
+    if args[0] == 'ls-files': die(1 if fail('sources') else 0)
+    if args[0] == 'diff': die(1 if fail('sources') or get('changed-source','__none__') in args else 0)
     path=args[-1].removeprefix('HEAD:')
     data=(repo/path).read_bytes()
     if args[0]=='cat-file': sys.stdout.buffer.write(data)
@@ -1591,7 +1619,7 @@ JOURNAL
   [ "$(cat "$dir/revoked")" = "$id" ]
   [ -s "$journal" ]; [ ! -e "$root/job" ]
   source "$WC_BIN"; wc_library; _wc_fixture_gate
-  local plist_path="$_WC_LAUNCHD_DIR/${_WC_LABEL}.plist" consumed='' new_log=0
+  local plist_path="$_WC_LAUNCHD_DIR/${_WC_LABEL}.plist"
   [ ! -e "$root$plist_path" ]
   rm "$root/fail.restore"; : > "$root/calls.log"
   run _wc_load_previous

@@ -206,7 +206,7 @@ function _wc_restore_line() {
   case "$kind" in
     created)
       case "$dest" in
-        "$_WC_CONF_DIR"|"$_WC_HELPER_DIR"|"$_WC_CONF_DIR/zdotdir"|"$_WC_CONF_DIR/.prev"|"$_WC_HELPER_DIR/.prev") ;;
+        "$_WC_CONF_DIR"|"$_WC_HELPER_DIR"|"$_WC_CONF_DIR/zdotdir"|"$_WC_CONF_DIR/.prev"|"$_WC_HELPER_DIR/.prev"|/var/db/k3dm-web-console|/var/db/k3dm-web-console-run) ;;
         *) return 5 ;;
       esac
       [[ "$dest" != "$_WC_CONF_DIR" || ! -f "$_WC_PREFIX$_WC_CONF_DIR/revoked" ]] || return 0
