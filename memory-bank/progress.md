@@ -36,3 +36,4 @@
 - 2026-11-22: memory-bank compressed (operator ask); full log archived to `memory-bank/archive/progress-2026-11-22.md`.
 - 2026-11-22: grooming started: Argon classified 53 bugs; Fable ideas review done; remote-promote 3a/3b drafted (untracked).
 - 2026-11-22: 2b, Hermes correlator, Hermes reauth dispatched to Luna (3 of 3).
+- Order main CI after #109 merge green (run 45081470809, promote e64ae03b); E3 still waits for the 01:00 PT scan.

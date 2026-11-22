@@ -137,3 +137,5 @@ interface:
 - Owed: operator merges; then Claude checks E3 (a dispatch run on main with build-push success and a promote commit;
   next scan without the FAILED line).
 
+
+Post-merge main CI (Claude, 2026-11-22): push run 45081470809 on 428e60de green (Checkstyle, Build & Test, Build, Scan & Push / build-push all success); promote commit e64ae03b. This is the push path only; E3 (workflow_dispatch from the scan) still owed.
