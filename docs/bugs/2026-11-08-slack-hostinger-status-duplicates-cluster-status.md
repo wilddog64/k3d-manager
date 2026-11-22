@@ -4,7 +4,7 @@
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Retiring a redundant, unused `/hostinger-status` Slack slash command where `/cluster-status hostinger` already covers the same checks and more, and the Slack command was already deleted in the Slack UI); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** live check — since 2026-11-22 (operator removes /hostinger-status from the Slack app, then `make deploy-worker`)
+**Waiting on:** live check — since 2026-11-22 (Slack app entry removed; `make deploy-worker` then `/k3dm help` owed)
 **Fix commit:** 8f6de4c1
 **Introduced by:** pre-existing (`/hostinger-status` added in v1.7.1, `0c9b2707`; `/cluster-status [provider]` later
 covered the same checks)
@@ -144,4 +144,11 @@ Claude, offline, in the task worktree under `sandbox-exec` (sudo/launchctl denie
 - N2 mutant (one line appended to `scripts/lib/webhook/policy.py`): test 6 red; file restored byte-identical.
 - Note: the N2 check reads the working tree diff, so it guards before commit only.
 - E2 live owed: after the Slack app entry is removed and the relay redeployed.
+
+## Live evidence 2026-11-22 (partial)
+
+Operator: `/hostinger-status` deleted from the Slack app. Screenshot of `/cluster-status hostinger` in Slack: "Cluster status:
+HEALTHY — k3s-hostinger (21 ok / 0 warn / 0 fail)" with the full report (ArgoCD, Frontend, Keycloak, ESO 20/20, hub ESO 9/9,
+logins). This proves the replacement path works; it worked before the fix too. Still owed for E2: relay redeployed
+(`make deploy-worker`) and `/k3dm help` no longer listing `/hostinger-status`.
 

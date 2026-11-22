@@ -1,4 +1,4 @@
-## Handoff — 2026-11-22 13:59 PST — grooming in progress; 1 dispatch running (2b) — START HERE
+## Handoff — 2026-11-22 14:07 PST — grooming in progress; 1 dispatch running (2b) — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
@@ -13,7 +13,8 @@
   planned = E4 + sudo/launchctl guards + base/mutant table. Review the Makefile change at verify.
 - Hostinger-status P3: verified offline, committed `fe64b3f7` on task branch (55 node / 10 bats / 46 pytest green;
   pre-fix 1+5+2 red; N2 mutant red). LANDED `8f6de4c1` (operator approved `--allow-out-of-scope` for
-  webhook_make_targets.py), VERIFIED. Live: operator removes the Slack app entry, then `make deploy-worker`.
+  webhook_make_targets.py), VERIFIED. Live: Slack entry removed + /cluster-status hostinger
+  HEALTHY 21/0/0 (operator 2026-11-22); owed: `make deploy-worker`, then `/k3dm help`.
 - 2b resume 4 running (correction): M8 misplaced `--approval` → exit 2 fix + 2 fixture fixes; resume 3 found it.
 - On each exit: verify from git (not the worker's report), must_not red on old code, full land `--test` set under
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit

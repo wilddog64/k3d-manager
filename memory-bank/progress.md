@@ -18,6 +18,7 @@
 
 ## Log
 
+- 2026-11-22: Hostinger E2 partial live: Slack entry removed, /cluster-status hostinger HEALTHY 21/0/0; deploy-worker + /k3dm help owed.
 - 2026-11-22: Hostinger P3 LANDED `8f6de4c1`, VERIFIED (operator scope go); reauth-reply E2 wording → 10-minute (operator).
 - 2026-11-22: Hostinger P3 verified offline (`fe64b3f7` task branch); land refused out-of-scope test file, operator go asked. 2b resume 4 (M8 fix) running.
 - 2026-11-22: 2b resume 2 incomplete (E1-E4 thin, guards/table missing); resume 3 narrowed to E1+E3.
