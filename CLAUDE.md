@@ -25,7 +25,7 @@ identical in `AGENTS.md` and `GEMINI.md`; `bin/k3dm-check-agent-docs` (run by `m
 - **The hub reads `deploy/hub`; promote to reach it** — release-branch config is inert on the hub until `make hub-deploy REF=<commit-ish>` (operator's tmux); confirm `make hub-promote-status` before asking for a live check, and ask for a promote if needed. Rollback: `make hub-rollback`. [more](docs/process/rules.md#hub-reads-deploy-hub)
 
 ## Environment Constraints
-- **Context Management:** 200K window, auto-compaction at about 167K. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point. [more](docs/process/rules.md#environment-constraints)
+- **Context Management:** 1M window since 2026-11-21 (was 200K); `autoCompactWindow` 400000 trial from 2026-11-21, so auto-compaction is expected near 330K, not yet observed. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point. [more](docs/process/rules.md#environment-constraints)
 
 ## Layout
 ```

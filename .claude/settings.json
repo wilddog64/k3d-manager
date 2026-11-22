@@ -5,7 +5,7 @@
       "Bash(bin/k3dm-cloud-request:*)"
     ]
   },
-  "autoCompactWindow": 200000,
+  "autoCompactWindow": 400000,
   "hooks": {
     "PostToolUse": [
       {

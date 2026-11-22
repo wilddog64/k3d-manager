@@ -99,7 +99,7 @@ Hub promote enforcement for `make hub-deploy REF=<commit-ish>` (moved from `CLAU
 <a id="environment-constraints"></a>
 ### Context management
 
-- **Context Management:** Sessions run in a 200K context window, and auto-compaction runs at about 167K. The 2026-10-22 trial of `autoCompactWindow: 400000` never applied, because the setting cannot exceed the window; it was set back to 200000 on 2026-11-01. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
+- **Context Management:** Sessions ran in a 200K context window until 2026-11-21, with auto-compaction at about 167K. From 2026-11-21 the window is 1M and `autoCompactWindow` is 400000 as a trial (see `docs/metrics/context-window-experiment.md`); the expected compaction point (~330K) is unconfirmed until the Observed compaction point panel shows it. The 2026-10-22 trial of `autoCompactWindow: 400000` never applied, because the setting cannot exceed the window; it was set back to 200000 on 2026-11-01. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
 
 ## Docs Conventions
 
