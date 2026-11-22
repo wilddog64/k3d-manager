@@ -2,6 +2,19 @@
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
+**Session update 2026-11-22 (evening):**
+- C r2 resume 11 VERIFIED by Claude: N6/N7/M10 scans scoped to part C libexec (mutant `X = "/usr/bin/python3"` in
+  totpctl red in both tests, restored); land set under sandbox-exec bats 238/238 (test 187 excluded) + pytest 142/142.
+  LANDED `1026dbe2` + `c79c8ec0` (plan `b06e27f5`) with `--allow-out-of-scope` and `--negative-filter`
+  (operator "go ahead to land test", spec `135b26fe`). P2 instruction-check bug LIVE-VERIFIED by this land (E2).
+- app-cve-scan auth FIXED: classic PAT `k3dm-app-cve-scan` (repo, read:packages, expires 2027-02-20, rotate by
+  2027-02-13); manual scan resolved 5/5, dispatched basket/frontend/payment/product-catalog rebuilds. Howto `78a9c44e`.
+- Captured: order CI missing `workflow_dispatch` P2, auth hint P3 (`fff5798e`); test 187 sandbox `ps` P3 (`eef73df5`).
+- Ideas: subagent split of tests/bugs/plans (`5602590d`); WIP>3 measurement (`77df6447`): workers run 31% of the time,
+  exit->land 6-7 min at 1-2 open vs 16 at 3; decision: try 4 in v1.46.0 after cheaper verification (operator agreed).
+- `make up APP=none` carried out of v1.45.0 to next `/release-groom` (operator "go ahead for that", `93fe6b62`).
+- v1.45.0 remaining: 2b + B (dispatch next), red-team gate, release PR. C live checks owed per spec (hub-deploy).
+
 **Session update 2026-11-21 12:25 PST:**
 - 2c LANDED `c17eae59` (plan LANDED `32f05e79`, pushed). Resume 9 N1 fix verified by Claude: pytest 90/90, bats 9/9;
   env-socket mutant red in `test_main_reads_no_environment` (scratch copy). First land failed on an unrelated race,

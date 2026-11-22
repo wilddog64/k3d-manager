@@ -1,11 +1,12 @@
 # `land` refuses a rebased task for instruction-file changes that came from the release branch
 
-**Status:** LANDED — `ffc6f3ed` (2026-11-22); E1 verified offline by Claude; E2 live owed (C r2 land)
+**Status:** LIVE-VERIFIED — `ffc6f3ed` (2026-11-22); E1 verified offline by Claude; E2 live by Claude 2026-11-22 (C r2 land)
+**Fix commit:** ffc6f3ed
+**Live evidence:** 2026-11-22 · run land-web-console-c-totp-gate-r2-ts1795377284 · env m4/codex-dispatch-real-ledger · scenario rebased-88-commits-no-instruction-override · commit ffc6f3ed · proves E2
 **Priority:** P2
 **Introduced by:** `0959fc6a` (instruction-file refusal, `docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-22
 **Approval:** operator, 2026-11-22 ("P2 should dispatch now")
 **Intent approved:** operator, 2026-11-22
 **Intent note:** E1 and E2 approved in session ("Approve, dispatch to Luna")
@@ -118,3 +119,11 @@ Before your last message, do all of these and paste the evidence:
 Compute the range the same way as the scope check (merge-base with the target when the recorded base is its
 ancestor). Tests: a task rebased over a target commit that edits `CLAUDE.md` lands without the flag (red today), and
 a task commit that edits `CLAUDE.md` is still refused after a rebase (positive control).
+
+## Live verification (E2, Claude, 2026-11-22)
+
+`bin/k3dm-codex-dispatch land --slug web-console-c-totp-gate-r2 --allow-out-of-scope --landing-actor claude --test ...`
+on m4, without `--allow-instruction-files`. The task was rebased over 88 target commits (`target_moved_commits: 88`),
+including the CLAUDE.md changes that caused the original refusal. Result: `landed: web-console-c-totp-gate-r2`
+(`1026dbe2`, `c79c8ec0`); ledger `land` event `instruction_files: []`, `test_result: passed`. No `instruction-files`
+refusal on this attempt (the earlier refusal at ts 1795360266 predates `ffc6f3ed`).
