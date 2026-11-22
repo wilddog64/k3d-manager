@@ -1,15 +1,16 @@
 # Bug: `/hostinger-status` duplicates `/cluster-status hostinger`, and in Slack it does not respond
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** VERIFIED — fix landed 8f6de4c1, 2026-11-22 (filed 2026-11-08)
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Retiring a redundant, unused `/hostinger-status` Slack slash command where `/cluster-status hostinger` already covers the same checks and more, and the Slack command was already deleted in the Slack UI); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** fix running — since 2026-11-22
+**Waiting on:** live check — since 2026-11-22 (operator removes /hostinger-status from the Slack app, then `make deploy-worker`)
+**Fix commit:** 8f6de4c1
 **Introduced by:** pre-existing (`/hostinger-status` added in v1.7.1, `0c9b2707`; `/cluster-status [provider]` later
 covered the same checks)
 **Should have been caught by:** live check
 **Severity:** low — confusing duplicate command; workaround: `/cluster-status hostinger`
-**Approval:** operator, 2026-11-08 ("go ahead to do that, and I will remove hostinger-status")
+**Approval:** operator, 2026-11-08 ("go ahead to do that, and I will remove hostinger-status"); land `--allow-out-of-scope` for `scripts/tests/bin/webhook_make_targets.py`, operator 2026-11-22 (spec Files omitted the make_targets test that proves M2)
 **Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 (screenshots: `/hostinger-status` → "failed because the app did not
@@ -132,3 +133,15 @@ Before your last message, do all of these and paste the evidence:
   decision and a testable N2; E1's intent changed, so it needs approval again.
 - Intents re-approved by the operator on 2026-11-08 after the spec review changed E1 ("E1 intent approved").
 - First-pass trial dispatch 2 of 3 (`docs/howto/dispatch-first-pass-trial.md`).
+
+## Verification 2026-11-22
+
+Claude, offline, in the task worktree under `sandbox-exec` (sudo/launchctl denied):
+- fix: `node --test workers/slack-relay/test/relay.test.mjs` 55 pass; `bats scripts/tests/plugins/slack_slash_commands.bats` 10/10;
+  `pytest scripts/tests/bin/webhook_make_targets.py` 46 pass. `shellcheck -S warning` clean (16 SC2016 info only); `git diff --check` clean.
+- pre-fix (base code + new tests): relay 1 fail (M1), bats 5 fail (tests 1, 2, 3, 5, 7: M2/N1), pytest 2 fail (/k3dm help, M2).
+  Test 6 (M3 route + N2 protected files) green on base by design.
+- N2 mutant (one line appended to `scripts/lib/webhook/policy.py`): test 6 red; file restored byte-identical.
+- Note: the N2 check reads the working tree diff, so it guards before commit only.
+- E2 live owed: after the Slack app entry is removed and the relay redeployed.
+

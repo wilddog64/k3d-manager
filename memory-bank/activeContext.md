@@ -1,19 +1,19 @@
-## Handoff — 2026-11-22 13:17 PST — grooming in progress; 2b running, Hostinger awaiting scope go — START HERE
+## Handoff — 2026-11-22 13:59 PST — grooming in progress; 1 dispatch running (2b) — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
-**Open dispatches 2 of 3 (all Luna, started 2026-11-22):**
+**Open dispatches 1 of 3 (all Luna, started 2026-11-22):**
 - `remote-promote-2b-promote-wiring`: land may use `--allow-instruction-files` for `.github/copilot-instructions.md` only (`f12bcc16`).
 - correlator P3 LANDED `f99f59f4`, VERIFIED (119 green; pre-fix 4 red; 2 mutants red); E2 live owed after hub runs it.
 - `2026-11-09-hermes-reauth-lasts-24h-and-is-reusable` (slack-relay index.js; E2 intent approved `ea602bdc`).
 - reauth P3 LANDED `e1972118`, VERIFIED (54 green; pre-fix 4 red; M4 mutant red after resume 2); E2 live after
-  `make deploy-worker`. Ask operator: approve E2 intent wording '10-minute reauth' in the reauth-reply bug.
+  `make deploy-worker`. E2 wording changed to '10-minute' (operator 2026-11-22).
 - 2b: resume 2 still incomplete (E5 4 tests + E7 2 done; E1 and E2 one test each; E3, E4, guards, table missing).
   It found and fixed a Makefile `$_got` escaping defect (M10). Resume 3 = E1+E3 only in hub_promote.bats; resume 4
   planned = E4 + sudo/launchctl guards + base/mutant table. Review the Makefile change at verify.
 - Hostinger-status P3: verified offline, committed `fe64b3f7` on task branch (55 node / 10 bats / 46 pytest green;
-  pre-fix 1+5+2 red; N2 mutant red). Land refused: `scripts/tests/bin/webhook_make_targets.py` (2 assertNotIn lines
-  proving M2's /k3dm help) is not in spec Files. Ask operator: `--allow-out-of-scope` for that file.
+  pre-fix 1+5+2 red; N2 mutant red). LANDED `8f6de4c1` (operator approved `--allow-out-of-scope` for
+  webhook_make_targets.py), VERIFIED. Live: operator removes the Slack app entry, then `make deploy-worker`.
 - 2b resume 4 running (correction): M8 misplaced `--approval` → exit 2 fix + 2 fixture fixes; resume 3 found it.
 - On each exit: verify from git (not the worker's report), must_not red on old code, full land `--test` set under
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit
