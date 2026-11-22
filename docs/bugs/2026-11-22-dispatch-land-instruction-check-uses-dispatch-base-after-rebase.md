@@ -7,7 +7,8 @@
 **Introducing change reviewed:** unknown
 **Waiting on:** dispatch — since 2026-11-22
 **Approval:** operator, 2026-11-22 ("P2 should dispatch now")
-**Intent approved:** operator, 2026-11-22 (E1, E2; "Approve, dispatch to Luna")
+**Intent approved:** operator, 2026-11-22
+**Intent note:** E1 and E2 approved in session ("Approve, dispatch to Luna")
 **Branch:** `k3d-manager-v1.45.0`
 **Prior art:** `docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md` (exact-slug grep, not scored) — read, different root cause: that change added the check; this is its diff range. `make find-similar-docs` unavailable on m4-air (vector store needs kube context `k3d-k3d-cluster`).
 **Filed:** 2026-11-22
