@@ -8,7 +8,8 @@
 **Waiting on:** fix running — since 2026-11-22
 **Prior art:** `docs/bugs/2026-11-22-test-all-failures-not-attributable-to-host.md` (slug grep, not scored) — read, different root cause; `make find-similar-docs` not run (vector store unreachable from m4-air).
 **Approval:** operator, 2026-11-22: "go ahead to file a P2 bug then dispatch to Luna" (dispatch without waiting for triage); Fable spec review requested by the operator, folded in (rev 2).
-**Intent approved:** operator, 2026-11-22 (rev 2, E1-E6, "Approve, dispatch + investigate")
+**Intent approved:** operator, 2026-11-22
+Intents approved for rev 2, E1-E6 ("Approve, dispatch + investigate").
 
 ## Symptom
 
