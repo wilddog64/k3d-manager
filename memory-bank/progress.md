@@ -9,13 +9,15 @@
   test-all metrics `64a8de5c` (E3); dispatch-stall C `e05a08ed` (E8) and B (E9/E10); remote-promote 2a VERIFIED, 2d (E11);
   hub-deploy self-update `3b541f3b`; remote-promote 2c `c17eae59` (VERIFIED offline, hub-deploy owed); password-bundle
   Keychain P3 `3971fa3f` (m4-air retry owed); multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
-- **Open dispatches:** web-console C r2 (Luna resume 7 done; 168-mutant rerun running before land); agy-repo-mode P3 LANDED `1e237612` (244/244; mutants all red after resume 2 added WAL/size/cache-allowlist tests); live E6-E8 owed after hub-deploy.
+- **Open dispatches:** web-console C r2 (168-mutant rerun: 158 red, G8 hang, 5 survivors; guarded B27 reached real sudo prompt again 2026-11-22, killed, no harm; Luna resume 8 running: suite-local sudo/launchctl stubs + B27/B34/B39/G9b/D40/G8 tests); agy-repo-mode P3 LANDED `1e237612` (244/244; mutants all red after resume 2 added WAL/size/cache-allowlist tests); live E6-E8 owed after hub-deploy.
 - **Not started:** 2b promote wiring, web-console B (both unblocked by 2c), red-team gate (intents approved).
 - **Rechecked 2026-11-21:** offline test-all P2, C1-C4 none reproduce (`af2cc5d9`), to grooming.
 - **Captured P3:** hub_deploy.bats catch-up test index.lock race (`0c999bbe`).
 - **v1.46.0:** plan 6 travel-bundle iPad SSH spec v1.1, intent approved (implementation in v1.46.0 only).
 
 ## Log
+
+- 2026-11-22: C r2 mutant rerun done; B27 bypassed outer guard via bats PATH resets (real sudo prompt, no ticket, killed); Luna resume 8 dispatched. Ideas row: stall watch for Claude background jobs (`270dfae4`).
 
 - 2026-11-21: autoCompactWindow 400000 trial for the 1M window (`1ab308ef`, operator approved); void if Observed compaction point stays near 167K. CLAUDE.md/rules.md 200K wording corrected.
 
