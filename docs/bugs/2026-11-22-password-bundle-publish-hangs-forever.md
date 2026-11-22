@@ -202,3 +202,12 @@ evidence:
 `launchctl kickstart -k gui/$(id -u)/com.k3d-manager.password-bundle` on m5 kills the hung run. On 2026-11-22 the next
 run hung again at the same line, so the workaround only clears it; a manual `make password-bundle-publish` from
 Terminal delivers the bundle.
+
+## Verification (Claude, 2026-11-22, m4-air)
+
+- `bats scripts/tests/plugins/password_bundle.bats`: 22/22; `land --test` pass incl. shellcheck.
+- N1: pre-fix plugin RED x7 (three hang tests hit the 30 s BATS_TEST_TIMEOUT).
+- N2 mutant (timeout branch pushes success, writes last-publish): RED x3. N3 mutant (payload printed on TERM): RED (test 22).
+- Extra mutants: kill pid instead of process group: RED (test 16; orphans held the run, cleaned up); no KILL escalation: RED (test 16).
+- Commit note: `_password_bundle_cleanup_temps` given the `function` keyword so the agent audit's if-count parser stops counting its embedded perl against the function above (false 9 > 8).
+- Owed: E6 live, after `make hub-deploy REF=<head>`.
