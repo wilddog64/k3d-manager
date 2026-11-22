@@ -232,6 +232,18 @@ test('cluster-status still relays and events GET is missing', async () => {
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
 })
 
+test('retired hostinger-status is rejected while cluster-status hostinger still relays', async () => {
+  const retired = loadWorker()
+  const rejected = await retired.dispatch(signed('/slack/commands', 'command=%2Fhostinger-status&user_id=UREADER&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  assert.match(await rejected.text(), /Unknown command: \/hostinger-status/)
+  assert.equal(retired.fetches.length, 0)
+
+  const current = loadWorker()
+  await current.dispatch(signed('/slack/commands', 'command=%2Fcluster-status&text=hostinger&user_id=UREADER&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  assert.equal(current.fetches.length, 1)
+  assert.equal(current.fetches[0].url, 'https://webhook.test/api/v1/cluster-status')
+})
+
 test('cluster-down forwards the signed Slack caller identity', async () => {
   const worker = loadWorker()
   await worker.dispatch(signed('/slack/commands', 'command=/cluster-down&text=aws&user_id=UDOWN&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))

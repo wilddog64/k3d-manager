@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
 const REAUTH_TTL_SECONDS   = 600
 const HERMES_ACTION_ID_RE  = /^[rd][0-9]+-[0-9a-f]{8}$/
@@ -9,7 +9,6 @@ const PROVIDER_ALIASES  = { azure: 'az' }
 const COMMAND_ROLES     = Object.freeze({
   '/cluster-status': 'reader',
   '/cluster-diagnose': 'reader',
-  '/hostinger-status': 'reader',
   '/cluster-refresh': 'operator',
   '/cluster-up': 'admin',
   '/cluster-down': 'admin',
@@ -466,17 +465,6 @@ async function handle(req, event) {
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`🔎 Running \`${parsed.payload.action}\` against *${parsed.payload.provider}*…`, threadTs, true)
-  }
-
-  if (command === '/hostinger-status') {
-    const payload = { response_url: responseUrl }
-    if (threadTs) payload.thread_ts = threadTs
-    event.waitUntil((async () => {
-      const { ok, conflict } = await relay('/api/v1/hostinger-status', payload, meta)
-      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
-      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
-    })())
-    return jsonReply('🖥️ Checking Hostinger app cluster status…', threadTs, true)
   }
 
   if (command === '/cluster-refresh') {

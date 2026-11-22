@@ -66,7 +66,6 @@ MAKE_TARGETS = {
 CLUSTER_COMMANDS = (
     ("/cluster-status [provider]", "reader", "cluster + access-layer status"),
     ("/cluster-diagnose [provider|hub] [verb]", "reader", "no verb: pods in all namespaces; pods, logs, apps, appsets"),
-    ("/hostinger-status", "reader", "permanent app-cluster status"),
     ("/cluster-refresh [provider]", "operator", "refresh the access layer"),
     ("/cluster-up [provider]", "admin", "bring a cluster up (records deployment metrics)"),
     ("/cluster-down [provider]", "admin", "tear a cluster down (records deployment metrics)"),
