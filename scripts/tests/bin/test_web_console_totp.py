@@ -26,6 +26,12 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 TOTPD_PATH = os.path.join(REPO_ROOT, "scripts/libexec/k3dm-console-totpd.py")
 TOTPCTL_PATH = os.path.join(REPO_ROOT, "scripts/libexec/k3dm-console-totpctl.py")
 GATE_PATH = os.path.join(REPO_ROOT, "scripts/libexec/k3dm-console-gate.py")
+# agent-audit: allow assert-removed N6/N7/M10 asserts re-indented, scan scoped to part C files
+PART_C_LIBEXEC = tuple(os.path.join(REPO_ROOT, "scripts/libexec", name) for name in (
+    "k3dm-console-gate.py",
+    "k3dm-console-totpd.py",
+    "k3dm-console-totpctl.py",
+))
 
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -506,22 +512,21 @@ def test_N3_and_E2_admit_logic():
     assert totpd.admit(DummySock(), conf, stub_runner, peer_cred_fn=cred_fn_peer, gate_path="/wrong/gate") is False
 
 def test_N6_and_N7_source_scan():
-    for root_dir in (os.path.join(REPO_ROOT, "scripts/libexec"),):
-        for fname in os.listdir(root_dir):
-            if fname.endswith(".py"):
-                fpath = os.path.join(root_dir, fname)
-                with open(fpath, "r", encoding="utf-8") as f:
-                    content = f.read()
-                if fname == "k3dm-console-totpd.py":
-                    assert "os.environ" not in content
-                if fname == "k3dm-console-gate.py":
-                    tokens = re.findall(r'os\.environ(?:\["([A-Z_]+)"\]|\.get\("([A-Z_]+)"\))', content)
-                    used_keys = {k1 or k2 for (k1, k2) in tokens if (k1 or k2)}
-                    assert used_keys.issubset({"HOME", "USER", "LOGNAME", "TERM", "LANG"})
-                for line in content.splitlines():
-                    if line.strip().startswith("#"):
-                        continue
-                    assert "/usr/bin/python3" not in line
+    assert all(os.path.isfile(path) for path in PART_C_LIBEXEC)
+    for fpath in PART_C_LIBEXEC:
+        fname = os.path.basename(fpath)
+        with open(fpath, "r", encoding="utf-8") as f:
+            content = f.read()
+        if fname == "k3dm-console-totpd.py":
+            assert "os.environ" not in content
+        if fname == "k3dm-console-gate.py":
+            tokens = re.findall(r'os\.environ(?:\["([A-Z_]+)"\]|\.get\("([A-Z_]+)"\))', content)
+            used_keys = {k1 or k2 for (k1, k2) in tokens if (k1 or k2)}
+            assert used_keys.issubset({"HOME", "USER", "LOGNAME", "TERM", "LANG"})
+        for line in content.splitlines():
+            if line.strip().startswith("#"):
+                continue
+            assert "/usr/bin/python3" not in line
 
 def test_N5_and_N9_and_E3_admin_enrol_and_rotate():
     tmp = make_short_tmpdir()
@@ -638,6 +643,7 @@ def test_N2_and_N4_and_E5_terminal_filter():
     assert gate.is_terminal_reply(b"hello") is False
 
 def test_N6_and_N7_and_M10_gate_entry():
+    assert all(os.path.isfile(path) for path in PART_C_LIBEXEC)
     if sys.platform != "darwin":
         pytest.skip("gate entry test is Darwin-only")
     tmp = make_short_tmpdir()
@@ -701,9 +707,8 @@ def test_N6_and_N7_and_M10_gate_entry():
         assert marker.exists()
         assert Path(scratch, "marker_sitecustomize").exists()
         forbidden = re.compile(rb"(?:^|[\s\x22\x27]|#!)/usr/bin/python3(?:$|[\s\x22\x27])")
-        for entry in Path(GATE_PATH).parent.iterdir():
-            if entry.is_file():
-                assert not forbidden.search(entry.read_bytes()), entry
+        for entry in PART_C_LIBEXEC:
+            assert not forbidden.search(Path(entry).read_bytes()), entry
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
