@@ -1,15 +1,15 @@
-## Handoff — 2026-11-22 12:56 PST — grooming in progress; 1 dispatch running — START HERE
+## Handoff — 2026-11-22 12:58 PST — grooming in progress; 2 dispatches running — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
-**Open dispatches 1 of 3 (all Luna, started 2026-11-22):**
+**Open dispatches 2 of 3 (all Luna, started 2026-11-22):**
 - `remote-promote-2b-promote-wiring`: land may use `--allow-instruction-files` for `.github/copilot-instructions.md` only (`f12bcc16`).
 - correlator P3 LANDED `f99f59f4`, VERIFIED (119 green; pre-fix 4 red; 2 mutants red); E2 live owed after hub runs it.
 - `2026-11-09-hermes-reauth-lasts-24h-and-is-reusable` (slack-relay index.js; E2 intent approved `ea602bdc`).
 - reauth P3 LANDED `e1972118`, VERIFIED (54 green; pre-fix 4 red; M4 mutant red after resume 2); E2 live after
   `make deploy-worker`. Ask operator: approve E2 intent wording '10-minute reauth' in the reauth-reply bug.
 - 2b exited 0 but self-reported incomplete (no E1-E5/E7 tests, no pre-fix/mutant table): resume 2 (continue) running.
-- Queued behind reauth (same index.js): `2026-11-08-slack-hostinger-status-duplicates-cluster-status`.
+- `2026-11-08-slack-hostinger-status-duplicates-cluster-status` dispatched to Luna 2026-11-22 (index.js free after reauth).
 - On each exit: verify from git (not the worker's report), must_not red on old code, full land `--test` set under
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit
   on the release branch while a land runs (ff-only merge).

@@ -18,6 +18,7 @@
 
 ## Log
 
+- 2026-11-22: Hostinger-status slash-command retirement P3 dispatched to Luna (2 of 3 open).
 - 2026-11-22: Hermes reauth P3 LANDED `e1972118`, VERIFIED offline (resume 2 fixed M4 test gap); E2 after deploy-worker.
 - 2026-11-22: Hermes correlator P3 LANDED `f99f59f4`, VERIFIED offline; Classified lines `7ababe12`, 3a/3b drafts `2b15ede0`.
 - 2026-11-22: reauth worker exited 0, verify found M4 test gap + out-of-scope intent edit, resumed (correction); 2b exited 0 incomplete (tests missing), resumed (continue).
