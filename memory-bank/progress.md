@@ -18,6 +18,7 @@
 
 ## Log
 
+- 2026-11-22: v1.46.0 cut to 5 (bounded-index, bug-lifecycle-metrics → backlog, operator); istio-ambient P3 → v1.46.0; CI green aa920a6f.
 - 2026-11-22: CI reds fixed `aa920a6f`; kagent idea; P2 filed: istio-ambient ApplicationSet targets retired ubuntu-k3s, Hostinger Istio unmanaged by Argo.
 - 2026-11-22: Hostinger E2 partial live: Slack entry removed, /cluster-status hostinger HEALTHY 21/0/0; deploy-worker + /k3dm help owed.
 - 2026-11-22: Hostinger P3 LANDED `8f6de4c1`, VERIFIED (operator scope go); reauth-reply E2 wording → 10-minute (operator).

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10, Claude
 **Branch:** `k3d-manager-v1.46.0` (cut from `main` after v1.43.2 merges; never `main`)
-**Status:** PROPOSED — operator approved the scope 2026-10-10
+**Status:** PROPOSED — moved out of v1.46.0 to the ordered backlog (operator, 2026-11-22 grooming: v1.46.0 over its cap; re-rank next week); — operator approved the scope 2026-10-10
 **Milestone:** v1.46.0, plan 5 of 5
 **Implementer:** Codex · **Verifier:** Claude
 

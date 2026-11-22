@@ -1,6 +1,6 @@
 # v1.46.0 — Bounded read-only index metrics diagnostics
 
-**Status:** PROPOSED — specification only; no runtime capability enabled
+**Status:** PROPOSED — moved out of v1.46.0 to the ordered backlog (operator, 2026-11-22 grooming: v1.46.0 over its cap; re-rank next week); — specification only; no runtime capability enabled
 **Date:** 2026-10-08
 **Milestone:** v1.46.0 candidate, plan 5 of 5 at drafting
 **Owner:** cloud-bridge, webhook security and observability maintainers

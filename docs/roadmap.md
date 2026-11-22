@@ -630,14 +630,14 @@ Bug fixes carried into v1.46.0 (operator, 2026-10-12; found when the OrbStack up
 | [`v1.46.0-cloud-request-submitter-authentication.md`](plans/v1.46.0-cloud-request-submitter-authentication.md) | Verify which agent submitted a request before the action and argument allowlists run. |
 | [`v1.46.0-cloud-request-slack-notification-routing.md`](plans/v1.46.0-cloud-request-slack-notification-routing.md) | A request may name an approved channel alias; nothing else changes the global `SLACK_CHANNEL_ID`. |
 | [`v1.46.0-operator-acceptance-automation.md`](plans/v1.46.0-operator-acceptance-automation.md) | An acceptance harness with explicit oracles; pilot on the k3dm Tests dashboard. |
-| [`v1.46.0-bounded-index-metrics-diagnostics.md`](plans/v1.46.0-bounded-index-metrics-diagnostics.md) | One read-only bridge action that explains a gap in the vector-store index-age panel. |
-| [`v1.46.0-bug-lifecycle-metrics.md`](plans/v1.46.0-bug-lifecycle-metrics.md) | Bug age, reopen rate and fix verification: `**Filed:**`, `**Recurred:**` and `**Verified by:**` lines, `make bug-close` (closes only after the named regression test passes), pre-commit checks, and a Lifecycle row on the Bug Tracking dashboard. Operator request 2026-10-10. |
 
 Also in v1.46.0, as a how-to rather than a spec: an inventory of every request channel (Slack,
 cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
 [Engineering-contract gaps](#engineering-contract-gaps-assessed-2026-10-10)).
 [`v1.46.0-bug-lifecycle-dashboard.md`](plans/v1.46.0-bug-lifecycle-dashboard.md) was folded into
-v1.43.0 and is superseded. v1.46.0 is at its five-plan cap.
+v1.43.0 and is superseded. On 2026-11-22 (grooming, operator chose Claude's and Fable's pick) `bounded-index-metrics-diagnostics`
+and `bug-lifecycle-metrics` moved to the ordered backlog, so v1.46.0 holds five plans: the three above plus travel-bundle
+iPad SSH and tailscale (plans 6 and 7 below). Remote-promote 3a/3b drafts are not yet counted; adding them needs a swap.
 
 **v1.46.0 plan 6 (cap exception, operator 2026-11-21: "can we add iPad air ssh plan into v1.46.0 as an extra one. I consider it as part of travel bundle"):** [`v1.46.0-travel-bundle-ipad-ssh.md`](plans/v1.46.0-travel-bundle-ipad-ssh.md) (SPEC v1.1 2026-11-21; intent approved, D1-D3 = (a); proof P1-P4 then blind review pending; implemented in v1.46.0). The iPad Air reaches service passwords as a travel-bundle client without holding a decryption key: Safari (browser-rendered SSH, no app or key on the iPad) logs in to the M4's web-console sshd (v1.45.0 plan 4: part A console sshd, part B Cloudflare Access, part C TOTP gate) and runs `make console-show-passwords` there (pager, timeout, tmux scrollback cleared). Depends on v1.45.0 plan 4 parts B and C landing and live-verifying; critical (internet-facing interactive path), so dispatch needs the operator's go. Source: `docs/ideas.md` row 2026-11-21 (service-password access from non-macOS devices).
 
@@ -1451,7 +1451,7 @@ Next steps, smallest first:
 
 | Step | Lands in | Scope |
 |---|---|---|
-| Operational requirements in every spec | DONE 2026-10-10, with `v1.46.0-bug-lifecycle-metrics.md` | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
+| Operational requirements in every spec | DONE 2026-10-10, with `bug-lifecycle-metrics.md` | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
 | Release evidence record | v1.58.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.57.0 gate result, open P0/P1 bugs. |
 | One authorization path, inventoried | v1.46.0 | Ship `v1.46.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
@@ -1645,6 +1645,8 @@ when a release has room; a new idea may be groomed in ahead of them, displacing 
    2. [`gcp-ssh-key-and-tunnel`](plans/gcp-ssh-key-and-tunnel.md): the SSH key is generated, `tcp:22` is scoped to the operator's IP, and the hub tunnel carries the API and the reverse Vault bridge.
    3. [`gcp-cluster-up-full-pipeline`](plans/gcp-cluster-up-full-pipeline.md): the "Steps 5–12 not yet ported" exit is removed, and the provider sets the SSH host and kube context instead of the literals `ubuntu` and `ubuntu-k3s`.
    4. [`gcp-lifecycle-and-dead-code`](plans/gcp-lifecycle-and-dead-code.md): status, refresh, restart and teardown handle GCP, and the dead GCP code is deleted.
+10. [`bounded-index-metrics-diagnostics`](plans/bounded-index-metrics-diagnostics.md), was v1.46.0 (moved out 2026-11-22 grooming, operator; v1.46.0 over cap): one read-only bridge action explaining a gap in the vector-store index-age panel. Re-rank at the 2026-11-29 grooming.
+11. [`bug-lifecycle-metrics`](plans/bug-lifecycle-metrics.md), was v1.46.0 (moved out 2026-11-22 grooming, operator; v1.46.0 over cap): bug age, reopen rate and fix verification (`**Filed:**`, `**Recurred:**`, `**Verified by:**`, `make bug-close`). `incident-severity-records` (v1.58.0) depends on it. Re-rank at the 2026-11-29 grooming.
 
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
