@@ -6,7 +6,7 @@
 **Should have been caught by:** spec — the 2026-10-27 product-catalog fix covered one repository and did not check the other app repositories
 **Introducing change reviewed:** unknown
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Automated CVE rebuild dispatches for `shopping-cart-order` always fail and wipe its build cache because `.github/workflows/ci.yml` lacks `workflow_dispatch`, requiring a manual push to `main`.)
-**Waiting on:** fix running — since 2026-11-22
+**Waiting on:** operator decision — since 2026-11-22 (merge order PR #109)
 **Triage:** patch → fix now in `wilddog64/shopping-cart-order` (operator 2026-11-22: "Fix now"; route "Spec + Luna"). The optional k3d-manager scanner part (Fix direction 2) carries to v1.46.0 as P3.
 **Spec reviewed:** Fable 2026-11-22 (needs changes: 5 should-fix, 2 nits, all applied)
 **Intent approved:** operator, 2026-11-22
@@ -122,4 +122,18 @@ interface:
   - "wilddog64/shopping-cart-order .github/workflows/ci.yml (on:, jobs.publish.if)"
   - "scripts/etc/argocd/platform-ops/app-cve-scan.sh dispatch POST (unchanged)"
 ```
+
+## Fix and review 2026-11-22
+
+- Luna (dispatch `order-ci-workflow-dispatch`) made the edit; its sandbox could not commit, so Claude committed it as
+  `227bbdbe` on `fix/cve-manual-rebuild` and opened `wilddog64/shopping-cart-order` PR #109 (normal, not draft).
+- Claude offline verification (E1, E2): `actionlint` exit 0; the `publish` condition gives main push → run, main
+  dispatch → run, pull request → skip, dispatch from another branch → skip. Red controls: base `00c9fcd` fails M1 and
+  N3; a mutant without the `refs/heads/main` clause fails N2. Diff: `ci.yml` only, +2 −1.
+- Blind Argon review (`docs/plans/review-order-pr109-workflow-dispatch.md`, `gemini-4-argon-medium`): no findings;
+  review worktree clean.
+- PR #109 CI: Checkstyle, Build & Test, coverage, GitGuardian pass; `Build, Scan & Push` skipped on the pull request,
+  live support for N2.
+- Owed: operator merges; then Claude checks E3 (a dispatch run on main with build-push success and a promote commit;
+  next scan without the FAILED line).
 
