@@ -50,6 +50,11 @@ Nothing in the publish path is time-limited:
   `--max-time`.
 - `age -e` (151) and the metrics push (`scripts/plugins/password_bundle.sh:15`, no `--max-time`).
 
+## Files
+
+- `scripts/plugins/password_bundle.sh`
+- `scripts/tests/plugins/password_bundle.bats`
+
 ## Scope
 
 This fix changes **only** `scripts/plugins/password_bundle.sh` and `scripts/tests/plugins/password_bundle.bats`. It
