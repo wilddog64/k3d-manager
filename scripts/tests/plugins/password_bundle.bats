@@ -84,6 +84,12 @@ STUB
 teardown() { kill "$TEST_SERVER_PID" 2>/dev/null || true; wait "$TEST_SERVER_PID" 2>/dev/null || true; }
 
 add() { NAME="$1" KEY="$2" password_bundle_add_recipient; }
+as_mac_host() {
+  [[ "$BATS_TEST_TMPDIR/bin" == "${PATH%%:*}" ]]
+  printf '#!/bin/sh\necho Darwin\n' > "$BATS_TEST_TMPDIR/bin/uname"
+  printf '#!/bin/sh\necho "$*" >> "%s/launchctl-hits"\nexit 97\n' "$BATS_TEST_TMPDIR" > "$BATS_TEST_TMPDIR/bin/launchctl"
+  chmod +x "$BATS_TEST_TMPDIR/bin/uname" "$BATS_TEST_TMPDIR/bin/launchctl"
+}
 seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
 
 @test 'N1 plaintext stays out of files; show is the positive control' {
@@ -183,6 +189,7 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
 }
 
 @test 'M6 add-laptop forces publication for the new identity and installs the schedule' {
+  as_mac_host
   add one "$KEY1"
   password_bundle_publish
   export K3DM_AGENT_LOAD=0
@@ -192,9 +199,11 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
   run bash -c 'printf "%s\n" "$TEST_ID2" | age -d -i /dev/stdin "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age"'
   [ "$status" -eq 0 ]; [ "$output" = password-sentinel ]
   [ -f "$HOME/Library/LaunchAgents/com.k3d-manager.password-bundle.plist" ]
+  [ ! -e "$BATS_TEST_TMPDIR/launchctl-hits" ]
 }
 
 @test 'N6 failed publication does not install the schedule' {
+  as_mac_host
   add one "$KEY1"
   export K3DM_AGENT_LOAD=0 TEST_FAIL=1
   run "$REAL_MAKE" -s -C "$SCRIPT_DIR/.." password-bundle-add-laptop NAME=two KEY="$KEY2"
@@ -204,6 +213,7 @@ seed() { add one "$KEY1" && add two "$KEY2" && password_bundle_publish; }
 }
 
 @test 'N7 invalid name or key changes nothing and does not install the schedule' {
+  as_mac_host
   add one "$KEY1"
   password_bundle_publish
   before="$(shasum -a 256 "$K3DM_PASSWORD_BUNDLE_DIR/service-passwords.age")"
