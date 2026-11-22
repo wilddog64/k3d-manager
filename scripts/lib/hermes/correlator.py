@@ -35,9 +35,28 @@ class Correlator:
                                             f"escalation ({', '.join(joined)} joined)")}
             return self._enrich(event, state, llm, today, vault_sealed)
         if not active and was_active:
+            current = {}
+            for item in records:
+                sensor = item["sensor"]
+                current.setdefault(sensor, set()).add(item["status"])
+            notified = sorted(set(notified or []))
+            degraded_now = sorted(sensor for sensor, statuses in current.items()
+                                  if "degraded" in statuses)
+            cleared = sorted(sensor for sensor in notified
+                             if "healthy" in current.get(sensor, set())
+                             and sensor not in degraded_now)
+            no_data = sorted(sensor for sensor in notified
+                             if sensor not in cleared and sensor not in degraded_now)
+            if notified:
+                header = f"Hermes correlated incident resolved ({' + '.join(notified)})."
+            else:
+                header = "Hermes correlated incident resolved (sensors not recorded)."
+            display = lambda items: ", ".join(items) if items else "none"
+            text = (f"{header} Cleared: {display(cleared)}. "
+                    f"Still degraded: {display(degraded_now)}. No data: {display(no_data)}.")
             state["incident_active"] = False
             state["incident_sensors"] = []
-            return {"kind": "resolved", "sensors": [], "text": "Hermes correlated incident resolved."}
+            return {"kind": "resolved", "sensors": [], "text": text}
         return None
 
     @staticmethod
