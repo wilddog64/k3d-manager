@@ -641,6 +641,8 @@ v1.43.0 and is superseded. v1.46.0 is at its five-plan cap.
 
 **v1.46.0 plan 6 (cap exception, operator 2026-11-21: "can we add iPad air ssh plan into v1.46.0 as an extra one. I consider it as part of travel bundle"):** [`v1.46.0-travel-bundle-ipad-ssh.md`](plans/v1.46.0-travel-bundle-ipad-ssh.md) (SPEC v1.1 2026-11-21; intent approved, D1-D3 = (a); proof P1-P4 then blind review pending; implemented in v1.46.0). The iPad Air reaches service passwords as a travel-bundle client without holding a decryption key: Safari (browser-rendered SSH, no app or key on the iPad) logs in to the M4's web-console sshd (v1.45.0 plan 4: part A console sshd, part B Cloudflare Access, part C TOTP gate) and runs `make console-show-passwords` there (pager, timeout, tmux scrollback cleared). Depends on v1.45.0 plan 4 parts B and C landing and live-verifying; critical (internet-facing interactive path), so dispatch needs the operator's go. Source: `docs/ideas.md` row 2026-11-21 (service-password access from non-macOS devices).
 
+**v1.46.0 plan 7 (cap exception, operator 2026-11-22: "put tailscale in v1.46.0 side by side with iPad SSH plan"):** [`v1.46.0-tailscale-break-glass-access.md`](plans/v1.46.0-tailscale-break-glass-access.md) (moved from v1.48.0 plan 5; spec only, scope revision owed before intent approval). An operator-only tailnet gives the iPad Air a second way into the Macs that does not depend on cloudflared, plus macOS Screen Sharing so a TCC or Keychain dialog on a clamshelled Mac can be answered while travelling (2026-11-22 password-bundle hang). Enrollment, system-extension approvals and live rollout need the operator at home and a separate go. Source: `docs/ideas.md` row 2026-11-22 (iPad-only travel GUI path).
+
 ### Candidate milestone — v1.47.0
 
 **Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.47.0`, cut from
@@ -734,12 +736,7 @@ go in:
   how it starts, which instruction file it follows, and how it hands live checks to the operator.
   Write the spec before Codex's period starts.
 
-Plan 5 (operator, 2026-10-26: private break-glass access while webhook is down) is
-[`tailscale-break-glass-access`](plans/v1.48.0-tailscale-break-glass-access.md): operator-only
-Tailscale access to m4 (then m2), restricted to macOS SSH over tcp:22 with explicit grants and
-negative-access tests, independent of webhook/cloud-bridge/Hostinger. This is a deliberate,
-restricted private management channel—not new public ingress or an AI-agent SSH path.
-The operator must separately approve enrollment and live rollout. **v1.48.0 is now at its five-plan cap.**
+Plan 5 (`tailscale-break-glass-access`) moved to v1.46.0 as plan 7 (operator, 2026-11-22); [`v1.46.0-tailscale-break-glass-access`](plans/v1.46.0-tailscale-break-glass-access.md). **v1.48.0 has one open plan slot.**
 
 ### Candidate milestone — v1.49.0
 

@@ -4,7 +4,7 @@
 **Priority:** P2 (break-glass read of rotated service passwords from a machine that is not one of the Macs; SSO still works)
 **Approval:** operator 2026-11-07: "for encrypted service password solution, talescale another function is for non Mac system like windows or linux can reach hub and show service passwords securely". Spec only. Installing Tailscale on the hub or on any client, enabling it, and every live step need a separate operator go.
 **Release:** v1.45.0 (branch `k3d-manager-v1.45.0`), plan 3
-**Depends on:** none in code. It is a sibling of `docs/plans/v1.45.0-service-password-travel-bundle.md`, which names this as its pull option under "Related, not in this plan". Shares tailnet enrollment of the hub with `docs/plans/v1.48.0-tailscale-break-glass-access.md`; whichever lands first enrolls the hub.
+**Depends on:** none in code. It is a sibling of `docs/plans/v1.45.0-service-password-travel-bundle.md`, which names this as its pull option under "Related, not in this plan". Shares tailnet enrollment of the hub with `docs/plans/v1.46.0-tailscale-break-glass-access.md`; whichever lands first enrolls the hub.
 
 ## Problem
 
@@ -68,7 +68,7 @@ The how-to gives the steps; no code changes tailnet policy:
 
 - The hub (M5) and each client join the tailnet. Identity login uses MFA, and device approval is on.
 - A deny-by-default grant: source is the operator's named client devices, destination is the hub, port `tcp:22`
-  only. Remove any catch-all rule first, as `docs/plans/v1.48.0-tailscale-break-glass-access.md` D1 requires.
+  only. Remove any catch-all rule first, as `docs/plans/v1.46.0-tailscale-break-glass-access.md` D1 requires.
 - No Funnel, no Serve, no exit node, no subnet routes. This plan does not use Tailscale SSH: the hub keeps macOS
   OpenSSH, which works the same with any Tailscale variant.
 - Pin the hub host key on the client: the first connection is made on the home LAN, or the fingerprint is compared
