@@ -9,7 +9,7 @@
   test-all metrics `64a8de5c` (E3); dispatch-stall C `e05a08ed` (E8) and B (E9/E10); remote-promote 2a VERIFIED, 2d (E11);
   hub-deploy self-update `3b541f3b`; remote-promote 2c `c17eae59` (VERIFIED offline, hub-deploy owed); password-bundle
   Keychain P3 `3971fa3f` (m4-air retry owed); multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
-- **Open dispatches:** web-console C r2 (Luna resume 7 done; 168-mutant rerun running before land); agy-repo-mode P3 (Flash run 1 done, 233/233; review R1 DB-copy cache + R2 allowlist test in bug doc `7056e003`; resume 1 waits on operator intent approval of E7/E8; prompt in scratchpad agy-resume1.md).
+- **Open dispatches:** web-console C r2 (Luna resume 7 done; 168-mutant rerun running before land); agy-repo-mode P3 (Flash run 1 done, 233/233; review R1 DB-copy cache + R2 allowlist test in bug doc `7056e003`; E7/E8 intents approved by operator; Flash resume 1 running (watcher brjc8c660)).
 - **Not started:** 2b promote wiring, web-console B (both unblocked by 2c), red-team gate (intents approved).
 - **Rechecked 2026-11-21:** offline test-all P2, C1-C4 none reproduce (`af2cc5d9`), to grooming.
 - **Captured P3:** hub_deploy.bats catch-up test index.lock race (`0c999bbe`).
