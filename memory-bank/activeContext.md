@@ -1,4 +1,4 @@
-## Handoff — 2026-11-22 14:38 PST — CI green aa920a6f; promote given; v1.46.0 cut to 5 — START HERE
+## Handoff — 2026-11-22 14:41 PST — promoted aa920a6f + relay d6a3ac28; live checks running — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
@@ -35,7 +35,9 @@
   test-all P2 close C3/C4; pull `v1.51.0-bug-count-query-translation` forward with the ask-docs P2; out-of-band repo
   tracking (dirused) + per-project quota.
 
-**Tonight (operator home):** CI green on `aa920a6f` (all 7 checks); asked operator for hub-sync + `hub-deploy REF=aa920a6f` + deploy-worker.
+**Tonight (operator home):** PROMOTED 14:40: deploy/hub 4217648..aa920a6 (appsets ok, platform-ops ok); relay Worker version
+  d6a3ac28. Bundle E6 sampling 1 h (14:41 first sample: PID '-', exit 0, success=1, last publish 14:27). Owed by operator
+  in Slack: /k3dm help (no hostinger-status), reauth E2 (/hermes-auth says 10 minutes; second card asks reauth).
   istio-ambient stale sandbox appset: P3, carry → v1.46.0 (operator). v1.46.0: bounded-index + bug-lifecycle-metrics moved
   to ordered backlog 10/11 (operator, grooming); v1.46.0 now 5 plans; 3a/3b need a swap to enter.
 
