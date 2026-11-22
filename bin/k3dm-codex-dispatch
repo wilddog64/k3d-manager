@@ -852,17 +852,14 @@ _dispatch_change_stats() {
 }
 
 _dispatch_scope_verdict() {
-  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base from merge_base
+  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base from
   local -a patterns=()
   if [[ ! -f "$worktree.run/base" ]]; then
     echo "scope: unknown (no recorded base)"
     return 1
   fi
   base="$(<"$worktree.run/base")"
-  from="$base"
-  if merge_base="$(git -C "$worktree" merge-base "$rel" HEAD 2>/dev/null)" && git -C "$worktree" merge-base --is-ancestor "$base" "$merge_base"; then
-    from="$merge_base"
-  fi
+  from="$(_dispatch_instruction_range_start "$worktree" "$rel" "$base")"
   if [[ -f "$worktree.run/spec.md" ]]; then
     local expected_spec_hash actual_spec_hash
     expected_spec_hash="$(cat "$worktree.run/spec-sha256" 2>/dev/null || true)"
@@ -909,6 +906,15 @@ _dispatch_instruction_files() {
       .github/copilot-instructions.md|*/.github/copilot-instructions.md|.claude/*|*/.claude/*|.codex/*|*/.codex/*|.gemini/*|*/.gemini/*) printf '%s\n' "$path" ;;
     esac
   done
+}
+
+_dispatch_instruction_range_start() {
+  local worktree="$1" target="$2" base="$3" merge_base
+  if merge_base="$(git -C "$worktree" merge-base "$target" HEAD 2>/dev/null)" && git -C "$worktree" merge-base --is-ancestor "$base" "$merge_base"; then
+    printf '%s\n' "$merge_base"
+  else
+    printf '%s\n' "$base"
+  fi
 }
 
 _dispatch_task_spec() {
@@ -1347,7 +1353,7 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
+  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base instruction_from target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
   local -a superseding=()
   local _landing_parts=""
   while (($#)); do
@@ -1390,13 +1396,14 @@ _dispatch_land() {
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   base="$(<"$run/base")"
-  instruction_files="$(_dispatch_instruction_files "$task" "$base")"
+  instruction_from="$(_dispatch_instruction_range_start "$task" "$target" "$base")"
+  instruction_files="$(_dispatch_instruction_files "$task" "$instruction_from")"
   if [[ -n "$instruction_files" && "$allow_instruction_files" -eq 0 ]]; then
     while IFS= read -r instruction_path; do
       [[ -n "$instruction_path" ]] || continue
       echo "instruction-file: $instruction_path"
       if git -C "$task" ls-files --error-unmatch "$instruction_path" >/dev/null 2>&1; then
-        git -C "$task" diff "$base" HEAD -- "$instruction_path"
+        git -C "$task" diff "$instruction_from" HEAD -- "$instruction_path"
         git -C "$task" diff --cached -- "$instruction_path"
         git -C "$task" diff -- "$instruction_path"
       else
