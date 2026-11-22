@@ -9,7 +9,8 @@
 **Waiting on:** fix running — since 2026-11-22
 **Triage:** patch → fix now in `wilddog64/shopping-cart-order` (operator 2026-11-22: "Fix now"; route "Spec + Luna"). The optional k3d-manager scanner part (Fix direction 2) carries to v1.46.0 as P3.
 **Spec reviewed:** Fable 2026-11-22 (needs changes: 5 should-fix, 2 nits, all applied)
-**Intent approved:** operator 2026-11-22 (E1-E3 as shown after the Fable review; dispatch Luna)
+**Intent approved:** operator, 2026-11-22
+**Intent note:** E1-E3 as shown to the operator after the Fable review; dispatch Luna approved the same day.
 **Prior art:** `docs/bugs/2026-10-27-product-catalog-ci-missing-workflow-dispatch.md` (exact-slug grep, not scored) — read, same root cause in another repository; new doc because the fix lands in `wilddog64/shopping-cart-order`
 **Filed:** 2026-11-22
 **Detected by:** Claude, reading the manual `app-cve-scan-manual` job log on the m5 hub after the scanner PAT was replaced
