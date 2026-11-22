@@ -53,10 +53,13 @@
 
 **Next, in order:**
 
-1. **web-console C r2 — resume 5, verify, land.** Worktree
+1. **web-console C r2 — resume 10 (correction) running, then verify, land.** Worktree
    `/Users/cliang/.local/share/k3d-manager/worktrees/v1.45.0/web-console-c-totp-gate-r2`; spec
-   `docs/plans/v1.45.0-web-console-c-totp-gate.md` (Handover run 2 + v6 changes). Verify every E1-E11 item and mutant,
-   independent verifier from Acceptance only, Claude commits, `land --slug web-console-c-totp-gate-r2`.
+   `docs/plans/v1.45.0-web-console-c-totp-gate.md`. 2026-11-22 land red: hub_deploy.bats test 238 needs
+   `web-console-totp` in its template list. Verify with the land's full `--test` set (totp, sshd, machine_setup,
+   hub_deploy bats + pytest) under sandbox-exec, then `land --slug web-console-c-totp-gate-r2 --allow-out-of-scope`
+   only; that land is also P2 `ffc6f3ed`'s E2 (no instruction-file refusal, empty `instruction_files`).
+   SSH on m4: use the launchd agent socket (zshdotfiles #8 restores it for new shells).
 2. **2b and web-console B** (`docs/plans/v1.45.0-remote-promote-2b-promote-wiring.md`,
    `docs/plans/v1.45.0-web-console-b-captures.md`) — 2c has landed, so both can dispatch now (WIP ≤ 3, one per file;
    check file overlap with C r2: Makefile).
