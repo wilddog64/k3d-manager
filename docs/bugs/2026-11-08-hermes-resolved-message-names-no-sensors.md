@@ -1,10 +1,10 @@
 # Bug: Hermes "correlated incident resolved" names no sensors, and reads as all-clear while one is still degraded
 
-**Status:** OPEN — filed 2026-11-08
+**Status:** VERIFIED — fix landed `f99f59f4` 2026-11-22 (offline); E2 live check owed after the Hermes worker redeploys
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (The issue only affects the clarity of the Slack resolution message wording while incident detection, correlation, and state transitions work as intended (and is explicitly noted as P3 in the report)); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** fix running — since 2026-11-22
+**Waiting on:** live check — since 2026-11-22
 **Introduced by:** `cd38a7e5` (v1.29.0, Hermes phase 1)
 **Should have been caught by:** spec
 **Severity:** low — misleading Slack message; workaround: read the earlier incident message and `bin/k3dm-hermes` status
@@ -14,6 +14,7 @@
 **Detected by:** operator, Slack, 2026-11-08 10:12 PST (screenshot: "Hermes correlated incident resolved." — "what
 incident was resolved? not very clear")
 **Affected:** `scripts/lib/hermes/correlator.py`
+**Fix commit:** `f99f59f4`
 **Branch:** `k3d-manager-v1.43.16` (operator, 2026-11-09)
 **Related:** `docs/bugs/2026-11-08-hermes-values-branch-flags-deploy-hub-and-r9-retargets-release-branch.md` (the
 incident in question: ci + values_branch; values_branch stayed degraded after "resolved");
@@ -117,3 +118,15 @@ Before your last message, do all of these and paste the evidence:
   ordering rules, literal example, test command and helper, E1 cases widened.
 - Files do not overlap the open dispatches or the Hermes values_branch P2 (`sensors.py`, `repairs.py`, `argocd.sh`,
   `test_hermes.py`). Dispatch when a WIP slot frees, after the P2 (a P2 that blocks the release goes first).
+
+## Verification 2026-11-22 (Claude, m4-air)
+
+- Worker: gpt-6-luna, one run, exit 0, uncommitted; Claude committed on the task branch and landed `f99f59f4`.
+- Under `sandbox-exec` (sudo/launchctl denied): `pytest scripts/tests/hermes/test_correlator_resolved_text.py
+  scripts/tests/hermes/test_hermes.py` 119 passed.
+- Pre-fix `correlator.py` with the new tests: 4 failed, 115 passed (N1, N2 red).
+- Mutants: counting an unknown or missing incident sensor as Cleared, 1 failed (N1); limiting Still degraded to the
+  incident's sensors, 1 failed (M1, sensor outside the incident). File restored byte-identical.
+- Land gate: the same two files, green. E2 (live) not run: needs the next real incident resolve after the hub runs the
+  new code.
+

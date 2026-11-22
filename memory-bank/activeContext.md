@@ -1,10 +1,10 @@
-## Handoff — 2026-11-22 12:51 PST — grooming in progress; 3 dispatches running — START HERE
+## Handoff — 2026-11-22 12:54 PST — grooming in progress; 2 dispatches running — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
-**Open dispatches 3 of 3 (all Luna, started 2026-11-22):**
+**Open dispatches 2 of 3 (all Luna, started 2026-11-22):**
 - `remote-promote-2b-promote-wiring`: land may use `--allow-instruction-files` for `.github/copilot-instructions.md` only (`f12bcc16`).
-- `2026-11-08-hermes-resolved-message-names-no-sensors` (correlator.py).
+- correlator P3 LANDED `f99f59f4`, VERIFIED (119 green; pre-fix 4 red; 2 mutants red); E2 live owed after hub runs it.
 - `2026-11-09-hermes-reauth-lasts-24h-and-is-reusable` (slack-relay index.js; E2 intent approved `ea602bdc`).
 - 12:5x: reauth exited 0: fix correct (TTL 600, key deleted after all refusals, before the store); 54/54 sandboxed;
   pre-fix 4 red (N1, N2 approve+deny, N3). Mutant (delete before allowlist) left the M4 test green (it checks another
@@ -17,7 +17,7 @@
   on the release branch while a land runs (ff-only merge).
 
 **Grooming 2026-11-22 (in progress, operator asked 2026-11-22):**
-- Argon classified the 53 unclassified OPEN bugs (Classified lines added, uncommitted until the grooming commit); 10
+- Argon classified the 53 unclassified OPEN bugs (committed `7ababe12`; 3a/3b drafts `2b15ede0`); 10
   Argon P3→P2; Claude would accept 3 (promote-waiting false alert, Hermes r7 first ESO group, ACG ssh config).
 - 109 OPEN bugs: 8 P2, 101 P3; 36 P3 on second pass (close candidates); 15 carry a stale `carry → v1.44.0`.
 - Fable blind ideas review done (ranks: weekly live-check session 1, verifier-first 2, stall watch for Claude jobs 3,
