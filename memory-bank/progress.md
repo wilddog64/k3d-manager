@@ -9,13 +9,15 @@
   test-all metrics `64a8de5c` (E3); dispatch-stall C `e05a08ed` (E8) and B (E9/E10); remote-promote 2a VERIFIED, 2d (E11);
   hub-deploy self-update `3b541f3b`; remote-promote 2c `c17eae59` (VERIFIED offline, hub-deploy owed); password-bundle
   Keychain P3 `3971fa3f` (m4-air retry owed); multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
-- **Open dispatches:** web-console C r2 (Luna resume 7 done; 168-mutant rerun running before land); agy-repo-mode P3 (Flash run 1 done, 233/233; review R1 DB-copy cache + R2 allowlist test in bug doc `7056e003`; E7/E8 intents approved by operator; Flash resume 1 running (watcher brjc8c660)).
+- **Open dispatches:** web-console C r2 (Luna resume 7 done; 168-mutant rerun running before land); agy-repo-mode P3 LANDED `1e237612` (244/244; mutants all red after resume 2 added WAL/size/cache-allowlist tests); live E6-E8 owed after hub-deploy.
 - **Not started:** 2b promote wiring, web-console B (both unblocked by 2c), red-team gate (intents approved).
 - **Rechecked 2026-11-21:** offline test-all P2, C1-C4 none reproduce (`af2cc5d9`), to grooming.
 - **Captured P3:** hub_deploy.bats catch-up test index.lock race (`0c999bbe`).
 - **v1.46.0:** plan 6 travel-bundle iPad SSH spec v1.1, intent approved (implementation in v1.46.0 only).
 
 ## Log
+
+- 2026-11-21: agy repo/mode P3 landed `1e237612` (Flash 3 runs; Claude mutation check 16/16 red; audit marker for 17 unknown->print assert rewrites).
 
 - 2026-11-21: five bug statuses corrected + Fix commit headers (`b8f1b19b`); Fix-commit recurrence on 2026-10-25 doc (`a985b682`, operator decision); Linux CI red fixed: password-bundle M6/N6/N7 assumed a Mac host (`4b8561af`, P3 doc, CI pending).
 

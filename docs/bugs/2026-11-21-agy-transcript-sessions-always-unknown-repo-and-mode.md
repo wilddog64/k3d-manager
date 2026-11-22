@@ -1,9 +1,10 @@
 # Bug: agy sessions from transcripts always report repo and mode "unknown"
 
-**Status:** OPEN — filed 2026-11-21; dispatched to Flash on operator instruction
+**Status:** LANDED — `1e237612` on k3d-manager-v1.45.0 (Flash, 3 runs; Claude verified 244/244 and mutation check: 16 mutants all red)
+**Fix commit:** `1e237612`
 **Priority:** P3
 **Classified:** pending (Argon, from this doc alone)
-**Waiting on:** fix running — since 2026-11-21 (resume 1 for review findings R1, R2)
+**Waiting on:** live check — since 2026-11-21 (E6/E7/E8 after hub-deploy and the next metrics push)
 **Introduced by:** `b44f5efd` (fix for `docs/bugs/2026-11-04-agy-activity-no-data-local-ledger-coverage.md`, landed in v1.43.14)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
