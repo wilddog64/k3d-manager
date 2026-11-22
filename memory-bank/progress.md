@@ -9,12 +9,14 @@
   test-all metrics `64a8de5c` (E3); dispatch-stall C `e05a08ed` (E8) and B (E9/E10); remote-promote 2a VERIFIED, 2d (E11);
   hub-deploy self-update `3b541f3b`; remote-promote 2c `c17eae59` (VERIFIED offline, hub-deploy owed); password-bundle
   Keychain P3 `3971fa3f` (m4-air retry owed); multi-project M2 bug metrics; Astra metrics; lib-foundation v0.5.7 subtree.
-- **Open dispatches:** web-console C r2 (Codex astra; resume 4 stopped on Codex usage limit 12:08, partial uncommitted; spec v6 `0f07641a`).
+- **Open dispatches:** web-console C r2 (Luna resume 7 done; 168-mutant rerun running before land); agy-repo-mode P3 (Flash, dispatched 2026-11-21).
 - **Not started:** 2b promote wiring, web-console B (both unblocked by 2c), red-team gate (intents approved).
 - **Rechecked 2026-11-21:** offline test-all P2, C1-C4 none reproduce (`af2cc5d9`), to grooming.
 - **Captured P3:** hub_deploy.bats catch-up test index.lock race (`0c999bbe`).
 - **v1.46.0:** plan 6 travel-bundle iPad SSH spec v1.1, intent approved (implementation in v1.46.0 only).
 
 ## Log
+
+- 2026-11-21: P3 agy transcript sessions always unknown repo/mode — filed, dispatched to Flash (`gemini-3.8-flash-medium`).
 
 - 2026-11-21: progress compressed; full log archived to `memory-bank/archive/progress-2026-11-21.md`.
