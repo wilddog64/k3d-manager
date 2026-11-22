@@ -12,6 +12,8 @@ import math
 import statistics
 import os
 import re
+import shutil
+import sqlite3
 import tempfile
 import time
 import datetime
@@ -2353,7 +2355,123 @@ def _agy_ledger_metrics(lines, ledger, now):
                 lines.append(f'k3dm_agy_tokens{{window="{window}",mode="{mode}",kind="{kind}"}} {value}')
 
 
-def _agy_metrics(lines, ledger, now, brain_root=None, events=None):
+def _decode_varint(data, pos):
+    val = 0
+    shift = 0
+    length = len(data)
+    while pos < length:
+        b = data[pos]
+        pos += 1
+        val |= (b & 0x7F) << shift
+        if not (b & 0x80):
+            return val, pos
+        shift += 7
+        if shift > 70:
+            raise ValueError("Varint too long")
+    raise ValueError("Truncated varint")
+
+
+def _iter_protobuf_fields(data):
+    pos = 0
+    length = len(data)
+    while pos < length:
+        key, pos = _decode_varint(data, pos)
+        field_no = key >> 3
+        wire_type = key & 0x07
+        if field_no == 0:
+            raise ValueError("Invalid field number 0")
+        if wire_type == 0:
+            val, pos = _decode_varint(data, pos)
+            yield field_no, wire_type, val
+        elif wire_type == 1:
+            if pos + 8 > length:
+                raise ValueError("Truncated 64-bit field")
+            val = data[pos : pos + 8]
+            pos += 8
+            yield field_no, wire_type, val
+        elif wire_type == 2:
+            chunk_len, pos = _decode_varint(data, pos)
+            if pos + chunk_len > length:
+                raise ValueError("Truncated length-delimited field")
+            val = data[pos : pos + chunk_len]
+            pos += chunk_len
+            yield field_no, wire_type, val
+        elif wire_type == 5:
+            if pos + 4 > length:
+                raise ValueError("Truncated 32-bit field")
+            val = data[pos : pos + 4]
+            pos += 4
+            yield field_no, wire_type, val
+        else:
+            raise ValueError(f"Unsupported wire type {wire_type}")
+
+
+def _extract_agy_repo_from_blob(blob):
+    try:
+        first_ws = None
+        for field_no, wire_type, val in _iter_protobuf_fields(blob):
+            if field_no == 1 and wire_type == 2:
+                first_ws = val
+                break
+        if first_ws is None:
+            return "other"
+        field_1_3 = None
+        for field_no, wire_type, val in _iter_protobuf_fields(first_ws):
+            if field_no == 3 and wire_type == 2:
+                field_1_3 = val
+                break
+        if not field_1_3:
+            return "other"
+        repo_str = None
+        for field_no, wire_type, val in _iter_protobuf_fields(field_1_3):
+            if field_no == 1 and wire_type == 2:
+                repo_str = val.decode("utf-8")
+                break
+        if not repo_str:
+            return "other"
+        repo = repo_str.rsplit("/", 1)[-1]
+        if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo):
+            return repo
+        return "other"
+    except Exception:
+        return "unknown"
+
+
+def _read_agy_repo_from_db(brain_root, session_id):
+    conv_dir = Path(brain_root).parent / "conversations"
+    db_path = conv_dir / f"{session_id}.db"
+    if not db_path.is_file():
+        return "unknown"
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_db = Path(tmp_dir) / f"{session_id}.db"
+            shutil.copyfile(db_path, tmp_db)
+            wal_path = conv_dir / f"{session_id}.db-wal"
+            if wal_path.is_file():
+                shutil.copyfile(wal_path, Path(tmp_dir) / f"{session_id}.db-wal")
+            shm_path = conv_dir / f"{session_id}.db-shm"
+            if shm_path.is_file():
+                shutil.copyfile(shm_path, Path(tmp_dir) / f"{session_id}.db-shm")
+
+            blob = None
+            conn = sqlite3.connect(str(tmp_db))
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT data FROM trajectory_metadata_blob")
+                row = cur.fetchone()
+                if row and isinstance(row[0], (bytes, bytearray, memoryview)):
+                    blob = bytes(row[0])
+            finally:
+                conn.close()
+
+            if blob is None:
+                return "unknown"
+            return _extract_agy_repo_from_blob(blob)
+    except Exception:
+        return "unknown"
+
+
+def _agy_metrics(lines, ledger, now, brain_root=None, events=None, agy_repo_cache=None):
     brain_root = Path(brain_root or os.environ.get(
         "K3DM_AGY_BRAIN_DIR", str(Path.home() / ".gemini/antigravity-cli/brain")))
     host = re.sub(r"[^A-Za-z0-9_.-]", "_", socket.gethostname().split(".", 1)[0])
@@ -2409,6 +2527,103 @@ def _agy_metrics(lines, ledger, now, brain_root=None, events=None):
         lines.append(f"k3dm_agy_transcript_skipped_lines {skipped}")
         if latest is not None:
             lines.append(f"k3dm_agy_latest_step_timestamp {latest}")
+        cache_path = agy_repo_cache or os.environ.get(
+            "K3DM_AGY_REPO_CACHE", str(Path.home() / ".local/share/k3d-manager/agy-usage/repo-cache.json"))
+        cache_file = Path(cache_path) if cache_path else None
+        cache = {}
+        if cache_file:
+            try:
+                if cache_file.is_file():
+                    raw = json.loads(cache_file.read_text(encoding="utf-8"))
+                    if isinstance(raw, dict):
+                        cache = raw
+            except Exception:
+                cache = {}
+        conv_dir = brain_root.parent / "conversations"
+        session_raw_repos = {}
+        cache_dirty = False
+        for session_id, _ in sessions:
+            db_path = conv_dir / f"{session_id}.db"
+            wal_path = conv_dir / f"{session_id}.db-wal"
+            db_mtime_ns = None
+            db_size = None
+            wal_mtime_ns = None
+            wal_size = None
+            try:
+                if db_path.is_file():
+                    st = db_path.stat()
+                    db_mtime_ns = st.st_mtime_ns
+                    db_size = st.st_size
+                if wal_path.is_file():
+                    w_st = wal_path.stat()
+                    wal_mtime_ns = w_st.st_mtime_ns
+                    wal_size = w_st.st_size
+            except OSError:
+                pass
+
+            cached = cache.get(session_id)
+            if (isinstance(cached, dict)
+                    and cached.get("db_mtime_ns") == db_mtime_ns
+                    and cached.get("db_size") == db_size
+                    and cached.get("wal_mtime_ns") == wal_mtime_ns
+                    and cached.get("wal_size") == wal_size
+                    and isinstance(cached.get("repo"), str)
+                    and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", cached["repo"])):
+                session_raw_repos[session_id] = cached["repo"]
+            else:
+                repo = _read_agy_repo_from_db(brain_root, session_id)
+                session_raw_repos[session_id] = repo
+                cache[session_id] = {
+                    "repo": repo,
+                    "db_mtime_ns": db_mtime_ns,
+                    "db_size": db_size,
+                    "wal_mtime_ns": wal_mtime_ns,
+                    "wal_size": wal_size,
+                }
+                cache_dirty = True
+
+        cutoff_30d = now - WINDOWS["30d"]
+        sessions_in_30d = {session_id for session_id, steps in sessions
+                           if any(cutoff_30d <= ts <= now for ts, _ in steps)}
+        keys_to_drop = [sid for sid in cache if sid not in sessions_in_30d]
+        if keys_to_drop:
+            for sid in keys_to_drop:
+                del cache[sid]
+            cache_dirty = True
+
+        if cache_file and cache_dirty:
+            try:
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                fd, tmp_file = tempfile.mkstemp(dir=cache_file.parent, prefix="repo-cache-", suffix=".tmp")
+                with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                    json.dump(cache, stream, indent=2)
+                os.chmod(tmp_file, 0o600)
+                os.replace(tmp_file, cache_file)
+            except Exception:
+                pass
+
+        counts = defaultdict(int)
+        for session_id, steps in sessions:
+            if session_id in sessions_in_30d:
+                r = session_raw_repos[session_id]
+                if r not in ("unknown", "other"):
+                    counts[r] += 1
+        top = {name for name, _ in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:10]}
+        interactive_ids = set()
+        history_path = brain_root.parent / "history.jsonl"
+        try:
+            with history_path.open("r", encoding="utf-8") as stream:
+                for line in stream:
+                    try:
+                        row = json.loads(line)
+                        if isinstance(row, dict):
+                            cid = row.get("conversationId")
+                            if isinstance(cid, str):
+                                interactive_ids.add(cid)
+                    except (ValueError, TypeError):
+                        continue
+        except OSError:
+            pass
         for window, seconds in WINDOWS.items():
             cutoff = now - seconds
             selected = []
@@ -2418,22 +2633,30 @@ def _agy_metrics(lines, ledger, now, brain_root=None, events=None):
                     selected.append((session_id, in_window))
             if not selected:
                 continue
-            count = len(selected)
-            untracked = sum(session_id not in dispatch_sessions for session_id, _ in selected)
-            active = 0
-            totals = defaultdict(int)
-            for _, steps in selected:
-                stamps = sorted(ts for ts, _ in steps)
-                active += sum(min(300, max(0, right-left)) for left, right in zip(stamps, stamps[1:]))
-                for _, tokens in steps:
-                    for kind, value in tokens.items():
-                        totals[kind] += value
-            labels = f'window="{window}",mode="unknown",repo="unknown"'
-            lines.append(f"k3dm_agy_sessions{{{labels}}} {count}")
-            lines.append(f"k3dm_agy_untracked_sessions{{{labels}}} {untracked}")
-            lines.append(f'k3dm_agy_active_seconds{{window="{window}",mode="unknown"}} {active}')
-            for kind, value in totals.items():
-                lines.append(f'k3dm_agy_tokens{{window="{window}",mode="unknown",kind="{kind}"}} {value}')
+            by_mode = defaultdict(list)
+            groups = defaultdict(list)
+            for session_id, in_window in selected:
+                raw_repo = session_raw_repos[session_id]
+                repo = raw_repo if raw_repo in top else ("unknown" if raw_repo == "unknown" else "other")
+                mode = "interactive" if session_id in interactive_ids else "print"
+                by_mode[mode].append((session_id, in_window))
+                groups[(mode, repo)].append((session_id, in_window))
+            for (mode, repo), group in groups.items():
+                labels = f'window="{window}",mode="{mode}",repo="{repo}"'
+                lines.append(f"k3dm_agy_sessions{{{labels}}} {len(group)}")
+                lines.append(f"k3dm_agy_untracked_sessions{{{labels}}} {sum(s_id not in dispatch_sessions for s_id, _ in group)}")
+            for mode, group in by_mode.items():
+                active = 0
+                totals = defaultdict(int)
+                for _, steps in group:
+                    stamps = sorted(ts for ts, _ in steps)
+                    active += sum(min(300, max(0, right-left)) for left, right in zip(stamps, stamps[1:]))
+                    for _, tokens in steps:
+                        for kind, value in tokens.items():
+                            totals[kind] += value
+                lines.append(f'k3dm_agy_active_seconds{{window="{window}",mode="{mode}"}} {active}')
+                for kind, value in totals.items():
+                    lines.append(f'k3dm_agy_tokens{{window="{window}",mode="{mode}",kind="{kind}"}} {value}')
         return
     ledger_path = Path(ledger)
     if ledger_path.is_file():
@@ -2835,7 +3058,7 @@ def _render_dispatch_gates(lines, events):
 
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
            codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None,
-           claude_usage_cache=None):
+           claude_usage_cache=None, agy_repo_cache=None):
     now = time.time() if now is None else now
     events, bad_stall = _prepare_stall_events(events)
     bad_lines += bad_stall
@@ -2952,7 +3175,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
     else:
         _quota_efficiency(lines, events, None, now)
     _claude_quota(lines, claude_usage_cache)
-    _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now, events=events)
+    _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now, events=events, agy_repo_cache=agy_repo_cache)
     _render_dispatch_gates(lines, events)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
     return "\n".join(lines) + "\n"
@@ -2994,6 +3217,7 @@ def main(argv=None):
     parser.add_argument("--claude-projects", default=str(Path.home() / ".claude" / "projects" / repo_key))
     parser.add_argument("--claude-cache", default=str(Path.home() / ".local/share/k3d-manager/claude-usage/rollup.json"))
     parser.add_argument("--claude-usage-cache", default=os.path.join(os.environ.get("STATUSLINE_CACHE_DIR") or "/tmp/claude", "statusline-usage-cache.json"))
+    parser.add_argument("--agy-repo-cache", default=os.environ.get("K3DM_AGY_REPO_CACHE", str(Path.home() / ".local/share/k3d-manager/agy-usage/repo-cache.json")))
     args = parser.parse_args(argv)
     if args.spec_stats is not None:
         print(json.dumps(_spec_stats(args.spec_stats), separators=(",", ":")))
@@ -3005,7 +3229,7 @@ def main(argv=None):
     payload = render(events, bad_lines, prices=model_prices, subscriptions=subscriptions,
                      checked=checked, codex_home=args.codex_home, claude_records=claude_records,
                      claude_prices=claude_prices, claude_context=claude_context, repo_root=_repo_root(),
-                     claude_usage_cache=args.claude_usage_cache)
+                     claude_usage_cache=args.claude_usage_cache, agy_repo_cache=args.agy_repo_cache)
     if args.dry_run:
         print(payload, end="")
         return 0
