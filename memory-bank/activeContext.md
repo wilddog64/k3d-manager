@@ -1,4 +1,4 @@
-## Handoff — 2026-11-22 14:07 PST — grooming in progress; 1 dispatch running (2b) — START HERE
+## Handoff — 2026-11-22 14:24 PST — operator home; CI fix aa920a6f running for promote — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
@@ -34,6 +34,9 @@
 - Carried agenda items (from 11-21): pre-commit `**Fix commit:**` rule; agy-quota-dashboard DRAFT placement; offline
   test-all P2 close C3/C4; pull `v1.51.0-bug-count-query-translation` forward with the ask-docs P2; out-of-band repo
   tracking (dirused) + per-project quota.
+
+**Tonight (operator home):** CI reds fixed `aa920a6f` (operator go); give `make hub-deploy REF=aa920a6f` when green.
+  Local unpushed (push after CI green): ideas kagent row `d706d647`, istio-ambient P2 bug. deploy-worker pending.
 
 **v1.45.0 state:** remote-promote 1/2a/2c/2d/2e landed, 2b running; travel bundle, multi-project, stall-recovery landed;
 web-console A live-verified, C LANDED `1026dbe2`/`c79c8ec0`, B = operator captures; make-up-app-none carried out.
