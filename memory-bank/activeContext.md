@@ -1,4 +1,4 @@
-## Handoff — 2026-11-22 13:11 PST — grooming in progress; 2 dispatches running — START HERE
+## Handoff — 2026-11-22 13:17 PST — grooming in progress; 2b running, Hostinger awaiting scope go — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
@@ -11,7 +11,10 @@
 - 2b: resume 2 still incomplete (E5 4 tests + E7 2 done; E1 and E2 one test each; E3, E4, guards, table missing).
   It found and fixed a Makefile `$_got` escaping defect (M10). Resume 3 = E1+E3 only in hub_promote.bats; resume 4
   planned = E4 + sudo/launchctl guards + base/mutant table. Review the Makefile change at verify.
-- `2026-11-08-slack-hostinger-status-duplicates-cluster-status` dispatched to Luna 2026-11-22 (index.js free after reauth).
+- Hostinger-status P3: verified offline, committed `fe64b3f7` on task branch (55 node / 10 bats / 46 pytest green;
+  pre-fix 1+5+2 red; N2 mutant red). Land refused: `scripts/tests/bin/webhook_make_targets.py` (2 assertNotIn lines
+  proving M2's /k3dm help) is not in spec Files. Ask operator: `--allow-out-of-scope` for that file.
+- 2b resume 4 running (correction): M8 misplaced `--approval` → exit 2 fix + 2 fixture fixes; resume 3 found it.
 - On each exit: verify from git (not the worker's report), must_not red on old code, full land `--test` set under
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit
   on the release branch while a land runs (ff-only merge).
