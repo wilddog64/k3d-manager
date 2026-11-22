@@ -17,6 +17,7 @@
 
 ## Log
 
+- 2026-11-22: ideas row: CRAP score per function with Grafana dashboard (Python slice first, bash via kcov after proof).
 - 2026-11-22: C r2 land attempts: scope exception recorded in spec (`2d9db6ab`, operator "go ahead"); rebase conflict in not-installed.list (2c promote-authority lines vs totp lines) resolved keeping both, task now `d85926d4`; land then refused for instruction files from the release branch's own `1ab308ef` (dispatcher diffs from dispatch base, not merge-base). P2 captured. Land waiting on operator decision for --allow-instruction-files.
 - 2026-11-22: C r2 Claude verification PASS under sandbox-exec + watcher: totp bats 34/34, sshd bats 58/58, pytest 142; mutants G8 (22 s, no stuck proc), G9b, B27, B34, B39 RED; D40 equivalent. Worktree committed `a2de8299`. Land refused: scripts/tests/bin/web_console_sshd.bats not in spec file list (test-only: sudo/launchctl guard stubs, scratch ZDOTDIR, git stub split). `--allow-out-of-scope` rerun blocked by auto-mode classifier; waiting on operator decision.
 - 2026-11-22: C r2 resume 9 exited 0 (no root sudo seen). Luna: pytest 142, totp bats 34, sshd bats 58; G8 mutant red in 20 s under sandbox-exec, no new stuck process. D40: no test added; Claude confirmed equivalent mutant (both handlers load state only after a full line, then close; one load per connection). Claude verification running under sandbox-exec + watcher.
