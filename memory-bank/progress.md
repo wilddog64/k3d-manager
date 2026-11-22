@@ -17,7 +17,7 @@
 
 ## Log
 
-- 2026-11-22: PasswordBundleStale root cause: hub launchd publish run hung since 02:01 (PID alive, later runs skipped); P2 filed `10333ca5` (plugin-only whole-run timeout; Makefile per-call timeouts after C r2). Fable spec review running; Luna dispatch after intents approved. Operator workaround: launchctl kickstart -k on m5.
+- 2026-11-22: PasswordBundleStale root cause: hub launchd publish run hung since 02:01 (PID alive, later runs skipped); P2 filed `10333ca5` (plugin-only whole-run timeout; Makefile per-call timeouts after C r2). Live hang point: `git -C <iCloud dir> rev-parse` blocked in getcwd/open under launchd (kickstarted run hung again; Terminal instant). Spec rev 2 (Fable folded in, `33157666`), intents approved, dispatched to gpt-6-luna as `password-bundle-publish-timeout`. iCloud-under-launchd investigation (Claude, read-only on m5) in progress.
 - 2026-11-22: P3 captured: test-all failures cannot be traced to the Mac that ran them (`2aa488fc`); both failing cases and whole files pass on m4-air, run came from m5 or m2 (no host label). PasswordBundleStale alert on hub: investigation waiting on operator's m5 pane output (SSH key refused, no tmux server on m4).
 - 2026-11-22: C r2 mutant rerun done; B27 bypassed outer guard via bats PATH resets (real sudo prompt, no ticket, killed); Luna resume 8 dispatched. Ideas row: stall watch for Claude background jobs (`270dfae4`).
 
