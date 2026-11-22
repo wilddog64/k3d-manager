@@ -13,7 +13,7 @@ doc shows the data is in agy's conversation DB. `make find-similar-docs` not run
 the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-21).
 **Approval:** operator, 2026-11-21: "can you check that then write a plan or bug ... if it is a bug then dispatch to flash"
 **Intent approved:** operator, 2026-11-21
-Intent approval rests on that dispatch instruction; the intents were shown to the operator after dispatch.
+Intents E1-E6 shown to the operator after dispatch; operator confirmed 2026-11-21: "intent approve".
 **Branch:** `k3d-manager-v1.45.0`
 **Severity:** low — two Agent Activity panels show a single "unknown" bar; totals are correct
 

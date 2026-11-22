@@ -81,7 +81,7 @@ agy/Codex report green suites they did not run; worker cd failures can delete un
   symlink (ask before changing).
 
 ## Grooming 2026-11-22 agenda
-- P3 `docs/bugs/2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md` filed and dispatched to Flash on operator instruction (repo from conversation DB `trajectory_metadata_blob` field 1.3.1, mode from history.jsonl); plan agy-quota-dashboard now reuses its reader.
+- P3 `docs/bugs/2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md` filed and dispatched to Flash on operator instruction, intents explicitly approved 2026-11-21 (repo from conversation DB `trajectory_metadata_blob` field 1.3.1, mode from history.jsonl); plan agy-quota-dashboard now reuses its reader.
 - New DRAFT `docs/plans/agy-quota-dashboard.md` (parent + Luna reader child + Flash dashboard child): place in backlog, approve intents, answer its 5 open questions (esp. which machines run agy). Revised same evening: brain transcripts carry per-step time+model+tokens; Agent Activity agy row exists but repo/mode are always `unknown` — plan now fills them and adds tokens by repo/model. Note Argon API rate rises 2026-12-01 (price file single-rate).
 - Offline test-all P2 (`2026-11-09-offline-test-all-red-on-m4-four-root-causes.md`): close C3/C4; C1/C2 → one P3 or close. agy usage reader + calibrated % gauge into argon-bug-classifier plan. hub_deploy.bats race P3: v1.45.0 or later (10-P3 cap).
 - Pull `docs/plans/v1.51.0-bug-count-query-translation.md` forward into the next open minor, displacing a not-started plan (operator 2026-11-17 "sounds good"); triage `docs/bugs/2026-11-17-ask-docs-list-wording-answers-old-release.md` with it.
