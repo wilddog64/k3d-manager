@@ -1,12 +1,12 @@
 # Bug: password-bundle publish can hang forever and silently stop every later run
 
-**Status:** OPEN — filed 2026-11-22
+**Status:** OPEN â filed 2026-11-22
 **Priority:** P2
 **Introduced by:** ddd9329e (travel bundle, v1.45.0 plan 2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-22
-**Prior art:** `docs/bugs/2026-11-22-test-all-failures-not-attributable-to-host.md` (slug grep, not scored) — read, different root cause; `make find-similar-docs` not run (vector store unreachable from m4-air).
+**Waiting on:** fix running â since 2026-11-22
+**Prior art:** `docs/bugs/2026-11-22-test-all-failures-not-attributable-to-host.md` (slug grep, not scored) â read, different root cause; `make find-similar-docs` not run (vector store unreachable from m4-air).
 **Approval:** operator, 2026-11-22: "go ahead to file a P2 bug then dispatch to Luna" (dispatch without waiting for triage); Fable spec review requested by the operator, folded in (rev 2).
 **Intent approved:** operator, 2026-11-22
 Intents approved for rev 2, E1-E6 ("Approve, dispatch + investigate").
@@ -30,10 +30,10 @@ after it was skipped, and the stale alert (no successful publish for 2 h) fired.
 
 `launchctl kickstart -k` killed 88191 (last exit -15) and started PID 7460, which hung at once:
 
-- Process tree: `bash 7460` → `bash 7521` → `git 7524`, all state S, over 1:38 elapsed.
+- Process tree: `bash 7460` â `bash 7521` â `git 7524`, all state S, over 1:38 elapsed.
 - `git 7524` is `git -C "$HOME/Library/Mobile Documents/com~apple~CloudDocs/k3dm/password-bundle" rev-parse --is-inside-work-tree`
   (`scripts/plugins/password_bundle.sh:141`), Homebrew git 2.56.1, cwd the iCloud delivery folder.
-- `sample 7524`: `cmd_rev_parse` → `setup_git_directory_gently` → `strbuf_getcwd` → `__getcwd` → `open$NOCANCEL`
+- `sample 7524`: `cmd_rev_parse` â `setup_git_directory_gently` â `strbuf_getcwd` â `__getcwd` â `open$NOCANCEL`
   (blocked in the kernel).
 
 The same line returns at once from the operator's Terminal. When launchd runs the job, opening paths in iCloud Drive
@@ -48,6 +48,16 @@ Narrowed down (Claude, m5-air, 04:44-04:47, read-only):
   same `git -C ... rev-parse --is-inside-work-tree` returns at once (rc 128, not a repo: the expected pass). So the
   lock alone does not block it; the block is specific to the launchd job. Open hypothesis: a privacy prompt or grant
   for the launchd-run process waiting on the locked screen. Next check: the operator unlocks m5 and looks for a dialog.
+
+**Confirmed 2026-11-22 04:56.** On unlocking m5, the operator found the dialog "“bash” wants to access files managed by
+“iCloud Drive”" waiting, and chose Allow. The stuck run 7460 then finished: `launchctl list` showed `-  0`, and
+`PB_STATE/last-publish` moved to 04:56:26. The bundle was not rewritten because its hash had not changed (files still
+dated Nov 21 11:29). The macOS privacy prompt blocks the file call until answered, and a locked headless hub never
+answers. The grant is for `/opt/homebrew/bin/bash`; Homebrew bash is not signed by Apple, so an upgrade may bring the
+prompt back.
+
+Follow-up for triage (not in this fix): keep the bash grant and re-grant after upgrades, or move the delivery folder
+out of iCloud Drive. Either way, this fix turns the next occurrence into a reported failure within 5 minutes.
 
 ### Why nothing recovers
 
