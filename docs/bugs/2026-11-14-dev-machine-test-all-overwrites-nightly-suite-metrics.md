@@ -2,7 +2,8 @@
 
 **Status:** LANDED — `64a8de5c` (Flash, v1.45.0; plan `docs/plans/test-all-metrics-explicit-pushgateway.md`); captured 2026-11-14 by Claude (alert investigation)
 **Priority:** P2 (operator, 2026-11-14)
-**Waiting on:** live check — since 2026-11-18 (E2 on the M4 by Claude; E3 after promote: operator re-runs `make install-test-metrics` on the hub)
+**Fix commit:** `64a8de5c`
+**Waiting on:** live check — since 2026-11-18 (E2 on the M4 by Claude; E3 after promote: operator re-runs `make install-test-metrics` on the hub; fix is on `deploy/hub` since hub-promote/20261121T135500Z, so E3 can run now)
 **Triage:** carry → v1.45.0, batched with install-test-metrics (same files) — operator grooming 2026-11-15 ("Accept as shown")
 **Release:** v1.44.1 (operator approved Claude's recommendation, 2026-11-14)
 **Introduced by:** unknown

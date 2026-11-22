@@ -2,6 +2,7 @@
 
 **Status:** VERIFIED — lib-foundation `a561b16`, merged to main `15d5001` (PR #89, 2026-11-18; CI 3/3 green on ubuntu-26.04) (noclobber lock claims for `_run_parallel_worker` and `_foundation_vcluster_lock`; root cause uutils `mkdir` on ubuntu-26.04); test fixes `7027b38`; subtree-pulled into k3d-manager `8fad0831`, k3d-manager CI 7/7 green on `11b3cc96` (run 44440453522)
 **Priority:** P2
+**Fix commit:** `8fad0831` (subtree pull of lib-foundation v0.5.7; upstream fix `a561b16`)
 **Triage:** carry → v1.45.0; Priority raised P3 → P2 (Argon P2 accepted: drops a worker result); fix upstream in lib-foundation — operator grooming 2026-11-15 ("Accept as shown")
 **Introduced by:** unknown
 **Should have been caught by:** offline test
@@ -14,7 +15,7 @@
 **Detected by:** Claude, lib-foundation PR #85 (release/v0.5.6) CI run 43594861512 attempt 1, 2026-11-14 12:27Z
 **Affected:** lib-foundation `scripts/lib/system.sh` (`_run_parallel`, `_run_parallel_worker` ~line 865),
 `scripts/tests/lib/run_parallel.bats` lines 47-56 — fix upstream, then subtree-pull
-**Branch:** `k3d-manager-v1.44.0`
+**Branch:** `k3d-manager-v1.45.0` (subtree pull `8fad0831` is not in v1.44.0; corrected 2026-11-21)
 
 ## Symptom
 

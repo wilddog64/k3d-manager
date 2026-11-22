@@ -1,6 +1,9 @@
 # dispatch-metrics: pushes to the hub time out silently and the dispatch dashboards go stale
 
-**Status:** VERIFIED — 795e101e, 2026-11-18 (fix `docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md`, whose E5 and E6 passed live 2026-11-18; live evidence is recorded in the plan)
+**Status:** LIVE-VERIFIED — 795e101e, 2026-11-18 (fix `docs/plans/dispatch-metrics-reliable-push-and-stale-alert.md`, whose E5 and E6 passed live 2026-11-18; live evidence is recorded in the plan)
+**Fix commit:** `795e101e`
+**Live evidence:** 2026-11-18 · run claude-prometheus-rules-read · env m5-air · scenario dispatch-metrics-stale-rule-loaded · commit ebac0d8c · proves E6
+**Live evidence:** 2026-11-18 · run operator-install-dispatch-metrics · env m4-air · scenario dispatch-metrics-push-timeout-retry · commit 795e101e · proves E5
 **Priority:** P2 (operator, 2026-11-18: "reliablity is a higer bug (maybe P2)") — the Agent Dispatch and cost dashboards stop updating with no alert; workaround is a manual `make dispatch-metrics` on the M4
 **Introduced by:** unknown
 **Should have been caught by:** unknown

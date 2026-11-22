@@ -1,11 +1,11 @@
 # Bug: unused `now` in the M2 project-verified test fails CI lint
 
-**Status:** LANDED — fix commit on `k3d-manager-v1.45.0` (this commit); CI green on it pending
+**Status:** VERIFIED — `03b86250`, CI lint green on `4a52c22e` (run 44914316268, 2026-11-21), which contains the fix; no live step (test-only lint fix)
+**Fix commit:** `03b86250`
 **Priority:** P2
 **Introduced by:** `467e1de0` (v1.45.0 plan 3, multi-project M2 bug metrics)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** live check — since 2026-11-18
 **Prior art:** docs/bugs/2026-11-08-spec-intent-test-unused-import-fails-ci-lint.md (exact-symptom precedent, read) — same class: Claude verified with the test suite but not `make lint-python`
 **Approval:** operator, 2026-11-18 ("go ahead": Claude fixes the one line directly, no dispatch)
 **Branch:** `k3d-manager-v1.45.0`
