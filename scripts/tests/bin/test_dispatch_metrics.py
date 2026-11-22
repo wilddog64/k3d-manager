@@ -2685,7 +2685,7 @@ def test_agy_e5_reader_works_on_copy_and_leaves_agy_home_byte_identical(monkeypa
     assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
 
     blob = build_agy_protobuf_blob([{"repo": "wilddog64/k3d-manager"}])
-    db_path = write_agy_conversation_db(home, "sess-copy-test", blob, wal=True, extra_tables=True)
+    write_agy_conversation_db(home, "sess-copy-test", blob, wal=True, extra_tables=True)
     write_agy_transcript(brain, "sess-copy-test", [
         {"created_at": "2027-01-15T08:00:00Z", "input_tokens": 5},
     ], now)

@@ -802,7 +802,7 @@ SH
   chmod 755 "$SCRATCH/early/tmux"
   PATH="$GUARD_BIN:$SCRATCH/early:$PATH"
   _assert_guard_path "$PATH"
-  _WC_PREFIX=''
+  _WC_PREFIX="$root"
   run _wct_find_tmux
   [ "$status" = 0 ]
   [ "$output" = /opt/homebrew/bin/tmux ]

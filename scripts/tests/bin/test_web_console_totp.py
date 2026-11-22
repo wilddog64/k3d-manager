@@ -12,7 +12,6 @@ import select
 import shutil
 import signal
 import socket
-import stat
 import struct
 import subprocess
 import sys
