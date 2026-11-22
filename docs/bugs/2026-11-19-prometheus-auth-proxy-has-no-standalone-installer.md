@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Missing `make install-prometheus-auth-proxy` target prevents standalone reinstallation when reported unwired, with a workaround of running `deploy_observability`.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold (slug `ls` empty; find-similar-docs not run, vector store context missing on the M4)
 

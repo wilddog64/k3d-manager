@@ -5,6 +5,7 @@
 **Introduced by:** the commit "chore(metrics): allow and price gemini-4-hydrogen for dispatch runs" (k3d-manager-v1.44.0, 2026-11-15)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** no (pushed after Copilot's last review of PR #161 at 34112fe3)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Minor metrics hygiene gap where `-xhigh` tier runs are not stripped for price lookup and default to unpriced sessions.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match. `make find-similar-docs` not run.
 **Filed:** 2026-11-16

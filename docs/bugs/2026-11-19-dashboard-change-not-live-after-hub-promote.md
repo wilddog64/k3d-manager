@@ -5,6 +5,7 @@
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Minor 3–7 minute Argo CD auto-sync delay after `hub-deploy`, with an immediate manual hard-refresh annotation workaround if needed sooner.)
 **Waiting on:** operator decision — since 2026-11-19
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from this laptop: context
 `k3d-k3d-cluster` missing). Read `docs/bugs/2026-11-14-plan-dashboard-lags-push-by-up-to-20-minutes.md`: different

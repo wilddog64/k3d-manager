@@ -5,6 +5,7 @@
 **Introduced by:** items 1-2 pre-existing (lib-foundation `f8025a2`); item 3 lib-foundation `a561b16` (v0.5.7, noclobber claims)
 **Should have been caught by:** review
 **Introducing change reviewed:** yes (Argon, Fable) for item 3 — found by Astra and Fable in the PR #89 review, accepted as low and deferred
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Interrupted vCluster downloads or pre-v0.5.7 directory locks leave stale lock files that block subsequent runs until manually removed, plus a non-regular file lock hygiene gap.)
 **Waiting on:** operator decision — since 2026-11-18 (grooming)
 **Prior art:** `docs/bugs/2026-11-14-lib-foundation-run-parallel-collision-test-flakes-on-linux.md` (exact-slug review) — read, different root cause; its plan accepted the old-directory-lock case (item 2). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18

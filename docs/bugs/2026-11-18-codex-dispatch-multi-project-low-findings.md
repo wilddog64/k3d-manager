@@ -5,6 +5,7 @@
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** review
 **Introducing change reviewed:** yes (Argon, missed)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Collection of low-severity CLI, pruning, metrics, test, and documentation hygiene findings in multi-project dispatch.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18

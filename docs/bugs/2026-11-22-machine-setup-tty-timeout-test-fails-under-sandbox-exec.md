@@ -5,6 +5,7 @@
 **Introduced by:** `abcde772` (v1.43.13, `tty_limited` helper)
 **Should have been caught by:** offline test — the helper was never run under the sandbox that land and verifier runs use
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-only failure where `machine_setup.bats` `tty_limited` relies on setuid `/bin/ps` and fails to kill timed-out fixtures when run under `sandbox-exec`.)
 **Waiting on:** operator decision — since 2026-11-22
 **Prior art:** `docs/bugs/2026-10-31-machine-setup-tty-test-hangs-push-gate.md` and `docs/bugs/2026-11-07-machine-setup-tests-inherit-caller-tty.md` (exact-slug and keyword grep; `make find-similar-docs` unavailable on m4) — read, different root cause: those added the time limits; this is the time limit failing to kill under a sandbox
 **Filed:** 2026-11-22

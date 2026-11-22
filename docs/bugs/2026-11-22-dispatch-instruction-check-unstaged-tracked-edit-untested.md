@@ -5,6 +5,7 @@
 **Introduced by:** `0959fc6a` (instruction-file refusal)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-coverage gap where `_dispatch_instruction_files` has no BATS test for unstaged edits to tracked instruction files.)
 **Waiting on:** operator decision — since 2026-11-22
 **Prior art:** `docs/bugs/2026-11-22-dispatch-land-instruction-check-uses-dispatch-base-after-rebase.md` (exact-slug grep, not scored) — read, different root cause: found while verifying it. `make find-similar-docs` not run (unavailable on m4-air).
 **Filed:** 2026-11-22

@@ -5,6 +5,7 @@
 **Introduced by:** c91b4409 (stall detector A2, k3d-manager-v1.44.1)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-only weakness where `dispatch_stall_watch.bats` E4 checks that `errors.txt` is non-empty without asserting the specific git failure output.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-17

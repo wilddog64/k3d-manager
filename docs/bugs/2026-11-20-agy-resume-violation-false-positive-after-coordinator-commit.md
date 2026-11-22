@@ -5,6 +5,7 @@
 **Introduced by:** unknown
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Coordinator commits between rounds trigger a false `VIOLATION: agent committed` on agy resume and block `land`, requiring manual git log inspection and PR landing.)
 **Waiting on:** operator decision — since 2026-11-20
 **Prior art:** none above threshold — `make find-similar-docs` unavailable (vector store context missing), exact-slug glob and `grep -il "agent committed" docs/bugs docs/issues` found nothing
 

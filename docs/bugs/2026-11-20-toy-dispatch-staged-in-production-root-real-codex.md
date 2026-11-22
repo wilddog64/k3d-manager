@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** none
 **Introducing change reviewed:** no
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Process and tooling safeguard gap where chaining `export` after a failing `cd` hook allowed a toy dispatch to start in the production root.)
 **Waiting on:** operator decision — since 2026-11-20
 **Prior art:** none — exact-slug glob only; `make find-similar-docs` unavailable (vector store needs the dead M4 k3d context), `git grep smartcd` hits are passing mentions only
 

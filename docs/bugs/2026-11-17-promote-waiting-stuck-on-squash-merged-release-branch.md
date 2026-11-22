@@ -5,6 +5,7 @@
 **Introduced by:** `46ec5b36` (v1.44.0, promotable lookup in `bin/k3dm-repo-sync`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (False `K3dmPromoteWaiting` alert fires continuously after a squash-merged release, with a workaround of switching the hub checkout to the next release branch.)
 **Waiting on:** operator decision — since 2026-11-17
 **Prior art:** `docs/bugs/2026-11-13-deploy-hub-behind-counts-docs-only-commits.md` (exact-slug pass; `find-similar-docs` not run, vector store needs the hub context) — read, related (docs-only commits counted), different root cause (dead upstream after squash merge). `docs/bugs/2026-11-12-hub-promote-containment-check-blind-to-squash-merges.md` — read, same squash-merge blind spot in a different tool.
 **Filed:** 2026-11-17

@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-only timing flake in `FleetRunnerTests.E3` on slow Windows CI runners.)
 **Waiting on:** operator decision — since 2026-11-18
 **Prior art:** none above threshold (find-similar-docs unavailable: vector store down; exact-slug glob empty)
 **Tracked:** dirused (OOB repo), not a k3d-manager release.

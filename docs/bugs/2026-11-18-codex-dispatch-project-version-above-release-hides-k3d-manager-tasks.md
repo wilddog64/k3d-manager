@@ -5,6 +5,7 @@
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Argon, missed)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Latent version-sorting defect where a project version higher than k3d-manager's release hides k3d-manager tasks in `status` and `stalled`.)
 **Waiting on:** operator decision
 **Prior art:** docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md — read; same helper, opposite direction (that one hides project tasks). `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18

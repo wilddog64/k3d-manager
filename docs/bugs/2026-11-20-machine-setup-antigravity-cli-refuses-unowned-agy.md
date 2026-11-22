@@ -5,6 +5,7 @@
 **Introduced by:** 20c9bc74 (cask:antigravity-cli added to brew.hub.list / brew.worker.list)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (`make machine-setup` fails when an existing working `/opt/homebrew/bin/agy` binary is not tracked by Homebrew, with a workaround of running `brew install --cask --force antigravity-cli`.)
 **Waiting on:** operator decision — since 2026-11-20
 **Prior art:** docs/bugs/2026-10-31-machine-setup-installs-wrong-gemini-and-no-agy.md (exact topic, read) — read, different root cause; find-similar-docs not run
 

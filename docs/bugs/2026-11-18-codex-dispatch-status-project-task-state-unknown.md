@@ -5,6 +5,7 @@
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** no
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Degraded status display and `k3dm-codex-land-pending` matching for non-k3d-manager project tasks, with a workaround of checking `open` and landing directly.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18

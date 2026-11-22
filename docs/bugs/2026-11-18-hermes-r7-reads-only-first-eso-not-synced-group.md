@@ -5,6 +5,7 @@
 **Introduced by:** fadf8438 (Hermes r7 gate, v1.44.2) — the regex predates it
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Fable spec review)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Broken `_r7_precondition` parsing in two-cluster ESO evidence can wrongly offer or withhold repair r7 depending on which cluster's count appears first.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18

@@ -6,6 +6,7 @@
 **Triage:** passed over (1st), unassigned — operator grooming 2026-11-15 (v1.45.0 at the 10-P3 cap: "Pass over today's 3")
 **Introduced by:** pre-existing
 **Should have been caught by:** review
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Cosmetic output issue where `make install-test-metrics` echoes raw recipe lines rather than reporting load status while installation still succeeds.)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4)
 
 ## Symptom

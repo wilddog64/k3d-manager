@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing (present at lib-foundation `f8025a2`, before v0.5.7)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Latent edge cases and test flakiness in `_run_parallel` (unbounded claim loop on invalid paths, dot-prefixed keys, shared `--out`) not triggered by current callers.)
 **Waiting on:** operator decision — since 2026-11-18 (grooming)
 **Prior art:** `docs/bugs/2026-11-14-lib-foundation-run-parallel-collision-test-flakes-on-linux.md` (exact-slug review) — read, different root cause (non-exclusive claim, fixed in v0.5.7). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
 **Filed:** 2026-11-18

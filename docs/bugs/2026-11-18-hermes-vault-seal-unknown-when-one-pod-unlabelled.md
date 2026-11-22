@@ -5,6 +5,7 @@
 **Introduced by:** v1.44.2 Hermes vault_seal sensor (`scripts/lib/hermes/sensors.py:905`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Latent multi-pod sensor edge case where an unlabelled Vault pod causes `vault_seal` to return `unknown`, with no impact on the single-pod hub.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18

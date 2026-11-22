@@ -5,6 +5,7 @@
 **Introduced by:** dd54b653 (2026-06-26, `_acg_upsert_ssh_host`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (ACG sandbox setup mutates tracked `~/.ssh/config` in place with `StrictHostKeyChecking no` and stale host IPs, requiring manual `git checkout` cleanup.)
 **Waiting on:** operator decision — since 2026-11-21
 **Prior art:** not run (find-similar-docs: vector store unavailable); exact-slug glob found none. Read, different root cause: `docs/bugs/2026-10-22-ssh-config-lost-operator-host-aliases.md` (operator aliases lost on rewrite; fixed by `~/.ssh/config.d/operator` + guard).
 

@@ -5,6 +5,7 @@
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Cosmetic dashboard labeling issue where non-worktree scratchpad runs and mismatched-version deleted worktrees appear as `m8src` or `other` in "Tokens by repo".)
 **Waiting on:** operator decision — since 2026-11-19
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from this laptop).
 **Approval:** none yet (capture only)

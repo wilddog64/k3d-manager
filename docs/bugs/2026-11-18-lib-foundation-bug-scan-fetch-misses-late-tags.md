@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing (`_publish_lib_foundation_bugs`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Metrics label lag where `git fetch` without `--tags` misses tags pushed onto already-fetched lib-foundation commits until a subsequent fetch.)
 **Waiting on:** operator decision — since 2026-11-18 (triage)
 **Prior art:** none above threshold (exact-slug check only; `make find-similar-docs` not run)
 **Filed:** 2026-11-18

@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing (order's `ci.yml` has never had a `workflow_dispatch` trigger)
 **Should have been caught by:** spec — the 2026-10-27 product-catalog fix covered one repository and did not check the other app repositories
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Automated CVE rebuild dispatches for `shopping-cart-order` always fail and wipe its build cache because `.github/workflows/ci.yml` lacks `workflow_dispatch`, requiring a manual push to `main`.)
 **Waiting on:** operator decision — since 2026-11-22
 **Prior art:** `docs/bugs/2026-10-27-product-catalog-ci-missing-workflow-dispatch.md` (exact-slug grep, not scored) — read, same root cause in another repository; new doc because the fix lands in `wilddog64/shopping-cart-order`
 **Filed:** 2026-11-22

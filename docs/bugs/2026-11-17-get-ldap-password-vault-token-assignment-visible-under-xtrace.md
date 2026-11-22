@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing (line identical on main)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Hygiene and defense-in-depth issue where `VAULT_TOKEN` assignment is not wrapped in `_no_trace` if someone manually invokes `bash -x`.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-17

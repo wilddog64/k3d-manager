@@ -5,6 +5,7 @@
 **Introduced by:** v1.44.0 (46ec5b36, bin/k3dm-hub-deploy added)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Diagnostic hygiene gap where `bin/k3dm-hub-deploy` lacks an upfront PATH preflight check for `gh` and `envsubst`, causing misleading late errors in non-interactive shells.)
 **Waiting on:** operator decision — since 2026-11-21
 **Prior art:** not run (find-similar-docs: vector store unavailable, context k3d-k3d-cluster missing); exact-slug glob found none. Related, different root cause: `docs/bugs/2026-11-19-hub-deploy-runs-stale-checkout-copy-of-itself.md`.
 

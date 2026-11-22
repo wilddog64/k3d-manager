@@ -5,6 +5,7 @@
 **Introduced by:** v1.34.0 (hermes-scheduled-e2e)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Cosmetic Slack summary formatting omission where the Hermes e2e `PASS` line omits the count of skipped tests.)
 **Waiting on:** operator decision — since 2026-11-21
 **Prior art:** not run (find-similar-docs: vector store unavailable, context k3d-k3d-cluster missing); exact-slug glob found none.
 

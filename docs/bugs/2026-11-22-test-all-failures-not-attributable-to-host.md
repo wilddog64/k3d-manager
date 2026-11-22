@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Observability hygiene gap where `k3dm-test-metrics` lacks a `host` label, preventing the dashboard from identifying which Mac pushed a test failure.)
 **Waiting on:** operator decision
 **Prior art:** `docs/bugs/2026-10-07-test-metrics-stale-failure-series.md` (grep, not scored) — read, different root cause (stale series, not missing host); `make find-similar-docs` not run (vector store unreachable from the M4 on 2026-11-21).
 

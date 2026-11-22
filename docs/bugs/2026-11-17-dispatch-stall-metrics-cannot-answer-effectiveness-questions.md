@@ -5,6 +5,7 @@
 **Introduced by:** `docs/bugs/2026-11-14-dispatch-stall-a-detector.md` (v1.44.1) for detection; stages B and C are not built yet
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Observability and measurement gap in stall recovery metrics rather than broken runtime functionality.)
 **Waiting on:** operator decision — since 2026-11-17 (Q4 baseline decided; priority and placement at triage)
 **Prior art:** `docs/bugs/2026-11-14-dispatch-stall-*.md` (exact-slug pass; `find-similar-docs` not run, vector store needs the hub context) — read, none records these four measures. `docs/bugs/2026-11-14-dispatch-stall-metrics-emit-no-zero-series-without-events.md` — related dashboard series, different gap.
 **Filed:** 2026-11-17

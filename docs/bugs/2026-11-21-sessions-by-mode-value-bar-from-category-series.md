@@ -5,6 +5,7 @@
 **Introduced by:** aa1196ed (v1.43.15 added `k3dm_codex_sessions{window,category}` under the same metric name the v1.43.6 panel groups by `mode`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Cosmetic Grafana query defect where `sum by (mode)` includes mode-less category series as an extra "Value" bar on the Agent Activity dashboard.)
 **Waiting on:** operator decision — since 2026-11-21
 **Prior art:** exact-slug glob none; `ls docs/bugs | grep -iE 'sessions-by-mode|value-bar|codex-sessions'` none; `make find-similar-docs` not run (vector store unavailable on the M4 earlier today)
 **Branch:** `k3d-manager-v1.45.0` (target set at triage)

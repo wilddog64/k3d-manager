@@ -5,6 +5,7 @@
 **Introduced by:** `6b34bd55` (v1.45.0 plan 4, web-console part A)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Code style, test coverage, and test execution speed hygiene issues in `bin/k3dm-web-console-sshd` and `web_console_sshd.bats`.)
 **Waiting on:** operator decision — since 2026-11-19
 **Prior art:** not run (find-similar-docs vector store unavailable: cluster context missing); exact-slug glob found no match
 

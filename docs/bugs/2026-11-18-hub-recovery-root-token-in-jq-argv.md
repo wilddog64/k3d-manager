@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing (`scripts/plugins/hub_recovery.sh:75` on `main`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Security hygiene rule violation where the Keychain fallback passes the Vault root token via `jq --arg` argv instead of stdin.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18

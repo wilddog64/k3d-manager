@@ -5,6 +5,7 @@
 **Introduced by:** unknown (web-console part A, v1.45.0)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Cosmetic stderr noise on first `install-web-console-sshd` run where `sshd -t`/`-T` prints two harmless "Unable to load host key" warnings before succeeding.)
 **Waiting on:** operator decision
 **Prior art:** exact-slug glob none; grep `Unable to load host key` in docs/bugs and docs/issues none; `make find-similar-docs` not run (vector store unavailable)
 

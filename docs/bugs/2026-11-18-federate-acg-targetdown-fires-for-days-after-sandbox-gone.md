@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Alert noise where `TargetDown{job="federate-acg"}` sends a daily warning email after an ACG sandbox is torn down or expires.)
 **Waiting on:** operator decision
 **Prior art:** `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md` (exact-slug review) — read, related (sandbox expiry leaves hub state behind), different object; `docs/bugs/2026-10-03-acg-sandbox-critical-alerts-send-sms.md` — read, routing only. `make find-similar-docs` not run.
 **Filed:** 2026-11-18
