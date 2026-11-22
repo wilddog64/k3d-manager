@@ -37,3 +37,4 @@
 - 2026-11-22: grooming started: Argon classified 53 bugs; Fable ideas review done; remote-promote 3a/3b drafted (untracked).
 - 2026-11-22: 2b, Hermes correlator, Hermes reauth dispatched to Luna (3 of 3).
 - Order main CI after #109 merge green (run 45081470809, promote e64ae03b); E3 still waits for the 01:00 PT scan.
+- hoverfocus (new OOB repo, focus-follows-mouse without raise): M1 specs a5e315b8 (umbrella, M1a Luna core, M1b Flash shell, parallel split trial); Fable review running; repo name/visibility and intents pending operator.

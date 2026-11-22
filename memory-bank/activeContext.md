@@ -98,3 +98,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 - 2026-11-22: memory-bank compressed (operator ask); previous file archived to `memory-bank/archive/activeContext-2026-11-22.md`.
 - 2026-11-21: memory-bank compressed; log archived to `memory-bank/archive/activeContext-2026-11-21.md`.
+- hoverfocus (new OOB repo, focus-follows-mouse without raise): M1 specs a5e315b8 (umbrella, M1a Luna core, M1b Flash shell, parallel split trial); Fable review running; repo name/visibility and intents pending operator.
