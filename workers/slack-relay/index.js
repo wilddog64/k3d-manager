@@ -1,6 +1,6 @@
 const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
-const REAUTH_TTL_SECONDS   = 86400
+const REAUTH_TTL_SECONDS   = 600
 const HERMES_ACTION_ID_RE  = /^[rd][0-9]+-[0-9a-f]{8}$/
 const HERMES_NONCE_RE      = /^[0-9a-f]{16}$/
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
@@ -269,7 +269,13 @@ async function handleInteractivity(req, event) {
       `⛔ Your ${decision} of ${actionId} was NOT recorded: you are not authorized to approve or deny Hermes repairs`, true, '', false)
     if (!await kv.get(`reauth:${userId}`)) {
       return postResponseUrl(responseUrl,
-        `🔐 Your ${decision} of ${actionId} was NOT recorded: re-authenticate with /hermes-auth (valid for 24h), then press again`, true, '', false)
+        `🔐 Your ${decision} of ${actionId} was NOT recorded: re-authenticate with /hermes-auth; it lasts 10 minutes and covers the next Approve or Deny, then press again`, true, '', false)
+    }
+    try {
+      await kv.delete(`reauth:${userId}`)
+    } catch (_) {
+      return postResponseUrl(responseUrl,
+        `⚠️ Your ${decision} of ${actionId} was NOT recorded: re-authentication could not be used; run /hermes-auth and try again`, true, '', false)
     }
     if (action.action_id === 'hermes_approve') {
       await kv.put(`approval:${actionId}`,
@@ -401,7 +407,7 @@ async function handle(req, event) {
     if (!kv) return jsonReply('⚠️ Hermes approvals are not configured on the relay', threadTs, true)
     if (!approverAllowed(userId)) return jsonReply('⛔ You are not authorized to approve Hermes repairs', threadTs, true)
     await kv.put(`reauth:${userId}`, '1', { expirationTtl: REAUTH_TTL_SECONDS })
-    return jsonReply('🔐 Re-authenticated for 24h — you can now approve Hermes repairs.', threadTs, true)
+    return jsonReply('🔐 Re-authenticated for 10 minutes; this covers your next Approve or Deny.', threadTs, true)
   }
 
   if (command === '/cluster-up') {

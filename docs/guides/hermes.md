@@ -74,10 +74,10 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 The relay worker records approval intent in Cloudflare KV; Hermes drains it on its next normal poll,
 up to ~5 minutes later. Every drained action still passes through `approve()`, which re-validates
 the precondition and preserves the one-attempt-per-incident invariant. Approvers are allowlisted by
-Slack user ID, separately from slash-command roles. `/hermes-auth` grants a 24-hour re-auth; enforce
-MFA at the Slack workspace or channel level. Deny dismisses only and writes no approval, so Hermes
-may re-propose the repair. Each incident carries a random nonce, and buttons from a previous incident
-are dropped.
+Slack user ID, separately from slash-command roles. `/hermes-auth` grants a 10-minute re-auth for one
+Approve or Deny decision. Enforce MFA at the Slack workspace or channel level. Deny dismisses only and
+writes no approval, so Hermes may re-propose the repair. Each incident carries a random nonce, and
+buttons from a previous incident are dropped.
 
 Operator setup (run in Terminal.app):
 
