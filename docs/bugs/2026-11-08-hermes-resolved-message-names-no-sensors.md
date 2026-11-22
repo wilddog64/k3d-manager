@@ -4,7 +4,7 @@
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (The issue only affects the clarity of the Slack resolution message wording while incident detection, correlation, and state transitions work as intended (and is explicitly noted as P3 in the report)); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** fix running — since 2026-11-22
 **Introduced by:** `cd38a7e5` (v1.29.0, Hermes phase 1)
 **Should have been caught by:** spec
 **Severity:** low — misleading Slack message; workaround: read the earlier incident message and `bin/k3dm-hermes` status
