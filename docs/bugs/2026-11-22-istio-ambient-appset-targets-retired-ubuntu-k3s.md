@@ -1,7 +1,7 @@
-# istio-ambient ApplicationSet targets the retired `ubuntu-k3s` cluster; Hostinger Istio is unmanaged
+# Stale ACG sandbox ApplicationSet `istio-ambient` (`ubuntu-k3s`) left on the hub; stale-sandbox sweep misses ArgoCD
 
 **Status:** OPEN — filed 2026-11-22
-**Priority:** P2
+**Priority:** P3 (proposed after operator context 2026-11-22; was P2 — operator decides; P2 again if Hostinger Istio is meant to be Argo-managed)
 **Introduced by:** unknown (ApplicationSet created 2026-10-30 14:18, the hub rebuild; `scripts/etc/argocd/vars.sh:68` defaults `ARGOCD_APP_CLUSTER_NAME` to `ubuntu-k3s`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
@@ -43,3 +43,31 @@ other Hostinger ApplicationSets render `ubuntu-hostinger`; find which reapply pa
 
 No change to the hub. A fix (render with `ubuntu-hostinger`, decide whether the `ubuntu-k3s` default should fail
 closed instead) and the adoption of the running Istio resources by new Applications need a spec and an operator go.
+
+## Operator context 2026-11-22
+
+Operator: "ubuntu-k3s is ACG aws sandbox. this probably a stale resource that need to be cleanup. might be cause by not
+running make down... we should have process to sweep these away".
+
+So the ApplicationSet is a leftover of an ACG AWS sandbox that was not torn down with `make down`, not a Hostinger
+render. Revised reading:
+
+- Current sweep gap: `bin/cleanup-stale-sandbox` (also `/cleanup-stale-sandbox`) stops the sandbox launchd agents and
+  deletes the `ubuntu-k3s` kube context only (lines 18-22). It does not touch ArgoCD: sandbox ApplicationSets,
+  Applications, or cluster secrets stay on the hub. On 2026-11-22 the hub still had the `ubuntu-k3s` kube context too.
+- Open question: Hostinger Istio. The 2026-08-13 issue saw the same `istio-ambient` ApplicationSet rendering
+  `ubuntu-hostinger` with Synced/Healthy Hostinger Istio Applications. Today no Istio Application exists and Hostinger
+  istiod/ztunnel/istio-cni run unmanaged. One ApplicationSet name serves both clusters, so a sandbox `make up` on
+  10-30 may have replaced the Hostinger rendering. Confirm before deleting: deleting the ApplicationSet clears the red
+  but leaves Hostinger Istio unmanaged.
+
+## Proposed fix (for triage)
+
+1. Sweep: extend `bin/cleanup-stale-sandbox` (dry run by default, `--confirm` applies) to list and remove hub ArgoCD
+   objects that target a sandbox cluster with no live registration: ApplicationSets/Applications whose destination is
+   the sandbox name, and the sandbox cluster secret. Report each one; never touch a `ubuntu-hostinger` or hub target.
+2. Detection: an alert or `make hub-status` line for an ApplicationSet with `ErrorOccurred=True` for more than a day,
+   so a 23-day red cannot recur unseen.
+3. Collision: give sandbox and Hostinger renders distinct ApplicationSet names (e.g. `istio-ambient-${APP_CLUSTER_NAME}`),
+   then restore Argo management of Hostinger Istio (adoption needs its own spec; live mesh).
+
