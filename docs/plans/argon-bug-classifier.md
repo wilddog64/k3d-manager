@@ -165,6 +165,29 @@ a small `gen_metadata` sample with Argon and non-Argon rows (field map confirmed
 agy stderr and exit code for a quota error (not yet seen; if it cannot be captured, M4 stays unproven and the phrase
 list is a guess to flag). Fixtures assert their target first (scratch HOME, stub agy on PATH, temp repo).
 
+## Quota calibration evidence
+
+**Point 1 — 2026-11-21 16:28 PST, M4** (operator screenshot of agy `Models & Quota`; tokens decoded read-only from copies of
+`~/.gemini/antigravity-cli/conversations/*.db`, `gen_metadata`).
+
+| Pool (agy panel) | Window | Remaining | Refreshes in | Window start (derived) | Our use in window |
+|---|---|---|---|---|---|
+| Gemini (Neon, Hydrogen, Orchestrator, 3.8 Flash) | 5 h | 97.69% | 2h 43m | 14:11 | 1 conversation (Flash audit, 19 calls): input 187,402, output 112,326 (97,127 thinking), cache read 1,751,464 |
+| Gemini | weekly | 96.40% | 155h 50m | 04:18 (11-21) | 2 conversations, 236 Flash calls: input 918,723, output 254,426 |
+| Claude and GPT (Opus 5.5, Sonnet 5.5, GPT-OSS 120B) | 5 h / weekly | 100% / 100% | — | — | none |
+| Gemini 4 Argon (separate on Pro) | weekly only | 100% | — | — | none in window |
+
+Findings:
+- Windows start at the first call, not on a clock: the derived starts match the creation times of the two conversation DBs
+  exactly (04:18 and 14:11). A window with no use shows "Quota available" and no refresh time.
+- Estimated Gemini budgets from this one point (input + output, cache reads excluded): 5 h ≈ 299,728 / 2.31% ≈ 13.0M;
+  weekly ≈ 1,173,149 / 3.60% ≈ 32.6M. Treat as ±30% until more points: whether cache reads or thinking tokens are weighted
+  differently is unknown, and the panel rounds to 0.01%.
+- Argon has its own weekly bucket with no 5 h limit shown; the quota guard for Argon classification needs a weekly budget only.
+- Field map correction: `gen_metadata` 1.4.2 is input tokens (it equals agy JSON `input_tokens`), not cached input.
+- Next points: record the panel again after a heavier Flash day and after an Argon batch, with the time, so the estimate can
+  be checked against a second and third point.
+
 ## Open questions
 
 1. **Budgets and N defaults.** Argon output tokens of ours are about 485K since 2026-11-05 (`docs/ideas.md:58`), but

@@ -1,4 +1,4 @@
-## Handoff — 2026-11-21 16:05 PST (00:05Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
+## Handoff — 2026-11-21 16:40 PST (00:40Z) — 2c and P3 landed; web-console C resumes after Codex reset 12:35 — START HERE
 
 **Objective (next session):** finish the v1.45.0 dispatch queue, then the red-team gate, then the release PR.
 
@@ -37,6 +37,8 @@
 - Luna resume 7 done 15:45: C3 G25 G35 B18 D27 killed; env 5 keys + fixed PATH; uninstall one commit; --tmux realpath;
   bats leak was sandbox /dev/tty. Claude verify: pytest 140 passed, bats 31/31 (run 1); full 168-mutant rerun on final
   tree running in `scratchpad/cverify2` (3 workers).
+- agy quota calibration point 1 recorded in `docs/plans/argon-bug-classifier.md` (Gemini 5h ≈13.0M, weekly ≈32.6M
+  tokens est.; windows start at first call; Argon separate weekly). More points wanted later.
 - Open dispatches 1 of 3: `web-console-c-totp-gate-r2`.
 
 **State at handoff:**
@@ -48,10 +50,6 @@
 **Waiting on the operator:**
 - `make hub-sync` then `make hub-deploy REF=<release head>` (rev 2, 2c, P3 onto the hub).
 - m4-air `make password-bundle-show` retry (should now prompt to unlock the Keychain).
-- **agy quota calibration (operator 2026-11-21: "I will paste info when I am home"):** operator pastes the agy
-  Models & Quota panel (Gemini pool and Claude/GPT-OSS pool: 5h % and weekly %, with time). When it arrives: copy
-  conversation DBs to scratchpad, sum tokens per pool over the last 5h/7d at that time, record pairs in
-  `docs/plans/argon-bug-classifier.md` as calibration evidence (estimated limit per pool). No process probe without a go.
 
 **Next, in order:**
 
