@@ -1,4 +1,4 @@
-## Handoff — 2026-11-22 12:34 PST — grooming in progress; 3 dispatches running — START HERE
+## Handoff — 2026-11-22 12:51 PST — grooming in progress; 3 dispatches running — START HERE
 
 **Objective:** finish v1.45.0 (2b land, B captures, red-team gate, release PR); groom 2026-11-22 (Step 0 triage + ideas).
 
@@ -6,6 +6,11 @@
 - `remote-promote-2b-promote-wiring`: land may use `--allow-instruction-files` for `.github/copilot-instructions.md` only (`f12bcc16`).
 - `2026-11-08-hermes-resolved-message-names-no-sensors` (correlator.py).
 - `2026-11-09-hermes-reauth-lasts-24h-and-is-reusable` (slack-relay index.js; E2 intent approved `ea602bdc`).
+- 12:5x: reauth exited 0: fix correct (TTL 600, key deleted after all refusals, before the store); 54/54 sandboxed;
+  pre-fix 4 red (N1, N2 approve+deny, N3). Mutant (delete before allowlist) left the M4 test green (it checks another
+  user's key) and the worker edited the approved E2 intent of `2026-11-08-hermes-card-replaced-by-reauth-reply.md`
+  (24h -> 10-minute): resume 2 (correction) fixes the test and reverts that doc. Ask operator to approve the intent wording.
+- 2b exited 0 but self-reported incomplete (no E1-E5/E7 tests, no pre-fix/mutant table): resume 2 (continue) running.
 - Queued behind reauth (same index.js): `2026-11-08-slack-hostinger-status-duplicates-cluster-status`.
 - On each exit: verify from git (not the worker's report), must_not red on old code, full land `--test` set under
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit
