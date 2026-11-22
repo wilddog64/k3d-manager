@@ -1,10 +1,10 @@
 # Bug: `/hostinger-status` duplicates `/cluster-status hostinger`, and in Slack it does not respond
 
-**Status:** VERIFIED — fix landed 8f6de4c1, 2026-11-22 (filed 2026-11-08)
+**Status:** LIVE-VERIFIED — 2026-11-22 (fix landed 8f6de4c1; filed 2026-11-08)
+**Live evidence:** 2026-11-22 · run d6a3ac28 · env Slack/hub · scenario k3dm-help-no-hostinger-status · commit aa920a6f · proves E2
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Retiring a redundant, unused `/hostinger-status` Slack slash command where `/cluster-status hostinger` already covers the same checks and more, and the Slack command was already deleted in the Slack UI); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** live check — since 2026-11-22 (Slack app entry removed; `make deploy-worker` then `/k3dm help` owed)
 **Fix commit:** 8f6de4c1
 **Introduced by:** pre-existing (`/hostinger-status` added in v1.7.1, `0c9b2707`; `/cluster-status [provider]` later
 covered the same checks)
@@ -151,4 +151,14 @@ Operator: `/hostinger-status` deleted from the Slack app. Screenshot of `/cluste
 HEALTHY — k3s-hostinger (21 ok / 0 warn / 0 fail)" with the full report (ArgoCD, Frontend, Keycloak, ESO 20/20, hub ESO 9/9,
 logins). This proves the replacement path works; it worked before the fix too. Still owed for E2: relay redeployed
 (`make deploy-worker`) and `/k3dm help` no longer listing `/hostinger-status`.
+
+## Live evidence 2026-11-22 (E2 complete)
+
+- Operator promoted `aa920a6f` (`make hub-deploy`, 14:40) and deployed the relay (version `d6a3ac28`).
+- 14:43 `/k3dm help` still listed `/hostinger-status`: the webhook process (PID 55782) had run since 2026-11-19 16:45
+  and hub-deploy did not restart it (filed: `docs/bugs/2026-11-22-hub-deploy-leaves-webhook-on-stale-code.md`).
+- Operator ran `make restart-webhook` (first bootstrap attempt `5: Input/output error`, retry reloaded). New webhook
+  PID 64328 and cloud-bridge PID 64334, both started 14:46:32 (Claude, `launchctl list` + `ps -o lstart`).
+- 14:46 `/k3dm help` (operator screenshot): the Cluster lifecycle list has no `/hostinger-status`; earlier the same day
+  `/cluster-status hostinger` returned HEALTHY 21/0/0. E2 passes.
 

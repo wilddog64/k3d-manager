@@ -167,3 +167,11 @@ Before your last message, do all of these and paste the evidence:
 - Residual (not in scope): KV get-then-delete is not atomic, so two clicks within the same instant could both pass;
   N2 covers a second click after a completed decision.
 
+## Live evidence 2026-11-22 (E2 partial)
+
+- Relay deployed by the operator 2026-11-22 14:40 (version `d6a3ac28`, from `aa920a6f`).
+- Operator screenshot 14:46: `/hermes-auth` replied "Re-authenticated for 10 minutes; this covers your next Approve or
+  Deny." The 10-minute part of E2 passes.
+- Still owed: approve or deny one Hermes card, then a button on a second card asks to re-authenticate and leaves the
+  card in place. Needs two real Hermes cards (next incident).
+

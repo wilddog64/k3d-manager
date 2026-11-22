@@ -31,7 +31,9 @@ code until someone restarts the agent. Live checks then fail or, worse, pass aga
 
 ## Workaround
 
-On the hub: `make restart-webhook` (also restarts the cloud bridge).
+On the hub: `make restart-webhook` (also restarts the cloud bridge). Used 2026-11-22 14:46: first bootstrap
+attempt printed `Bootstrap failed: 5: Input/output error`, the target's retry loop reloaded it; new PIDs started
+14:46:32 and `/k3dm help` then showed the new code.
 
 ## Proposed fix (for triage)
 

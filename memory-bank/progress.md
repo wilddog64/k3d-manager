@@ -18,6 +18,7 @@
 
 ## Log
 
+- 2026-11-22: promoted aa920a6f + relay d6a3ac28; Hostinger-status LIVE-VERIFIED; reauth E2 partial; P2 filed hub-deploy-leaves-webhook-on-stale-code.
 - 2026-11-22: v1.46.0 cut to 5 (bounded-index, bug-lifecycle-metrics → backlog, operator); istio-ambient P3 → v1.46.0; CI green aa920a6f.
 - 2026-11-22: CI reds fixed `aa920a6f`; kagent idea; P2 filed: istio-ambient ApplicationSet targets retired ubuntu-k3s, Hostinger Istio unmanaged by Argo.
 - 2026-11-22: Hostinger E2 partial live: Slack entry removed, /cluster-status hostinger HEALTHY 21/0/0; deploy-worker + /k3dm help owed.
