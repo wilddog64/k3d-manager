@@ -159,6 +159,20 @@ unless marked "operator's call".
   root propagates to the inherited copies. Save the folder ACL first, so the change can be undone with
   `icacls … /restore`. After the fix, P11 is re-run (`icacls` of the exe, `bin`, the profile root and the plan root)
   and the ancestor walk must pass.
+- **Operator decision (2026-11-23): the sysadmin grants stay.** "I don't want to remove sysadmin access. at least not
+  until they confirm I can remove them". `icacls C:\Users\cliang` shows the two entries are explicit `(OI)(CI)(F)` on
+  the profile root. The earlier `/remove:g` processed 0 files, so nothing was changed.
+  - **Proposed O7 revision (needs approval):** the ancestor walk stays, and the operator may mark specific principals
+    as trusted.
+    - `/schedule` preview lists every principal outside {user, SYSTEM, Administrators} with write, delete,
+      delete-child, write-DAC or write-owner on the exe copy or plan path chain, and asks for each.
+    - Accepted principals (by SID) are recorded in `plan.txt` and the run report.
+    - `/runplan` re-walks the chain and refuses if any principal is outside {user, SYSTEM, Administrators, accepted}.
+      So a new entry added after scheduling still blocks.
+    - An unresolved SID is shown as the raw SID with `(unresolved)` and is never accepted by default.
+  - **Rationale:** a sysadmin holding full control of the profile can already change anything the operator runs, so
+    accepting them adds no new exposure.
+  - **IT follow-up:** confirm who `S-1-5-21-…-8249` is (a deleted account or a foreign-domain account).
 - **Elevation.** `whoami /groups` shows `Medium Mandatory Level` (S-1-16-8192): the shell was **not elevated**. So a
   non-elevated user can create a task folder (`\dirused-probe\`) with `schtasks /create`, which is P10 part 1. The
   XML security descriptor is still unproven.
