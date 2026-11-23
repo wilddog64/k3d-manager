@@ -143,3 +143,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: totp-a LANDED f1dca6e8, verify pass (gaps: M4 enrol/rotate clear + non-root UNLOCK, M6 unlock/first-refused lines, M9 source-grep). istioctl-a LANDED lib-foundation release/v0.5.8 12e58b6, verify pass, pushed (gap: N2 no dedicated negative test). Next: tag v0.5.8 + subtree pull before istioctl-b. Dispatching totp-a2.
 - 2026-11-23: dispatched totp-a2 and age-identity (WIP 3 with argocd). V4 defect 2 held: shares hub_data.sh with age-identity, goes after it lands.
 - 2026-11-23: filed P3 agy-dashboard-print-mode-label-unclear (display-only rename print→headless, label value kept); queued for next free slot.
+- 2026-11-23: argocd-alert-regex LANDED 400041df (--allow-out-of-scope: servicemonitor bats grep pin; spec Files fixed b0159a81), verify pass; L1 live after promote. Dispatching mode-label spec (agy-dashboard-print-mode-label-unclear, intents approved).
