@@ -64,3 +64,4 @@
 - 2026-11-22: hoverfocus installed on m2 (operator go; clone m1-base 87322d6, make install, ~/Applications, agent running). Operator uninstalls from m4. Relicensed Apache-2.0 (was MIT), bef450c on m1-base (operator request); GitHub license badge appears after M1 merges to main.
 - 2026-11-22: hoverfocus main protection: build required (operator go); PUT restated all other rules, read back unchanged (admins on, 0 approvals, conversation resolution, no force-push/deletion).
 - 2026-11-22: hoverfocus M1a spec rev 2 written (variant B only, MenuModel.loadConfig via ConfigLoader, StartChecks order test, N5 no event records, selftest SkyLight check); Fable spec review next.
+- 2026-11-22: hoverfocus M1a rev 2 pushed 4a26a803; Fable spec review agent running (read-only).
