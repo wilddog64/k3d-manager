@@ -302,6 +302,7 @@ def _run_impl(conf_path, sock_path, tmux_prefix, expected_server_uid, expected_c
                 if not write_with_timeout(1, clear_screen, timeout=2.0, clock=clock):
                     return 1
                 line_buf = bytearray()
+                overflow = False
                 start_read = clock()
                 while True:
                     if term_raised[0]:
@@ -321,20 +322,37 @@ def _run_impl(conf_path, sock_path, tmux_prefix, expected_server_uid, expected_c
                     start_read = clock()
                     if b in (b"\x03", b"\x1a", b"\x1c", b"\x04"):
                         line_buf.clear()
+                        overflow = False
                         if not write_with_timeout(1, b"\nCode: ", timeout=2.0, clock=clock):
                             return 1
                         continue
                     if b in (b"\r", b"\n"):
                         break
-                    if len(line_buf) < 7:
+                    if b in (b"\x7f", b"\x08"):
+                        if line_buf:
+                            line_buf.pop()
+                        continue
+                    if len(line_buf) < 20:
                         line_buf.extend(b)
-                code_str = line_buf.decode("ascii", errors="replace")
-                if len(code_str) != 6 or not code_str.isdigit():
+                    else:
+                        overflow = True
+                typed = line_buf.decode("ascii", errors="replace")
+                code_str = typed.replace(" ", "").replace("-", "").upper()
+                if overflow:
                     failed_prompts += 1
                     write_with_timeout(1, b"\nInvalid code\n", timeout=2.0, clock=clock)
                     time.sleep(2.0)
                     continue
-                v_res = verify_totp(sock_path, code_str, expected_server_uid=expected_server_uid, connect_fn=connect_fn)
+                if len(code_str) == 6 and code_str.isdigit():
+                    verify_code = code_str
+                elif len(code_str) == 16 and re.fullmatch(r"[A-Z2-7]{16}", code_str):
+                    verify_code = "-".join(code_str[i:i + 4] for i in range(0, 16, 4))
+                else:
+                    failed_prompts += 1
+                    write_with_timeout(1, b"\nInvalid code\n", timeout=2.0, clock=clock)
+                    time.sleep(2.0)
+                    continue
+                v_res = verify_totp(sock_path, verify_code, expected_server_uid=expected_server_uid, connect_fn=connect_fn)
                 if v_res == "OK":
                     code_verified = True
                     break
@@ -345,7 +363,9 @@ def _run_impl(conf_path, sock_path, tmux_prefix, expected_server_uid, expected_c
                     continue
                 if v_res.startswith("WAIT"):
                     failed_prompts += 1
-                    write_with_timeout(1, b"\nToo many attempts; try again later\n", timeout=2.0, clock=clock)
+                    wait_match = re.fullmatch(r"WAIT ([0-9]+)", v_res)
+                    seconds = wait_match.group(1) if wait_match else "?"
+                    write_with_timeout(1, f"\nToo many attempts; try again later ({seconds} s)\n".encode(), timeout=2.0, clock=clock)
                     time.sleep(2.0)
                     continue
                 sys.stderr.write("console login unavailable\n")
