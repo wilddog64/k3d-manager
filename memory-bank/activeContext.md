@@ -125,3 +125,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-22: 2b resume 8 exited rc 0 (missed exit ~70 min); Claude rerunning the focused suites, then Makefile mutants. hoverfocus M1b r2 exited rc 0 (~1h45m earlier, missed); independent Acceptance-only verifier started.
 
 - 2026-11-23: dr-drill on m2 failed at hub-up: Homebrew istioctl 1.32.0 (2026-11-12) rejects pinned k3s v1.32.0 (IST0142). Bug `docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md` (P2 proposed, operator decision). Explains daily DR freshness reds. hoverfocus make install on m2: bootstrap error 5; launchd log shows 37 EALREADY at 03:50:28 then service removed; BTM item enabled+allowed; manual retry from iTerm2 also error 5 and not in launchd log — cause still open.
+
+- 2026-11-23: CORRECTION: live hub is m5-air (k3s v1.32.0, Istio 1.31.1); the m2 cluster (1.31.5 / Istio 1.28.3, EOL) is an older cluster. dr-drill bug triaged patch → v1.45.1 (operator), pin istioctl 1.31.4 to match hub. Red-team gate DONE (no P0/P1). v1.45.0 left: 2c verify, 2e independent verifier, release PR (CI, Argon review, smoke, scope check).
