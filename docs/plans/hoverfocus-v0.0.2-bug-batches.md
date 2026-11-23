@@ -1,7 +1,7 @@
 # HoverFocus v0.0.2 — bug batches (Flash / Luna split)
 
 **Filed:** 2026-11-23
-**Status:** plan — no dispatch yet (operator to approve batches and intents)
+**Status:** plan — L1/F1 child specs rev 1 written ([L1](hoverfocus-v0.0.2-l1-app-lifecycle.md), [F1](hoverfocus-v0.0.2-f1-install.md)); `v0.0.2` cut on origin at `d426f18`; awaiting Fable spec review, operator intents and go. P1 probe also covers the Cmd-W/key-window gap (B2 recurrence) and Safari (`docs/bugs/2026-11-23-hoverfocus-safari-no-focus.md`)
 **Repo:** `hoverfocus`, branch `v0.0.2` cut from `main` at `d426f18` (v0.0.1)
 **Approval:** "plan for bugs distributions between flash and luna" (operator, 2026-11-23)
 

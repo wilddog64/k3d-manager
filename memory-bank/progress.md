@@ -118,3 +118,4 @@
 - 2026-11-23: Safari bug update: operator screenshot shows hover focus works on Safari (video area, no raise); location-dependence still to check, else close not reproducible.
 - 2026-11-23: B2 (hoverfocus window-not-key) recurrence: Cmd-W does nothing in Safari after hover focus; proposed P3→P2 (operator to confirm); folded into P1 probe.
 - 2026-11-23: operator confirmed Cmd-W also fails in TextEdit after hover focus (general window-not-key gap, B2). Operator at work; live tests at home.
+- 2026-11-23: hoverfocus v0.0.2: wrote L1 (AppCoordinator, reload fails closed, trust watch) and F1 (install wait/session/plutil/hint) specs rev 1, intents pending; launchctl proof captured on m4 (print missing rc 113, managername over SSH Background); pushed branch v0.0.2 at d426f18 on hoverfocus origin. Next: Fable spec review.
