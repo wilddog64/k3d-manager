@@ -59,3 +59,4 @@
 - 2026-11-22 2b LANDED e3eb53ca (attempt 5); pushed; CI pending. Hub-deploy REF after green: e3eb53ca.
 - 2026-11-22 CI on e3eb53ca: 6/7 green; test-python red on 2 web_console_totp tests (connect before listen race, P3 docs/bugs/2026-11-22-web-console-totp-tests-connect-before-listen.md). Not 2b. Pushing docs commits re-runs CI on new head.
 - 2026-11-22 CI 7/7 green on 948e5e7d (2b code = e3eb53ca + docs). Ask operator: make hub-deploy REF=948e5e7d, then Claude live check. hoverfocus M1b LANDED 87322d6 on m1-base (land 3; land test used scratch swift shim --disable-sandbox, nested sandbox_apply refused); pushed; hoverfocus CI running. Next: build as required check (operator go), M1a rev 2.
+- 2026-11-22 ~20:00 PST: operator hub-deploy REF=948e5e7d (first attempt used stale history REF=74ff9a6f, 142 behind; promoter refused, no change). deploy/hub=948e5e7d, tag hub-promote/20261123T035950Z. Deploy steps running; live check after operator done.
