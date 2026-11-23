@@ -512,7 +512,16 @@ sync-main:
 ## Reapply every ApplicationSet pinned to deploy/hub (APPSETS_STAGE=hub|all)
 appsets-reapply:
 	@bin/k3dm-require-role hub
-	@K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+	@set -eo pipefail; source "$(CURDIR)/scripts/lib/foundation/scripts/lib/system.sh"; \
+	_sha=""; if [ -n "$${APPSETS_SHA:-}" ]; then \
+	  printf '%s' "$${APPSETS_SHA}" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$$' || { echo '[appsets-reapply] invalid APPSETS_SHA' >&2; exit 2; }; \
+	  _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
+	  _got="$$( _run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}' )"; \
+	  if [ "$$_got" != "$${APPSETS_SHA}" ]; then [ -z "$${K3DM_SUPERSEDED_OUT:-}" ] || printf 'superseded %s %s\n' "$$_got" "$${APPSETS_SHA}" > "$${K3DM_SUPERSEDED_OUT}"; _got7=$$(printf '%s' "$$_got" | cut -c1-7); _want7=$$(printf '%s' "$${APPSETS_SHA}" | cut -c1-7); echo "[appsets-reapply] deploy/hub is $$_got7, not $$_want7; superseded" >&2; exit 1; fi; \
+	  _sha="$${APPSETS_SHA}"; _tmp="$$(mktemp -d "$${TMPDIR:-/tmp}/k3dm-appsets.XXXXXX")"; trap 'rm -rf -- "$$_tmp"' EXIT; \
+	  _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
+	  (cd "$$_tmp" && K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm); \
+	else K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm; fi
 
 ## Report Applications whose k3d-manager values source is not on deploy/hub (read-only)
 appsets-check:
@@ -1419,7 +1428,10 @@ platform-ops:
 	 _cleanup() { _run_command --soft -- rm -rf -- "$$_tmp" || true; }; \
 	 trap _cleanup EXIT; \
 	 _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
-	 _sha=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
+	 _got=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
+	 _sha="$$_got"; if [ -n "$${PLATFORM_OPS_SHA:-}" ]; then \
+	   printf '%s' "$${PLATFORM_OPS_SHA}" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$$' || { echo '[platform-ops] invalid PLATFORM_OPS_SHA' >&2; exit 2; }; \
+	   if [ "$$_got" != "$${PLATFORM_OPS_SHA}" ]; then [ -z "$${K3DM_SUPERSEDED_OUT:-}" ] || printf 'superseded %s %s\n' "$$_got" "$${PLATFORM_OPS_SHA}" > "$${K3DM_SUPERSEDED_OUT}"; _got7=$$(printf '%s' "$$_got" | cut -c1-7); _want7=$$(printf '%s' "$${PLATFORM_OPS_SHA}" | cut -c1-7); echo "[platform-ops] deploy/hub is $$_got7, not $$_want7; superseded" >&2; exit 1; fi; _sha="$${PLATFORM_OPS_SHA}"; fi; \
 	 _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
 	 (cd "$$_tmp" && _run_command --soft -- ./scripts/k3d-manager deploy_argocd_platform_ops --confirm); \
 	 mkdir -p "$(HOME)/.local/share/k3d-manager/repo-sync"; \

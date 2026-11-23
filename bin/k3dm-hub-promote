@@ -90,6 +90,29 @@ resolve_on_origin() {
   printf '%s' "$sha"
 }
 
+approval_resolve() {
+  local ref="$1" name="" local_sha="" origin_sha="" sha="" refs="" rc
+  for name in "refs/heads/$ref" "refs/remotes/$REMOTE/$ref"; do
+    if git_cmd show-ref --verify --quiet "$name"; then rc=0; else rc=$?; fi
+    [[ "$rc" == 0 || "$rc" == 1 ]] || return 75
+    if [[ "$rc" == 0 ]]; then
+      if sha="$(git_cmd rev-parse --verify "${name}^{commit}" 2>/dev/null)"; then :; else return 75; fi
+      if [[ "$name" == "refs/heads/$ref" ]]; then local_sha="$sha"; else origin_sha="$sha"; fi
+    fi
+  done
+  if [[ -n "$local_sha" && -n "$origin_sha" && "$local_sha" != "$origin_sha" ]]; then
+    printf "[hub-promote] branch '%s' differs: local %s; origin/%s %s\n" "$ref" "$local_sha" "$ref" "$origin_sha" >&2; return 2
+  fi
+  if sha="$(git_cmd rev-parse --verify --quiet "${ref}^{commit}" 2>/dev/null)"; then rc=0; else rc=$?; fi
+  [[ "$rc" == 0 ]] || { [[ "$rc" == 1 ]] && { printf "[hub-promote] cannot resolve REF '%s' to a commit\n" "$ref" >&2; return 2; }; return 75; }
+  if refs="$(git_cmd for-each-ref --contains "$sha" --format='%(refname)' "refs/remotes/$REMOTE/")"; then :; else return 75; fi
+  local reachable=0 line
+  while IFS= read -r line; do [[ "$line" == "refs/remotes/$REMOTE/HEAD" || -z "$line" ]] || reachable=1; done <<< "$refs"
+  [[ "$reachable" == 1 ]] || { printf '[hub-promote] commit %s is not reachable from an origin branch\n' "$sha" >&2; return 2; }
+  [[ "$sha" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || return 75
+  printf '%s' "$sha"
+}
+
 classify_check_runs() {
   local sha="$1" data count pending failed
   data="$(_run_command --soft -- gh api --paginate "repos/$GH_REPO/commits/$sha/check-runs" --jq '.check_runs[]')" || return 2
@@ -285,7 +308,7 @@ rollback() {
 }
 
 main() {
-  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1] | rollback [BREAK_GLASS=1] | status | is-contained TARGET OLD'
+  [[ $# -ge 1 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1] | promote REF --approval ID | rollback [BREAK_GLASS=1] | status | is-contained TARGET OLD'
   case "$1" in
     is-green)
       [[ $# == 2 && -n "$2" ]] || die 'usage: k3dm-hub-promote is-green <sha>'
@@ -312,6 +335,67 @@ main() {
       rollback "$break_glass"
       ;;
     promote)
+      if [[ $# == 4 && "$3" == --approval ]]; then
+        local ref="$2" approval_id="$4" sha old_sha client_rc reply human
+        [[ "$approval_id" =~ ^p[0-9]+-[0-9a-f]{8}$ ]] || { printf '[hub-promote] ERROR: usage: promote REF --approval ID\n' >&2; exit 2; }
+        if [[ "${BREAK_GLASS:-}" != '' && "${BREAK_GLASS:-}" != 0 || "${SKIP_CHECK_RUNS:-}" != '' && "${SKIP_CHECK_RUNS:-}" != 0 ]]; then
+          printf '[hub-promote] --approval cannot be combined with BREAK_GLASS or SKIP_CHECK_RUNS\n' >&2; exit 1
+        fi
+        if git_cmd fetch "$REMOTE" --prune; then :; else printf '[hub-promote] could not fetch origin for approval %s; rerun the same command\n' "$approval_id" >&2; exit 75; fi
+        if sha="$(approval_resolve "$ref")"; then :; else rc=$?; printf '[hub-promote] cannot resolve approval %s (exit %s); rerun the same command\n' "$approval_id" "$rc" >&2; exit "$rc"; fi
+        if reply="$(env -u BREAK_GLASS -u SKIP_CHECK_RUNS -u SKIP_CHECK_RUNS_REASON -u REF -u MAKEFLAGS -u MFLAGS -u MAKELEVEL "$REPO_ROOT/bin/k3dm-promote-client" promote --id "$approval_id" --sha "$sha")"; then client_rc=0; else client_rc=$?; fi
+        human="$(/usr/bin/python3 -I - "$sha" "$client_rc" "$reply" <<'PYCODE'
+import json
+import re
+import sys
+
+requested, client_rc, raw_reply = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+try:
+    value = json.loads(raw_reply)
+except Exception:
+    print("DENIED\tclient denied approval (malformed reply)" if client_rc == 2 else "INVALID")
+    raise SystemExit
+expected = {"v", "result", "code", "message", "data"}
+valid = isinstance(value, dict) and set(value) == expected and type(value.get("v")) is int and value["v"] == 1
+sha_pattern = r"^[0-9a-f]{40}([0-9a-f]{24})?$"
+tag_pattern = r"^hub-promote/[0-9]{8}T[0-9]{6}Z$"
+if client_rc == 0:
+    data = value.get("data")
+    valid = valid and value.get("result") == "ok" and value.get("code") == "ok" and isinstance(value.get("message"), str) and isinstance(data, dict) and set(data) == {"outcome", "old", "new", "tag"} and data.get("outcome") in ("moved", "already") and data.get("new") == requested and isinstance(data.get("old"), str) and re.fullmatch(sha_pattern, data["old"]) and isinstance(data.get("tag"), str) and re.fullmatch(tag_pattern, data["tag"])
+    if valid:
+        print("OK\t%s\t%s\t%s\t%s" % (data["outcome"], data["old"], data["new"], data["tag"]))
+        raise SystemExit
+elif client_rc == 1:
+    data = value.get("data")
+    valid = valid and value.get("result") == "refused" and isinstance(value.get("code"), str) and isinstance(value.get("message"), str) and isinstance(data, dict) and set(data) == {"approval"} and data.get("approval") in ("kept", "final")
+    if valid:
+        print("REFUSED\t%s\t%s" % (data["approval"], value["message"]))
+        raise SystemExit
+elif client_rc == 2:
+    message = value.get("message") if isinstance(value, dict) and isinstance(value.get("message"), str) else "client denied approval (malformed reply)"
+    print("DENIED\t%s" % message)
+    raise SystemExit
+elif client_rc not in (0, 1, 2):
+    message = value.get("message") if isinstance(value.get("message"), str) else "no reply"
+    print("UNKNOWN\t%s" % message)
+    raise SystemExit
+print("INVALID")
+PYCODE
+)"
+        case "$human" in
+          OK$'\t'*) IFS=$'\t' read -r _ outcome old_sha new_sha tag <<< "$human"; if [[ "$outcome" == moved ]]; then printf '[hub-promote] approval %s moved deploy/hub %s..%s (%s)\n' "$approval_id" "${old_sha:0:7}" "${new_sha:0:7}" "$tag" >&2; else printf '[hub-promote] approval %s had already moved deploy/hub %s..%s (%s)\n' "$approval_id" "${old_sha:0:7}" "${new_sha:0:7}" "$tag" >&2; fi; printf 'approved-sha %s\napproved-old %s\n' "$new_sha" "$old_sha"; exit 0 ;;
+          REFUSED$'\t'*) IFS=$'\t' read -r _ state message <<< "$human"; if [[ "$state" == kept ]]; then printf '[hub-promote] refused: %s; approval %s is kept\n' "$message" "$approval_id" >&2; else printf '[hub-promote] refused: %s; approval %s is closed; request a new one\n' "$message" "$approval_id" >&2; fi; exit 1 ;;
+          DENIED$'\t'*) printf '[hub-promote] refused: %s\n' "${human#*$'\t'}" >&2; exit 2 ;;
+          UNKNOWN$'\t'*) printf '[hub-promote] could not decide for approval %s (%s); rerun the same command; bin/k3dm-promote-client show --id %s reports its state\n' "$approval_id" "${human#*$'\t'}" "$approval_id" >&2; exit 75 ;;
+          *) printf '[hub-promote] the authority\x27s reply for approval %s did not match the request; rerun the same command\n' "$approval_id" >&2; exit 75 ;;
+        esac
+      fi
+      for arg in "${@:2}"; do
+        if [[ "$arg" == --approval ]]; then
+          printf '[hub-promote] ERROR: usage: promote REF --approval ID\n' >&2
+          exit 2
+        fi
+      done
       [[ $# -ge 2 && $# -le 4 ]] || die 'usage: k3dm-hub-promote promote REF [BREAK_GLASS=1] [SKIP_CHECK_RUNS=1]'
       local ref="$2" break_glass="${3:-${BREAK_GLASS:-0}}" skip_checks="${4:-${SKIP_CHECK_RUNS:-0}}" old new
       [[ "$break_glass" == 0 || "$break_glass" == 1 ]] || die 'BREAK_GLASS must be 0 or 1'

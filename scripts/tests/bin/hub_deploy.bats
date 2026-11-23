@@ -9,6 +9,7 @@ setup() {
   REAL_GIT="$(command -v git)"
   WORK="${BATS_TEST_TMPDIR}/scratch-repo"
   ORIGIN="${BATS_TEST_TMPDIR}/origin.git"
+  mkdir -p "$BATS_TEST_TMPDIR/guards"
   export HOME="${BATS_TEST_TMPDIR}/home" XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
   export K3DM_REPO_SYNC_STATE_DIR="${BATS_TEST_TMPDIR}/repo-sync" K3DM_HUB_DEPLOY_CHECKOUT_WAIT=0
   mkdir -p "$WORK/bin" "$WORK/scripts/lib/foundation/scripts/lib" "$WORK/scripts/etc/argocd/applicationsets" "$HOME" "$XDG_CONFIG_HOME/k3d-manager" "${BATS_TEST_TMPDIR}/stubs"
@@ -36,6 +37,18 @@ EOF
 [[ -f "$FIXTURE_ROOT" ]] || exit 98
 printf 'promote %s\n' "$*" >> "$CALLS"
 printf 'skip=%s reason=%s\n' "${SKIP_CHECK_RUNS:-0}" "${SKIP_CHECK_RUNS_REASON:-}" >> "$CALLS"
+if [[ " $* " == *" --approval "* ]]; then
+  printf 'approval-argv %s\n' "$*" >> "$CALLS"
+  if [[ -e "$HOME/.local/share/k3d-manager/hub-deploy/state" ]]; then printf 'approval-state present\n' >> "$CALLS"; else printf 'approval-state absent\n' >> "$CALLS"; fi
+  [[ -n "${APPROVAL_NEW_SHA:-}" && -n "${APPROVAL_OLD_SHA:-}" ]] || exit 97
+  [[ "${APPROVAL_PROMOTE_FAIL:-0}" == 0 ]] || exit "$APPROVAL_PROMOTE_FAIL"
+  "$REAL_GIT" -C "$TEST_WORK" push --quiet origin "$APPROVAL_NEW_SHA:refs/heads/deploy/hub"
+  if [[ "${APPROVAL_MOVE_AFTER_PROMOTE:-0}" == 1 ]]; then
+    "$REAL_GIT" -C "$TEST_WORK" push --quiet origin "+$OTHER_SHA:refs/heads/deploy/hub" || { echo 'fixture deploy/hub move failed' >&2; exit 96; }
+  fi
+  if [[ "${APPROVAL_BAD_OUTPUT:-0}" == 1 ]]; then printf 'approved-sha %s\n' "$APPROVAL_NEW_SHA"; else printf 'approved-sha %s\napproved-old %s\n' "$APPROVAL_NEW_SHA" "$APPROVAL_OLD_SHA"; fi
+  exit 0
+fi
 if [[ "${REQUIRE_TTY:-0}" == 1 && "$1" == promote ]]; then
   [[ -t 0 ]] || { printf 'confirmation requires a TTY\n' >&2; exit 1; }
   printf "Type 'promote' to continue: " >&2
@@ -60,6 +73,26 @@ EOF
 #!/usr/bin/env bash
 [[ -f "$FIXTURE_ROOT" && "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
 target="${*: -1}"
+if [[ "${E4_MAKE_MODE:-0}" == 1 ]]; then
+  printf '%s\n' "$*" >> "$BATS_TEST_TMPDIR/e4-make-args"
+  if [[ ! -e "$BATS_TEST_TMPDIR/e4-state-at-make" ]]; then
+    cp "$HOME/.local/share/k3d-manager/hub-deploy/state" "$BATS_TEST_TMPDIR/e4-state-at-make"
+  fi
+  for arg in "$@"; do
+    case "$arg" in
+      appsets-reapply|platform-ops) target="$arg" ;;
+      APPSETS_SHA=*) printf 'APPSETS_SHA=%s\n' "${arg#APPSETS_SHA=}" >> "$BATS_TEST_TMPDIR/e4-make-env" ;;
+      PLATFORM_OPS_SHA=*) printf 'PLATFORM_OPS_SHA=%s\n' "${arg#PLATFORM_OPS_SHA=}" >> "$BATS_TEST_TMPDIR/e4-make-env" ;;
+      K3DM_SUPERSEDED_OUT=*) printf 'K3DM_SUPERSEDED_OUT=%s\n' "${arg#K3DM_SUPERSEDED_OUT=}" >> "$BATS_TEST_TMPDIR/e4-make-env"; export E4_SUPERSEDED_FILE="${arg#K3DM_SUPERSEDED_OUT=}" ;;
+    esac
+  done
+  e4_failure_target="${E4_MAKE_STEP:-$target}"
+  if [[ "$target" == "$e4_failure_target" && "${E4_MAKE_SUPERSEDED:-0}" == 1 ]]; then
+    printf 'superseded %s %s\n' "${E4_GOT_SHA:-$CHANGED_SHA}" "$CHANGED_SHA" > "$E4_SUPERSEDED_FILE"
+    exit 2
+  fi
+  if [[ "$target" == "$e4_failure_target" ]]; then [[ "${E4_MAKE_FAIL:-0}" == 0 ]] || exit "$E4_MAKE_FAIL"; fi
+fi
 state="$HOME/.local/share/k3d-manager/hub-deploy/state"
 if [[ -e "$state" ]]; then
   [[ -r "$state" ]] || exit 94
@@ -171,9 +204,36 @@ EOF
   "$REAL_GIT" -C "$WORK" branch fixture-other "$OTHER_SHA"
   "$REAL_GIT" -C "$WORK" push --quiet origin "$OTHER_SHA:refs/heads/fixture-other"
   "$REAL_GIT" -C "$WORK" checkout -q --detach "$BASE_SHA"
-  export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
+  : > "$BATS_TEST_TMPDIR/sudo.hit"; : > "$BATS_TEST_TMPDIR/launchctl.hit"
+  cat > "$BATS_TEST_TMPDIR/guards/sudo" <<'GUARD'
+#!/bin/sh
+: > "$BATS_TEST_TMPDIR/sudo.hit"
+exit 1
+GUARD
+  cat > "$BATS_TEST_TMPDIR/guards/launchctl" <<'GUARD'
+#!/bin/sh
+: > "$BATS_TEST_TMPDIR/launchctl.hit"
+exit 1
+GUARD
+  chmod +x "$BATS_TEST_TMPDIR/guards/"*
+  export PATH="$BATS_TEST_TMPDIR/guards:$BATS_TEST_TMPDIR/stubs:$PATH"
+  [[ "$(command -v sudo)" == "$BATS_TEST_TMPDIR/guards/sudo" && "$(command -v launchctl)" == "$BATS_TEST_TMPDIR/guards/launchctl" ]]
+  # LaunchAgent behavior is simulated by this suite's launchctl stub. Keep it
+  # ahead of the fail-closed guard after verifying the guard resolution above.
+  export PATH="$BATS_TEST_TMPDIR/stubs:$BATS_TEST_TMPDIR/guards:$PATH"
   [[ "$HOME" == "$BATS_TEST_TMPDIR/home" && "$K3DM_REPO_SYNC_STATE_DIR" == "$BATS_TEST_TMPDIR/repo-sync" ]]
   [[ -d "$WORK/.git" && "$(command -v make)" == "$BATS_TEST_TMPDIR/stubs/make" && "$(command -v launchctl)" == "$BATS_TEST_TMPDIR/stubs/launchctl" ]]
+}
+
+teardown() {
+  [ ! -s "$BATS_TEST_TMPDIR/sudo.hit" ] || { echo 'sudo guard was hit' >&2; return 1; }
+  [ ! -s "$BATS_TEST_TMPDIR/launchctl.hit" ] || { echo 'launchctl guard was hit' >&2; return 1; }
+}
+
+_prepare_e4_approval() {
+  : > "$BATS_TEST_TMPDIR/e4-make-args"
+  : > "$BATS_TEST_TMPDIR/e4-make-env"
+  export APPROVAL_NEW_SHA="$CHANGED_SHA" APPROVAL_OLD_SHA="$BASE_SHA" E4_MAKE_MODE=1 E4_GOT_SHA="$OTHER_SHA" CHANGED_SHA OTHER_SHA
 }
 
 @test "M1: changed ApplicationSets run every step in order" {
@@ -803,4 +863,156 @@ install_fixture() {
   run "$WORK/bin/k3dm-hub-deploy" changed
   [ "$status" -eq 0 ]
   grep -qx install-sandbox-reaper "$CALLS"
+}
+
+@test 'E7 approval documentation describes the signed authority path and its limit' {
+  files=(
+    "$REPO/docs/process/rules.md"
+    "$REPO/docs/howto/hub-promote.md"
+    "$REPO/.github/copilot-instructions.md"
+  )
+  for file in "${files[@]}"; do [ -s "$file" ]; done
+  rg -q 'Worker-signed envelope' "${files[0]}"
+  rg -qi 'check value' "${files[0]}"
+  rg -q 'Part 2e' "${files[0]}"
+  rg -q 'gate on the honest path, not a barrier' "${files[0]}"
+  rg -q 'Approved promote' "${files[1]}"
+  rg -q 'signature' "${files[1]}"
+  rg -q 'envelope_stale' "${files[1]}"
+  rg -q 'bin/k3dm-hub-deploy <ref> --approval <id>' "${files[1]}"
+  rg -qi 'exit 75' "${files[1]}"
+  rg -q 'bin/k3dm-promote-client show' "${files[1]}"
+  rg -q 'superseded' "${files[1]}"
+  rg -q 'promote-authority\.md' "${files[1]}"
+  rg -q 'promote authority' "${files[2]}"
+}
+
+@test 'E7 pre-change documentation copies fail the approval wording checks' {
+  fixture="$REPO/scripts/tests/fixtures/remote-promote-2b-docs"
+  "$REAL_GIT" -C "$REPO" show HEAD:docs/process/rules.md | cmp - "$fixture/rules.md"
+  "$REAL_GIT" -C "$REPO" show HEAD:docs/howto/hub-promote.md | cmp - "$fixture/hub-promote.md"
+  "$REAL_GIT" -C "$REPO" show HEAD:.github/copilot-instructions.md | cmp - "$fixture/copilot-instructions.md"
+  for pattern in 'Worker-signed envelope' 'check value' 'Part 2e' 'gate on the honest path, not a barrier'; do
+    run rg -qi -- "$pattern" "$fixture/rules.md"
+    [ "$status" -ne 0 ] || { printf 'pre-change rules unexpectedly contains: %s\n' "$pattern" >&3; return 1; }
+  done
+  for pattern in 'Approved promote' 'signature' 'envelope_stale' 'bin/k3dm-hub-deploy <ref> --approval <id>' 'exit 75' 'bin/k3dm-promote-client show' 'superseded' 'promote-authority\.md'; do
+    run rg -qi -- "$pattern" "$fixture/hub-promote.md"
+    [ "$status" -ne 0 ] || { printf 'pre-change hub-promote unexpectedly contains: %s\n' "$pattern" >&3; return 1; }
+  done
+  run rg -q 'promote authority' "$fixture/copilot-instructions.md"
+  [ "$status" -ne 0 ]
+}
+
+@test 'E4 approval takes both machine lines, seeds first-run state, and pins each make call' {
+  _prepare_e4_approval
+  run "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  grep -qx 'approval-state absent' "$CALLS"
+  grep -q "skip=0 reason=" "$CALLS"
+  [[ "$output" == *"no reconcile state yet; full launchd reconcile owed; appsets base ${BASE_SHA:0:7}"* ]]
+  [ "$(cat "$BATS_TEST_TMPDIR/e4-state-at-make")" = $'appsets '"$BASE_SHA"$'\nlaunchd full' ]
+  grep -q "APPSETS_SHA=$CHANGED_SHA" "$BATS_TEST_TMPDIR/e4-make-env"
+  grep -q "PLATFORM_OPS_SHA=$CHANGED_SHA" "$BATS_TEST_TMPDIR/e4-make-env"
+  [ "$(grep -c '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")" -eq 2 ]
+  while IFS= read -r line; do path="${line#K3DM_SUPERSEDED_OUT=}"; [ ! -e "$path" ]; done < <(grep '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")
+  grep -q 'appsets-reapply APPSETS_SHA=' "$BATS_TEST_TMPDIR/e4-make-args"
+  grep -q 'platform-ops PLATFORM_OPS_SHA=' "$BATS_TEST_TMPDIR/e4-make-args"
+}
+
+@test 'E4 lost state with a temporary file requests full appsets and launchd work' {
+  _prepare_e4_approval
+  mkdir -p "$HOME/.local/share/k3d-manager/hub-deploy"
+  : > "$HOME/.local/share/k3d-manager/hub-deploy/state.tmp.12345"
+  run "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'state unreadable; full launchd reconcile and appsets reapply owed'* ]]
+  grep -q "APPSETS_SHA=$CHANGED_SHA" "$BATS_TEST_TMPDIR/e4-make-env"
+}
+
+@test 'E4 remote moved after approval stops at superseded before make' {
+  _prepare_e4_approval
+  run env APPROVAL_MOVE_AFTER_PROMOTE=1 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'has been superseded'*'stopped at superseded'* ]]
+  [ ! -s "$BATS_TEST_TMPDIR/e4-make-args" ]
+}
+
+@test 'E4 superseded make maps to 1 and removes its file while ordinary make failure stays 2' {
+  _prepare_e4_approval
+  run env E4_MAKE_SUPERSEDED=1 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'stopped at superseded'* ]]
+  while IFS= read -r line; do path="${line#K3DM_SUPERSEDED_OUT=}"; [ ! -e "$path" ]; done < <(grep '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")
+
+  _prepare_e4_approval
+  run env E4_MAKE_FAIL=2 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'stopped at appsets-reapply'* ]]
+  while IFS= read -r line; do path="${line#K3DM_SUPERSEDED_OUT=}"; [ ! -e "$path" ]; done < <(grep '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")
+
+  _prepare_e4_approval
+  run env E4_MAKE_FAIL=75 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'stopped at appsets-reapply (child exit 75)'* ]]
+  while IFS= read -r line; do path="${line#K3DM_SUPERSEDED_OUT=}"; [ ! -e "$path" ]; done < <(grep '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")
+}
+
+@test 'E4 platform-ops superseded maps to 1 and removes its recorded file' {
+  _prepare_e4_approval
+  run --separate-stderr env E4_MAKE_STEP=platform-ops E4_MAKE_SUPERSEDED=1 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  grep -q 'platform-ops PLATFORM_OPS_SHA=' "$BATS_TEST_TMPDIR/e4-make-args"
+  [[ "$stderr" == *'has been superseded'* ]]
+  [[ "$stderr" == *'stopped at superseded'* ]]
+  while IFS= read -r line; do path="${line#K3DM_SUPERSEDED_OUT=}"; [ ! -e "$path" ]; done < <(grep '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")
+}
+
+@test 'E4 platform-ops ordinary failures retain step mapping without superseded' {
+  for code in 2 75; do
+    _prepare_e4_approval
+    run --separate-stderr env E4_MAKE_STEP=platform-ops E4_MAKE_FAIL="$code" "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+    if [[ "$code" == 2 ]]; then
+      [ "$status" -eq 2 ]
+      [[ "$stderr" == *'stopped at platform-ops:'* ]]
+    else
+      [ "$status" -eq 1 ]
+      [[ "$stderr" == *'stopped at platform-ops (child exit 75)'* ]]
+    fi
+    [[ "$stderr" != *'has been superseded'* ]]
+    grep -q 'platform-ops PLATFORM_OPS_SHA=' "$BATS_TEST_TMPDIR/e4-make-args"
+    while IFS= read -r line; do path="${line#K3DM_SUPERSEDED_OUT=}"; [ ! -e "$path" ]; done < <(grep '^K3DM_SUPERSEDED_OUT=' "$BATS_TEST_TMPDIR/e4-make-env")
+  done
+}
+
+@test 'E4 malformed promote machine output and ls-remote failure map to 75 after client call' {
+  _prepare_e4_approval
+  run env APPROVAL_BAD_OUTPUT=1 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 75 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'stopped at promote'* ]]
+  [[ "$output" == *"rerun bin/k3dm-hub-deploy $CHANGED_SHA --approval p123-abcdef12"* ]]
+
+  _prepare_e4_approval
+  run env FAIL_REMOTE=1 REMOTE_FAIL_CODE=43 "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-abcdef12
+  [ "$status" -eq 75 ]
+  grep -qx "approval-argv promote fixture-changed --approval p123-abcdef12" "$CALLS"
+  [[ "$output" == *'stopped at read-promoted-ref'* ]]
+  [[ "$output" == *"rerun bin/k3dm-hub-deploy $CHANGED_SHA --approval p123-abcdef12"* ]]
+}
+
+@test 'E4 malformed approval id and misplaced approval exit 2 before hub-promote' {
+  run "$WORK/bin/k3dm-hub-deploy" fixture-changed --approval p123-bad
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'usage: k3dm-hub-deploy <ref> [--approval <id>]'* ]]
+  [ "$(grep -c '^promote ' "$CALLS" || true)" -eq 0 ]
+  run "$WORK/bin/k3dm-hub-deploy" fixture-changed extra --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  [ "$(grep -c '^promote ' "$CALLS" || true)" -eq 0 ]
 }

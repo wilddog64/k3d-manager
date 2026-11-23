@@ -8,12 +8,16 @@ source "$REPO_ROOT/scripts/lib/foundation/scripts/lib/system.sh"
 die() { printf '[hub-deploy] ERROR: %s\n' "$*" >&2; exit 2; }
 stop() {
   local step="$1" code="$2" suffix=''
-  if [[ "$code" == 75 && "$step" != run-lock ]]; then code=1; suffix=' (child exit 75)'; fi
-  printf 'hub-deploy: stopped at %s%s: rerun make hub-deploy REF=%s after fixing it\n' "$step" "$suffix" "$ref" >&2
+  if [[ "$code" == 75 && "$step" != run-lock ]] && { [[ -z "${approval_id:-}" ]] || [[ "$step" != promote && "$step" != read-deploy-hub && "$step" != read-promoted-ref ]]; }; then code=1; suffix=' (child exit 75)'; fi
+  if [[ -n "${approval_id:-}" ]]; then printf 'hub-deploy: stopped at %s%s: rerun bin/k3dm-hub-deploy %s --approval %s after fixing it\n' "$step" "$suffix" "${new:-$ref}" "$approval_id" >&2
+  else printf 'hub-deploy: stopped at %s%s: rerun make hub-deploy REF=%s after fixing it\n' "$step" "$suffix" "$ref" >&2; fi
   exit "$code"
 }
-retry_hint() { printf 'hub-deploy: launchd %s %s; pending; rerun bin/k3dm-hub-deploy <ref>\n' "$1" "$2" >&2; }
-[[ $# == 1 && -n "$1" ]] || die 'usage: k3dm-hub-deploy <commit-ish>'
+retry_hint() { if [[ -n "${approval_id:-}" ]]; then printf 'hub-deploy: launchd %s %s; pending; rerun bin/k3dm-hub-deploy %s --approval %s\n' "$1" "$2" "${new:-$ref}" "$approval_id" >&2; else printf 'hub-deploy: launchd %s %s; pending; rerun bin/k3dm-hub-deploy <ref>\n' "$1" "$2" >&2; fi; }
+approval_id=''
+if [[ $# == 3 && "$2" == --approval ]]; then ref="$1"; approval_id="$3"; [[ "$approval_id" =~ ^p[0-9]+-[0-9a-f]{8}$ ]] || die 'usage: k3dm-hub-deploy <ref> [--approval <id>]'
+elif [[ $# == 1 && -n "$1" ]]; then ref="$1"
+else die 'usage: k3dm-hub-deploy <ref> [--approval <id>]'; fi
 ref="$1"
 stage2=0
 if [[ -n "${K3DM_HUB_DEPLOY_PREV+x}" ]]; then
@@ -77,9 +81,14 @@ valid_state() {
   [[ -n "$appsets" && -n "$launchd" ]]
 }
 if [[ "$stage2" == 1 ]]; then old="$prev"
+elif [[ -n "$approval_id" ]]; then old=''
 elif old="$(remote_sha)"; then :; else code=$?; stop read-deploy-hub "$code"; fi
 pending=()
-if valid_state; then :
+approval_first_run=0
+if [[ -n "$approval_id" ]] && valid_state; then :
+elif [[ -n "$approval_id" ]]; then
+  approval_first_run=1; appsets=''; launchd=full; pending=()
+elif valid_state; then :
 elif [[ ! -e "$STATE_DIR/state" && "$(_run_command --soft -- ls -A "$STATE_DIR" 9>&-)" == run.lock ]]; then
   appsets="$old"; launchd=full; pending=()
   printf 'hub-deploy: no reconcile state yet; full launchd reconcile owed; appsets base %s\n' "${old:0:7}"
@@ -92,7 +101,12 @@ fi
 RS_DIR="${K3DM_REPO_SYNC_STATE_DIR:-$HOME/.local/share/k3d-manager/repo-sync}"
 RS_STALE=$((2 * ${K3DM_REPO_SYNC_TIMEOUT:-60} + 60))
 owned=0
+superseded_file=''
 release_lock() { if [[ "$owned" == 1 && -r "$RS_DIR/lock/pid" && "$(_run_command --soft -- cat "$RS_DIR/lock/pid" 9>&-)" == "$$" ]]; then _run_command --soft -- rm -rf "$RS_DIR/lock" 9>&-; fi; owned=0; }
+cleanup() { [[ -z "$superseded_file" ]] || rm -f -- "$superseded_file"; release_lock; }
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM HUP
 checkout_ok() {
   local head dirty
   head="$(_run_command --soft -- git -C "$REPO_ROOT" rev-parse HEAD 9>&-)" || return 1
@@ -116,6 +130,19 @@ take_lock() {
 }
 
 if [[ "$stage2" == 0 ]]; then
+  if [[ -n "$approval_id" ]]; then
+    if machine="$(_run_command --soft -- "$REPO_ROOT/bin/k3dm-hub-promote" promote "$ref" --approval "$approval_id" 9>&-)"; then :; else code=$?; stop promote "$code"; fi
+    new="${machine#approved-sha }"; new="${new%%$'\n'*}"; promoted_old="${machine##*$'\n'}"; promoted_old="${promoted_old#approved-old }"
+    [[ "$new" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ && "$promoted_old" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ && "$machine" == $'approved-sha '*$'\napproved-old '* ]] || stop promote 75
+    old="$promoted_old"
+    if [[ "$approval_first_run" == 1 ]]; then
+      if [[ ! -e "$STATE_DIR/state" && "$(_run_command --soft -- ls -A "$STATE_DIR" 9>&-)" == run.lock ]]; then appsets="$promoted_old"; printf 'hub-deploy: no reconcile state yet; full launchd reconcile owed; appsets base %s\n' "${promoted_old:0:7}";
+      else appsets=full; printf 'hub-deploy: state unreadable; full launchd reconcile and appsets reapply owed\n'; fi
+      launchd=full; pending=(); write_state || stop state-write 1
+    fi
+    if got="$(remote_sha)"; then :; else stop read-promoted-ref 75; fi
+    if [[ "$got" != "$new" ]]; then printf 'hub-deploy: deploy/hub is now %s; approval %s moved it to %s and has been superseded; nothing more to deploy for it\n' "${got:0:7}" "$approval_id" "${new:0:7}" >&2; stop superseded 1; fi
+  else
   if _run_command --soft -- "$REPO_ROOT/bin/k3dm-hub-promote" promote "$ref" 9>&-; then :; else code=$?; stop promote "$code"; fi
   if new="$(remote_sha)"; then :; else code=$?; stop read-promoted-ref "$code"; fi
   if want="$(_run_command --soft -- git -C "$REPO_ROOT" rev-parse --verify "$ref^{commit}" 9>&-)"; then :; else stop resolve-promoted-ref 1; fi
@@ -123,7 +150,8 @@ if [[ "$stage2" == 0 ]]; then
     printf 'hub-deploy: deploy/hub is %s, not the promoted %s; superseded\n' "${new:0:7}" "${want:0:7}" >&2
     stop superseded 1
   fi
-  trap release_lock EXIT
+  fi
+  trap cleanup EXIT
   deadline=$(( $(_run_command --soft -- date +%s 9>&-) + ${K3DM_HUB_DEPLOY_CHECKOUT_WAIT:-330} ))
   caught_up=0
   while :; do
@@ -149,6 +177,7 @@ if [[ "$stage2" == 0 ]]; then
     printf 'hub-deploy: promoted copy has no handoff; continuing with the running copy\n'
   elif [[ -x "$REPO_ROOT/bin/k3dm-hub-deploy" ]]; then
     printf 'hub-deploy: continuing with the promoted copy at %s\n' "${new:0:7}"
+    if [[ -n "$approval_id" ]]; then exec env K3DM_HUB_DEPLOY_PREV="$old" "$REPO_ROOT/bin/k3dm-hub-deploy" "$new" --approval "$approval_id"; fi
     exec env K3DM_HUB_DEPLOY_PREV="$old" "$REPO_ROOT/bin/k3dm-hub-deploy" "$new"
   else stop handoff 1
   fi
@@ -168,11 +197,13 @@ else
   diff_status=$?; [[ "$diff_status" == 1 ]] || stop diff "$diff_status"; reapply=ran
 fi
 if [[ "$reapply" == ran ]]; then
-  if _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" appsets-reapply 9>&-; then :; else code=$?; stop appsets-reapply "$code"; fi
+  if [[ -n "$approval_id" ]]; then superseded_file="$(mktemp "${TMPDIR:-/tmp}/k3dm-superseded.XXXXXX")"; if _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" appsets-reapply "APPSETS_SHA=$new" "K3DM_SUPERSEDED_OUT=$superseded_file" 9>&-; then :; else code=$?; if [[ "$(head -n 1 "$superseded_file" 2>/dev/null | cut -d' ' -f1)" == superseded ]]; then printf 'hub-deploy: deploy/hub is now %s; approval %s moved it to %s and has been superseded; nothing more to deploy for it\n' "$(cut -d' ' -f2 "$superseded_file" | cut -c1-7)" "$approval_id" "${new:0:7}" >&2; stop superseded 1; fi; stop appsets-reapply "$code"; fi; rm -f -- "$superseded_file"; superseded_file=''
+  elif _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" appsets-reapply 9>&-; then :; else code=$?; stop appsets-reapply "$code"; fi
 fi
 appsets="$new"; write_state || stop state-write 1
 for step in appsets-check platform-ops; do
-  if _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" "$step" 9>&-; then :; else code=$?; stop "$step" "$code"; fi
+  if [[ "$step" == platform-ops && -n "$approval_id" ]]; then superseded_file="$(mktemp "${TMPDIR:-/tmp}/k3dm-superseded.XXXXXX")"; if _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" "$step" "PLATFORM_OPS_SHA=$new" "K3DM_SUPERSEDED_OUT=$superseded_file" 9>&-; then :; else code=$?; if [[ "$(head -n 1 "$superseded_file" 2>/dev/null | cut -d' ' -f1)" == superseded ]]; then printf 'hub-deploy: deploy/hub is now %s; approval %s moved it to %s and has been superseded; nothing more to deploy for it\n' "$(cut -d' ' -f2 "$superseded_file" | cut -c1-7)" "$approval_id" "${new:0:7}" >&2; stop superseded 1; fi; stop "$step" "$code"; fi; rm -f -- "$superseded_file"; superseded_file=''
+  elif _run_command --soft -- make --no-print-directory -C "$REPO_ROOT" "$step" 9>&-; then :; else code=$?; stop "$step" "$code"; fi
 done
 pin_file="$HOME/.local/share/k3d-manager/repo-sync/deployed-platform-ops"
 if [[ -r "$pin_file" ]] && pin="$(_run_command --soft -- cat "$pin_file" 9>&-)"; then :; else stop platform-ops-pin 1; fi
@@ -220,7 +251,7 @@ for name in "${candidates[@]}"; do
   ready+=("$name"); pending+=("$name")
 done
 launchd="$new"; write_state || stop state-write 1
-trap release_lock EXIT
+trap cleanup EXIT
 plist_stamp() { if [[ "$(_run_command --soft -- uname -s 9>&-)" == Darwin ]]; then _run_command --soft -- /usr/bin/stat -f '%Fm %i' "$1" 9>&-; else _run_command --soft -- /usr/bin/stat -c '%.9Y %i' "$1" 9>&-; fi; }
 ran=0
 if ((${#ready[@]})); then

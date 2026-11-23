@@ -33,7 +33,7 @@ setup() {
   mkdir -p "$WORK/scripts/lib/foundation/scripts/lib"
   cp "$REPO/Makefile" "$WORK/Makefile"
   cp "$REPO/bin/k3dm-require-role" "$WORK/bin/"
-  cp "$REPO/bin/k3dm-hub-promote" "$WORK/bin/" 2>/dev/null || true
+  cp "${TEST_HUB_PROMOTE:-$REPO/bin/k3dm-hub-promote}" "$WORK/bin/k3dm-hub-promote" 2>/dev/null || true
   cp "$REPO/scripts/lib/foundation/scripts/lib/system.sh" "$WORK/scripts/lib/foundation/scripts/lib/"
   cat > "$WORK/scripts/k3d-manager" <<'EOF'
 #!/usr/bin/env bash
@@ -48,6 +48,19 @@ EOF
   printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: tracked\n' > "$WORK/scripts/etc/argocd/platform-ops/test.yaml"
   printf 'scratch-repo\n' > "$WORK/.fixture-root"
   mkdir -p "$BATS_TEST_TMPDIR/stubs"
+  mkdir -p "$BATS_TEST_TMPDIR/guards"
+  : > "$BATS_TEST_TMPDIR/sudo.hit"; : > "$BATS_TEST_TMPDIR/launchctl.hit"
+  cat > "$BATS_TEST_TMPDIR/guards/sudo" <<'GUARD'
+#!/bin/sh
+: > "$BATS_TEST_TMPDIR/sudo.hit"
+exit 1
+GUARD
+  cat > "$BATS_TEST_TMPDIR/guards/launchctl" <<'GUARD'
+#!/bin/sh
+: > "$BATS_TEST_TMPDIR/launchctl.hit"
+exit 1
+GUARD
+  chmod +x "$BATS_TEST_TMPDIR/guards/"*
   REAL_GIT_PATH="$(command -v git)"
   REAL_DATE_PATH="$(command -v date)"
   export REAL_DATE_PATH DATE_COUNTER="$BATS_TEST_TMPDIR/date-counter"
@@ -60,6 +73,10 @@ for arg in "$@"; do
   [[ "$arg" == "$SCRATCH_REPO" || "$arg" == "$MOVE_SOURCE_REPO" || "$arg" == "$TEST_ORIGIN" || "$arg" == "--git-dir=$TEST_ORIGIN" ]] && allowed=1
 done
 [[ "$allowed" == 1 ]] || { echo "git stub refused a non-fixture target: $*" >&2; exit 97; }
+printf '%s\n' "$*" >> "${GIT_COMMANDS:-/dev/null}"
+if [[ -n "${INJECT_GIT_FAILURE:-}" && " $* " == *" $INJECT_GIT_FAILURE "* ]]; then
+  exit "${INJECT_GIT_STATUS:-128}"
+fi
 if [[ "${CHERRY_FAIL:-0}" == 1 && " $* " == *" cherry "* ]]; then
   echo "stubbed git cherry failure" >&2
   exit 1
@@ -128,7 +145,9 @@ EOF
   chmod +x "$BATS_TEST_TMPDIR/stubs/gh" "$BATS_TEST_TMPDIR/stubs/kubectl" "$BATS_TEST_TMPDIR/stubs/date"
   chmod +x "$BATS_TEST_TMPDIR/stubs/git"
   export REAL_GIT_PATH SCRATCH_REPO="$WORK" TEST_ORIGIN="$ORIGIN"
-  export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
+  export PATH="$BATS_TEST_TMPDIR/guards:$BATS_TEST_TMPDIR/stubs:$PATH"
+  [ "$(command -v sudo)" = "$BATS_TEST_TMPDIR/guards/sudo" ]
+  [ "$(command -v launchctl)" = "$BATS_TEST_TMPDIR/guards/launchctl" ]
   git -C "$WORK" add Makefile scripts bin .fixture-root
   git -C "$WORK" commit -qm initial
   git -C "$WORK" branch -M k3d-manager-v1.43.15
@@ -141,6 +160,37 @@ EOF
   export CALLS="$BATS_TEST_TMPDIR/calls"
   : > "$BATS_TEST_TMPDIR/kubectl-calls"
   export KUBECTL_CAPTURE="$BATS_TEST_TMPDIR/kubectl-calls"
+}
+
+teardown() {
+  [ ! -s "$BATS_TEST_TMPDIR/sudo.hit" ] || { echo 'sudo guard was hit' >&2; return 1; }
+  [ ! -s "$BATS_TEST_TMPDIR/launchctl.hit" ] || { echo 'launchctl guard was hit' >&2; return 1; }
+}
+
+_install_approval_client_stub() {
+  local client_dir="${1:-$WORK}"
+  cat > "$client_dir/bin/k3dm-promote-client" <<'CLIENT'
+#!/usr/bin/env bash
+# Stub of the Part 2c client, written from the Part 2a B.5-B.6 contract; not a capture.
+printf '%s\n' "$*" >> "$CLIENT_ARGS"
+printf '%s\n' "${*: -1}" >> "$CLIENT_SHAS"
+for name in BREAK_GLASS SKIP_CHECK_RUNS SKIP_CHECK_RUNS_REASON REF MAKEFLAGS MFLAGS MAKELEVEL; do
+  [[ ! -v $name ]] || printf '%s=%s\n' "$name" "${!name}" >> "$CLIENT_ENV"
+done
+printf '%s\n' "$CLIENT_REPLY"
+exit "${CLIENT_EXIT:-0}"
+CLIENT
+  chmod +x "$client_dir/bin/k3dm-promote-client"
+  export CLIENT_ARGS="$BATS_TEST_TMPDIR/client-args" CLIENT_SHAS="$BATS_TEST_TMPDIR/client-shas"
+  export CLIENT_ENV="$BATS_TEST_TMPDIR/client-env"
+  : > "$CLIENT_ARGS"; : > "$CLIENT_SHAS"; : > "$CLIENT_ENV"
+}
+
+_assert_approval_client_sha() {
+  local expected_sha="$1" expected_id="${2:-p123-abcdef12}"
+  [ "$(tail -n 1 "$CLIENT_ARGS")" = "promote --id $expected_id --sha $expected_sha" ]
+  [ "$(tail -n 1 "$CLIENT_SHAS")" = "$expected_sha" ]
+  [[ "$expected_sha" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]
 }
 
 @test "M4: is-green shares promote classification and distinguishes lookup failure" {
@@ -805,7 +855,8 @@ rollback: yes"
 }
 
 @test "G regression: non-TTY promoter test completes when suite stdin is a terminal" {
-  clean_path="${PATH#"$BATS_TEST_TMPDIR/stubs:"}"
+  clean_path="${PATH#"$BATS_TEST_TMPDIR/guards:"}"
+  clean_path="${clean_path#"$BATS_TEST_TMPDIR/stubs:"}"
   clean_path="$(printf '%s' "$clean_path" | tr ':' '\n' | grep -v '/libexec/bats-core$' | paste -sd: -)"
   if script --version 2>/dev/null | grep -q util-linux; then
     inner="$(printf '%q ' bats --tap -f 'N2: non-TTY' "$BATS_TEST_FILENAME")"
@@ -1260,4 +1311,298 @@ STUB
     [[ "$output" == *"confirmation requires a TTY"* ]]
     [ "$(git -C "$ORIGIN" rev-parse refs/heads/deploy/hub)" = "$hub_before" ]
   done
+}
+
+@test 'E1 approval client receives the full resolved sha and valid ok prints two machine lines' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  cat > "$WORK/bin/k3dm-promote-client" <<'CLIENT'
+#!/usr/bin/env bash
+# Stub of the Part 2c client, written from the Part 2a contract; not a capture.
+printf '%s\n' "$*" > "$CLIENT_ARGS"
+for name in BREAK_GLASS SKIP_CHECK_RUNS SKIP_CHECK_RUNS_REASON REF MAKEFLAGS MFLAGS MAKELEVEL; do [[ ! -v $name ]] || printf '%s=%s\n' "$name" "${!name}" >> "$CLIENT_ENV"; done
+printf '{"v":1,"result":"ok","code":"ok","message":"moved","data":{"outcome":"moved","old":"%s","new":"%s","tag":"hub-promote/20261107T210001Z"}}\n' "$EXPECTED_SHA" "$EXPECTED_SHA"
+CLIENT
+  chmod +x "$WORK/bin/k3dm-promote-client"
+  export CLIENT_ARGS="$BATS_TEST_TMPDIR/client-args" CLIENT_ENV="$BATS_TEST_TMPDIR/client-env" EXPECTED_SHA="$sha"
+  : > "$CLIENT_ENV"
+  run --separate-stderr "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  [ "$(cat "$CLIENT_ARGS")" = "promote --id p123-abcdef12 --sha $sha" ]
+  [ ! -s "$CLIENT_ENV" ]
+  [ "$output" = $'approved-sha '$sha$'\napproved-old '$sha ]
+  [[ "$stderr" == *"approval p123-abcdef12 moved deploy/hub"* ]]
+}
+
+@test 'E2 approval refuses bypass and strips empty and zero bypass variables before client' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  cat > "$WORK/bin/k3dm-promote-client" <<'CLIENT'
+#!/usr/bin/env bash
+# Stub of the Part 2c client, written from the Part 2a contract; not a capture.
+printf '%s\n' "$*" > "$CLIENT_ARGS"
+for name in BREAK_GLASS SKIP_CHECK_RUNS SKIP_CHECK_RUNS_REASON REF MAKEFLAGS MFLAGS MAKELEVEL; do [[ ! -v $name ]] || printf '%s=%s\n' "$name" "${!name}" >> "$CLIENT_ENV"; done
+printf '{"v":1,"result":"ok","code":"ok","message":"moved","data":{"outcome":"moved","old":"%s","new":"%s","tag":"hub-promote/20261107T210001Z"}}\n' "$EXPECTED_SHA" "$EXPECTED_SHA"
+CLIENT
+  chmod +x "$WORK/bin/k3dm-promote-client"
+  export CLIENT_ARGS="$BATS_TEST_TMPDIR/client-args" CLIENT_ENV="$BATS_TEST_TMPDIR/client-env" EXPECTED_SHA="$sha"
+  run env BREAK_GLASS=1 "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  [ ! -e "$CLIENT_ARGS" ]
+  run env SKIP_CHECK_RUNS=1 "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  [ ! -e "$CLIENT_ARGS" ]
+  : > "$CLIENT_ENV"
+  run env BREAK_GLASS=0 SKIP_CHECK_RUNS= "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  [ "$(cat "$CLIENT_ARGS")" = "promote --id p123-abcdef12 --sha $sha" ]
+  [ ! -s "$CLIENT_ENV" ]
+}
+
+@test 'E1 malformed ok replies map to 75 after the client receives the full requested sha' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  other_sha="$(printf '%040d' 1)"
+  malformed=(
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"},"extra":true}'
+    '{"v":true,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":"1","result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"no","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"ok","code":"no","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"ok","code":"ok","message":7,"data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z","extra":true}}'
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z","missing":"extra"}}'
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"other","old":"'"$sha"'","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$other_sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"abc","new":"'"$sha"'","tag":"hub-promote/20261107T210001Z"}}'
+    '{"v":1,"result":"ok","code":"ok","message":"x","data":{"outcome":"moved","old":"'"$sha"'","new":"'"$sha"'","tag":"bad"}}'
+  )
+  labels=('wrong-key' 'boolean-v' 'string-v' 'wrong-result' 'wrong-code' 'non-string-message' 'extra-data-key' 'wrong-data-keys' 'bad-outcome' 'wrong-new' 'bad-old' 'bad-tag')
+  for i in "${!malformed[@]}"; do
+    : > "$CLIENT_ARGS"; : > "$CLIENT_SHAS"
+    export CLIENT_REPLY="${malformed[$i]}" CLIENT_EXIT=0
+    run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+    if [ "$status" -ne 75 ]; then printf 'case=%s expected=75 got=%s output=%s\n' "${labels[$i]}" "$status" "$output" >&3; return 1; fi
+    _assert_approval_client_sha "$sha" || { printf 'case=%s client sha mismatch\n' "${labels[$i]}" >&3; return 1; }
+    [[ "$output" == *"reply for approval p123-abcdef12 did not match"* ]] || { printf 'case=%s missing invalid-reply diagnostic\n' "${labels[$i]}" >&3; return 1; }
+  done
+}
+
+@test 'E1 valid refused kept reply maps to 1 after client receives the full sha' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  export CLIENT_EXIT=1 CLIENT_REPLY='{"v":1,"result":"refused","code":"policy","message":"not eligible","data":{"approval":"kept"}}'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  _assert_approval_client_sha "$sha"
+  [[ "$output" == *'not eligible; approval p123-abcdef12 is kept'* ]]
+}
+
+@test 'E1 client exit 75 keeps retry status and names show after reaching client' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  export CLIENT_EXIT=75 CLIENT_REPLY='{"v":1,"result":"unknown","code":"pending","message":"not final","data":{}}'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 75 ]
+  _assert_approval_client_sha "$sha"
+  [[ "$output" == *'bin/k3dm-promote-client show --id p123-abcdef12 reports its state'* ]]
+  [[ "$output" != *'is kept'* ]]
+}
+
+@test 'E1 client exit 2 maps to 2 for a malformed reply after reaching client' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  export CLIENT_EXIT=2 CLIENT_REPLY='not-json'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  _assert_approval_client_sha "$sha"
+  [[ "$output" == *'client denied approval (malformed reply)'* ]]
+}
+
+@test 'E2 ignores a client path override while the script-local client receives the full sha' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  other="$BATS_TEST_TMPDIR/other-client"
+  printf '#!/usr/bin/env bash\nprintf called > "%s"\n' "$BATS_TEST_TMPDIR/other-client.hit" > "$other"
+  chmod +x "$other"
+  export K3DM_PROMOTE_CLIENT="$other" CLIENT_EXIT=0
+  export CLIENT_REPLY="{\"v\":1,\"result\":\"ok\",\"code\":\"ok\",\"message\":\"moved\",\"data\":{\"outcome\":\"moved\",\"old\":\"$sha\",\"new\":\"$sha\",\"tag\":\"hub-promote/20261107T210001Z\"}}"
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  _assert_approval_client_sha "$sha"
+  [ ! -e "$BATS_TEST_TMPDIR/other-client.hit" ]
+}
+
+@test 'E1 refused final, malformed refusal, and client exit 2 map correctly after reaching client' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  export CLIENT_EXIT=1 CLIENT_REPLY='{"v":1,"result":"refused","code":"policy","message":"closed request","data":{"approval":"final"}}'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 1 ]
+  _assert_approval_client_sha "$sha"
+  [[ "$output" == *'approval p123-abcdef12 is closed; request a new one'* ]]
+
+  : > "$CLIENT_ARGS"; : > "$CLIENT_SHAS"
+  export CLIENT_EXIT=1 CLIENT_REPLY='{"v":1,"result":"refused","code":"policy","message":"bad refusal","data":{"approval":"unknown"}}'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 75 ]
+  _assert_approval_client_sha "$sha"
+
+  : > "$CLIENT_ARGS"; : > "$CLIENT_SHAS"
+  export CLIENT_EXIT=2 CLIENT_REPLY='{"v":1,"result":"refused","code":"denied","message":"operator denied","data":{"approval":"kept"}}'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  _assert_approval_client_sha "$sha"
+  [[ "$output" == *'operator denied'* ]]
+}
+
+@test 'E1 rerun with the same approval id calls client again and reports already with the same machine lines' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  export CLIENT_EXIT=0 CLIENT_REPLY="{\"v\":1,\"result\":\"ok\",\"code\":\"ok\",\"message\":\"moved\",\"data\":{\"outcome\":\"moved\",\"old\":\"$sha\",\"new\":\"$sha\",\"tag\":\"hub-promote/20261107T210001Z\"}}"
+  run --separate-stderr "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  first_output="$output"
+  _assert_approval_client_sha "$sha"
+  export CLIENT_REPLY="{\"v\":1,\"result\":\"ok\",\"code\":\"ok\",\"message\":\"already\",\"data\":{\"outcome\":\"already\",\"old\":\"$sha\",\"new\":\"$sha\",\"tag\":\"hub-promote/20261107T210001Z\"}}"
+  run --separate-stderr "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$CLIENT_ARGS" | tr -d ' ')" = 2 ]
+  [ "$(wc -l < "$CLIENT_SHAS" | tr -d ' ')" = 2 ]
+  [ "$(sed -n '1p' "$CLIENT_SHAS")" = "$sha" ] && [ "$(sed -n '2p' "$CLIENT_SHAS")" = "$sha" ]
+  [ "$output" = "$first_output" ]
+  [[ "$stderr" == *'had already moved deploy/hub'* ]]
+}
+
+@test 'E1 approval does not take already-at shortcut while TTY path still does' {
+  sha="$(git -C "$WORK" rev-parse deploy/hub)"
+  _install_approval_client_stub
+  export CLIENT_EXIT=0 CLIENT_REPLY="{\"v\":1,\"result\":\"ok\",\"code\":\"ok\",\"message\":\"already\",\"data\":{\"outcome\":\"already\",\"old\":\"$sha\",\"new\":\"$sha\",\"tag\":\"hub-promote/20261107T210001Z\"}}"
+  run --separate-stderr "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 0 ]
+  _assert_approval_client_sha "$sha"
+  run "$WORK/bin/k3dm-hub-promote" promote deploy/hub
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'deploy/hub is already at'* ]]
+  [ "$(wc -l < "$CLIENT_ARGS" | tr -d ' ')" = 1 ]
+}
+
+@test 'E1 malformed ids and misplaced approval exit 2 without reaching client' {
+  _install_approval_client_stub
+  for id in p1-xyz r1-0123abcd ''; do
+    run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval "$id"
+    [ "$status" -eq 2 ]
+    [ ! -s "$CLIENT_ARGS" ]
+  done
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test p123-abcdef12 --approval
+  [ "$status" -eq 2 ]
+  [ ! -s "$CLIENT_ARGS" ]
+}
+
+@test 'E1 positional BREAK_GLASS=1 retains the base path behavior' {
+  _make_candidate
+  cp "$WORK/bin/k3dm-hub-promote" "$WORK/bin/k3dm-hub-promote-fixed"
+  "$REAL_GIT_PATH" show HEAD:bin/k3dm-hub-promote > "$WORK/bin/k3dm-hub-promote-base"
+  chmod +x "$WORK/bin/k3dm-hub-promote-base"
+  run "$WORK/bin/k3dm-hub-promote-base" promote k3d-manager-v1.43.15 1
+  base_status="$status" base_output="$output"
+  run "$WORK/bin/k3dm-hub-promote-fixed" promote k3d-manager-v1.43.15 1
+  [ "$status" -eq "$base_status" ]
+  [ "$output" = "$base_output" ]
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'no GitHub check runs exist'* || "$output" == *'requires a TTY'* ]]
+}
+
+@test 'E1 approval never pushes, reads credentials, or prompts and forwards a 64-hex sha' {
+  sha_work="$BATS_TEST_TMPDIR/sha256-repo"
+  sha_origin="$BATS_TEST_TMPDIR/sha256-origin.git"
+  "$REAL_GIT_PATH" init --bare --object-format=sha256 -q "$sha_origin"
+  "$REAL_GIT_PATH" init --object-format=sha256 -q "$sha_work"
+  "$REAL_GIT_PATH" -C "$sha_work" config user.name 'Hub promote SHA256 tests'
+  "$REAL_GIT_PATH" -C "$sha_work" config user.email 'sha256@example.invalid'
+  mkdir -p "$sha_work/bin" "$sha_work/scripts/lib/foundation/scripts/lib"
+  cp "${TEST_HUB_PROMOTE:-$REPO/bin/k3dm-hub-promote}" "$sha_work/bin/k3dm-hub-promote"
+  cp "$REPO/scripts/lib/foundation/scripts/lib/system.sh" "$sha_work/scripts/lib/foundation/scripts/lib/"
+  printf 'sha256\n' > "$sha_work/fixture"
+  "$REAL_GIT_PATH" -C "$sha_work" add .
+  "$REAL_GIT_PATH" -C "$sha_work" commit -qm sha256
+  "$REAL_GIT_PATH" -C "$sha_work" branch -M feature/test
+  "$REAL_GIT_PATH" -C "$sha_work" remote add origin "$sha_origin"
+  "$REAL_GIT_PATH" -C "$sha_work" push -q origin feature/test
+  sha="$("$REAL_GIT_PATH" -C "$sha_work" rev-parse HEAD)"
+  [ "${#sha}" -eq 64 ]
+  _install_approval_client_stub "$sha_work"
+  export SCRATCH_REPO="$sha_work" TEST_ORIGIN="$sha_origin" EXPECTED_SHA="$sha"
+  export CLIENT_REPLY="{\"v\":1,\"result\":\"ok\",\"code\":\"ok\",\"message\":\"moved\",\"data\":{\"outcome\":\"moved\",\"old\":\"$sha\",\"new\":\"$sha\",\"tag\":\"hub-promote/20261107T210001Z\"}}"
+  export GIT_COMMANDS="$BATS_TEST_TMPDIR/git-commands" SECURITY_HITS="$BATS_TEST_TMPDIR/security-hits"
+  : > "$GIT_COMMANDS"; : > "$SECURITY_HITS"
+  cat > "$BATS_TEST_TMPDIR/stubs/security" <<'SECURITY'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$SECURITY_HITS"
+exit 1
+SECURITY
+  chmod +x "$BATS_TEST_TMPDIR/stubs/security"
+  run --separate-stderr env SCRATCH_REPO="$sha_work" TEST_ORIGIN="$sha_origin" "$sha_work/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12 < /dev/null
+  [ "$status" -eq 0 ]
+  _assert_approval_client_sha "$sha"
+  [[ "$sha" =~ ^[0-9a-f]{64}$ ]]
+  if rg -q '(^| )push( |$)' "$GIT_COMMANDS"; then printf 'unexpected git commands:\n%s\n' "$(cat "$GIT_COMMANDS")" >&3; return 1; fi
+  [ ! -s "$SECURITY_HITS" ]
+  [[ "$stderr" != *'Type '* && "$stderr" != *'TTY'* ]]
+  [[ "$output" == $'approved-sha '$sha$'\napproved-old '$sha ]]
+}
+
+@test 'E3 fetch failure returns 75 and does not reach client' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  mv "$ORIGIN" "$ORIGIN.offline"
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 75 ]
+  [ ! -s "$CLIENT_ARGS" ]
+  [[ "$output" == *'could not fetch origin for approval p123-abcdef12'* ]]
+  mv "$ORIGIN.offline" "$ORIGIN"
+  [ -n "$sha" ]
+}
+
+@test 'E3 git status failures return 75 and do not reach client' {
+  sha="$(git -C "$WORK" rev-parse feature/test)"
+  _install_approval_client_stub
+  export GIT_COMMANDS="$BATS_TEST_TMPDIR/git-commands"
+  : > "$GIT_COMMANDS"
+  for pair in 'show-ref 128' 'rev-parse 128' 'for-each-ref 129'; do
+    read -r operation code <<< "$pair"
+    : > "$CLIENT_ARGS"; : > "$GIT_COMMANDS"
+    run env INJECT_GIT_FAILURE="$operation" INJECT_GIT_STATUS="$code" "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+    if [ "$status" -ne 75 ]; then printf 'operation=%s expected=75 got=%s output=%s\n' "$operation" "$status" "$output" >&3; return 1; fi
+    [ ! -s "$CLIENT_ARGS" ] || { printf 'operation=%s unexpectedly reached client with %s\n' "$operation" "$(cat "$CLIENT_ARGS")" >&3; return 1; }
+    [[ "$output" == *'approval p123-abcdef12'* ]] || { printf 'operation=%s missing approval id diagnostic\n' "$operation" >&3; return 1; }
+    grep -q "$operation" "$GIT_COMMANDS"
+  done
+  [ -n "$sha" ]
+}
+
+@test 'E3 unresolved REF maps to refusal 2 and does not reach client' {
+  _install_approval_client_stub
+  run "$WORK/bin/k3dm-hub-promote" promote missing-ref --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  [ ! -s "$CLIENT_ARGS" ]
+  [[ "$output" == *"cannot resolve REF 'missing-ref' to a commit"* ]]
+}
+
+@test 'E3 differing local and origin refs and unreachable commits refuse without client call' {
+  _install_approval_client_stub
+  printf 'local divergence\n' >> "$WORK/fixture"
+  git -C "$WORK" add fixture
+  git -C "$WORK" commit -qm 'local only divergence'
+  run "$WORK/bin/k3dm-hub-promote" promote feature/test --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  [ ! -s "$CLIENT_ARGS" ]
+  [[ "$output" == *"branch 'feature/test' differs"*'approval p123-abcdef12'* ]]
+
+  git -C "$WORK" checkout -qb local-only refs/remotes/origin/feature/test
+  printf 'unreachable\n' > "$WORK/unreachable"
+  git -C "$WORK" add unreachable
+  git -C "$WORK" commit -qm unreachable
+  run "$WORK/bin/k3dm-hub-promote" promote local-only --approval p123-abcdef12
+  [ "$status" -eq 2 ]
+  [ ! -s "$CLIENT_ARGS" ]
+  [[ "$output" == *'not reachable from an origin branch'*'approval p123-abcdef12'* ]]
 }

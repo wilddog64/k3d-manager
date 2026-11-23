@@ -62,6 +62,17 @@ make platform-ops
 kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter --timeout=180s
 ```
 
+### Approved promote
+
+Request an approval from the promote authority. The reply shows the approval id and four-character check value. Approve it with the TOTP code and check value shown on the card, then run:
+
+```sh
+bin/k3dm-hub-deploy <ref> --approval <id>
+```
+
+The approval travels as a signed envelope: the Worker signs the id, nonce, approver, check value, code and time with a key also held by the daemon; the daemon verifies the signature first. A `signature` refusal (for example, a missing signature after relay key rotation) or `envelope_stale` refusal leaves the record pending, so enter a fresh code. Exit 75 means the authority could not decide; inspect it with `bin/k3dm-promote-client show --id <id>` and rerun the same command. Reruns are safe. A superseded approval exits 1 and has nothing more to deploy. See [promote authority](promote-authority.md).
+
+
 ## Promote (manual sequence)
 
 Promote a commit that is reachable from an `origin` branch and has completed

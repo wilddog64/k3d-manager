@@ -94,6 +94,8 @@ Full text. `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` carry a short summary in the
 
 Hub promote enforcement for `make hub-deploy REF=<commit-ish>` (moved from `CLAUDE.md` 2026-11-14; the rule is operator 2026-11-07, superseding 2026-07-24): green check runs and typed confirmation are enforced by `bin/k3dm-hub-promote` (`check_runs`, `show_and_confirm`); `k3dm.k3d.io/rollout-stage` on every ApplicationSet by `scripts/tests/plugins/argocd_appset_rollout_stage.bats`.
 
+Promote can also use an approval from the root promote authority (`bin/k3dm-promote-client`): a Worker-signed envelope is checked there for signature, nonce, approver, TOTP code and check value, and evaluation and push run there; user-side scripts only ask. Until the GitHub ruleset in `docs/howto/promote-authority.md` is enabled after Part 2e, this authority is a gate on the honest path, not a barrier.
+
 ## Environment Constraints
 
 <a id="environment-constraints"></a>
