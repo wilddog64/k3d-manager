@@ -4,6 +4,8 @@
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** `docs/plans/dirused-m10-scheduled-purge.md`; builds on `docs/plans/dirused-m10b-scheduled-purge.md` (one-time plans) and
 `docs/plans/dirused-m9b-stop-delete-start.md` (stop/delete/start).
+**Depends on:** `docs/plans/dirused-m10d-unattended-service-stop.md` for any rule that names a service allowed to stop (M10b rev 2
+scheduled runs stop no service; M10b's live check is now M10b3 E-B3L2).
 **Repo / branch:** wilddog64/dirused / TBD
 **Version:** TBD (after v0.0.27)
 **Risk:** high — repeated unattended deletes and service stops
