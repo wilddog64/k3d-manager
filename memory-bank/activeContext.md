@@ -141,3 +141,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: PR #164 opened (v1.45.0 release, not draft). Argon review spec docs/plans/release-pr164-v1.45.0-review.md written; dispatching agy role review.
 
 - 2026-11-23: CodeQL #38/#39 (totpctl enroll secret to /dev/tty) — false positive, operator approved dismissal; classifier blocked Claude dismissing → operator dismisses. Issue doc written. Argon review + CI running.
+
+- 2026-11-23: hoverfocus bootstrap error 5 root cause = SSH pane is launchd Background session vs plist LimitLoadToSessionType Aqua. Claude sent `open HoverFocus.app` to m2 pane work:2.0 (operator asked): running pid 86349; E-L1 needs operator at m2 (Accessibility + hover test).
