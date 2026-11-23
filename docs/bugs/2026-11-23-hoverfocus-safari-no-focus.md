@@ -25,6 +25,14 @@ standard windows.
 
 **Prediction to check:** focus works over Safari's tab bar or toolbar (shallow tree) but not over page content.
 
+## Update 2026-11-23 (operator screenshot)
+
+Operator: "works". The screenshot shows Safari (YouTube, video area) key with a TextEdit window above it whose title
+bar is inactive, so a hover reached Safari without a click and without raising. So Safari is not refused outright.
+Still open: which point was hovered (video area vs text or links), and whether the earlier failure depends on where
+the pointer sits (deep tree under text/links) or was a one-off. If it does not come back over text and links, close as
+not reproducible.
+
 ## Next
 
 1. Operator quick check: hover over an unfocused Safari window's tab bar, then over its page.
