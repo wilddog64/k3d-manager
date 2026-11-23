@@ -136,6 +136,27 @@ unless marked "operator's call".
   not the file's text.
 - **P1 itself is pending.** It is answered after 23:00 with the session disconnected.
 
+**2026-11-23, follow-up (operator screenshot):**
+
+- **P11: the source is the profile root.**
+  - `icacls bin` shows the same five full-control entries, inherited `(I)(OI)(CI)`. So they come from
+    `C:\Users\cliang` itself (or above): the second domain account and the unresolved SID have full control of the
+    whole profile, `%LOCALAPPDATA%` included.
+  - Consequence: copying the exe into a protected plan folder under `%LOCALAPPDATA%` is **not enough**. FILE_DELETE_CHILD
+    on a parent lets that account rename the protected `dirused` (or plan) folder away and plant its own folder and exe
+    at the same path. The scheduled task then launches the planted exe as the operator, before any dirused check runs.
+    The owner check cannot help, because it runs inside the exe being replaced.
+  - Spec change (b2 O7 check, b3): the "writable by others" refusal must walk **every ancestor** of the exe-copy
+    and plan paths, up to the volume root. It refuses if any principal other than the user, SYSTEM or Administrators
+    holds write, delete, delete-child, write-DAC or write-owner (or generic write/all) on any of them, and names the
+    folder and principal.
+  - On this jump box that refuses today. Scheduling waits until the profile ACL is corrected, which is the operator's
+    or the domain admin's call (why the account has it is unknown), or until a plan root outside the profile is found
+    whose whole ancestor chain passes.
+- **Elevation.** `whoami /groups` shows `Medium Mandatory Level` (S-1-16-8192): the shell was **not elevated**. So a
+  non-elevated user can create a task folder (`\dirused-probe\`) with `schtasks /create`, which is P10 part 1. The
+  XML security descriptor is still unproven.
+
 
 ## Behaviour
 
