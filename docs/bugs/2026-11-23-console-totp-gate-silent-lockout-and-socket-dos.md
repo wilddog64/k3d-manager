@@ -1,16 +1,43 @@
 # Bug: console TOTP gate: flat silent lockout allows slow brute force and operator lockout; world-writable socket
 
-**Status:** OPEN — spec rev 3 (recovery-code unlock added; pending Fable + Argon review)
+**Status:** OPEN — spec rev 4 (Fable + Argon review applied; pending operator intent approval for new items)
 **Priority:** P2
 **Introduced by:** v1.45.0 web-console plan C (`1026dbe2`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (Fable + Argon review of rev 3, then intent approval of E8–E12 and L2; child A waits)
+**Waiting on:** operator decision — since 2026-11-23 (intent approval of the rev 4 items listed under Acceptance, and the `**Approval:**` exception; A1 and A2 wait)
+**Approval:** pending operator — exception to "X.Y.N is bug-fix only": recovery codes (B8) are a feature-shaped addition in a patch release. Justified because the escalating lock this patch adds (24 h at level 4, operator Q3) makes the existing lockout worse for an operator travelling with an iPad only, and recovery codes are the no-root way back in.
 **Triage:** patch → v1.45.1 (security and DR release); metrics, alerts and socket mode split to follow-ups (see Follow-ups)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match
 **Detected by:** v1.45.0 red-team gate, 2026-11-22, on `7dfb7238` — see [docs/issues/2026-11-23-v1.45.0-red-team.md](../issues/2026-11-23-v1.45.0-red-team.md)
 **Severity:** the second factor weakens over time unobserved (about 0.4%/day for a cert holder); a cert holder or same-uid process can keep the operator out.
 **Findings:** Fable 2 (Medium), Fable 8 (Low). Claude: plausible (constants read; not reproduced: needs root daemon), P2.
+
+## Rev 4 changes (Fable + Argon review of rev 3, 2026-11-23)
+
+Each finding was checked against the source at `2adc7f60`. Where the two reviews differed, the gate or daemon code
+decided; the reason is in the row.
+
+| Finding | Kind | Resolution |
+|---------|------|------------|
+| Fable B-1 / Argon 1: one global 60 s recovery window lets anyone with a console cert keep it closed, so the operator's valid code gets `WAIT`; the window also equals the gate's 60 s prompt timeout (`gate :206`, `:309-311`) | blocker | **Rate limit dropped** (operator decision). Every recovery-format attempt is evaluated; only the `totp-recovery-failure count=<n>` log line is throttled to one per 60 s. `recovery_next_mono`, the `WAIT` reply on recovery input, `totp-recovery-rate-limited`, interface `recovery_rate` and the "remove the 60 s window" mutation are gone. M12, N10 and E10 rewritten (B8 "No rate limit" gives the bound) |
+| Argon 7: a wrong recovery code while unlocked feeds TOTP `failures` | nit | Accepted: a wrong recovery code never changes `failures`, `locked_until` or `lock_level`. Recovery probes cannot lock TOTP; an operator's recovery typo cannot add to their TOTP count |
+| Fable S-1 / Argon 6.3: pending codes outlive the pending operation | should-fix | B8 "Pending lifecycle": cleared on commit OK, post-rename failure, fifth wrong code, `ABORT` and expiry; `RECOVERY_GET` parsed with `re.fullmatch(r"RECOVERY_GET [0-9]", line)` (`int("-1")` would return the last code); `RECOVERY_COMMIT` needs `pending_operation == "RECOVERY"`; `ENROLL_BEGIN` / `ROTATE_BEGIN` refused while a recovery set is pending. New N13 with a positive control; mutation "keep pending codes after commit" |
+| Fable S-2 / Argon 4: codes stay on screen and may be invalid after a failed enrol/rotate | should-fix | totpctl sends `ABORT` on any non-OK exit (except after `UNAVAILABLE`) and prints the fixed line `recovery codes above may not be valid; run totpctl recovery-status / recovery-regen`; the scrollback clear moves into `finally` (today only on OK, `totpctl.py:127`). E12 case added |
+| Fable S-3: with `locked_until` kept as the decay anchor, the expiry reset at `totpd.py:744-746` (trigger `locked_until > 0`) would fire on every later VERIFY | should-fix | B1: the expiry reset fires only when `failures >= 5` and the lock has expired; it keeps `locked_until` |
+| Fable S-4: a v1.45.0 state with an active lock has no level; `lock_level` type rule inconsistent ("int 1–4" in child A) | should-fix | B3: a 5-key state with `locked_until > 0` loads as level 1 (clamp 300 s, next lock 1800 s); `test_N1_D4b_lockout_requests_do_not_increment_failures` (tests `:2382`) seeds exactly that and still reads `WAIT 300`. `lock_level`: `type(v) is int`, 0–4, explicit 0 accepted, bool refused. M5 and E4 updated; A1 item 4 fixed |
+| Fable S-5: the fault seam is one value (`run.injected_commit_fault`, totpd `:604`, `:647`, `:748`, `:779`, `:796`; tests `:943`, `:1442`, `:2410`), so a burn fault cannot be told from a state fault | should-fix | B8 "Fault seam": keyed by file name (`{"state.json": ..., "recovery.json": ...}`); a bare string still means `state.json`, so the three existing tests are unchanged. Burn pre-rename → `UNAVAILABLE`, code still valid; burn post-rename → `UNAVAILABLE`, no reset, fatal exit. E9 cases |
+| Fable S-6 / Argon 2: startup removes only `state.json.tmp` (`totpd.py:380-385`); a crash mid-write leaves `recovery.json.tmp` and every later O_EXCL write fails | blocker (Argon) | B8 "Startup cleanup": both tmp files, with `os.path.lexists`. Test in E8 |
+| Fable S-7: when `load_recovery` runs is unstated; concurrency unproven | should-fix | B8 "Load": at start, on a recovery-format VERIFY and on `RECOVERY_STATUS`, never on the TOTP path. Concurrent twin of `test_N1_D40_concurrent_same_code_is_accepted_once` (tests `:2437`) in E9. N12's positive control triggers a load |
+| Fable S-8 | should-fix | Applied: child A split into A1 (lock, gate untouched) and A2 (recovery, serial after A1); `**Approval:**` line (pending operator) in the parent and A2 records the X.Y.N feature exception. A2 is 4 files because the gate change is needed to prove N8 |
+| Fable S-9: hash preimage and version check loose | should-fix | B8 "Storage": `h = sha256(bytes.fromhex(s) + code)`, `code` the ungrouped 16-character uppercase ASCII; `type(v) is int and v == 1` |
+| Argon 3: gate cap truncates input, so overlong input could pass; Fable: no truncated input can become a valid code | should-fix | Read `gate :329-330`: bytes past the cap are dropped silently. Security effect is nil (a valid code is still needed), but trailing garbage should not be accepted, so **Argon wins on rejection**: an overflow flag makes over-cap input a local "Invalid code". **Partly rejected:** Argon's strict 4-4-4-4 grouping. Hyphens in any position are stripped; the 16-character base32 check is what matters, and loose grouping helps blind typing on an iPad |
+| Argon 5: `os.urandom` stubs assert `size == 20` (tests `:1438-1441`, `:2064`); the secret scan (`:2377`) does not know `recovery.json` | should-fix | A2 Test rules authorise updating those stubs (sizes 10 and 16 allowed, distinct deterministic bytes) and the scan |
+| Argon 6.1: `os.path.exists` + `open` follows symlinks; a dangling symlink reads as missing | should-fix | B8 "Load": `os.lstat` (ENOENT → missing), then `os.open(O_RDONLY|O_NOFOLLOW)` + `os.fstat`; a dangling symlink is damaged |
+| Argon 6.2: `RECOVERY_COMMIT` could write `recovery.json` after the state vanished | should-fix | `RECOVERY_COMMIT` also needs `cur_state` enrolled, else `UNAVAILABLE` |
+| Fable nits: gate backspace, iPad spaces, WAIT seconds, stale line refs, "Six files" count | nit | Gate handles 0x7f/0x08 and drops spaces; the WAIT message shows the seconds from the reply (reply words unchanged); refs fixed (gate cap `:329-330`, totpd line limit `:703`, totpctl secret print `:98-99`, "commit not confirmed" `:131`, usage `:36`, scrollback clear `:127`); Files count fixed |
+| Pending window for recovery sets | design | `RECOVERY_BEGIN` uses 600 s (new verb, trivial). Enrol/rotate keep 300 s (`totpd.py:586`, `:630`) because changing them moves existing behaviour; part C tells the operator to have a place ready for the codes before starting |
+| Child A size | operator decision | Split into A1 (lock, decay, unlock, logs; gate untouched) and A2 (recovery codes and the gate change), serial: A2 depends on A1 (Routing) |
 
 ## Rev 3 changes (operator decisions, 2026-11-23)
 
@@ -59,15 +86,15 @@ short-lived certs are follow-ups.
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `scripts/libexec/k3dm-console-totpd.py` | escalating lock with a persisted `lock_level` (written only when non-zero); decay; monotonic in-process deadline set once per lock; `load_state` migration; structured log lines; admin `UNLOCK`; recovery codes (B8): `recovery.json`, VERIFY accepts the recovery format, rate limit, burn, admin `RECOVERY_*` verbs |
-| 2 | `scripts/libexec/k3dm-console-gate.py` | **changed (rev 3):** line buffer cap 7 → 20 bytes (`:327-328`); the local format check (`:332`) also accepts a recovery code and sends it in canonical grouped form (B8 Wire). Reply regex `:157` and branches `:338-352` unchanged |
-| 3 | `scripts/libexec/k3dm-console-totpctl.py` | `totpctl unlock`, `recovery-status`, `recovery-regen` (usage line `:37`, verb dispatch `:38-90`); enrol/rotate also print the ten recovery codes on `/dev/tty` |
+| 1 | `scripts/libexec/k3dm-console-totpd.py` | A1: escalating lock with a persisted `lock_level` (written only when non-zero); decay; monotonic in-process deadline set once per lock; `load_state` migration; structured log lines; admin `UNLOCK`. A2: recovery codes (B8): `recovery.json`, VERIFY accepts the recovery format, burn, admin `RECOVERY_*` verbs, keyed fault seam, startup tmp cleanup |
+| 2 | `scripts/libexec/k3dm-console-gate.py` | A2 only: line buffer cap 7 → 20 bytes with an overflow flag (`:329-330`); backspace and spaces; the local format check (`:332`) also accepts a recovery code and sends it in canonical grouped form (B8 Wire); the WAIT message shows the seconds (`:348`). Reply regex `:157` and branch structure `:338-350` unchanged |
+| 3 | `scripts/libexec/k3dm-console-totpctl.py` | A1: `totpctl unlock` (usage line `:36`, verb dispatch `:39-146`). A2: `recovery-status`, `recovery-regen`; enrol/rotate print the ten recovery codes on `/dev/tty` after the secret (`:98-99`), `ABORT` plus a fixed warning on non-OK, scrollback clear in `finally` (today `:127`) |
 | 4 | `scripts/etc/ssh/k3dm-web-console_sshd_config.tmpl` | `RevokedKeys /etc/k3dm-web-console/revoked_keys` after `TrustedUserCAKeys` |
 | 5 | `bin/k3dm-web-console-sshd` | expected-lines list (`_wc_render` `:25-75`); stage an empty KRL if absent (beside `_wc_stage_keys` `:464-474`); `_wc_dest_check` (`:149-151`), `_wc_files_healthy` (`:217-240`), dry-run plan (`:693`). The non-purge uninstall list (`:739`) is **not** changed: it already leaves `revoked_keys` in place; a test pins that |
 | 6 | `docs/howto/web-console-totp.md`, `docs/howto/web-console-sshd.md` | unlock, revoke a cert, upgrade order, rollback step |
 | T | `scripts/tests/bin/test_web_console_totp.py`, `scripts/tests/bin/web_console_sshd.bats` | tests below |
 
-Six files, so the work is split (see Routing).
+Seven rows (six code and doc rows plus tests), so the work is split (see Routing).
 
 ## Behaviour
 
@@ -77,6 +104,11 @@ operator decision Q3. The fifth failure still replies `NO`; attempts while locke
 `WAIT <remaining>`. At level 4 each further run of five failures re-locks for 86400 s (about 5 guesses a day). When a
 lock expires, `failures` resets to 0 and **`lock_level` is kept**, so the next five failures escalate. A successful code, a
 valid recovery code (B8), `totpctl unlock`, enrol or rotate resets `failures`, `locked_until` and `lock_level` to 0.
+
+**Expiry reset trigger (rev 4, Fable S-3).** Today the reset runs whenever `locked_until > 0` and the lock has passed
+(`totpd.py:744-746`). Because decay keeps `locked_until` on disk as its anchor, that trigger would fire on every later
+VERIFY. The reset now fires only when `failures >= 5` and the lock has expired; it sets `failures` to 0 and keeps
+`locked_until` and `lock_level`.
 
 **Decay (Q4, operator 2026-11-23).** While no lock is active and `lock_level > 0`, the level drops by one for each full
 86400 s since the last lock expired, applied at the next VERIFY and at daemon start. The anchor is `locked_until`
@@ -103,9 +135,12 @@ restart extends it by at most one duration.
 Note: on macOS `time.monotonic()` does not advance while the machine sleeps, so a lock imposed before sleep runs for its
 full awake duration after wake. That lengthens locks, never shortens them; accepted and stated in the guide.
 
-**B3 State migration and rollback safety.** `load_state` accepts the old 5-key set (reads as `lock_level: 0`) or the
-5-key set plus `lock_level`. Any other key set, a non-int or negative value, or `lock_level > 4` returns `False`
-(state-unavailable), as today. **Writers include `lock_level` only when it is non-zero**; a commit at level 0 writes the
+**B3 State migration and rollback safety.** `load_state` accepts the old 5-key set or the 5-key set plus `lock_level`.
+A 5-key state reads as `lock_level: 0` when `locked_until` is 0, and as `lock_level: 1` when `locked_until > 0` (rev 4,
+Fable S-4): v1.45.0 had one level, so an active v1.45.0 lock is clamped to 300 s (B2) and the next lock is 1800 s. The
+existing `test_N1_D4b_lockout_requests_do_not_increment_failures` (tests `:2382`) seeds exactly that state and still
+reads `WAIT 300` with the file unchanged. When present, `lock_level` must satisfy `type(v) is int and 0 <= v <= 4`
+(an explicit 0 is accepted; `true` is refused). Any other key set or value returns `False` (state-unavailable), as today. **Writers include `lock_level` only when it is non-zero**; a commit at level 0 writes the
 exact v1.45.0 5-key form. So a v1.45.0 daemon reads every state this version writes at level 0. See Rollback. Recovery
 codes never enter `state.json`; they live in `recovery.json` (B8), which v1.45.0 does not read.
 
@@ -120,8 +155,11 @@ like `status`.
 - `totp-locked-reply lock_level=<l>` (only on the first refused attempt per lock, so a loop cannot flood the log)
 - `totp-unlock source=<admin|success|recovery|enrol|rotate|decay>` (`decay` when the level reaches 0 by decay)
 - `totp-recovery-used remaining=<n>`; `totp-recovery-low remaining=<n>` (level WARN) when `n <= 2`
-- `totp-recovery-failure`; `totp-recovery-rate-limited` (first refused attempt per 60 s window only)
+- `totp-recovery-failure count=<n>`: at most one line per 60 s against `monotonic()`, `n` = wrong recovery attempts since
+  the last such line (rev 4: the attempts themselves are not limited, B8)
 - `totp-recovery-regen count=<n>`; `totp-recovery-damaged` (once per change of the file's load result)
+
+A1 ships the first four events (`source=recovery` excepted); A2 adds the recovery events and `source=recovery`.
 
 No line ever carries the submitted code, the secret, a counter value, or a recovery code, salt or hash. Logging stays best-effort and never changes a
 reply. In v1.45.1 these lines are the only record of an attack; alerting on them is the v1.46.0 follow-up.
@@ -145,61 +183,111 @@ missing, a symlink, not regular, or not `0:0:644` through `_wc_file_mode` (`:132
 config while the file is missing. Reason (External behaviour): sshd then refuses every key, and `sshd -t` does not
 catch it. To revoke a cert: `ssh-keygen -k -u -f /etc/k3dm-web-console/revoked_keys <cert or spec>` (operator, root).
 
-**B8 Recovery codes (operator decision, 2026-11-23).** Ten single-use codes give the operator a way in from the console,
-without root on the hub, when locked out or without the authenticator.
+**B8 Recovery codes (operator decision, 2026-11-23; rev 4).** Ten single-use codes give the operator a way in from the
+console, without root on the hub, when locked out or without the authenticator. Shipped by child A2.
 
-- **Generation.** The daemon makes a pending set of 10 codes at `ENROLL_BEGIN`, `ROTATE_BEGIN` and a new
-  `RECOVERY_BEGIN`, beside the pending secret (`totpd.py:577-588`, same 300 s pending window). Each code is
-  `os.urandom(10)` as base32: 16 characters of `[A-Z2-7]`, 80 bits, shown as `XXXX-XXXX-XXXX-XXXX`.
+- **Generation.** The daemon makes a pending set of 10 codes, `pending_recovery_codes`, at `ENROLL_BEGIN`,
+  `ROTATE_BEGIN` and a new `RECOVERY_BEGIN`, beside the pending secret (`totpd.py:577-631`). Each code is
+  `os.urandom(10)` as base32: 16 characters of `[A-Z2-7]`, 80 bits, shown as `XXXX-XXXX-XXXX-XXXX`. Pending window:
+  enrol and rotate keep 300 s (`:586`, `:630`); `RECOVERY_BEGIN` uses 600 s (a new verb, so no existing behaviour
+  moves). A longer enrol/rotate window is left out; part C tells the operator to have a place ready for the codes first.
+- **Pending lifecycle (rev 4, Fable S-1, Argon 6.3).** `pending_recovery_codes` is set to `None` on every path that ends
+  the pending operation: commit OK (`:606`, `:649`), post-rename commit failure (`:614`, `:657`), the fifth wrong commit
+  code (`:619`, `:662`), `ABORT` (`:665`), and expiry (any admin request at or after `pending_admin_expiry` clears both
+  the secret and the codes). A pre-rename commit failure keeps both, as today for the secret, so the operator can retry
+  inside the window. `ENROLL_BEGIN`, `ROTATE_BEGIN` and `RECOVERY_BEGIN` reply `REFUSED` while any operation is pending,
+  including a recovery set (which has no pending secret, so the check reads `pending_operation` and the expiry, not
+  `pending_admin_secret` alone).
 - **Display.** totpctl's admin reply cap is 64 bytes (`totpctl.py:18-19`) and the daemon's admin request buffer is 32
   bytes (`totpd.py:559`), so the 10 codes (190 characters) cannot travel in one reply. A new verb `RECOVERY_GET <i>`
-  (`i` = 0–9, pending set only) replies `CODE <grouped>` (24 bytes), or `UNAVAILABLE` when nothing is pending or the
-  window expired. totpctl prints the codes once on `/dev/tty` after the secret, the way it prints the secret today
-  (`totpctl.py:105-107`), never on stdout, in argv or in env, and clears the scrollback at the end as it already does
-  (`:141`).
+  replies `CODE <grouped>` (24 bytes) while a set is pending, else `UNAVAILABLE`. The verb is matched with
+  `re.fullmatch(r"RECOVERY_GET [0-9]", line)`, so `RECOVERY_GET -1` or `RECOVERY_GET 10` is `UNAVAILABLE`
+  (`int("-1")` would index the last code). totpctl prints the codes once on `/dev/tty` after the secret
+  (`totpctl.py:98-99`), never on stdout, in argv or in env.
+- **Scrollback and failed enrol/rotate (rev 4, Fable S-2, Argon 4).** The scrollback clear (`\x1b[3J\x1b[H\x1b[2J`,
+  today only on the OK path, `totpctl.py:127`) moves into a `finally` that runs on every exit once a secret or code was
+  printed: enroll, rotate and recovery-regen. On any enrol/rotate exit other than `OK` after the codes were printed
+  (prompt timeout, local "Invalid code", `NO`, `UNAVAILABLE`), totpctl prints, after its existing message, the fixed line
+  `recovery codes above may not be valid; run totpctl recovery-status / recovery-regen`, and sends `ABORT` except after
+  `UNAVAILABLE` (the daemon may be down, or the commit may have landed; `recovery-status` tells).
 - **Storage.** Hashes only, in a separate file `<state_dir>/recovery.json`, root 0600 (owner `expected_dir_owner`),
   written with `commit_state`'s pattern (`totpd.py:100-139`: O_EXCL|O_NOFOLLOW tmp at 0600, fsync, `os.replace`, dir
-  fsync; same pre-/post-rename error split). Format: `{"v": 1, "codes": [{"s": "<32 hex salt>", "h": "<64 hex
-  sha256(salt || code)>"}]}`, 0–10 entries; a burned code's entry is removed. A salted SHA-256 is enough because each code
-  carries 80 bits: a slow KDF adds nothing against an 80-bit search, would block the single-threaded select loop for
-  every attempt, and `hashlib.scrypt` depends on the interpreter's OpenSSL build, which is not checked on the hub's
-  CommandLineTools Python. `state.json` is untouched, so B3's rollback property holds.
+  fsync; same pre-/post-rename error split; generalise `commit_state` to take a file name, or add a sibling). Format:
+  `{"v": 1, "codes": [{"s": "<32 hex salt>", "h": "<64 hex>"}]}`, 0–10 entries, where
+  `h = sha256(bytes.fromhex(s) + code).hexdigest()` and `code` is the ungrouped 16-character uppercase ASCII string (rev 4,
+  Fable S-9). The loader checks `type(v) is int and v == 1` (so `true` and `1.0` are refused), exactly the keys `v` and
+  `codes`, and exactly `s` and `h` per entry as lowercase hex of those lengths. A burned code's entry is removed. A salted
+  SHA-256 is enough because each code carries 80 bits: a slow KDF adds nothing against an 80-bit search, would block the
+  single-threaded select loop for every attempt, and `hashlib.scrypt` depends on the interpreter's OpenSSL build, which
+  is not checked on the hub's CommandLineTools Python. `state.json` is untouched, so B3's rollback property holds.
+- **Fault seam (rev 4, Fable S-5).** `run.injected_commit_fault` (read at `totpd.py:604`, `:647`, `:748`, `:779`, `:796`)
+  becomes keyed by file name, for example `{"state.json": "pre-rename-open"}` or `{"recovery.json": "post-rename-dir-fsync"}`.
+  A bare string keeps today's meaning, `{"state.json": <value>}`, so the existing tests at tests `:943`, `:1442` and
+  `:2410` need no change.
+- **Startup cleanup (rev 4, Fable S-6, Argon 2).** The leftover-tmp step (`totpd.py:380-385`) removes both
+  `state.json.tmp` and `recovery.json.tmp`, each tested with `os.path.lexists`; a failed unlink exits 1, as today. Without
+  this, a crash between the tmp write and the rename leaves a file that makes every later O_EXCL write fail.
 - **Commit order.** `ENROLL_COMMIT` / `ROTATE_COMMIT` write `recovery.json` first, then `state.json`. If the state commit
-  fails before the rename, the new codes are live and the old secret stays; totpctl already says "commit not confirmed;
-  run web-console-totp-status" (`:147`) and the operator reruns rotate, which issues a fresh set. `RECOVERY_COMMIT` writes
-  only `recovery.json` and replaces the whole set.
-- **Load.** `load_recovery` gives "recovery unavailable" for a symlink, a non-regular file, a wrong owner, a mode other
-  than 0600, any format deviation or more than 10 entries; a missing file means 0 codes (an existing enrolment after the
-  upgrade, until the operator runs `recovery-regen`). A bad `recovery.json` **never** makes TOTP login unavailable: it
-  only disables recovery and logs `totp-recovery-damaged`.
-- **Wire.** Gate: line buffer cap 7 → 20 bytes (`:327-328`). Input is accepted if it is 6 digits, or if after uppercasing
-  and removing hyphens it is 16 `[A-Z2-7]` characters; the latter is sent in canonical form, `VERIFY XXXX-XXXX-XXXX-XXXX`
-  (26 bytes before the newline, inside the daemon's 31-byte line limit, `totpd.py:695`). Anything else stays the local
-  "Invalid code" (`:332-336`). The echo stays off, so lowercase and missing hyphens are accepted to cut typing errors.
-  Daemon VERIFY accepts exactly `[0-9]{6}` or `[A-Z2-7]{4}(-[A-Z2-7]{4}){3}`; anything else is the existing wire reject.
-  The reply vocabulary is unchanged (`OK | NO | WAIT <n> | UNAVAILABLE`), so the gate regex `:157` and branches
-  `:338-352` stay as they are.
-- **Rate limit.** One recovery-format attempt per 60 s, locked or not, held in-process against `monotonic()`
-  (`recovery_next_mono`). An attempt inside the window replies `WAIT <remaining>` and is not evaluated. Bound: 10 valid
-  codes in 2^80 at 1,440 attempts a day is about 1.2×10^-20 per day. A daemon restart resets the window; restarts need
-  root or a crash, and a crash loop is itself paced by launchd.
+  fails before the rename, the new codes are live and the old secret stays; totpctl says "commit not confirmed; run
+  web-console-totp-status" (`totpctl.py:131`) plus the S-2 line, and the operator reruns rotate or `recovery-regen`.
+  `RECOVERY_COMMIT` writes only `recovery.json` and replaces the whole set.
+- **Load (rev 4, Fable S-7, Argon 6.1).** `load_recovery` runs only at daemon start, on a recovery-format VERIFY and on
+  `RECOVERY_STATUS`; never on the TOTP path, so a damaged file cannot touch a TOTP login. Method: `os.lstat`; ENOENT means
+  missing, which is 0 codes (an existing enrolment after the upgrade, until `recovery-regen`). Otherwise
+  `os.open(path, O_RDONLY | O_NOFOLLOW)` and `os.fstat(fd)` on the opened file: regular, uid `expected_dir_owner`, mode
+  0600. A symlink (dangling or not), any open or read error, a non-regular file, a wrong owner or mode, any format
+  deviation or more than 10 entries gives "recovery unavailable" and logs `totp-recovery-damaged` once per change of the
+  load result. A bad `recovery.json` **never** makes TOTP login unavailable.
+- **Wire.** Gate (`:329-330`, rev 4 Argon 3 and Fable nits):
+  - line buffer cap 7 → 20 bytes with an overflow flag: a byte that arrives when the buffer is full sets the flag, and
+    Enter with the flag set is the local "Invalid code"; no truncated prefix is ever checked;
+  - backspace (0x7f or 0x08) removes the last buffered byte, if any (the gate reads one byte at a time with canonical
+    mode off, so the terminal does not erase); the overflow flag stays set until Enter;
+  - spaces are dropped as they arrive, for blind typing on an iPad keyboard;
+  - after Enter: 6 digits are sent as today; otherwise, uppercased with hyphens removed (any position), 16 `[A-Z2-7]`
+    characters are sent in canonical form, `VERIFY XXXX-XXXX-XXXX-XXXX` (26 bytes before the newline, inside the daemon's
+    31-byte line limit, `totpd.py:703`); anything else stays the local "Invalid code" (`:332-336`).
+
+  The echo stays off. Daemon VERIFY accepts exactly `[0-9]{6}` or `[A-Z2-7]{4}(-[A-Z2-7]{4}){3}`; anything else is the
+  existing wire reject. The reply vocabulary is unchanged (`OK | NO | WAIT <n> | UNAVAILABLE`), so the gate regex `:157`
+  stays. The WAIT branch (`:346-350`) shows the seconds the reply carries:
+  `Too many attempts; try again later (<n> s)`; the text before the parenthesis is unchanged.
+- **No rate limit (rev 4, Fable B-1, Argon 1, operator decision).** Every recovery-format attempt that reaches the
+  daemon is evaluated, locked or not. Every admitted peer is the gate running as the console uid (B6), so a global
+  limiter cannot tell the operator from an attacker: any window an attacker can keep closed blocks the operator's valid
+  code, and rev 3's 60 s window also matched the gate's 60 s prompt timeout (`gate :206`), so one typo could time the
+  operator out. Bound without a limiter: attempts are paced by the admission path (an ssh certificate login, the `admit()`
+  process-tree check, 4 admitted slots, the gate's 2 s sleep after each `NO`, at most 10 prompts per session). Even at
+  100 attempts a second, 10 codes in 2^80 give about 7×10^-17 per day. Only the log line is throttled (B5): wrong
+  attempts are counted in-process and `totp-recovery-failure count=<n>` is written at most once per 60 s against
+  `monotonic()`; the first wrong attempt after a quiet minute logs at once; a count not yet written is lost at exit.
 - **Verify.** The candidate is compared with every remaining entry with `hmac.compare_digest`, with no early exit.
   - Valid unused code: commit `recovery.json` without that entry (the burn) **before** replying; then commit `state.json`
-    with `failures`, `locked_until` and `lock_level` at 0 (5-key form) and reply `OK`. `last_counter` is unchanged. If
-    the burn fails before the rename: `UNAVAILABLE`, nothing reset, the code stays valid. If the state commit fails
-    before the rename after the burn: `UNAVAILABLE` and the code is spent (fail closed). Post-rename failures keep
-    today's fatal exit.
-  - Wrong code while not locked: counts as a failure (`failures += 1`, may lock), reply `NO`.
-  - Wrong code while locked: reply `NO`; the lock is unchanged (the 60 s window is the limit).
+    with `failures`, `locked_until` and `lock_level` at 0 (5-key form) and reply `OK`. `last_counter` is unchanged.
+    - Burn fails before the rename: `UNAVAILABLE`, nothing reset, the code stays valid.
+    - Burn fails after the rename: `UNAVAILABLE`, no state reset, fatal exit (as today's post-rename path); the code is spent.
+    - State commit fails before the rename after the burn: `UNAVAILABLE`, the code is spent (fail closed).
+    - State commit fails after the rename: today's fatal exit.
+  - Wrong code, locked or not: reply `NO`; `failures`, `locked_until` and `lock_level` are unchanged (rev 4, Argon 7).
+    Recovery-format probes cannot lock TOTP, and an operator's recovery typo cannot add to their TOTP failures.
   - No codes left, or recovery unavailable: a recovery-format input is handled as a wrong code.
   - TOTP input while locked: `WAIT <n>`, as today.
+  - Concurrency: the select loop is single-threaded and each recovery VERIFY loads `recovery.json` afresh, so two
+    admitted connections sending the same valid code get exactly one `OK` and one `NO`.
+- **Exhaustion under sustained attack.** A code cannot be burned without being known, but a certificate holder can
+  re-lock TOTP after each recovery (a recovery resets `lock_level` to 0, so the next lock is 300 s), and each recovery
+  spends one of the operator's codes. The remedy is to revoke that certificate (B7, `ssh-keygen -k -u`) and run
+  `recovery-regen` at home. Part C documents this.
 - **Commands (root, peer uid 0 on `admin.sock`).**
   - `totpctl recovery-status` → `RECOVERY_STATUS` → `RECOVERY <n>` | `NOT_ENROLLED` | `UNAVAILABLE`; prints
     `recovery codes left: <n>` (or `not enrolled` / `recovery unavailable`).
   - `totpctl recovery-regen` → `RECOVERY_BEGIN` (`RECOVERY_PENDING` | `NOT_ENROLLED` | `REFUSED` while another admin
-    operation is pending) → ten `RECOVERY_GET` → the operator types `yes` on the tty after saving them → `RECOVERY_COMMIT`
-    → `OK` | `UNAVAILABLE`. Without `yes` totpctl sends `ABORT` and the old set stays. No TOTP code is asked: root at
-    home already outranks the second factor.
+    operation is pending) → ten `RECOVERY_GET` → the operator types `yes` on the tty after saving them (600 s timeout)
+    → `RECOVERY_COMMIT` → `OK` | `UNAVAILABLE`. Without `yes` totpctl sends `ABORT` and the old set stays. The scrollback
+    is cleared in `finally` after the commit or abort. No TOTP code is asked: root at home already outranks the second
+    factor.
+  - `RECOVERY_COMMIT` replies `UNAVAILABLE` unless `pending_operation == "RECOVERY"`, the window has not expired and
+    `cur_state` is enrolled (rev 4, Argon 6.2), so it never writes an orphan `recovery.json`.
 - **Never in argv, env or logs.** The gate never logs the input line; totpd's log calls take no argument derived from the
   line; totpctl reads no code from argv. A source-scan test (extending `test_N6_and_N7_source_scan`) and a log scan after
   a recovery login check this, each paired with a positive control (`remaining=` is present).
@@ -245,11 +333,12 @@ rollback and live again after a re-upgrade, minus any burned. `PURGE_SECRET=1` r
 
 | Contract | Writers | Readers | Change |
 |----------|---------|---------|--------|
-| `state.json` key set | `totpd.py` commits at `:599`, `:643`, `:745`, `:776`, `:792` (via `commit_state` `:100-111`) | `load_state` `:141-160`; v1.45.0 `load_state` on rollback; test fixtures that seed 5-key state, `test_web_console_totp.py:154,251,351,408,754,852` | optional 6th key `lock_level`, written only when non-zero; 5-key still loads and is still written at level 0 |
-| totpd reply vocabulary | `totpd.py` totp_client branch `:736-805` | gate `:157` (regex), `:338-351` (branches; unknown reply → "console login unavailable") | unchanged (`OK | NO | UNAVAILABLE | WAIT <n>`); recovery reuses `OK`, `NO` and `WAIT` |
-| VERIFY request format | gate `verify_totp` `:112-162`, local check `:327-336` | totpd VERIFY branch (6-digit check, line limit `:695`); `test_N1_and_E1_wire_rejections` `:396`; `test_N12_and_E4_verifier_socket_not_in_child` `:835` | adds `VERIFY XXXX-XXXX-XXXX-XXXX` (`[A-Z2-7]`); 6 digits unchanged; every other form still rejected |
-| admin verbs | `totpctl.py:42,78-79` | `totpd.py:572-664` | add `UNLOCK` → `UNLOCKED`; `RECOVERY_STATUS`, `RECOVERY_BEGIN`, `RECOVERY_GET <i>`, `RECOVERY_COMMIT` (B8); `RECOVERY_GET` also serves the set pending under `ENROLL_BEGIN` / `ROTATE_BEGIN` |
-| `<state_dir>/recovery.json` (new) | totpd only: enrol/rotate/regen commit, burn on recovery login | totpd `load_recovery`; `_wct_purge_state` `bin/k3dm-web-console-totp:405-409` (removes the dir); v1.45.0 does not read it | new, root 0600, hashes only |
+| `state.json` key set | `totpd.py` commits at `:605`, `:648`, `:749`, `:780`, `:797` (via `commit_state` `:100-139`) | `load_state` `:141-160`; v1.45.0 `load_state` on rollback; test fixtures that seed 5-key state, `test_web_console_totp.py:154,251,351,408,754,852`, and `test_N1_D4b_lockout_requests_do_not_increment_failures` `:2382` (5-key with an active lock) | optional 6th key `lock_level`, written only when non-zero; 5-key still loads (level 1 when `locked_until > 0`) and is still written at level 0; `locked_until` kept after expiry while `lock_level > 0` |
+| totpd reply vocabulary | `totpd.py` totp_client branch `:730-805` | gate `:157` (regex), `:338-352` (branches; unknown reply → "console login unavailable") | unchanged (`OK | NO | UNAVAILABLE | WAIT <n>`); recovery reuses `OK` and `NO`; the WAIT message at `:348` adds the seconds |
+| VERIFY request format | gate `verify_totp` `:112-162`, input loop and local check `:322-336` | totpd VERIFY branch (6-digit check `:724`, line limit `:703`); `test_N1_and_E1_wire_rejections` `:396`; `test_N12_and_E4_verifier_socket_not_in_child` `:835` | adds `VERIFY XXXX-XXXX-XXXX-XXXX` (`[A-Z2-7]`); 6 digits unchanged; every other form still rejected |
+| admin verbs | `totpctl.py:42,78-79` | `totpd.py:572-668` | A1 adds `UNLOCK` → `UNLOCKED`; A2 adds `RECOVERY_STATUS`, `RECOVERY_BEGIN`, `RECOVERY_GET <i>`, `RECOVERY_COMMIT` (B8); `RECOVERY_GET` also serves the set pending under `ENROLL_BEGIN` / `ROTATE_BEGIN`; `ENROLL_BEGIN` / `ROTATE_BEGIN` refused while a recovery set is pending; totpctl sends `ABORT` after a non-OK enrol/rotate |
+| commit fault seam `run.injected_commit_fault` (test-only) | tests `:943`, `:1442`, `:2410` (bare strings) | `totpd.py:604`, `:647`, `:748`, `:779`, `:796` | A2: keyed by file name; a bare string still means `state.json`, so the three writers are unchanged |
+| `<state_dir>/recovery.json` (new) | totpd only: enrol/rotate/regen commit, burn on recovery login | totpd `load_recovery` (start, recovery VERIFY, `RECOVERY_STATUS`); startup tmp cleanup `:380-385` (`recovery.json.tmp`); `_wct_purge_state` `bin/k3dm-web-console-totp:405-409` (removes the dir); v1.45.0 does not read it | new, root 0600, hashes only |
 | totp log `/var/log/k3dm-web-console-totp.log` | `log_event` `:335-340` | `bin/k3dm-web-console-totp` (mode 0600, `:376`), `scripts/etc/launchd/com.k3d-manager.web-console-totp.plist.tmpl`, `scripts/tests/bin/web_console_totp.bats` | new structured lines appended; bare names kept |
 | sshd_config line set | template; `_wc_render` `bin/k3dm-web-console-sshd:25-75` | sshd; `_wc_check_config` (C2) `:158-163`; `web_console_sshd.bats` render tests | add one line in both, same position; C2 fails between promote and reinstall (Upgrade order) |
 | `/etc/k3dm-web-console/revoked_keys` (new) | sshd installer stage (beside `_wc_stage_keys` `:464-474`); operator `ssh-keygen -k -u` | sshd (`RevokedKeys`); `_wc_dest_check` `:149-151`; `_wc_files_healthy` `:217-240` → `_wc_check_files` (C1) `:327-334`; dry plan `:693`; uninstall `:739` (keeps it) and `:740` (purge removes it) | new; distinct from the `revoked` marker (`web_console_common.sh:129,212,217,495-497`; `bin/k3dm-web-console-sshd:150,220,330,381,406,544,563,739`), which is unchanged |
@@ -297,7 +386,7 @@ must:
   - id: M4
     text: "`totpctl unlock` (admin UNLOCK, peer uid 0 only) and enrol/rotate clear the lock; a non-root admin peer is refused"
   - id: M5
-    text: a 5-key state.json loads as lock_level 0; a commit at level 0 writes exactly the v1.45.0 5-key set; a commit at level >= 1 adds lock_level; extra keys, a negative or non-int lock_level, or lock_level > 4 are refused
+    text: a 5-key state.json loads as lock_level 0 when locked_until is 0 and as lock_level 1 when locked_until > 0 (an active v1.45.0 lock is clamped to 300 s and the next lock is 1800 s); a commit at level 0 writes exactly the v1.45.0 5-key set; a commit at level >= 1 adds lock_level; an explicit lock_level 0 loads; extra keys, a negative, bool or non-int lock_level, or lock_level > 4 are refused
   - id: M6
     text: each failure, lock, first refused attempt per lock and unlock writes one structured log line with no code, secret or counter value (positive control - the line exists)
   - id: M7
@@ -305,17 +394,17 @@ must:
   - id: M8
     text: the rendered sshd_config and the _wc_render list both carry RevokedKeys /etc/k3dm-web-console/revoked_keys; install creates an empty KRL 0:0:644 only when absent; _wc_files_healthy fails when it is missing, a symlink or the wrong mode; a non-purge uninstall leaves it in place and PURGE=1 removes it
   - id: M9
-    text: at level 4 totpd replies WAIT <n> and the gate's existing branch (:346-350) shows "Too many attempts; try again later" (positive control)
+    text: at level 4 totpd replies WAIT <n> and the gate's WAIT branch (:346-350) shows a message starting "Too many attempts; try again later" (positive control)
   - id: M10
-    text: enrol, rotate and recovery-regen each produce 10 distinct 16-character base32 codes, readable only through RECOVERY_GET while pending; recovery.json is root 0600 and holds only salted SHA-256 hashes; state.json keeps the B3 key set
+    text: enrol, rotate and recovery-regen each produce 10 distinct 16-character base32 codes, readable only through RECOVERY_GET <0-9> while pending; recovery.json is root 0600 and holds only sha256(salt bytes + ungrouped code) hashes with v == 1 (int); state.json keeps the B3 key set; daemon start removes a leftover recovery.json.tmp
   - id: M11
-    text: while locked, a valid unused recovery code replies OK, resets failures, locked_until and lock_level to 0, and is burned on disk before the reply; the same code a second time replies NO
+    text: while locked, a valid unused recovery code replies OK, resets failures, locked_until and lock_level to 0, and is burned on disk before the reply; the same code a second time replies NO; two admitted connections sending the same code get exactly one OK; a burn failure before the rename replies UNAVAILABLE and leaves the code valid, after the rename replies UNAVAILABLE with no reset and a fatal exit
   - id: M12
-    text: recovery-format attempts are limited to one per 60 s against monotonic(), locked or not; an attempt inside the window replies WAIT <n> and is not evaluated; a wrong code while not locked counts as a failure, while locked leaves the lock unchanged
+    text: a valid recovery code is accepted immediately after any number of wrong recovery attempts, locked or not; a wrong recovery code replies NO and leaves failures, locked_until and lock_level unchanged; totp-recovery-failure count=<n> is logged at most once per 60 s
   - id: M13
-    text: the gate accepts a recovery code grouped, ungrouped or lowercase and sends VERIFY XXXX-XXXX-XXXX-XXXX; 6-digit input is unchanged; other forms stay a local Invalid code; totpd VERIFY accepts exactly the two forms
+    text: the gate accepts a recovery code grouped, ungrouped, lowercase, with spaces or corrected with backspace, and sends VERIFY XXXX-XXXX-XXXX-XXXX; input longer than the 20-byte cap is a local Invalid code, never a truncated prefix; 6-digit input is unchanged; other forms stay a local Invalid code; the WAIT message shows the seconds from the reply; totpd VERIFY accepts exactly the two forms
   - id: M14
-    text: totpctl recovery-status prints the remaining count; recovery-regen replaces the whole set only after the operator types yes (ABORT otherwise); both are refused to a non-root admin peer; a recovery login logs totp-recovery-used remaining=<n> and totp-recovery-low when n <= 2
+    text: totpctl recovery-status prints the remaining count; recovery-regen replaces the whole set only after the operator types yes (ABORT otherwise); RECOVERY_COMMIT needs a pending RECOVERY operation and an enrolled state; both are refused to a non-root admin peer; a non-OK enrol or rotate sends ABORT (except after UNAVAILABLE) and prints the fixed recovery warning line; the scrollback is cleared on every exit after codes were printed; a recovery login logs totp-recovery-used remaining=<n> and totp-recovery-low when n <= 2
   - id: M15
     text: with no active lock and lock_level > 0, the level drops by one per full 86400 s since the last lock expired; at 0 the state is the 5-key form with locked_until 0
 must_not:
@@ -347,20 +436,23 @@ must_not:
     text: a burned recovery code must not unlock a second time
     red_on_current: no recovery path exists; the test's first step (valid code -> OK) already fails
   - id: N10
-    text: recovery-format attempts must not be evaluated more than once per 60 s
-    red_on_current: totpd wire-rejects the recovery format, so the second-attempt WAIT assertion fails
+    text: a valid recovery code must not be refused after any number of wrong recovery attempts, locked or not
+    red_on_current: totpd wire-rejects the recovery format (VERIFY branch, :724), so the final valid-code OK assertion fails
   - id: N11
     text: no recovery code may appear in plaintext in recovery.json, state.json, the log or totpctl argv
     red_on_current: pre-fix has no recovery.json and no remaining= line, so the paired positive controls (10 hash entries; remaining= logged) fail
   - id: N12
     text: a damaged recovery.json must not make TOTP login unavailable
-    red_on_current: pre-fix never logs totp-recovery-damaged, so the positive control paired with the TOTP-OK assert fails
+    red_on_current: pre-fix never loads recovery.json, so the positive control (a recovery-format VERIFY or RECOVERY_STATUS triggers a load and logs totp-recovery-damaged) paired with the TOTP-OK assert fails
+  - id: N13
+    text: RECOVERY_GET after the pending set ends (commit, ABORT, expiry or the fifth wrong commit code), or with a malformed index (-1, 10), must not return a CODE
+    red_on_current: pre-fix RECOVERY_GET is an unknown verb, so the positive control (the same index returned CODE while pending) fails
 evidence:
   - id: E1
     proves: [M1, M15, N1]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "escalat or decay"
-    red_control: on pre-fix totpd the second lock reads WAIT 300, not WAIT 1800; the decay case reads lock_level after wall += 86400 past expiry and pre-fix has no lock_level
+    red_control: on pre-fix totpd the second lock reads WAIT 300, not WAIT 1800; the decay case reads lock_level after wall += 86400 past expiry and pre-fix has no lock_level; an expiry case asserts that one wrong code after the lock expired leaves locked_until on disk (the reset fires only at failures >= 5)
     intent: pending
   - id: E2
     proves: [M2, N2]
@@ -378,7 +470,7 @@ evidence:
     proves: [M4, M5]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "unlock or migration or level0_five_keys"
-    red_control: pre-fix admin replies to UNLOCK with the unknown-verb path; a state with lock_level is refused by pre-fix load_state; level0_five_keys asserts the committed key set equals the v1.45.0 set after unlock
+    red_control: pre-fix admin replies to UNLOCK with the unknown-verb path; a state with lock_level is refused by pre-fix load_state; level0_five_keys asserts the committed key set equals the v1.45.0 set after unlock; the migration case seeds a v1.45.0 5-key state with an active lock, reads WAIT 300 (positive control), then after expiry five failures read WAIT 1800 (pre-fix reads WAIT 300); lock_level true and lock_level 0 cases (refused, loaded)
     intent: pending
   - id: E5
     proves: [M6, N4]
@@ -390,38 +482,38 @@ evidence:
     proves: [M9]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "level4_reply"
-    red_control: pre-fix code never reaches level 4 (flat 300 s), so the WAIT 86400 assertion fails; the gate-message check is the positive control
+    red_control: pre-fix code never reaches level 4 (flat 300 s), so the WAIT 86400 assertion fails; the gate-message check (prefix "Too many attempts; try again later") is the positive control
     intent: pending
   - id: E8
-    proves: [M10, N11]
+    proves: [M10, N11, N13]
     kind: offline
-    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_generate or recovery_storage or recovery_plaintext"
-    red_control: pre-fix ENROLL_BEGIN pends no codes and RECOVERY_GET is an unknown verb; plaintext scans of recovery.json, state.json and the log are paired with the hash-count and remaining= positive controls
-    intent: pending
+    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_generate or recovery_storage or recovery_plaintext or recovery_pending_ends or recovery_tmp_cleanup"
+    red_control: pre-fix ENROLL_BEGIN pends no codes and RECOVERY_GET is an unknown verb; plaintext scans of recovery.json, state.json and the log are paired with the hash-count and remaining= positive controls; recovery_pending_ends gets CODE for index 3 while pending, then UNAVAILABLE after commit, ABORT, expiry and the fifth wrong code, and for RECOVERY_GET -1 and 10; recovery_tmp_cleanup seeds recovery.json.tmp (and a dangling symlink of that name) and asserts it is gone after start
+    intent: pending (proposed — Recovery codes are shown once when you enrol, rotate or regenerate, are stored only as hashes, and never appear in the log, the state file or a command line.)
   - id: E9
     proves: [M11, N8, N9]
     kind: offline
-    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_unlock or recovery_burn or gate_recovery_reaches"
-    red_control: pre-fix gate prints Invalid code without connecting (stub verifier records no VERIFY line); pre-fix totpd wire-rejects; burn case asserts recovery.json lost the entry before the OK reply is read (commit fault injected after the burn -> UNAVAILABLE and entry gone)
-    intent: pending
+    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_unlock or recovery_burn or gate_recovery_reaches or recovery_concurrent"
+    red_control: pre-fix gate prints Invalid code without connecting (stub verifier records no VERIFY line); pre-fix totpd wire-rejects; burn cases use the keyed fault seam - state.json fault after the burn -> UNAVAILABLE and entry gone; recovery.json pre-rename fault -> UNAVAILABLE and the same code then replies OK; recovery.json post-rename fault -> UNAVAILABLE, state unchanged, daemon exits; recovery_concurrent (twin of test_N1_D40) sends one code on two admitted connections and asserts [NO, OK]
+    intent: pending (proposed — When the console is locked, typing one unused recovery code at the Code prompt lets you in and clears the lock, and that code never works again, even if two logins race or the disk write fails.)
   - id: E10
     proves: [M12, N10]
     kind: offline
-    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_rate"
-    red_control: two attempts 30 s apart on the monotonic seam; pre-fix wire-rejects both, so the WAIT 30 assertion fails; a third attempt at +61 s is the positive control
-    intent: pending
+    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_after_wrong"
+    red_control: twenty wrong recovery codes back to back with monotonic unchanged, each NO (positive control that they were evaluated), then a valid code replies OK; run once unlocked (failures still 0 after the wrong codes) and once locked; pre-fix wire-rejects the recovery format, so the OK assertion fails; the log holds one totp-recovery-failure line (count=1) after the twenty; after monotonic += 60 one more wrong code writes a second line with count=20
+    intent: pending (proposed — A typo, or an attacker's junk from another console session, never stops the operator's real recovery code from working; wrong codes are logged without filling the log.)
   - id: E11
     proves: [M13]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "gate_recovery_input"
-    red_control: GateProcess against a stub verifier socket; pre-fix gate sends nothing for grouped, ungrouped and lowercase input; 6-digit input sent unchanged is the positive control
-    intent: pending
+    red_control: GateProcess against a stub verifier socket; pre-fix gate sends nothing for grouped, ungrouped, lowercase, spaced and backspace-corrected input; 21 bytes of input (a valid code plus trailing bytes) records no VERIFY line; a stub reply WAIT 42 shows "(42 s)"; 6-digit input sent unchanged is the positive control
+    intent: pending (proposed — The console accepts a recovery code typed with or without dashes or spaces, in any case and with backspace corrections, still accepts the 6-digit code as before, and says how many seconds a lock has left.)
   - id: E12
     proves: [M14, N12]
     kind: offline
-    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_status or recovery_regen or recovery_damaged"
-    red_control: pre-fix totpctl has no recovery-status verb (unknown command, rc 1); damaged recovery.json case asserts TOTP OK plus a totp-recovery-damaged line (absent pre-fix)
-    intent: pending
+    command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_status or recovery_regen or recovery_damaged or enrol_failure_warns"
+    red_control: pre-fix totpctl has no recovery-status verb (unknown command, rc 1); damaged recovery.json cases (symlink, dangling symlink, mode 0644, v true) trigger a load with RECOVERY_STATUS, assert a totp-recovery-damaged line (absent pre-fix) and then TOTP OK; enrol_failure_warns sends a wrong code and asserts NO, an ABORT recorded by the daemon, the fixed warning line and the scrollback clear sequence; RECOVERY_COMMIT without a RECOVERY pending replies UNAVAILABLE
+    intent: pending (proposed — Root at home can see how many recovery codes are left and replace the whole set, a failed enrol or rotate warns that its codes are void, and a damaged recovery file never blocks normal code login.)
   - id: E7
     proves: [M8, N5, N6, N7]
     kind: offline
@@ -439,7 +531,7 @@ evidence:
     kind: live
     command: operator at home after Upgrade order step 3 runs sudo totpctl recovery-status (reads 10), logs in once at the console with one recovery code, reruns recovery-status (reads 9) and pastes the log's totp-recovery-used line; Claude reads the pasted output only (recovery.json is never printed)
     red_control: recovery login refused, count not 9, or a code visible in the pasted log blocks the release PR
-    intent: pending
+    intent: pending (proposed — After the upgrade, one real recovery-code login at the console works and leaves nine codes, without any code reaching the log.)
 interface:
   totpd_reply: "OK | NO | UNAVAILABLE | WAIT <n>"
   verify_request: "VERIFY <6 digits> | VERIFY XXXX-XXXX-XXXX-XXXX ([A-Z2-7])"
@@ -447,7 +539,9 @@ interface:
   cli: "totpctl unlock | recovery-status | recovery-regen"
   state_keys: "secret, last_counter, failures, locked_until, enrolled; lock_level only when non-zero"
   recovery_file: "<state_dir>/recovery.json, root 0600, {v: 1, codes: [{s: <32 hex>, h: <64 hex sha256(salt||code)>}]}, 0-10 entries"
-  recovery_rate: "1 recovery-format attempt per 60 s (monotonic)"
+  recovery_log: "totp-recovery-failure count=<n>, at most one line per 60 s (monotonic); attempts are not limited"
+  recovery_hash: "sha256(bytes.fromhex(s) + ungrouped 16-char uppercase code)"
+  commit_fault_seam: "run.injected_commit_fault = {<file name>: <fault>}; a bare string means state.json"
   decay: "-1 level per full 86400 s since the last lock expired"
   lock_seconds: "[300, 1800, 14400, 86400]"
   sshd_line: RevokedKeys /etc/k3dm-web-console/revoked_keys
@@ -462,30 +556,42 @@ Test fixtures, for every child:
   prefix, never unstubbed.
 - The existing `test_N1_and_M2_lockout_and_hmac_calls` asserts the flat reset (`:236`, `WAIT 300` at about `:305`). It
   is updated to the escalation, because that assertion is the bug.
+- A2 only (Argon 5): `admin_commit_at_pty` (tests `:1438-1441`) and `test_N9_M8_rotation_verifies_only_the_committed_secret`
+  (`:2064`) stub `totpd.os.urandom` for size 20 only; they may be updated to also serve sizes 10 and 16 with distinct
+  deterministic bytes. `test_N5_M8_secret_scan_across_enrollment_and_login` (around `:2377`) may be updated to allow
+  `recovery.json` and to scan it for the plaintext codes. No other existing assertion is weakened.
 
 **Intent approved:** operator, 2026-11-23
 
-Rev 3 note: that approval covers E1–E7 and L1. E8–E12 and L2 (recovery codes, decay) are not yet approved; they
-are approved on child A after the Fable + Argon review.
+Rev 3 note: that approval covers E1–E7 and L1.
+
+Rev 4 note, items **not** covered by that approval (operator to approve before the child dispatches):
+- **A1:** E1 (red_control adds the expiry-trigger case, Fable S-3), E4 (adds the v1.45.0 active-lock migration and the
+  `lock_level` type cases, S-4), E6 (the gate message is matched as a prefix). Their intent text is unchanged. E2, E3
+  and E5 are unchanged and stay approved.
+- **A2:** all of E8–E12 and L2, including the rewritten E10 (no rate limit) and new N13. A2 carries
+  `**Intent approved:** pending`.
 
 ## Routing
 
-More than 3 files, so the work splits into three child specs, one dispatch per file set:
+More than 3 files, so the work splits into four child specs, one dispatch per file set:
 
 | Child | Worker | Files | Evidence |
 |-------|--------|-------|----------|
-| A: lock, decay, clock, migration, log, unlock, recovery codes ([spec](../plans/v1.45.1-totp-a-lock-and-recovery.md)) | Luna | 1, 2, 3 + `test_web_console_totp.py` | E1–E6, E8–E12 |
-| B: RevokedKeys | Luna | 4, 5 + `web_console_sshd.bats` | E7 |
-| C: guide | Flash | 6 (unlock, revoke a cert, upgrade order, rollback, macOS sleep note) | doc review by Claude |
+| A1: lock, decay, clock, migration, log, unlock ([spec](../plans/v1.45.1-totp-a-lock-and-recovery.md)) | Luna | 1, 3 + `test_web_console_totp.py` | E1–E6 |
+| A2: recovery codes and the gate change ([spec](../plans/v1.45.1-totp-a2-recovery-codes.md)) | Luna | 1, 2, 3 + `test_web_console_totp.py` | E8–E12, L2 |
+| B: RevokedKeys ([spec](../plans/v1.45.1-totp-b-revoked-keys.md)) | Luna | 4, 5 + `web_console_sshd.bats` | E7 |
+| C: guide ([spec](../plans/v1.45.1-totp-c-guides.md)) | Flash | 6 (lock levels, unlock, recovery codes and their exhaustion, revoke a cert, upgrade order, rollback, macOS sleep note) | doc review by Claude |
 
-- A and B touch no common file and can run in parallel. C depends on the final reply/levels from A and the install
-  behaviour from B; dispatch it after both land.
-- Suggested order: B first (smallest, isolated), then A after review and intent approval of rev 3, then C.
-- **A is one child, not split (rev 3).** It has three source files plus the test file. A split into A1 (lock, decay,
-  unlock) and A2 (recovery) was weighed: both change `totpd.py` (state handling, VERIFY branch, admin verbs),
-  `totpctl.py` and `test_web_console_totp.py`, so under one-dispatch-per-file they would run in sequence anyway, and A2
-  would rebase onto A1's state and commit changes. One child with one reviewer pass is cheaper and safer. Operator to
-  confirm with the intent approval.
+- **A1 then A2, serial (rev 4, operator decision).** A2 shares every A1 file (`totpd.py`, `totpctl.py`, the test file)
+  and builds on A1's state and commit changes (reset to the 5-key form, `lock_level`, structured `log_event`), so it
+  dispatches only after A1 has landed. A1 leaves the gate untouched. A2 has three source files plus tests, one over the
+  usual three; the gate change is about twenty lines and cannot be split off: a gate-only child has no daemon to send the
+  recovery form to, and a daemon-only child cannot prove N8 end to end.
+- A1 and B touch no common file and can run in parallel. C depends on the final levels and unlock paths from A1 and A2
+  and on the install behaviour from B; dispatch it after all three land.
+- Suggested order: B first (smallest, isolated), A1 after its rewritten intents are approved, A2 after A1 lands and its
+  intents and the `**Approval:**` exception are approved, then C.
 - L1 runs after promote and the reinstalls and is done by the operator or Claude, not a worker; L2 is the operator's.
 
 ## Follow-ups (out of scope for v1.45.1)
@@ -542,5 +648,8 @@ More than 3 files, so the work splits into three child specs, one dispatch per f
 - Q4: the lock level decays (Claude's recommendation, accepted).
 - New request: an unlock path from the console that does not need root on the hub. Child B (RevokedKeys) can dispatch now.
 - Unlock without root: **recovery codes** (operator chose "Recovery codes (Recommended)"). Ten single-use 80-bit codes,
-  hashes only in `recovery.json`, one attempt per 60 s, burned before the reply, regenerated by root `totpctl
-  recovery-regen` (B8). Design goes to Fable + Argon review before intent approval; child A waits for both.
+  hashes only in `recovery.json`, burned before the reply, regenerated by root `totpctl recovery-regen` (B8). Reviewed
+  by Fable and Argon (rev 4).
+- Rev 4 (after the reviews): **no recovery rate limit**; every recovery attempt is evaluated and only the failure log
+  line is throttled to one per 60 s (supersedes the rev 3 "one attempt per 60 s"). Child A is **split into A1 and A2**,
+  serial. The patch-scope exception for recovery codes is recorded in `**Approval:**` (pending operator).
