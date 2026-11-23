@@ -1,6 +1,6 @@
 # hoverfocus M1a — decision engine, config loader, private API shim, event tap
 
-**Status:** READY rev 4, 2026-11-22 — Fable re-check of rev 3: "ready after should-fix" (E2 `-w` grep, confirmed by Claude on a fixture) plus 6 nits, all taken in rev 4. Fable review of rev 2: needs rework (3 blockers, 12 should-fix, 4 nits), all taken in rev 3 (rev 2 → rev 3: M8/N6 proved through `--print-config`, selftest may name symbols, untestable resolve-failure clause made code-read, engine traps, tick semantics, idempotent start, AX timeout/throttle, public tap check and raise, docs ranges, red controls; rev 1 → rev 2: focus technique fixed to variant B from
+**Status:** LANDED — hoverfocus@4cbd3771 (auto: land 2026-11-23; verify pending); , 2026-11-22 — Fable re-check of rev 3: "ready after should-fix" (E2 `-w` grep, confirmed by Claude on a fixture) plus 6 nits, all taken in rev 4. Fable review of rev 2: needs rework (3 blockers, 12 should-fix, 4 nits), all taken in rev 3 (rev 2 → rev 3: M8/N6 proved through `--print-config`, selftest may name symbols, untestable resolve-failure clause made code-read, engine traps, tick semantics, idempotent start, AX timeout/throttle, public tap check and raise, docs ranges, red controls; rev 1 → rev 2: focus technique fixed to variant B from
 the operator's probe; base is `m1-base` with M1b landed; `MenuModel.loadConfig` routed through `ConfigLoader`; start
 order tested through `StartChecks`; no event records)
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release; no `docs/ideas.md` row.
