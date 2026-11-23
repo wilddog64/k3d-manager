@@ -28,6 +28,15 @@ Allow an optional cluster prefix on the service alternative (`(.+-)?shopping-car
 names with a read-only `argocd_app_info` query (operator or Claude on the hub). Add or update a promtool unit test with a
 cluster-prefixed series.
 
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/etc/argocd/platform-ops/prometheusrule.yaml` | `ArgoCDAppDegraded` and `ArgoCDAppOutOfSync` name regex: optional cluster prefix on the shopping-cart alternative |
+| `scripts/tests/plugins/argocd_app_alert_regex.bats` | new: `promtool test rules` over a heredoc test file (follow `scripts/tests/plugins/dispatch_alert_rules.bats` for extracting the rule group and handling a missing promtool) |
+
+Read only: `scripts/etc/argocd/applicationsets/services-git.yaml`.
+
 ## Acceptance
 
 ```yaml
