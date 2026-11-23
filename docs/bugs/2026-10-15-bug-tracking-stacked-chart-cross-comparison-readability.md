@@ -4,9 +4,8 @@
 **Branch:** `k3d-manager-v1.46.0` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Grafana presentation/readability; no data-integrity defect established
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic dashboard chart readability issue (hidden segment values, potentially clipped legends, and overlapping color palettes across two charts) with consistent underlying data and no functional breakage); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
-**Status:** OPEN — operator screenshots reviewed, configuration inspected; implementation not started
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator.
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN — operator screenshots reviewed, configuration inspected; implementation not started
 **Approval:** operator explicitly requested P3 bug filing; no code or dashboard changes authorized
 
 ## Observed problem

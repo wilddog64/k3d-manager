@@ -1,0 +1,13 @@
+	path = /Library/LaunchDaemons/com.k3d-manager.capture-sshd.plist
+	state = running
+	program = /usr/sbin/sshd
+	arguments = {
+		/usr/sbin/sshd
+		-D
+		-e
+		-f
+		/private/var/db/k3dm-capture-2026-11-19/prod.conf
+	pid = 59966
+	last exit code = (never exited)
+		state = active
+		state = active

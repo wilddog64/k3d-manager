@@ -79,7 +79,7 @@ tunnel:
 
 ```js
 '/cluster-up' '/cluster-down' '/cluster-status' '/cluster-diagnose' '/cluster-refresh'
-'/cluster-resume' '/hostinger-status' '/cleanup-stale-sandbox' '/argocd-upgrade' '/ask-docs'
+'/cluster-resume' '/cleanup-stale-sandbox' '/argocd-upgrade' '/ask-docs'
 '/hermes-auth' '/k3dm' '/ask' '/claude' '/gemini' '/codex'
 ```
 

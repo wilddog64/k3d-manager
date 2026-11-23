@@ -259,3 +259,17 @@ spec:
           annotations:
             summary: "Hub data export has never run"
             description: "No successful hub data export metric exists."
+    - name: dispatch.alerts
+      rules:
+        - alert: DispatchMetricsStale
+          expr: |
+            (
+              max by (job) (time() - push_time_seconds{job="k3dm-dispatch"}) > 3600
+              or absent(push_time_seconds{job="k3dm-dispatch"})
+            )
+            and on() max(k3dm_disk_probe_success{host="m4"}) == 1
+          for: 30m
+          labels: {group: dispatch, severity: warning, cluster: hub}
+          annotations:
+            summary: "Dispatch metrics have not reached the hub for over 90 minutes while the M4 is reachable"
+            description: "The M4 pushes dispatch metrics after dispatch ledger events and every 15 minutes (LaunchAgent com.k3d-manager.dispatch-metrics). Check ~/.local/share/k3d-manager/worktrees/metrics.log and ~/.local/share/k3d-manager/logs/dispatch-metrics.log on the M4, and the com.k3d-manager.hub-pushgateway-port-forward tunnel. See docs/bugs/2026-11-18-dispatch-metrics-push-times-out-silently.md."

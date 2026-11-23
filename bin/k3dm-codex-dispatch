@@ -111,21 +111,50 @@ _dispatch_schedule_metrics() {
   (
     # shellcheck disable=SC2329 # invoked indirectly by the EXIT trap
     _dispatch_metrics_cleanup() {
+      if [[ -n "${refresher_pid:-}" ]]; then
+        kill "$refresher_pid" 2>/dev/null || true
+        wait "$refresher_pid" 2>/dev/null || true
+        refresher_pid=""
+      fi
       if (( owns_lock )); then rmdir "$lock" 2>/dev/null || true; fi
     }
     owns_lock=1
+    refresher_pid=""
     trap _dispatch_metrics_cleanup EXIT
     trap 'exit 1' HUP INT TERM
+    local refresh_interval="${K3DM_DISPATCH_METRICS_LOCK_REFRESH:-60}"
+    if [[ ! "$refresh_interval" =~ ^[1-9][0-9]*$ ]]; then
+      printf '%s invalid K3DM_DISPATCH_METRICS_LOCK_REFRESH %s, falling back to 60\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$refresh_interval" >>"$_dispatch_worktree_root/metrics.log"
+      refresh_interval=60
+    fi
     while :; do
       rm -f "$pending"
+      (
+        sleep_pid=""
+        trap 'if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT HUP
+        while :; do
+          sleep "$refresh_interval" &
+          sleep_pid=$!
+          wait "$sleep_pid" 2>/dev/null || { if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi; exit 0; }
+          sleep_pid=""
+          touch "$lock" 2>/dev/null || exit 0
+        done
+      ) &
+      refresher_pid=$!
       "${K3DM_DISPATCH_METRICS_BIN:-$_dispatch_script_dir/k3dm-dispatch-metrics}" >>"$_dispatch_worktree_root/metrics.log" 2>&1 || true
+      if [[ -n "$refresher_pid" ]]; then
+        kill "$refresher_pid" 2>/dev/null || true
+        wait "$refresher_pid" 2>/dev/null || true
+        refresher_pid=""
+      fi
       [[ -e "$pending" ]] && continue
       rmdir "$lock" 2>/dev/null || break
       owns_lock=0
       if [[ -e "$pending" ]] && mkdir "$lock" 2>/dev/null; then owns_lock=1; continue; fi
       break
     done
-  ) &
+  ) </dev/null >>"$_dispatch_worktree_root/metrics.log" 2>&1 &
 }
 
 _dispatch_log() {
@@ -370,13 +399,14 @@ Usage:
   bin/k3dm-codex-dispatch gate-coverage-start
   bin/k3dm-codex-dispatch link --slug S [--version V] --parent P --role build|review|verify
   bin/k3dm-codex-dispatch combine [--version V] --parent P --parts a,b --conflicts N --result pass|fail --evidence FILE --by NAME
+  bin/k3dm-codex-dispatch schedule-metrics
 EOF
 }
 
 # S1 gate commands share one deterministic, line-order ledger reader. Keeping
 # this in the dispatcher avoids creating a second state file or dependency.
 _dispatch_s1() {
-  python3 - "$_dispatch_worktree_root" "$_dispatch_repo_root" "$@" <<'PY'
+  K3DM_DISPATCH_SELF="$_dispatch_script_dir/k3dm-codex-dispatch" python3 - "$_dispatch_worktree_root" "$_dispatch_repo_root" "$@" <<'PY'
 import hashlib, json, os, re, subprocess, sys, time
 from pathlib import Path
 
@@ -483,7 +513,7 @@ def append(event, version=None, slug=None, **fields):
     ledger.parent.mkdir(parents=True,exist_ok=True)
     with ledger.open('a') as f: f.write(json.dumps(obj,separators=(',',':'))+'\n')
     if command!='gate-status':
-        subprocess.Popen([os.environ.get('K3DM_DISPATCH_METRICS_BIN',str(Path(manager)/'bin/k3dm-dispatch-metrics'))],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+        subprocess.Popen([os.environ['K3DM_DISPATCH_SELF'],'schedule-metrics'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
 def current_version(rows):
     branch=subprocess.run(['git','-C',manager,'symbolic-ref','--quiet','--short','HEAD'],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL).stdout.strip()
     m=re.fullmatch(r'k3d-manager-(v?\d+\.\d+\.\d+)',branch)
@@ -822,17 +852,14 @@ _dispatch_change_stats() {
 }
 
 _dispatch_scope_verdict() {
-  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base from merge_base
+  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base from
   local -a patterns=()
   if [[ ! -f "$worktree.run/base" ]]; then
     echo "scope: unknown (no recorded base)"
     return 1
   fi
   base="$(<"$worktree.run/base")"
-  from="$base"
-  if merge_base="$(git -C "$worktree" merge-base "$rel" HEAD 2>/dev/null)" && git -C "$worktree" merge-base --is-ancestor "$base" "$merge_base"; then
-    from="$merge_base"
-  fi
+  from="$(_dispatch_instruction_range_start "$worktree" "$rel" "$base")"
   if [[ -f "$worktree.run/spec.md" ]]; then
     local expected_spec_hash actual_spec_hash
     expected_spec_hash="$(cat "$worktree.run/spec-sha256" 2>/dev/null || true)"
@@ -879,6 +906,15 @@ _dispatch_instruction_files() {
       .github/copilot-instructions.md|*/.github/copilot-instructions.md|.claude/*|*/.claude/*|.codex/*|*/.codex/*|.gemini/*|*/.gemini/*) printf '%s\n' "$path" ;;
     esac
   done
+}
+
+_dispatch_instruction_range_start() {
+  local worktree="$1" target="$2" base="$3" merge_base
+  if merge_base="$(git -C "$worktree" merge-base "$target" HEAD 2>/dev/null)" && git -C "$worktree" merge-base --is-ancestor "$base" "$merge_base"; then
+    printf '%s\n' "$merge_base"
+  else
+    printf '%s\n' "$base"
+  fi
 }
 
 _dispatch_task_spec() {
@@ -1317,7 +1353,7 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
+  local slug="" explicit_version="" allow=0 allow_instruction_files=0 test_set=0 no_test=0 review_pending=0 test_cmd="" landing_actor=unknown landing_model="" landing_vendor=unknown rel version task run spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base instruction_from target_sha task_before target_count=0 instruction_files="" instruction_path prior_slug prior_run unnamed_prior="" superseding_slug superseding_match
   local -a superseding=()
   local _landing_parts=""
   while (($#)); do
@@ -1354,18 +1390,20 @@ _dispatch_land() {
   [[ -n "$target" ]] || target="$rel"
   _dispatch_event_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
   [[ ! -f "$run/violation" ]] || _dispatch_error "VIOLATION: agent committed"
-  [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
-  [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
+  if [[ ! -f "$run/exit" ]] && _dispatch_worker_matches_start "$run"; then
+    _dispatch_error "Codex is still running"
+  fi
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   base="$(<"$run/base")"
-  instruction_files="$(_dispatch_instruction_files "$task" "$base")"
+  instruction_from="$(_dispatch_instruction_range_start "$task" "$target" "$base")"
+  instruction_files="$(_dispatch_instruction_files "$task" "$instruction_from")"
   if [[ -n "$instruction_files" && "$allow_instruction_files" -eq 0 ]]; then
     while IFS= read -r instruction_path; do
       [[ -n "$instruction_path" ]] || continue
       echo "instruction-file: $instruction_path"
       if git -C "$task" ls-files --error-unmatch "$instruction_path" >/dev/null 2>&1; then
-        git -C "$task" diff "$base" HEAD -- "$instruction_path"
+        git -C "$task" diff "$instruction_from" HEAD -- "$instruction_path"
         git -C "$task" diff --cached -- "$instruction_path"
         git -C "$task" diff -- "$instruction_path"
       else
@@ -1518,7 +1556,83 @@ _dispatch_land() {
   git -C "$repo_path" worktree remove "$task"
   git -C "$repo_path" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
   git -C "$repo_path" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
+  _dispatch_mark_plan_landed "$run" "$land_commit" "$repo_path" || true
   echo "landed: $slug"; echo "push: git -C $repo_path push origin $target && make hub-sync"
+}
+
+_dispatch_mark_plan_landed() {
+  local run="$1" land_commit="$2" repo_path="$3"
+  local spec git_dir role spec_path repo_name ref date_value state
+  local slug version
+  slug="${run##*/}"; version="$(basename "$(dirname "$run")")"
+  slug="${slug%.run}"
+  (( ${review_pending:-0} == 0 )) || return 0
+  spec="$(<"$run/spec")"
+  [[ "$spec" == docs/plans/*.md && "${spec#docs/plans/}" != */* ]] || return 0
+  role="$(jq -r --arg slug "$slug" --arg version "$version" 'select(.slug==$slug and .version==$version and (.event=="start" or .event=="link")) | .role // empty' "$_dispatch_worktree_root/ledger.jsonl" 2>/dev/null | tail -n 1)"
+  [[ "$role" != review && "$role" != verify ]] || return 0
+  spec_path="$_dispatch_repo_root/$spec"
+  if ! git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1; then
+    echo "land: plan status not updated (spec not tracked in $_dispatch_repo_root); set it by hand"
+    return 0
+  fi
+  if ! git -C "$_dispatch_repo_root" diff --quiet -- "$spec" ||
+     ! git -C "$_dispatch_repo_root" diff --cached --quiet -- "$spec"; then
+    echo "land: plan status not updated (spec has local changes); set it by hand"
+    return 0
+  fi
+  git_dir="$(git -C "$_dispatch_repo_root" rev-parse --path-format=absolute --git-dir 2>/dev/null)" || return 0
+  for state in MERGE_HEAD CHERRY_PICK_HEAD rebase-merge rebase-apply; do
+    if [[ -e "$git_dir/$state" ]]; then
+      echo "land: plan status not updated (repository operation in progress); set it by hand"
+      return 0
+    fi
+  done
+  repo_name="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
+  ref="${land_commit:0:8}"
+  [[ "$repo_name" == k3d-manager ]] || ref="$repo_name@$ref"
+  date_value="$(date +%F)"
+  local status_result
+  status_result="$(python3 - "$spec_path" "$ref" "$date_value" <<'PYPLAN'
+import re, sys
+from pathlib import Path
+p, ref, date = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+text = p.read_text(encoding="utf-8")
+header_end = re.search(r"(?m)^## ", text)
+limit = header_end.start() if header_end else len(text)
+match = re.search(r"(?m)^\*\*Status:\*\*\s*(.*)$", text[:limit])
+if not match:
+    print("none")
+    raise SystemExit(0)
+value = match.group(1)
+pattern = re.compile(r"^(DRAFT|PLANNED|PLAN|PROPOSED|READY|APPROVED|IN PROGRESS|IN-PROGRESS|DISPATCHED|QUEUED)(\s+(?:rev\s*)?v?\d+)?\s*([—–:.-]\s*)?", re.I)
+auto = re.match(r"^LANDED — .*?\(auto: land [^)]+\)(.*)$", value, re.I)
+if auto:
+    remainder = auto.group(1).lstrip(" ;—–:.-")
+elif pattern.match(value):
+    remainder = value[pattern.match(value).end():].strip()
+else:
+    print("left " + (value.split()[0] if value.split() else ""))
+    raise SystemExit(0)
+new = f"LANDED — {ref} (auto: land {date}; verify pending)"
+if remainder:
+    new += "; " + remainder
+text = text[:match.start(1)] + new + text[match.end(1):]
+p.write_text(text, encoding="utf-8")
+print("updated")
+PYPLAN
+)" || return 0
+  case "$status_result" in
+    none) return 0 ;;
+    left\ *) echo "land: plan status left as ${status_result#left }"; return 0 ;;
+    updated) ;;
+  esac
+  if ! git -C "$_dispatch_repo_root" commit -q --only -m "docs(plans): $slug landed $ref" -- "$spec"; then
+    git -C "$_dispatch_repo_root" checkout -- "$spec" >/dev/null 2>&1 || true
+    echo "land: plan status not updated (commit failed); set it by hand"
+    return 0
+  fi
+  echo "land: plan status set LANDED in $spec"
 }
 
 _dispatch_handoff() {
@@ -1853,6 +1967,7 @@ main() {
     prune) shift; _dispatch_prune "$@" ;;
     usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;
     release-merged) shift; _dispatch_release_merged "$@" ;;
+    schedule-metrics) shift; (($# == 0)) || _dispatch_error "schedule-metrics accepts no options"; _dispatch_schedule_metrics; exit 0 ;;
     gate-status|mark|gate-record|gate-coverage-start|link|combine) cmd="$1"; shift; _dispatch_s1 "$cmd" "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;

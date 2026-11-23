@@ -1,10 +1,10 @@
 # Bug: a `/hermes-auth` re-auth lasts 24h and covers every decision in that window
 
-**Status:** OPEN — filed 2026-11-09
+**Status:** VERIFIED — fix landed `e1972118` 2026-11-22 (offline); E2 live check owed after `make deploy-worker`
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Security hygiene hardening to shorten re-auth confirmation window from 24h to 10m and single-use while existing allowlist and Slack signature checks still protect access); Claude proposed P3. Agreed.
 **Triage:** carry → v1.44.0 (Hermes relay batch) — grooming 2026-11-12, operator.
-**Waiting on:** dispatch — since 2026-11-12
+**Waiting on:** live check — since 2026-11-22
 **Introduced by:** `4b6ce874` (v1.33.0, Hermes Slack approvals)
 **Should have been caught by:** spec
 **Prior art:** not run (`make find-similar-docs` could not reach its vector store from the M4, 2026-11-09: context
@@ -14,10 +14,12 @@
 the Slack signature still apply
 **Approval:** operator, 2026-11-09 ("go ahead for that": 10 minutes plus one use per grant, dispatched with the
 reauth-reply P3; a TOTP second factor goes to `docs/ideas.md`)
-**Intent approved:** operator, 2026-11-09, E1 only; E2 not yet approved
+**Intent approved:** operator, 2026-11-22
+Intent note: E1 approved 2026-11-09; E2 approved 2026-11-22 ("Approve E2, dispatch reauth").
 **Filed:** 2026-11-09
 **Detected by:** operator, 2026-11-09 ("24h is too long")
 **Affected:** `workers/slack-relay/index.js`
+**Fix commit:** `e1972118`
 **Branch:** `k3d-manager-v1.43.16`
 **Related:** `docs/bugs/2026-11-08-hermes-card-replaced-by-reauth-reply.md` and
 `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md` (same file, both P3; dispatch the three
@@ -150,3 +152,26 @@ Before your last message, do all of these and paste the evidence:
 - Dispatch in one batch with the reauth-reply P3 (and the hostinger-status P3, same file) once there is room under
   the WIP limit. Fold the three specs into one dispatch; the reauth-reply guard fix goes first in the diff.
 - E2 needs the relay redeployed, so it waits for the operator's `make deploy-worker` after the land.
+
+## Verification 2026-11-22 (Claude, m4-air)
+
+- Worker: gpt-6-luna, 2 runs (resume 2 = correction). First run: fix correct, but the refused-clicks test checked
+  another user's grant, so a mutant deleting the clicker's grant before the allowlist check stayed green; it also
+  edited the approved E2 intent of `2026-11-08-hermes-card-replaced-by-reauth-reply.md` (reverted; wording raised
+  with the operator).
+- Under `sandbox-exec` (sudo/launchctl denied), `workers/slack-relay`: `node --test test/` 54 passed.
+- Pre-fix `index.js` with the new tests: 4 failed (N1; N2 for Approve and Deny; N3).
+- Mutant (delete `reauth:<user>` before the allowlist check): 6 failed, including the refused-clicks test (M4).
+- Ordering condition met: the reauth-reply fix landed `09ea1d02` and the relay was deployed 2026-11-15.
+- Land gate: relay suite plus slack plugin suites, green.
+- Residual (not in scope): KV get-then-delete is not atomic, so two clicks within the same instant could both pass;
+  N2 covers a second click after a completed decision.
+
+## Live evidence 2026-11-22 (E2 partial)
+
+- Relay deployed by the operator 2026-11-22 14:40 (version `d6a3ac28`, from `aa920a6f`).
+- Operator screenshot 14:46: `/hermes-auth` replied "Re-authenticated for 10 minutes; this covers your next Approve or
+  Deny." The 10-minute part of E2 passes.
+- Still owed: approve or deny one Hermes card, then a button on a second card asks to re-authenticate and leaves the
+  card in place. Needs two real Hermes cards (next incident).
+

@@ -36,7 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: trust-vault-ca
-.PHONY: promote hub-promote hub-deploy hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync install-dispatch-stall-watch uninstall-dispatch-stall-watch
+.PHONY: promote hub-promote hub-deploy hub-rollback hub-promote-status install-repo-sync uninstall-repo-sync install-dispatch-stall-watch uninstall-dispatch-stall-watch install-dispatch-metrics uninstall-dispatch-metrics
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -105,6 +105,25 @@ uninstall-dispatch-stall-watch:
 	@rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-stall-watch.plist"
 	@echo "uninstall-dispatch-stall-watch: OK, com.k3d-manager.dispatch-stall-watch unloaded and plist removed"
 
+install-dispatch-metrics:
+	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.local/share/k3d-manager/logs"
+	@sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" scripts/etc/launchd/com.k3d-manager.dispatch-metrics.plist.tmpl > "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-metrics.plist" || { echo "install-dispatch-metrics: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-metrics.plist" >&2; exit 1; }
+	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
+	  echo "install-dispatch-metrics: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
+	else \
+	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.dispatch-metrics" 2>/dev/null || true; \
+	  if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-metrics.plist"; then \
+	    echo "install-dispatch-metrics: OK, com.k3d-manager.dispatch-metrics loaded; log: $(HOME)/.local/share/k3d-manager/logs/dispatch-metrics.log"; \
+	  else \
+	    echo "install-dispatch-metrics: FAILED, launchctl bootstrap of com.k3d-manager.dispatch-metrics did not load the agent" >&2; exit 1; \
+	  fi; \
+	fi
+
+uninstall-dispatch-metrics:
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.dispatch-metrics" 2>/dev/null || true
+	@rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.dispatch-metrics.plist"
+	@echo "uninstall-dispatch-metrics: OK, com.k3d-manager.dispatch-metrics unloaded and plist removed"
+
 
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:
@@ -125,17 +144,23 @@ install-prometheus-credential-rotator:
 
 .PHONY: install-test-metrics
 install-test-metrics:
-	sed \
+	@sed \
 	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl \
-	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"
-	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist" || { echo "install-test-metrics: FAILED to write $(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist" >&2; exit 1; }
+	@if [ "$(K3DM_AGENT_LOAD)" = 0 ]; then \
+	  echo "install-test-metrics: plist written, agent not loaded (K3DM_AGENT_LOAD=0)"; \
+	else \
 	  launchctl bootout "gui/$$(id -u)/com.k3d-manager.test-metrics" 2>/dev/null || true; \
-	  launchctl bootstrap "gui/$$(id -u)" \
-	    "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; \
+	  if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; then \
+	    echo "install-test-metrics: OK, com.k3d-manager.test-metrics loaded (nightly 04:30); log: $(HOME)/Library/Logs/k3dm-test-metrics.log"; \
+	  else \
+	    echo "install-test-metrics: FAILED, launchctl bootstrap of com.k3d-manager.test-metrics did not load the agent" >&2; exit 1; \
+	  fi; \
 	fi
 
+.PHONY: install-web-console-sshd uninstall-web-console-sshd revoke-web-console-sshd web-console-sshd-check install-web-console-totp uninstall-web-console-totp web-console-totp-enroll web-console-totp-rotate web-console-totp-status
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-host test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
@@ -487,7 +512,17 @@ sync-main:
 ## Reapply every ApplicationSet pinned to deploy/hub (APPSETS_STAGE=hub|all)
 appsets-reapply:
 	@bin/k3dm-require-role hub
-	@K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+	@set -eo pipefail; \
+	_sha=""; if [ -n "$${APPSETS_SHA:-}" ]; then \
+	  source "$(CURDIR)/scripts/lib/foundation/scripts/lib/system.sh"; \
+	  printf '%s' "$${APPSETS_SHA}" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$$' || { echo '[appsets-reapply] invalid APPSETS_SHA' >&2; exit 2; }; \
+	  _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
+	  _got="$$( _run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}' )"; \
+	  if [ "$$_got" != "$${APPSETS_SHA}" ]; then [ -z "$${K3DM_SUPERSEDED_OUT:-}" ] || printf 'superseded %s %s\n' "$$_got" "$${APPSETS_SHA}" > "$${K3DM_SUPERSEDED_OUT}"; _got7=$$(printf '%s' "$$_got" | cut -c1-7); _want7=$$(printf '%s' "$${APPSETS_SHA}" | cut -c1-7); echo "[appsets-reapply] deploy/hub is $$_got7, not $$_want7; superseded" >&2; exit 1; fi; \
+	  _sha="$${APPSETS_SHA}"; _tmp="$$(mktemp -d "$${TMPDIR:-/tmp}/k3dm-appsets.XXXXXX")"; trap 'rm -rf -- "$$_tmp"' EXIT; \
+	  _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
+	  (cd "$$_tmp" && K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm); \
+	else K3D_MANAGER_BRANCH=deploy/hub K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm; fi
 
 ## Report Applications whose k3d-manager values source is not on deploy/hub (read-only)
 appsets-check:
@@ -607,6 +642,33 @@ install-sudoers:
 ## Install the fixed system launchd socket relays for browser listeners
 install-browser-relays:
 	bin/install-browser-relays.sh
+
+install-web-console-sshd:
+	bin/k3dm-web-console-sshd install $${CA_FILE:+--ca-file "$$CA_FILE"} $${AFTER_REVOKE:+--after-revoke}
+
+uninstall-web-console-sshd:
+	@case "$${PURGE-}" in ""|0) set -- ;; 1) set -- --purge ;; *) echo "PURGE must be 1 or unset" >&2; exit 2 ;; esac; bin/k3dm-web-console-sshd uninstall "$$@"
+
+revoke-web-console-sshd:
+	bin/k3dm-web-console-sshd revoke
+
+web-console-sshd-check:
+	bin/k3dm-web-console-sshd check
+
+install-web-console-totp:
+	bin/k3dm-web-console-totp install $${TMUX:+--tmux "$$TMUX"} $${DRY_RUN:+--dry-run}
+
+uninstall-web-console-totp:
+	@case "$${PURGE_SECRET-}" in ""|0) set -- ;; 1) set -- --purge-secret ;; *) echo "PURGE_SECRET must be 1 or unset" >&2; exit 2 ;; esac; bin/k3dm-web-console-totp uninstall "$$@"
+
+web-console-totp-enroll:
+	bin/k3dm-web-console-totp enroll
+
+web-console-totp-rotate:
+	bin/k3dm-web-console-totp rotate
+
+web-console-totp-status:
+	bin/k3dm-web-console-totp status
 
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
@@ -1038,14 +1100,13 @@ restore:
 show-service-passwords:
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	[ -n "$$_vault_tok" ] || { echo "[show-service-passwords] ERROR: cannot read secrets/vault-root (check k3d-k3d-cluster context)" >&2; exit 1; }; \
-	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then \
+	if ! printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then \
 		echo "[show-service-passwords] Vault credential lookup unavailable; restarting its port-forward" >&2; \
 		$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
 		__vault_ready=0; \
 		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
 			sleep 1; \
-			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
+			if printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
 		done; \
 		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault unreachable at 127.0.0.1:18200 with the secrets/vault-root token (port-forward restarted, still failing)" >&2; exit 1; }; \
 	fi
@@ -1054,26 +1115,22 @@ show-service-passwords:
 	@echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
-	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_argocd_vault_file=$$(mktemp); _argocd_initial_file=$$(mktemp); _argocd_payload=$$(mktemp); \
-	curl -sf -H "@$$_vault_hdr" \
+	_argocd_vault_pw=$$(printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- \
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
-	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password",""))' 2>/dev/null >"$$_argocd_vault_file" || true; \
-	kubectl get secret argocd-initial-admin-secret -n cicd \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null >"$$_argocd_initial_file" || true; \
+	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password",""))' 2>/dev/null || true); \
+	_argocd_initial_pw=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
 	_argocd_url="$${SHOW_SERVICE_PASSWORDS_ARGOCD_URL:-https://argocd.3ai-talk.org}"; _argocd_vault_code=000; _argocd_initial_code=000; _argocd_vault_rejected=0; \
 	for _argocd_candidate in vault initial; do \
-	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_file="$$_argocd_vault_file"; else _argocd_candidate_file="$$_argocd_initial_file"; fi; \
-	  if [ -s "$$_argocd_candidate_file" ]; then \
-	    jq -n --arg username admin --rawfile password "$$_argocd_candidate_file" '{username:$$username,password:($$password|rtrimstr("\n"))}' >"$$_argocd_payload"; \
-	    _argocd_code=$$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @"$$_argocd_payload" "$$_argocd_url/api/v1/session" || true); \
+	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_pw="$$_argocd_vault_pw"; else _argocd_candidate_pw="$$_argocd_initial_pw"; fi; \
+	  if [ -n "$$_argocd_candidate_pw" ]; then \
+	    _argocd_code=$$(printf '%s' "$$_argocd_candidate_pw" | jq -Rs '{username:"admin",password:(.|rtrimstr("\n"))}' | curl -q -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @- "$$_argocd_url/api/v1/session" || true); \
 	    if [ "$$_argocd_candidate" = vault ]; then _argocd_vault_code="$$_argocd_code"; else _argocd_initial_code="$$_argocd_code"; fi; \
-	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$(cat "$$_argocd_candidate_file")"; break; fi; \
+	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$_argocd_candidate_pw"; break; fi; \
 	    if [ "$$_argocd_candidate" = vault ] && [ "$$_argocd_code" != 000 ] && [ "$${_argocd_code#5}" = "$$_argocd_code" ]; then _argocd_vault_rejected=1; fi; \
 	  fi; \
 	done; \
-	if [ -z "$$_argocd" ]; then _argocd="$$(cat "$$_argocd_vault_file" 2>/dev/null || true)"; [ -n "$$_argocd" ] || _argocd="$$(cat "$$_argocd_initial_file" 2>/dev/null || true)"; fi; \
-	rm -f "$$_vault_hdr" "$$_argocd_vault_file" "$$_argocd_initial_file" "$$_argocd_payload"; \
+	if [ -z "$$_argocd" ]; then _argocd="$$_argocd_vault_pw"; [ -n "$$_argocd" ] || _argocd="$$_argocd_initial_pw"; fi; \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
@@ -1081,23 +1138,19 @@ show-service-passwords:
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_grafana=$$(curl -sf -H "@$$_vault_hdr" \
+	_grafana=$$(printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf -H @- \
 	  "http://127.0.0.1:18200/v1/secret/data/observability/grafana" 2>/dev/null | \
 	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
-	rm -f "$$_vault_hdr"; \
 	echo "  Grafana     https://grafana.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_grafana:-N/A}";\
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_prom_creds=$$(curl -sf \
-	  -H "@$$_vault_hdr" \
+	_prom_creds=$$(printf 'X-Vault-Token: %s\n' "$$_vault_tok" | curl -q -sf \
+	  -H @- \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
 	  | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["data"]; print(d.get("user","admin")+"|"+d.get("password","N/A"))' 2>/dev/null || true); \
-	rm -f "$$_vault_hdr"; \
 	_prom_user=$${_prom_creds%%|*}; \
 	_prom_pass=$${_prom_creds##*|}; \
 	echo "  Prometheus  https://prometheus.3ai-talk.org";\
@@ -1376,7 +1429,10 @@ platform-ops:
 	 _cleanup() { _run_command --soft -- rm -rf -- "$$_tmp" || true; }; \
 	 trap _cleanup EXIT; \
 	 _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
-	 _sha=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
+	 _got=$$(_run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}'); \
+	 _sha="$$_got"; if [ -n "$${PLATFORM_OPS_SHA:-}" ]; then \
+	   printf '%s' "$${PLATFORM_OPS_SHA}" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$$' || { echo '[platform-ops] invalid PLATFORM_OPS_SHA' >&2; exit 2; }; \
+	   if [ "$$_got" != "$${PLATFORM_OPS_SHA}" ]; then [ -z "$${K3DM_SUPERSEDED_OUT:-}" ] || printf 'superseded %s %s\n' "$$_got" "$${PLATFORM_OPS_SHA}" > "$${K3DM_SUPERSEDED_OUT}"; _got7=$$(printf '%s' "$$_got" | cut -c1-7); _want7=$$(printf '%s' "$${PLATFORM_OPS_SHA}" | cut -c1-7); echo "[platform-ops] deploy/hub is $$_got7, not $$_want7; superseded" >&2; exit 1; fi; _sha="$${PLATFORM_OPS_SHA}"; fi; \
 	 _run_command --soft -- git -C "$(CURDIR)" archive "$$_sha" | _run_command --soft -- tar -x -C "$$_tmp"; \
 	 (cd "$$_tmp" && _run_command --soft -- ./scripts/k3d-manager deploy_argocd_platform_ops --confirm); \
 	 mkdir -p "$(HOME)/.local/share/k3d-manager/repo-sync"; \
@@ -2333,7 +2389,7 @@ help:
 	@echo "    make appsets-reapply       Reapply ApplicationSets pinned to deploy/hub (APPSETS_STAGE=hub optional)"
 	@echo "    make appsets-check         Report Applications not reading deploy/hub values (read-only)"
 	@echo "    make hub-promote REF=...   Promote a checked origin commit to deploy/hub (BREAK_GLASS=1 or SKIP_CHECK_RUNS=1 SKIP_CHECK_RUNS_REASON=... optional)"
-	@echo "    make hub-deploy REF=...    Promote, reconcile and verify the hub (typed confirmation required)"
+	@echo "    make hub-deploy REF=...    Promote, reconcile and verify the hub (typed confirmation required; reinstalls changed launchd agents)"
 	@echo "    make promote REF=...       hub-promote, then appsets-check and platform-ops (stops at first failure)"
 	@echo "    make hub-rollback          Return deploy/hub to the state before the last promotion"
 	@echo "    make hub-promote-status    Show deploy/hub SHA, recent tags, and release ahead count"
@@ -2364,6 +2420,15 @@ help:
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
 	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
+	@echo "    make install-web-console-totp     Install the TOTP gate daemon and forced-command"
+	@echo "    make uninstall-web-console-totp   Remove the TOTP gate (PURGE_SECRET=1 removes state)"
+	@echo "    make web-console-totp-enroll      Enrol TOTP secret on interactive terminal"
+	@echo "    make web-console-totp-rotate      Rotate TOTP secret on interactive terminal"
+	@echo "    make web-console-totp-status      Show TOTP enrolment status"
+	@echo "    make install-web-console-sshd     Install the loopback console daemon (CA_FILE=path, AFTER_REVOKE=1)"
+	@echo "    make web-console-sshd-check       Check the installed daemon and listener"
+	@echo "    make revoke-web-console-sshd      Stop the daemon and its sessions"
+	@echo "    make uninstall-web-console-sshd   Remove the daemon (PURGE=1 removes the host keys and CA)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo "    make cloudflared-config         Check or install the repo-managed Cloudflare tunnel config"
 	@echo "    make cloudflare-preflight       Read-only HTTPS/TLS preflight (ZONE_ID=<zone>; DRY_RUN=1 prints the plan)"
@@ -2404,3 +2469,47 @@ machine-secrets-export:
 machine-secrets-import:
 	@test -n "$(FILE)" || { echo 'Usage: make machine-secrets-import FILE=<file> [FORCE=1]' >&2; exit 2; }
 	@if [ "$(FORCE)" = 1 ]; then bin/k3dm-machine-secrets import --in "$(FILE)" --force; else bin/k3dm-machine-secrets import --in "$(FILE)"; fi
+
+.PHONY: password-bundle-enroll password-bundle-add-recipient password-bundle-add-laptop password-bundle-remove-recipient password-bundle-publish password-bundle-show password-bundle-install password-bundle-uninstall
+
+## Enroll this laptop for encrypted service password delivery
+password-bundle-enroll:
+	@./scripts/k3d-manager password_bundle_enroll
+
+## Add a laptop recipient: NAME=<name> KEY=<age public key>
+password-bundle-add-recipient:
+	@./scripts/k3d-manager password_bundle_add_recipient
+
+## Add a laptop and publish for it: NAME=<name> KEY=<age public key>
+password-bundle-add-laptop:
+	@./scripts/k3d-manager password_bundle_add_laptop
+
+## Remove a laptop recipient and republish: NAME=<name>
+password-bundle-remove-recipient:
+	@./scripts/k3d-manager password_bundle_remove_recipient
+
+## Publish encrypted service passwords
+password-bundle-publish:
+	@./scripts/k3d-manager password_bundle_publish
+
+## Show the latest encrypted service passwords
+password-bundle-show:
+	@./scripts/k3d-manager password_bundle_show
+
+## Install the password bundle schedule
+password-bundle-install:
+	@./scripts/k3d-manager password_bundle_install
+
+## Remove the password bundle schedule
+password-bundle-uninstall:
+	@./scripts/k3d-manager password_bundle_uninstall
+
+.PHONY: promote-authority-install promote-authority-enrol promote-authority-status
+promote-authority-install:
+	@bin/k3dm-promote-authority install "OPERATOR_IDS=$$OPERATOR_IDS" "INSTALL_REF=$$INSTALL_REF"
+
+promote-authority-enrol:
+	@bin/k3dm-promote-authority enrol
+
+promote-authority-status:
+	@bin/k3dm-promote-authority status

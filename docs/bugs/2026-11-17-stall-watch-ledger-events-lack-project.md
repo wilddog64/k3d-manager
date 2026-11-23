@@ -5,6 +5,7 @@
 **Introduced by:** 6972d10a (multi-project M1: `project` ledger key added via `_dispatch_ledger_event` only)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Minor telemetry omission where `stall_detected` ledger events omit the `project` field, with no current impact because per-project readers do not exist yet.)
 **Waiting on:** operator decision
 **Prior art:** not run (vector store unreachable: context `k3d-k3d-cluster` does not exist; exact-slug glob found none)
 

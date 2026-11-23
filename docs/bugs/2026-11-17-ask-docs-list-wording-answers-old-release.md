@@ -2,9 +2,12 @@
 
 **Status:** OPEN
 **Priority:** P2 (proposed) — a wrong answer, not just a miss: Slack names v1.43.4 as the current release while the branch is v1.44.1. Workaround: ask with a count word ("how many bugs fixed in current release").
+**Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Degraded `ask-docs` query routing returns wrong release answers for "list" wording, with a workaround of phrasing the query with count words.)
 **Waiting on:** operator decision — since 2026-11-17
 **Prior art:** `docs/plans/v1.51.0-bug-count-query-translation.md` (exact-slug pass found no bug doc; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read: its 2026-10-30 note already lists list wording falling through to search; this doc records the wrong-release answer as a bug so triage can pull that plan forward. Also read `docs/bugs/2026-10-09-ask-docs-latest-bugs-misses-recent-fixes.md` (VERIFIED, same symptom family, different trigger).
 **Filed:** 2026-11-17

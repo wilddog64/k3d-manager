@@ -5,6 +5,7 @@
 **Introduced by:** dd7c18ed (unseal watchdog stage 1, k3d-manager-v1.44.1)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Edge-case log filtering flaw where an empty shard file causes `grep -F -v -- ""` to drop Vault error lines while still logging the failure exit code.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-17

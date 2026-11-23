@@ -5,6 +5,7 @@
 **Introduced by:** 59dd12e5 (W1 fix, v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Unproven potential edge case where non-`Warning:` stderr lines from `kubectl` would cause `_kubectl_json` parsing to fail open to the LLM fallback.)
 **Waiting on:** operator decision
 **Prior art:** docs/bugs/2026-11-17-vault-sealed-landed-review-findings.md (W1) — read; this is a gap in that fix. `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18

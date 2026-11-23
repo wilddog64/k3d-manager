@@ -1,0 +1,31 @@
+
+  === Service Credentials ===
+
+  ArgoCD      https://argocd.3ai-talk.org
+    user:     admin
+    password: vault-pass
+
+  Grafana     https://grafana.3ai-talk.org
+    user:     admin
+    password: other-pass
+
+  Prometheus  https://prometheus.3ai-talk.org
+    user:     admin
+    password: other-pass
+
+  Alertmanager https://alertmanager.3ai-talk.org
+    user:     admin
+    password: N/A
+
+  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)
+  Keycloak    https://keycloak.3ai-talk.org
+    user:     admin
+    password: N/A
+    realm SSO users (secret/keycloak/users/*):
+      user:     admin
+      password: no Vault record on this cluster (LDAP accounts exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset to display)
+      user:     developer
+      password: no Vault record on this cluster (LDAP accounts exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset to display)
+      user:     operator
+      password: no Vault record on this cluster (LDAP accounts exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset to display)
+

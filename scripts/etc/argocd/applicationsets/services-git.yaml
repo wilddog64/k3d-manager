@@ -8,19 +8,24 @@ metadata:
     app-type: services
     k3dm.k3d.io/rollout-stage: app-cluster
 spec:
-  ignoreApplicationDifferences:
-    - jqPathExpressions:
-        - .spec.source.kustomize.images
   generators:
     - matrix:
         generators:
-          - git:
-              repoURL: https://github.com/wilddog64/k3d-manager
-              revision: '${K3D_MANAGER_BRANCH}'
-              directories:
-                - path: services/*
-                - path: services/shopping-cart-identity
-                  exclude: true
+          - matrix:
+              generators:
+                - git:
+                    repoURL: https://github.com/wilddog64/k3d-manager
+                    revision: '${K3D_MANAGER_BRANCH}'
+                    directories:
+                      - path: services/*
+                      - path: services/shopping-cart-identity
+                        exclude: true
+                - git:
+                    repoURL: https://github.com/wilddog64/k3d-manager
+                    revision: cve-pins/hub
+                    pathParamPrefix: cvePinsFile
+                    files:
+                      - path: pins.json
           - clusters:
               selector:
                 matchLabels:
@@ -79,3 +84,13 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+  templatePatch: |
+    {{- with index .cvePins .path.basename }}
+    {{- if regexMatch "^sha256:[0-9a-f]{64}$" (toString (index . "digest")) }}
+    spec:
+      source:
+        kustomize:
+          images:
+            - 'ghcr.io/wilddog64/{{ $.path.basename }}@{{ index . "digest" }}'
+    {{- end }}
+    {{- end }}

@@ -1,10 +1,9 @@
 # Bug: Codex subagent sessions of a dispatch are counted as "Ledger gaps"
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic/hygiene metric categorization skew (`subagent` sessions misbucketed into `dispatch_unrecorded` instead of their parent's category on the cost dashboard, explicitly slated for the P3 batch)); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
 **Introduced by:** v1.43.15 (`docs/plans/v1.43.15-cost-attribution-coverage.md`: `_classify_session` re-parents only `guardian_review` sessions)
 **Should have been caught by:** spec (the 2026-11-01 M4 capture the spec copied had no `thread_source: subagent` session)
 **Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none

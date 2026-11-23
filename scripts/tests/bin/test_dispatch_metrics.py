@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -130,12 +131,13 @@ def test_stall_recovery_cli_dry_run_uses_only_asserted_scratch_targets(tmp_path,
     ledger = root / "ledger.jsonl"
     home.mkdir()
     root.mkdir()
-    rows = [event(1794614401, "stall_detected", stall="stall-cli", reason="silent", silent_s=60),
-            event(1794614402, "stall_diagnosis", stall="stall-cli", status="ok", cost_usd=0.42),
-            event(1794614403, "stall_proposal", stall="stall-cli"),
-            event(1794614404, "stall_decision", stall="stall-cli", decision="approved"),
-            event(1794614405, "stall_resume", stall="stall-cli", rc=0),
-            event(1794614406, "land")]
+    base = int(time.time()) - 3600
+    rows = [event(base + 1, "stall_detected", stall="stall-cli", reason="silent", silent_s=60),
+            event(base + 2, "stall_diagnosis", stall="stall-cli", status="ok", cost_usd=0.42),
+            event(base + 3, "stall_proposal", stall="stall-cli"),
+            event(base + 4, "stall_decision", stall="stall-cli", decision="approved"),
+            event(base + 5, "stall_resume", stall="stall-cli", rc=0),
+            event(base + 6, "land")]
     ledger.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
     monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
@@ -2331,11 +2333,14 @@ def agy_scratch(monkeypatch, tmp_path, now):
     brain.mkdir(parents=True)
     ledger_dir.mkdir(parents=True)
     worktree_root.mkdir()
+    cache_path = home / ".local/share/k3d-manager/agy-usage/repo-cache.json"
     assert home != Path.home() and brain.is_dir() and ledger_dir.is_dir() and worktree_root.is_dir()
+    assert cache_path.is_relative_to(tmp_path)
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("K3DM_AGY_BRAIN_DIR", str(brain))
     monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(ledger_dir))
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(worktree_root))
+    monkeypatch.setenv("K3DM_AGY_REPO_CACHE", str(cache_path))
     monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
     assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
     return home, brain, ledger_dir, worktree_root
@@ -2351,11 +2356,12 @@ def test_agy_transcripts_report_in_window_tokens_active_time_and_source(monkeypa
         {"created_at": "2027-01-15T08:06:40Z", "output_tokens": 7},
     ], now)
     output = dispatch_metrics.render([], 0, now, repo_root=tmp_path / "repo")
-    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
-    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="input_tokens"} 3' in output
-    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="cache_read_tokens"} 5' in output
-    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="output_tokens"} 7' in output
-    assert 'k3dm_agy_active_seconds{window="1d",mode="unknown"} 300' in output
+    # agent-audit: allow assert-removed mode="unknown" asserts replaced by mode="print" (sessions without history.jsonl entry)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="unknown"} 1' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="input_tokens"} 3' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="cache_read_tokens"} 5' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="output_tokens"} 7' in output
+    assert 'k3dm_agy_active_seconds{window="1d",mode="print"} 300' in output
     assert 'source="transcripts"} 1' in output
     assert "PRIVATE_MARKER" not in output
 
@@ -2370,14 +2376,14 @@ def test_agy_transcript_window_boundary_and_dispatch_tracking(monkeypatch, tmp_p
     write_agy_transcript(brain, "untracked", [{"created_at": "2027-01-15T07:59:00Z"}], now)
     events = [event(now, "agent_exit", exit=0, session="tracked")]
     output = dispatch_metrics.render(events, 0, now, repo_root=repo)
-    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 2' in output
-    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="input_tokens"} 4' in output
-    assert 'k3dm_agy_untracked_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
-    assert 'k3dm_agy_active_seconds{window="1d",mode="unknown"} 0' in output
-    assert 'k3dm_agy_sessions{window="30d",mode="unknown",repo="unknown"} 2' in output
-    assert 'k3dm_agy_tokens{window="30d",mode="unknown",kind="input_tokens"} 103' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="unknown"} 2' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="input_tokens"} 4' in output
+    assert 'k3dm_agy_untracked_sessions{window="1d",mode="print",repo="unknown"} 1' in output
+    assert 'k3dm_agy_active_seconds{window="1d",mode="print"} 0' in output
+    assert 'k3dm_agy_sessions{window="30d",mode="print",repo="unknown"} 2' in output
+    assert 'k3dm_agy_tokens{window="30d",mode="print",kind="input_tokens"} 103' in output
     codex_only = dispatch_metrics.render([event(now, "codex_exit", exit=0, session="tracked")], 0, now, repo_root=repo)
-    assert 'k3dm_agy_untracked_sessions{window="1d",mode="unknown",repo="unknown"} 2' in codex_only
+    assert 'k3dm_agy_untracked_sessions{window="1d",mode="print",repo="unknown"} 2' in codex_only
 
 
 def test_agy_missing_sources_emit_source_but_no_usage_zero(monkeypatch, tmp_path):
@@ -2412,7 +2418,7 @@ def test_agy_transcript_skips_malformed_bad_tokens_and_unreadable_file(monkeypat
     output = dispatch_metrics.render([], 0, now, repo_root=repo)
     assert 'k3dm_agy_transcript_skipped_lines 4' in output
     assert "k3dm_agy_tokens{" not in output
-    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="unknown"} 1' in output
 
 
 def test_agy_transcript_invalid_utf8_line_is_skipped_without_losing_valid_steps(monkeypatch, tmp_path):
@@ -2428,9 +2434,9 @@ def test_agy_transcript_invalid_utf8_line_is_skipped_without_losing_valid_steps(
     )
     os.utime(path, (now, now))
     output = dispatch_metrics.render([], 0, now, repo_root=repo)
-    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
-    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="input_tokens"} 4' in output
-    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="output_tokens"} 6' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="unknown"} 1' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="input_tokens"} 4' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="output_tokens"} 6' in output
     assert "k3dm_agy_transcript_skipped_lines 1" in output
 
 
@@ -2441,7 +2447,7 @@ def test_agy_transcripts_prefer_brain_over_duplicate_ledger(monkeypatch, tmp_pat
     (ledger_dir / "agy.jsonl").write_text(json.dumps({"start": now, "mode": "print", "usage": {"input_tokens": 5}}) + "\n")
     output = dispatch_metrics.render([], 0, now, repo_root=repo)
     assert 'source="transcripts"} 1' in output
-    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="unknown"} 1' in output
     assert 'k3dm_agy_sessions{window="1d",mode="print",repo="other"}' not in output
 
 
@@ -2470,6 +2476,539 @@ def test_agy_dry_run_with_no_sources_succeeds_without_zero_usage(monkeypatch, tm
     assert completed.returncode == 0, completed.stderr
     assert 'source="none"} 1' in completed.stdout
     assert "k3dm_agy_sessions{" not in completed.stdout and "k3dm_agy_tokens{" not in completed.stdout
+
+
+# Captured from read-only schema and field layout on host m4-air, date 2026-11-21, agy 1.5.14
+def _encode_varint_bytes(n):
+    res = bytearray()
+    while True:
+        b = n & 0x7F
+        n >>= 7
+        if n:
+            res.append(b | 0x80)
+        else:
+            res.append(b)
+            break
+    return bytes(res)
+
+
+def _encode_pb_field(field_no, wire_type, payload):
+    key = (field_no << 3) | wire_type
+    if wire_type == 2:
+        return _encode_varint_bytes(key) + _encode_varint_bytes(len(payload)) + payload
+    elif wire_type == 0:
+        return _encode_varint_bytes(key) + _encode_varint_bytes(payload)
+    raise ValueError(f"unsupported wire type {wire_type}")
+
+
+def build_agy_protobuf_blob(workspaces):
+    top = bytearray()
+    for ws in workspaces:
+        ws_bytes = bytearray()
+        if "folder" in ws and ws["folder"] is not None:
+            ws_bytes.extend(_encode_pb_field(1, 2, ws["folder"].encode("utf-8")))
+        if "git_root" in ws and ws["git_root"] is not None:
+            ws_bytes.extend(_encode_pb_field(2, 2, ws["git_root"].encode("utf-8")))
+        if "repo" in ws:
+            f1_3 = bytearray()
+            if ws["repo"] is not None:
+                f1_3.extend(_encode_pb_field(1, 2, ws["repo"].encode("utf-8")))
+            if "remote_url" in ws and ws["remote_url"] is not None:
+                f1_3.extend(_encode_pb_field(2, 2, ws["remote_url"].encode("utf-8")))
+            ws_bytes.extend(_encode_pb_field(3, 2, bytes(f1_3)))
+        if "branch" in ws and ws["branch"] is not None:
+            ws_bytes.extend(_encode_pb_field(4, 2, ws["branch"].encode("utf-8")))
+        top.extend(_encode_pb_field(1, 2, bytes(ws_bytes)))
+    return bytes(top)
+
+
+def write_agy_conversation_db(home, session_id, blob_bytes=None, wal=False, extra_tables=False):
+    assert home.name == "home" and ("pytest" in str(home) or "tmp" in str(home))
+    conv_dir = home / ".gemini/antigravity-cli/conversations"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    db_path = conv_dir / f"{session_id}.db"
+    db_path.unlink(missing_ok=True)
+    for ext in ("-wal", "-shm"):
+        (conv_dir / f"{session_id}.db{ext}").unlink(missing_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    if wal:
+        conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE trajectory_metadata_blob(id text DEFAULT 'main', data blob)")
+    if blob_bytes is not None:
+        conn.execute("INSERT INTO trajectory_metadata_blob(id, data) VALUES ('main', ?)", (blob_bytes,))
+    if extra_tables:
+        conn.execute("CREATE TABLE steps(id text, content text)")
+        conn.execute("INSERT INTO steps VALUES ('1', 'step_data')")
+        conn.execute("CREATE TABLE gen_metadata(id text, info text)")
+        conn.execute("INSERT INTO gen_metadata VALUES ('1', 'gen_data')")
+        conn.execute("CREATE TABLE executor_metadata(id text, meta text)")
+        conn.execute("INSERT INTO executor_metadata VALUES ('1', 'exec_data')")
+    conn.commit()
+    conn.close()
+    return db_path
+
+
+def test_agy_e1_repo_extraction_git_other_and_top_level_first_field(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
+
+    # Session 1: primary workspace is owner/k3d-manager (untracked)
+    blob1 = build_agy_protobuf_blob([{
+        "folder": "file:///Users/cliang/src/personal/k3d-manager",
+        "git_root": "file:///Users/cliang/src/personal/k3d-manager",
+        "repo": "wilddog64/k3d-manager",
+        "remote_url": "https://github.com/wilddog64/k3d-manager.git",
+        "branch": "task/v1.45.0/slug",
+    }])
+    write_agy_conversation_db(home, "sess-k3d", blob1)
+    write_agy_transcript(brain, "sess-k3d", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10}], now)
+
+    # Session 2: empty 1.3 (not a git repo) -> other
+    blob2 = build_agy_protobuf_blob([{
+        "folder": "file:///Users/cliang/scratchpad",
+        "repo": None,
+    }])
+    write_agy_conversation_db(home, "sess-other", blob2)
+    write_agy_transcript(brain, "sess-other", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 20}], now)
+
+    # Session 3: multiple workspaces (M5): 1st is dirused, 2nd is k3d-manager
+    blob3 = build_agy_protobuf_blob([
+        {"folder": "file:///Users/cliang/src/dirused", "repo": "wilddog64/dirused"},
+        {"folder": "file:///Users/cliang/src/k3d-manager", "repo": "wilddog64/k3d-manager"},
+    ])
+    write_agy_conversation_db(home, "sess-multi", blob3)
+    write_agy_transcript(brain, "sess-multi", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 30}], now)
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    # M1 & N4:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="k3d-manager"} 1' in output
+    assert 'k3dm_agy_untracked_sessions{window="1d",mode="print",repo="k3d-manager"} 1' in output
+    # M2:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="other"} 1' in output
+    # M5:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="dirused"} 1' in output
+    # N4: bare repo name only, no owner or URLs or paths
+    assert "wilddog64" not in output
+    assert "personal/k3d-manager" not in output
+    assert "https://" not in output
+    assert "task/v1.45.0" not in output
+
+
+def test_agy_e2_missing_or_corrupt_db_reports_unknown_without_failure(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
+
+    # Session 1: missing db
+    write_agy_transcript(brain, "missing-db", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    # Session 2: corrupt db file
+    conv_dir = home / ".gemini/antigravity-cli/conversations"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    (conv_dir / "corrupt-db.db").write_bytes(b"\x00\xffCORRUPT_SQLITE_HEADER")
+    write_agy_transcript(brain, "corrupt-db", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 2}], now)
+
+    # Session 3: valid sqlite db with malformed blob
+    write_agy_conversation_db(home, "malformed-blob", blob_bytes=b"\xff\xff\xff\xff")
+    write_agy_transcript(brain, "malformed-blob", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 3}], now)
+
+    # Session 4 (positive control): valid db
+    blob_good = build_agy_protobuf_blob([{"repo": "wilddog64/k3d-manager"}])
+    write_agy_conversation_db(home, "good-db", blob_good)
+    write_agy_transcript(brain, "good-db", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 4}], now)
+
+    # N5: does not fail or drop sessions
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    # M3:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="unknown"} 3' in output
+    assert 'k3dm_agy_untracked_sessions{window="1d",mode="print",repo="unknown"} 3' in output
+    # positive control:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="k3d-manager"} 1' in output
+
+
+def test_agy_e3_mode_interactive_from_history_and_no_private_keys_read(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
+
+    blob = build_agy_protobuf_blob([{"repo": "wilddog64/k3d-manager"}])
+    write_agy_conversation_db(home, "sess-interactive", blob)
+    write_agy_conversation_db(home, "sess-print", blob)
+
+    history = home / ".gemini/antigravity-cli/history.jsonl"
+    history.write_text(json.dumps({
+        "conversationId": "sess-interactive",
+        "display": "PRIVATE_USER_DISPLAY_QUERY",
+    }) + "\n")
+
+    write_agy_transcript(brain, "sess-interactive", [
+        {"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10,
+         "content": "PRIVATE_TRANSCRIPT_CONTENT", "thinking": "PRIVATE_THINKING",
+         "tool_calls": [{"call": "PRIVATE_TOOL"}]},
+    ], now)
+    write_agy_transcript(brain, "sess-print", [
+        {"created_at": "2027-01-15T08:00:00Z", "input_tokens": 15},
+    ], now)
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    # M4:
+    assert 'k3dm_agy_sessions{window="1d",mode="interactive",repo="k3d-manager"} 1' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="k3d-manager"} 1' in output
+    # N3: private keys never read or output
+    assert "PRIVATE_USER_DISPLAY_QUERY" not in output
+    assert "PRIVATE_TRANSCRIPT_CONTENT" not in output
+    assert "PRIVATE_THINKING" not in output
+    assert "PRIVATE_TOOL" not in output
+
+
+def test_agy_e4_totals_match_pre_fix_and_ledger_is_byte_identical(monkeypatch, tmp_path):
+    now = 1_800_000_600
+    home, brain, ledger_dir, repo = agy_scratch(monkeypatch, tmp_path, now)
+    assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
+
+    # Ledger fixtures only (no brain) -> byte-identical output (M7)
+    shutil.rmtree(brain)
+    ledger = ledger_dir / "agy.jsonl"
+    ledger.write_text(json.dumps({"start": now - 10, "mode": "print", "repo": "repo-a",
+                                  "duration_s": 9, "usage": {"input_tokens": 11}}) + "\n")
+    out_ledger = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_source_present{host="' in out_ledger and 'source="ledger"} 1' in out_ledger
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-a"} 1' in out_ledger
+    assert 'k3dm_agy_active_seconds{window="1d",mode="print"} 9' in out_ledger
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="input_tokens"} 11' in out_ledger
+
+
+def test_agy_e5_reader_works_on_copy_and_leaves_agy_home_byte_identical(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
+
+    blob = build_agy_protobuf_blob([{"repo": "wilddog64/k3d-manager"}])
+    write_agy_conversation_db(home, "sess-copy-test", blob, wal=True, extra_tables=True)
+    write_agy_transcript(brain, "sess-copy-test", [
+        {"created_at": "2027-01-15T08:00:00Z", "input_tokens": 5},
+    ], now)
+
+    # N2: verify only trajectory_metadata_blob is queried
+    queries = []
+    real_connect = dispatch_metrics.sqlite3.connect
+
+    def spy_connect(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+        conn.set_trace_callback(queries.append)
+        return conn
+
+    monkeypatch.setattr(dispatch_metrics.sqlite3, "connect", spy_connect)
+
+    gemini_root = home / ".gemini"
+    files_before = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in gemini_root.rglob("*") if p.is_file()}
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+
+    files_after = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in gemini_root.rglob("*") if p.is_file()}
+    # N1: byte-identical files, no new files created in ~/.gemini
+    assert files_before == files_after
+    # N2: only trajectory_metadata_blob queried, never steps / gen_metadata / executor_metadata
+    assert all("trajectory_metadata_blob" in q for q in queries)
+    assert not any("steps" in q or "gen_metadata" in q or "executor_metadata" in q for q in queries)
+    # Positive control:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="k3d-manager"} 1' in output
+
+
+def test_agy_top_10_repos_in_30d_fold_remaining_into_other(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    assert brain.is_relative_to(tmp_path) and home.is_relative_to(tmp_path)
+
+    # 12 repos with varying session counts
+    for i in range(1, 13):
+        r_name = f"repo-{i:02d}"
+        blob = build_agy_protobuf_blob([{"repo": f"owner/{r_name}"}])
+        # Give repo-01 through repo-10 higher counts, repo-11 and repo-12 1 count each
+        count = 13 - i
+        for c in range(count):
+            sid = f"sess-{r_name}-{c}"
+            write_agy_conversation_db(home, sid, blob)
+            write_agy_transcript(brain, sid, [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    # repo-01 through repo-10 are top 10
+    for i in range(1, 11):
+        r_name = f"repo-{i:02d}"
+        assert f'repo="{r_name}"' in output
+    # repo-11 and repo-12 must fold into other
+    assert 'repo="repo-11"' not in output
+    assert 'repo="repo-12"' not in output
+    # other must include repo-11 and repo-12 (count = 2 + 1 = 3)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="other"} 3' in output
+
+
+def test_agy_e7_cache_skips_unchanged_dbs_and_rereads_modified(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    cache_file = home / ".local/share/k3d-manager/agy-usage/repo-cache.json"
+    assert home.is_relative_to(tmp_path) and cache_file.is_relative_to(tmp_path)
+
+    blob1 = build_agy_protobuf_blob([{"repo": "wilddog64/repo-one"}])
+    blob2 = build_agy_protobuf_blob([{"repo": "wilddog64/repo-two"}])
+    write_agy_conversation_db(home, "sess-1", blob1)
+    write_agy_conversation_db(home, "sess-2", blob2)
+    write_agy_transcript(brain, "sess-1", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10}], now)
+    write_agy_transcript(brain, "sess-2", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 20}], now)
+
+    # Run 1: initial run populates cache
+    out1 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-one"} 1' in out1
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-two"} 1' in out1
+    assert cache_file.is_file()
+    assert (cache_file.stat().st_mode & 0o777) == 0o600
+    cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
+    assert "sess-1" in cached_data and cached_data["sess-1"]["repo"] == "repo-one"
+    assert "sess-2" in cached_data and cached_data["sess-2"]["repo"] == "repo-two"
+
+    # Run 2 (M8): no DB change -> 0 sqlite3.connect calls, same labels
+    connect_calls = []
+    real_connect = dispatch_metrics.sqlite3.connect
+
+    def spy_connect(*args, **kwargs):
+        connect_calls.append(args)
+        return real_connect(*args, **kwargs)
+
+    monkeypatch.setattr(dispatch_metrics.sqlite3, "connect", spy_connect)
+    out2 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert len(connect_calls) == 0
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-one"} 1' in out2
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-two"} 1' in out2
+
+    # Run 3 (M9): changing sess-1 DB makes only sess-1 be re-read
+    blob1_mod = build_agy_protobuf_blob([{"repo": "wilddog64/repo-one-mod"}])
+    write_agy_conversation_db(home, "sess-1", blob1_mod)
+    connect_calls.clear()
+    out3 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert len(connect_calls) == 1
+    assert "sess-1.db" in str(connect_calls[0][0])
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-one-mod"} 1' in out3
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-two"} 1' in out3
+
+    # Drop entries outside 30d set
+    data = json.loads(cache_file.read_text(encoding="utf-8"))
+    data["stale-session-old"] = {
+        "repo": "stale-repo",
+        "db_mtime_ns": 1,
+        "db_size": 1,
+        "wal_mtime_ns": None,
+        "wal_size": None,
+    }
+    cache_file.write_text(json.dumps(data), encoding="utf-8")
+    dispatch_metrics.render([], 0, now, repo_root=repo)
+    pruned_data = json.loads(cache_file.read_text(encoding="utf-8"))
+    assert "stale-session-old" not in pruned_data
+    assert "sess-1" in pruned_data and "sess-2" in pruned_data
+
+    # Corrupt cache recovers in memory
+    cache_file.write_text("{corrupt json", encoding="utf-8")
+    out_corrupt = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-one-mod"} 1' in out_corrupt
+
+    # Unwritable cache keeps going without failing
+    cache_file.parent.chmod(0o500)
+    try:
+        out_unwritable = dispatch_metrics.render([], 0, now, repo_root=repo)
+        assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-one-mod"} 1' in out_unwritable
+    finally:
+        cache_file.parent.chmod(0o700)
+
+
+def test_agy_e8_repo_name_allowlist_rejects_quotes_spaces_and_length(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    cache_file = home / ".local/share/k3d-manager/agy-usage/repo-cache.json"
+    assert home.is_relative_to(tmp_path) and cache_file.is_relative_to(tmp_path)
+
+    # 1.3.1 with bad"name (quotes)
+    blob_quotes = build_agy_protobuf_blob([{"repo": 'owner/bad"name'}])
+    write_agy_conversation_db(home, "sess-quotes", blob_quotes)
+    write_agy_transcript(brain, "sess-quotes", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    # 1.3.1 with space
+    blob_space = build_agy_protobuf_blob([{"repo": "owner/has space"}])
+    write_agy_conversation_db(home, "sess-space", blob_space)
+    write_agy_transcript(brain, "sess-space", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    # 1.3.1 with 65-character name (> 64)
+    long_name = "x" * 65
+    blob_long = build_agy_protobuf_blob([{"repo": f"owner/{long_name}"}])
+    write_agy_conversation_db(home, "sess-long", blob_long)
+    write_agy_transcript(brain, "sess-long", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    # Positive control: valid name and 64-character name
+    blob_valid = build_agy_protobuf_blob([{"repo": "owner/valid-repo"}])
+    write_agy_conversation_db(home, "sess-valid", blob_valid)
+    write_agy_transcript(brain, "sess-valid", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    name_64 = "y" * 64
+    blob_64 = build_agy_protobuf_blob([{"repo": f"owner/{name_64}"}])
+    write_agy_conversation_db(home, "sess-64", blob_64)
+    write_agy_transcript(brain, "sess-64", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 1}], now)
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+
+    # R2 / E8: rejected repos report as "other"
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="other"} 3' in output
+    # Positive controls:
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="valid-repo"} 1' in output
+    assert f'k3dm_agy_sessions{{window="1d",mode="print",repo="{name_64}"}} 1' in output
+
+    # N6: no repo label failing [A-Za-z0-9._-]{1,64} enters any series
+    assert 'bad"name' not in output
+    assert "has space" not in output
+    assert long_name not in output
+
+    # N6: cache file holds only validated bare names, never quotes, spaces, or paths
+    cache_raw = cache_file.read_text(encoding="utf-8")
+    assert 'bad"name' not in cache_raw
+    assert "has space" not in cache_raw
+    assert long_name not in cache_raw
+    cached_dict = json.loads(cache_raw)
+    for sid, entry in cached_dict.items():
+        assert re.fullmatch(r"[A-Za-z0-9._-]{1,64}", entry["repo"]) is not None
+
+
+def test_agy_m9_wal_mtime_or_size_change_triggers_reread(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    cache_file = home / ".local/share/k3d-manager/agy-usage/repo-cache.json"
+    assert home.is_relative_to(tmp_path) and cache_file.is_relative_to(tmp_path)
+
+    blob1 = build_agy_protobuf_blob([{"repo": "wilddog64/repo-wal-1"}])
+    conv_dir = home / ".gemini/antigravity-cli/conversations"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    db_path = conv_dir / "sess-wal.db"
+    wal_path = conv_dir / "sess-wal.db-wal"
+
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE trajectory_metadata_blob(id text DEFAULT 'main', data blob)")
+    conn.execute("INSERT INTO trajectory_metadata_blob(id, data) VALUES ('main', ?)", (blob1,))
+    conn.commit()
+
+    reader = sqlite3.connect(str(db_path))
+    reader.execute("SELECT * FROM trajectory_metadata_blob").fetchall()
+
+    conn.execute("UPDATE trajectory_metadata_blob SET data = ?", (blob1,))
+    conn.commit()
+
+    write_agy_transcript(brain, "sess-wal", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10}], now)
+
+    out1 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-wal-1"} 1' in out1
+    assert cache_file.is_file()
+    assert wal_path.is_file()
+
+    st_db_before = db_path.stat()
+
+    blob2 = build_agy_protobuf_blob([{"repo": "wilddog64/repo-wal-2"}])
+    conn.execute("UPDATE trajectory_metadata_blob SET data = ?", (blob2,))
+    conn.commit()
+    conn.close()
+
+    os.utime(db_path, ns=(st_db_before.st_atime_ns, st_db_before.st_mtime_ns))
+    st_db_after = db_path.stat()
+    assert st_db_after.st_mtime_ns == st_db_before.st_mtime_ns
+    assert st_db_after.st_size == st_db_before.st_size
+
+    out2 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-wal-2"} 1' in out2
+    assert 'repo="repo-wal-1"' not in out2
+    reader.close()
+
+
+def test_agy_m9_db_size_change_with_restored_mtime_triggers_reread(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    cache_file = home / ".local/share/k3d-manager/agy-usage/repo-cache.json"
+    assert home.is_relative_to(tmp_path) and cache_file.is_relative_to(tmp_path)
+
+    blob1 = build_agy_protobuf_blob([{"repo": "wilddog64/repo-size-1"}])
+    db_path = write_agy_conversation_db(home, "sess-size", blob1)
+    write_agy_transcript(brain, "sess-size", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10}], now)
+
+    out1 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-size-1"} 1' in out1
+
+    st_before = db_path.stat()
+
+    large_folder = "file:///path/" + ("p" * 8000)
+    blob2 = build_agy_protobuf_blob([{"repo": "wilddog64/repo-size-2", "folder": large_folder}])
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("UPDATE trajectory_metadata_blob SET data = ?", (blob2,))
+    conn.commit()
+    conn.close()
+
+    os.utime(db_path, ns=(st_before.st_atime_ns, st_before.st_mtime_ns))
+    st_after = db_path.stat()
+    assert st_after.st_mtime_ns == st_before.st_mtime_ns
+    assert st_after.st_size != st_before.st_size
+
+    out2 = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-size-2"} 1' in out2
+    assert 'repo="repo-size-1"' not in out2
+
+
+def test_agy_n6_cache_corrupt_repo_name_rejected_and_reread(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    cache_file = home / ".local/share/k3d-manager/agy-usage/repo-cache.json"
+    assert home.is_relative_to(tmp_path) and cache_file.is_relative_to(tmp_path)
+
+    blob_bad = build_agy_protobuf_blob([{"repo": "wilddog64/from-db"}])
+    db_bad = write_agy_conversation_db(home, "sess-bad", blob_bad)
+    write_agy_transcript(brain, "sess-bad", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10}], now)
+    st_bad = db_bad.stat()
+
+    blob_good = build_agy_protobuf_blob([{"repo": "wilddog64/not-used"}])
+    db_good = write_agy_conversation_db(home, "sess-good", blob_good)
+    write_agy_transcript(brain, "sess-good", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 10}], now)
+    st_good = db_good.stat()
+
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(json.dumps({
+        "sess-bad": {
+            "repo": 'bad"name',
+            "db_mtime_ns": st_bad.st_mtime_ns,
+            "db_size": st_bad.st_size,
+            "wal_mtime_ns": None,
+            "wal_size": None,
+        },
+        "sess-good": {
+            "repo": "from-cache-valid",
+            "db_mtime_ns": st_good.st_mtime_ns,
+            "db_size": st_good.st_size,
+            "wal_mtime_ns": None,
+            "wal_size": None,
+        },
+    }), encoding="utf-8")
+
+    connect_calls = []
+    real_connect = dispatch_metrics.sqlite3.connect
+
+    def spy_connect(*args, **kwargs):
+        connect_calls.append(args)
+        return real_connect(*args, **kwargs)
+
+    monkeypatch.setattr(dispatch_metrics.sqlite3, "connect", spy_connect)
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+
+    assert 'bad"name' not in output
+    assert 'repo="bad\"name"' not in output
+
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="from-db"} 1' in output
+    assert any("sess-bad.db" in str(c) for c in connect_calls)
+
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="from-cache-valid"} 1' in output
+    assert not any("sess-good.db" in str(c) for c in connect_calls)
 
 
 def test_quota_efficiency_requires_same_reset_and_positive_observed_delta(tmp_path, monkeypatch):
@@ -2533,6 +3072,32 @@ def test_model_identity_exports_worker_and_coordinator_from_latest_start():
     assert len(worker) == 1 and len(coordinator) == 1
     assert 'vendor="openai",model="gpt-5.6-luna",source="explicit",status="selected"' in worker[0]
     assert 'vendor="anthropic",model="claude-opus-5-5",source="runtime",status="runtime_reported"' in coordinator[0]
+
+
+def test_model_identity_names_astra_62_and_sol_62():
+    for model in ("gpt-6.2-astra", "gpt-6.2-sol"):
+        output = dispatch_metrics.render([
+            event(1, "start", "astra", agent="codex", model=model,
+                  worker_identity={"vendor": "openai", "model": model, "source": "explicit", "status": "selected"}),
+            event(2, "codex_exit", "astra", tokens=10),
+            event(3, "land", "astra"),
+        ], 0, 100)
+        worker = _identity_lines(output, "worker")
+        assert len(worker) == 1
+        assert f'model="{model}"' in worker[0]
+
+
+def test_model_identity_still_other_for_unlisted_gpt_model():
+    model = "gpt-6.9-nonexistent"
+    output = dispatch_metrics.render([
+        event(1, "start", "astra", agent="codex", model=model,
+              worker_identity={"vendor": "openai", "model": model, "source": "explicit", "status": "selected"}),
+        event(2, "codex_exit", "astra", tokens=10),
+        event(3, "land", "astra"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1
+    assert 'model="other"' in worker[0]
 
 
 def test_repeated_handoffs_preserve_claude_primary_and_human_landing_stays_review_pending(tmp_path):
@@ -3886,6 +4451,14 @@ def test_claude_cost_prices_fable_at_published_rates_and_preserves_opus():
     assert cost_fable == pytest.approx(0.19625)
 
 
+def test_codex_cost_prices_gpt_6_astra_from_the_real_price_file():
+    price_file = dispatch_metrics._repo_root() / "scripts/etc/agent/codex-model-prices.json"
+    codex_models, _, _, _ = dispatch_metrics._prices(price_file)
+    usage = {"model": "gpt-6-astra", "input": 10_000, "cached_input": 4_000, "output": 1_000}
+    assert dispatch_metrics._cost(usage, codex_models) == pytest.approx(0.114)
+    assert dispatch_metrics._cost({**usage, "model": "gpt-6.2-astra"}, codex_models) is None
+
+
 def test_claude_cost_prices_fable_52_and_preserves_fable_51():
     price_file = dispatch_metrics._repo_root() / "scripts/etc/agent/codex-model-prices.json"
     _, _, _, claude_models = dispatch_metrics._prices(price_file)
@@ -4032,3 +4605,582 @@ def test_dispatch_dashboard_has_unreported_coordinator_share_stat():
     panel = next(panel for panel in dashboard["panels"] if panel.get("title") == "Unreported coordinator share")
     assert panel["type"] == "stat"
     assert panel["targets"][0]["expr"] == 'k3dm_dispatch_coordinator_unreported_share{window="$window"}'
+
+
+def test_push_timeout_defaults_and_env_overrides(tmp_path, monkeypatch):
+    scratch_home = tmp_path / "home"
+    scratch_wt = tmp_path / "worktrees"
+    scratch_home.mkdir(parents=True)
+    scratch_wt.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(scratch_home))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(scratch_wt))
+    assert os.environ["HOME"] == str(scratch_home)
+    assert os.environ["K3DM_WORKTREE_ROOT"] == str(scratch_wt)
+
+    prices_file = tmp_path / "prices.json"
+    prices_file.write_text("{}")
+    (scratch_wt / "ledger.jsonl").write_text("")
+
+    shipper_calls = []
+    real_run = subprocess.run
+
+    def fake_run(cmd, *a, **kw):
+        if any("k3dm-dispatch-logs" in str(arg) for arg in (cmd if isinstance(cmd, (list, tuple)) else [cmd])):
+            shipper_calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    sleep_calls = []
+    monkeypatch.setattr(time, "sleep", lambda s: sleep_calls.append(s))
+
+    captured_timeouts = []
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def fake_urlopen(req, timeout=None):
+        captured_timeouts.append(timeout)
+        return DummyResponse()
+
+    monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", fake_urlopen)
+
+    argv = [
+        "--codex-home", str(tmp_path / "codex"),
+        "--claude-projects", str(tmp_path / "claude-projects"),
+        "--claude-cache", str(tmp_path / "claude-cache.json"),
+        "--prices", str(prices_file),
+    ]
+
+    # No env set -> must be 30 (N3: red today, currently 5)
+    monkeypatch.delenv("K3DM_DISPATCH_PUSH_TIMEOUT", raising=False)
+    monkeypatch.delenv("K3DM_DISPATCH_PUSH_ATTEMPTS", raising=False)
+    monkeypatch.delenv("K3DM_DISPATCH_PUSH_BACKOFF", raising=False)
+    captured_timeouts.clear()
+    assert dispatch_metrics.main(argv) == 0
+    assert captured_timeouts == [30]
+
+    # Valid override
+    monkeypatch.setenv("K3DM_DISPATCH_PUSH_TIMEOUT", "7")
+    captured_timeouts.clear()
+    assert dispatch_metrics.main(argv) == 0
+    assert captured_timeouts == [7]
+
+    # Invalid / out of range timeout values fall back to 30
+    for invalid in ["abc", "0", "-1", "inf", "500", "NaN"]:
+        monkeypatch.setenv("K3DM_DISPATCH_PUSH_TIMEOUT", invalid)
+        captured_timeouts.clear()
+        assert dispatch_metrics.main(argv) == 0
+        assert captured_timeouts == [30]
+
+
+def test_push_retries_and_stubs(tmp_path, monkeypatch, capsys):
+    import http.server
+    import threading
+
+    scratch_home = tmp_path / "home"
+    scratch_wt = tmp_path / "worktrees"
+    scratch_home.mkdir(parents=True)
+    scratch_wt.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(scratch_home))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(scratch_wt))
+    assert os.environ["HOME"] == str(scratch_home)
+    assert os.environ["K3DM_WORKTREE_ROOT"] == str(scratch_wt)
+
+    prices_file = tmp_path / "prices.json"
+    prices_file.write_text("{}")
+    (scratch_wt / "ledger.jsonl").write_text("")
+
+    shipper_calls = []
+    real_run = subprocess.run
+
+    def fake_run(cmd, *a, **kw):
+        if any("k3dm-dispatch-logs" in str(arg) for arg in (cmd if isinstance(cmd, (list, tuple)) else [cmd])):
+            shipper_calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    sleep_calls = []
+    monkeypatch.setattr(time, "sleep", lambda s: sleep_calls.append(s))
+
+    requests_received = []
+    status_sequence = []
+
+    class StubHandler(http.server.BaseHTTPRequestHandler):
+        def do_PUT(self):
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            requests_received.append((self.path, body))
+            code = status_sequence.pop(0) if status_sequence else 200
+            self.send_response(code)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), StubHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    argv = [
+        "--codex-home", str(tmp_path / "codex"),
+        "--claude-projects", str(tmp_path / "claude-projects"),
+        "--claude-cache", str(tmp_path / "claude-cache.json"),
+        "--prices", str(prices_file),
+    ]
+
+    try:
+        monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", f"http://127.0.0.1:{server.server_port}")
+
+        # Case 1 (N2): stub fails once (e.g. 503) then 200 -> exit 0, shipper called once, one failure line
+        status_sequence[:] = [503, 200]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 0
+        assert len(requests_received) == 2
+        assert len(shipper_calls) == 1
+        assert sleep_calls == [5]  # backoff * 1
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 1
+        # M4 check: UTC ISO timestamp, attempt 1/3, HTTP 503
+        assert "(attempt 1/3): HTTP 503" in lines[0]
+        assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z dispatch metrics push failed \(attempt 1/3\): HTTP 503", lines[0])
+
+        # Case 2: all attempts failing -> exit 1, exactly 3 requests, sleeps [5, 10], shipper not called
+        status_sequence[:] = [500, 500, 500]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 1
+        assert len(requests_received) == 3
+        assert len(shipper_calls) == 0
+        assert sleep_calls == [5, 10]
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 3
+        assert "(attempt 1/3): HTTP 500" in lines[0]
+        assert "(attempt 2/3): HTTP 500" in lines[1]
+        assert "(attempt 3/3): HTTP 500" in lines[2]
+
+        # Case 3: HTTP 404 (4xx) -> exactly 1 request, exit 1, shipper not called
+        status_sequence[:] = [404]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 1
+        assert len(requests_received) == 1
+        assert len(shipper_calls) == 0
+        assert sleep_calls == []
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 1
+        assert "(attempt 1/3): HTTP 404" in lines[0]
+
+        # Case 4: env fallbacks for attempts and backoff
+        # attempts: 0, 9, x -> 3
+        for invalid_att in ["0", "9", "x"]:
+            monkeypatch.setenv("K3DM_DISPATCH_PUSH_ATTEMPTS", invalid_att)
+            status_sequence[:] = [500, 500, 500]
+            requests_received.clear()
+            sleep_calls.clear()
+            assert dispatch_metrics.main(argv) == 1
+            assert len(requests_received) == 3
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_ATTEMPTS", raising=False)
+
+        # backoff: -1, 99 -> 5
+        for invalid_bo in ["-1", "99"]:
+            monkeypatch.setenv("K3DM_DISPATCH_PUSH_BACKOFF", invalid_bo)
+            status_sequence[:] = [500, 500, 500]
+            requests_received.clear()
+            sleep_calls.clear()
+            assert dispatch_metrics.main(argv) == 1
+            assert sleep_calls == [5, 10]
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_BACKOFF", raising=False)
+
+        # Positive tests that valid ATTEMPTS and BACKOFF overrides are honoured
+        monkeypatch.setenv("K3DM_DISPATCH_PUSH_ATTEMPTS", "2")
+        monkeypatch.setenv("K3DM_DISPATCH_PUSH_BACKOFF", "3")
+        status_sequence[:] = [500, 500]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 1
+        assert len(requests_received) == 2
+        assert sleep_calls == [3]  # backoff (3) * attempt (1)
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 2
+        assert "(attempt 1/2): HTTP 500" in lines[0]
+        assert "(attempt 2/2): HTTP 500" in lines[1]
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_ATTEMPTS", raising=False)
+        monkeypatch.delenv("K3DM_DISPATCH_PUSH_BACKOFF", raising=False)
+
+        # Case 5: urlopen raises ConnectionResetError / URLError -> retries, logs exception text
+        real_urlopen = dispatch_metrics.urllib.request.urlopen
+        conn_err_attempts = [0]
+
+        def flaky_urlopen(req, timeout=None):
+            conn_err_attempts[0] += 1
+            if conn_err_attempts[0] == 1:
+                raise dispatch_metrics.urllib.error.URLError(ConnectionResetError(104, "Connection reset by peer"))
+            return real_urlopen(req, timeout=timeout)
+
+        monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", flaky_urlopen)
+        status_sequence[:] = [200]
+        requests_received.clear()
+        shipper_calls.clear()
+        sleep_calls.clear()
+        capsys.readouterr()
+
+        rc = dispatch_metrics.main(argv)
+        assert rc == 0
+        assert conn_err_attempts[0] == 2
+        assert len(requests_received) == 1
+        assert len(shipper_calls) == 1
+        assert sleep_calls == [5]
+        out = capsys.readouterr().out
+        lines = [line for line in out.splitlines() if "dispatch metrics push failed" in line]
+        assert len(lines) == 1
+        assert "(attempt 1/3):" in lines[0]
+        assert "Connection reset by peer" in lines[0]
+        monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", real_urlopen)
+
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+def test_bug_2026_11_20_E1_case_a_one_file_codex_then_premium_null(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-a.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-a", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_b_two_files_codex_older_premium_newer(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    file_a = folder / "rollout-case-b-a.jsonl"
+    file_b = folder / "rollout-case-b-b.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    file_a.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-ba", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+    ]) + "\n")
+    file_b.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-bb", "timestamp": datetime.fromtimestamp(now - 25, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert file_a.is_file() and file_b.is_file()
+    assert (home / "sessions") in file_a.parents and (home / "sessions") in file_b.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_c_positive_control_codex_only(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-c.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-c", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_d_premium_with_numeric_limits_ignored(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-d.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": {"used_percent": 5.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 5.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-d", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    assert "0.05" not in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_e_no_limit_id_exported_as_before(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-e.jsonl"
+    record_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    no_limit_id_record = {
+        "primary": {"used_percent": 30.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 40.0, "window_minutes": 10080, "resets_at": now + 10080},
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-e", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": record_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": no_limit_id_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.3' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
+    expected_stamp = dispatch_metrics._timestamp(record_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E2_quota_observations_written_for_codex_record(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-e2.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    premium_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    premium_record = {
+        "limit_id": "premium", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-e2", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": premium_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": premium_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+
+    obs_file = tmp_path / "state" / "codex-quota-observations.jsonl"
+    assert obs_file.is_file()
+    rows = [json.loads(line) for line in obs_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert any(r.get("timestamp") == expected_stamp and r.get("used_percent") == 100.0 for r in rows)
+
+
+def test_bug_2026_11_20_E1_case_f_codex_then_newer_codex_with_null_limits(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-f.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    null_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    null_codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-f", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": null_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": null_codex_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output
+
+
+def test_bug_2026_11_20_E1_case_g_codex_then_newer_no_limit_id_with_null_limits(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    now = int(time.time())
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    session_file = folder / "rollout-case-g.jsonl"
+    codex_ts = datetime.fromtimestamp(now - 20, timezone.utc).isoformat()
+    null_ts = datetime.fromtimestamp(now - 10, timezone.utc).isoformat()
+    codex_record = {
+        "limit_id": "codex", "limit_name": None,
+        "primary": {"used_percent": 82.0, "window_minutes": 300, "resets_at": now + 300},
+        "secondary": {"used_percent": 100.0, "window_minutes": 10080, "resets_at": now + 10080},
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    null_no_id_record = {
+        "primary": None, "secondary": None,
+        "credits": {"has_credits": False, "unlimited": False, "balance": "0E-10"},
+        "individual_limit": None, "spend_control_reached": None, "plan_type": "plus", "rate_limit_reached_type": None,
+    }
+    session_file.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid-g", "timestamp": datetime.fromtimestamp(now - 30, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": codex_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": codex_record}}),
+        json.dumps({"type": "event_msg", "timestamp": null_ts, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": null_no_id_record}}),
+    ]) + "\n")
+
+    assert session_file.is_file()
+    assert (home / "sessions") in session_file.parents
+    assert dispatch_metrics._root().is_relative_to(tmp_path)
+
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.82' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 1.0' in output
+    expected_stamp = dispatch_metrics._timestamp(codex_ts)
+    assert f"k3dm_codex_quota_sample_timestamp_seconds {expected_stamp}" in output

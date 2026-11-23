@@ -165,6 +165,36 @@ foundation_vcluster_managed_binary() {
   printf '%s/lib-foundation/vcluster/0.20.0/vcluster\n' "${XDG_DATA_HOME}"
 }
 
+vcluster_lock_stub_fixture() {
+  local real
+  real="$(command -v mkdir)"
+  mkdir "${BATS_TEST_TMPDIR}/bin"
+  cat > "${BATS_TEST_TMPDIR}/bin/mkdir" <<EOF
+#!/bin/sh
+# mimics uutils coreutils 0.10.0 mkdir losing a race (ubuntu:26.04, 2026-11-18): exits 0 when the directory already exists
+for a in "\$@"; do last="\$a"; done; [ -d "\$last" ] && exit 0; exec "$real" "\$@"
+EOF
+  printf '#!/bin/sh\nexit 0\n' > "${BATS_TEST_TMPDIR}/bin/sleep"
+  chmod +x "${BATS_TEST_TMPDIR}/bin/mkdir" "${BATS_TEST_TMPDIR}/bin/sleep"
+  PATH="${BATS_TEST_TMPDIR}/bin:${PATH}"; export PATH
+  mkdir "${BATS_TEST_TMPDIR}/probe"; mkdir "${BATS_TEST_TMPDIR}/probe"
+}
+
+@test "vcluster lock: a held lock is not taken again even when mkdir succeeds on an existing directory" {
+  vcluster_lock_stub_fixture
+  _foundation_vcluster_lock "${BATS_TEST_TMPDIR}/v.lock"
+  run _foundation_vcluster_lock "${BATS_TEST_TMPDIR}/v.lock"
+  [ "$status" -ne 0 ]
+}
+
+@test "vcluster lock: a released lock can be taken again" {
+  vcluster_lock_stub_fixture
+  _foundation_vcluster_lock "${BATS_TEST_TMPDIR}/v.lock"
+  rm -f -- "${BATS_TEST_TMPDIR}/v.lock"
+  run _foundation_vcluster_lock "${BATS_TEST_TMPDIR}/v.lock"
+  [ "$status" -eq 0 ]
+}
+
 bats_require_minimum_version 1.5.0
 
 secret_store_fixture() {
@@ -691,7 +721,7 @@ EOF
   mv "${VCLUSTER_STUB_BIN}/curl" "${VCLUSTER_STUB_BIN}/curl.real"
   cat > "${VCLUSTER_STUB_BIN}/curl" <<'EOF'
 #!/usr/bin/env bash
-if [[ -d "${XDG_DATA_HOME}/lib-foundation/vcluster/0.20.0.lock" ]]; then echo held >> "${BATS_TEST_TMPDIR}/lock.log"; else echo dropped >> "${BATS_TEST_TMPDIR}/lock.log"; fi
+if [[ -e "${XDG_DATA_HOME}/lib-foundation/vcluster/0.20.0.lock" ]]; then echo held >> "${BATS_TEST_TMPDIR}/lock.log"; else echo dropped >> "${BATS_TEST_TMPDIR}/lock.log"; fi
 exec "${VCLUSTER_STUB_BIN}/curl.real" "$@"
 EOF
   chmod 0755 "${VCLUSTER_STUB_BIN}/curl"

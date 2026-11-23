@@ -872,7 +872,7 @@ function _run_parallel_worker() {
   [[ -n "$base" ]] || base="_"
   key="$base"
   n=1
-  while ! mkdir "${out}/.${key}.lock" 2>/dev/null; do
+  while ! ( set -o noclobber; : >"${out}/.${key}.lock" ) 2>/dev/null; do
     n=$((n + 1)); key="${base}-${n}"
   done
   start="$(date +%s)"
@@ -2169,7 +2169,7 @@ function _foundation_vcluster_checksum() {
 
 function _foundation_vcluster_lock() {
   local lock_dir="$1" attempt=0
-  while ! mkdir -- "${lock_dir}" 2>/dev/null; do
+  while ! ( set -o noclobber; : >"${lock_dir}" ) 2>/dev/null; do
     attempt=$((attempt + 1))
     (( attempt < 120 )) || return 1
     sleep 0.25
@@ -2206,7 +2206,7 @@ function foundation_ensure_vcluster_cli() {
     trap - RETURN
     [[ -z "${temp_dir}" ]] || rm -rf -- "${temp_dir}"
     [[ -z "${staged_binary}" ]] || rm -f -- "${staged_binary}"
-    rmdir -- "${lock_dir}" 2>/dev/null || true
+    rm -f -- "${lock_dir}" 2>/dev/null || true
   }
   _foundation_vcluster_abort() {
     local message="$1"

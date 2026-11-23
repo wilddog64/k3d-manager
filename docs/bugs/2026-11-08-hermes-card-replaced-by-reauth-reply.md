@@ -9,7 +9,7 @@
 **Should have been caught by:** live check
 **Severity:** low — a pending repair card can no longer be approved or denied from Slack; workarounds: wait for Hermes
 to post the repair again, or `bin/k3dm-hermes approve <id>` on the hub
-**Approval:** operator, 2026-11-08 ("approved those two requests")
+**Approval:** operator, 2026-11-08 ("approved those two requests"); E2 intent "24h" → "10-minute" reauth, operator 2026-11-22 (reauth TTL changed in e1972118)
 **Intent approved:** operator, 2026-11-13
 **Intent approval words:** "apporve three intents and you can dispatch them" (vault-unseal, hermes-card amended E1, coordinator-unattributed)
 **Filed:** 2026-11-08
@@ -86,7 +86,7 @@ evidence:
   - id: E2
     proves: [M1]
     kind: live
-    intent: "after the relay is redeployed, the operator lets the 24h reauth lapse (or uses a second approver without one), presses Deny on a k3d-manager card, sees the reauth prompt as a private message while the card and its buttons stay, then runs /hermes-auth and denies the same card"
+    intent: "after the relay is redeployed, the operator lets the 10-minute reauth lapse (or uses a second approver without one), presses Deny on a k3d-manager card, sees the reauth prompt as a private message while the card and its buttons stay, then runs /hermes-auth and denies the same card"
 interface:
   - "workers/slack-relay/index.js default export fetch(req, env, ctx) on POST /slack/interactivity, with the response_url fetch captured"
   - "the approvals KV binding APPROVALS_KV and the APPROVER_ALLOWLIST secret"

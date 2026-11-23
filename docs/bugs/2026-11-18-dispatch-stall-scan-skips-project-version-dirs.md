@@ -5,6 +5,7 @@
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Degraded stall monitoring that skips lower-versioned project directories (`v0.0.x`), requiring manual stall checks for project dispatches.)
 **Waiting on:** operator decision
 **Prior art:** docs/bugs/2026-11-17-stall-watch-ledger-events-lack-project.md (keyword) — read, different root cause (ledger field, not the scan). Exact slug: no match. `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18

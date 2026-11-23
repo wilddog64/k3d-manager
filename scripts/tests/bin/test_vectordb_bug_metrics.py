@@ -19,6 +19,9 @@ from promtool_helper import resolve_promtool  # noqa: E402
 @pytest.fixture
 def metrics(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(tmp_path / "missing-lib-foundation"))
+    registry = tmp_path / "empty-projects.list"
+    registry.write_text("")
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
     module = Path(os.environ.get("METRICS_MODULE", ROOT / "bin/k3dm-vectordb-metrics"))
     return SimpleNamespace(**runpy.run_path(module))
 
@@ -138,6 +141,28 @@ def test_plan_approval_and_plan_metrics(metrics, tmp_path):
     assert 'release="v1.43.5"' in output and 'execution="ready",verification="n/a"} 1' in output
 
 
+def test_plan_child_specs_fold_out_of_plan_rows(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    docs = {
+        "docs/plans/v1.58.0-umbrella.md": "# Umbrella\n**Status:** PROPOSED\n**Release:** v1.58.0 plan 1 (branch k3d-manager-v1.58.0)\n",
+        "docs/plans/v1.58.0-umbrella-a.md": "# Umbrella A\n**Release:** v1.58.0 plan 1 part A of A/B (umbrella ...)\n",
+        "docs/plans/v1.58.0-umbrella-2b.md": "# Umbrella 2b\n**Release:** v1.58.0 plan 1 part 2b (umbrella ...)\n",
+        "docs/plans/v1.58.0-child-m2.md": "# Child M2\n**Parent plan:** `docs/plans/v1.58.0-other.md`\n",
+        "docs/plans/v1.58.0-other.md": "# Other\n**Release:** v1.58.0 plan 2 (displaced foo, operator)\n",
+        "docs/plans/v1.58.0-partial.md": "# Partner part split\n**Release:** v1.58.0 plan 3 (branch ...)\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = [line for line in output.splitlines() if line.startswith("k3dm_plan_info{")]
+    assert len(rows) == 3
+    assert 'k3dm_plan_child_docs{repo="k3d-manager",release="v1.58.0"} 3' in output
+    assert 'k3dm_plan_info_skipped{repo="k3d-manager"} 0' in output
+    release_doc_counts = [
+        int(m.group(1))
+        for m in re.finditer(r'k3dm_plan_release_docs\{[^}]*release="v1\.58\.0"[^}]*\}\s+(\d+)', output)
+    ]
+    assert sum(release_doc_counts) == 3
+
+
 def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_path):
     assert tmp_path.resolve() != ROOT.resolve()
     docs = {
@@ -212,6 +237,67 @@ def test_plan_operator_go_is_own_label_and_real_blockers_remain(metrics, tmp_pat
     assert 'blocked_by="branch not cut"' in rows["v1.56.0-branch"]
     assert 'blocked_by="v1.55.0-dep not landed"' in rows["v1.55.0-dependency"]
     assert all("needs your dispatch" not in row for row in rows.values())
+
+
+def test_plan_spec_stage_blocks_draft_and_planned(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    root = tmp_path / "scratch-repo"
+    (root / "docs/plans").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.58.0", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"], check=True)
+    (root / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(root), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-qm", "seed"], check=True)
+    docs = {
+        "docs/plans/v1.58.0-draft.md": "# Draft\n**Status:** DRAFT — written\n",
+        "docs/plans/v1.58.0-planned.md": "# Planned\n**Status:** PLANNED — not started\n",
+        "docs/plans/v1.58.0-plan.md": "# Plan\n**Status:** PLAN — not started\n",
+        "docs/plans/v1.58.0-draft-gated.md": "# Draft gated\n**Status:** DRAFT\n**Dispatch:** needed\n",
+        "docs/plans/v1.58.0-proposed.md": "# Proposed\n**Status:** PROPOSED\n",
+        "docs/plans/v1.58.0-spec-written.md": "# Written\n**Status:** SPEC WRITTEN — not implemented\n",
+        "docs/plans/v1.58.0-planned-dispatched.md": "# Dispatched\n**Status:** PLANNED\n",
+    }
+    ledger = root / "ledger.jsonl"
+    ledger.write_text(json.dumps({"ts": 1, "event": "start", "version": "v1.58.0",
+                                  "slug": "planned-worker",
+                                  "spec": "docs/plans/v1.58.0-planned-dispatched.md"}) + "\n")
+    assert ledger.resolve() != Path("~/.local/share/k3d-manager/worktrees/ledger.jsonl").expanduser().resolve()
+    output = metrics._plan_metrics(root, texts=docs, ledger=ledger)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'blocked_by="spec not reviewed"' in rows["v1.58.0-draft"]
+    assert 'blocked_by="spec not written"' in rows["v1.58.0-planned"]
+    assert 'blocked_by="spec not written"' in rows["v1.58.0-plan"]
+    assert 'dispatch_approval="n/a"' in rows["v1.58.0-draft"]
+    assert 'dispatch_approval="n/a"' in rows["v1.58.0-planned"]
+    assert 'dispatch_approval="needed"' in rows["v1.58.0-draft-gated"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-proposed"]
+    assert 'dispatch_approval="unknown"' in rows["v1.58.0-proposed"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-spec-written"]
+    assert 'blocked_by="dispatched"' in rows["v1.58.0-planned-dispatched"]
+    assert all('execution="proposed"' in row for row in rows.values())
+
+
+def test_plan_intent_no_needs_approval_without_filed_date(metrics, tmp_path):
+    assert tmp_path.resolve() != ROOT.resolve()
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.58.0", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
+    (tmp_path / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
+    docs = {
+        "docs/plans/v1.58.0-no.md": "# No\n**Status:** PROPOSED\n**Intent approved:** no — needs operator\n",
+        "docs/plans/v1.58.0-yes.md": "# Yes\n**Status:** PROPOSED\n**Intent approved:** operator, 2026-11-18\n",
+        "docs/plans/v1.58.0-neither.md": "# Neither\n**Status:** PROPOSED\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'intents need approval' in rows["v1.58.0-no"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-yes"]
+    assert 'blocked_by="ready on your go"' in rows["v1.58.0-neither"]
 
 
 @pytest.mark.parametrize("exit_code", [None, 0, 1])
@@ -1802,8 +1888,8 @@ def test_missing_dispatch_header_reads_as_a_pending_decision_only_before_dispatc
     subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
     docs = {
-        "docs/plans/v1.54.0-waiting.md": "# Waiting\n**Status:** PLANNED\n**Approval:** approved\n",
-        "docs/plans/v1.54.0-gated.md": "# Gated\n**Status:** PLANNED\n**Dispatch:** needed\n",
+        "docs/plans/v1.54.0-waiting.md": "# Waiting\n**Status:** PROPOSED\n**Approval:** approved\n",
+        "docs/plans/v1.54.0-gated.md": "# Gated\n**Status:** PROPOSED\n**Dispatch:** needed\n",
         "docs/plans/v1.54.0-landed.md": "# Landed\n**Status:** LANDED\n**Approval:** approved\n",
         "docs/plans/v1.54.0-dropped.md": "# Dropped\n**Status:** DROPPED\n",
         "docs/plans/v1.54.0-superseded.md": "# Superseded\n**Status:** SUPERSEDED\n",
@@ -1828,3 +1914,419 @@ def test_plan_dispatch_ledger_path_follows_worktree_root(metrics, tmp_path, monk
     assert metrics._dispatch_ledger_path() == tmp_path / "worktrees" / "ledger.jsonl"
     monkeypatch.delenv("K3DM_WORKTREE_ROOT")
     assert metrics._dispatch_ledger_path() == Path("~/.local/share/k3d-manager/worktrees/ledger.jsonl").expanduser()
+
+
+def _project_clone(tmp_path, name="sample", docs=None):
+    origin = tmp_path / f"{name}-origin.git"
+    clone = tmp_path / name
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    clone.mkdir()
+    _git_repo(clone, docs or {"open.md": "# open\n\n**Priority:** P1\n**Status:** OPEN\n"})
+    subprocess.run(["git", "remote", "add", "origin", str(origin)], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+    subprocess.run(["git", "fetch", "-q", "origin", "main"], cwd=clone, check=True)
+    return clone, origin
+
+
+def _stub_push(metrics, monkeypatch):
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+    requests = []
+    monkeypatch.setattr(metrics.urllib.request, "urlopen",
+                        lambda request, **_kwargs: requests.append(request) or Response())
+    monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
+    return requests
+
+
+def test_project_legacy_rows(metrics, monkeypatch, tmp_path):
+    docs = tmp_path / "manager"
+    _git_repo(docs, {"one.md": "# one\n**Priority:** P2\n**Status:** OPEN\n"})
+    # Move fixture docs into the intended legacy location and commit both directories.
+    (docs / "docs/bugs/one.md").unlink()
+    (docs / "docs/dirused/bugs").mkdir(parents=True)
+    (docs / "docs/bugs/different.md").write_text("# other\n**Priority:** P1\n**Status:** OPEN\n")
+    (docs / "docs/dirused/bugs/one.md").write_text("# one\n**Priority:** P2\n**Status:** OPEN\n")
+    subprocess.run(["git", "add", "docs"], cwd=docs, check=True)
+    subprocess.run(["git", "commit", "-qm", "legacy docs"], cwd=docs, check=True)
+    clone, _origin = _project_clone(tmp_path, docs={"seed.md": "# seed\n**Status:** OPEN\n"})
+    (clone / "docs/bugs/seed.md").unlink()
+    (clone / "docs/bugs").rmdir()
+    subprocess.run(["git", "add", "-A", "docs/bugs"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "remove in-repo bugs"], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+    assert docs.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    registry = tmp_path / "projects.list"
+    registry.write_text(f"dirused|{clone}|wilddog64/dirused|tag|main\n")
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    requests = _stub_push(metrics, monkeypatch)
+    metrics._publish_registry_bugs(docs)
+    pushed = {r.full_url.split("/metrics/job/")[1]: r.data.decode() for r in requests if getattr(r, "data", None)}
+    assert "k3dm-bug-docs/instance/dirused" in pushed
+    assert 'k3dm_bug_docs{repo="dirused",priority="P2",state="open"} 1' in pushed["k3dm-bug-docs/instance/dirused"]
+    assert 'repo="dirused"' in pushed["k3dm-bug-open/instance/dirused"]
+    assert "k3dm-bug-releases/instance/dirused" not in pushed
+
+
+def test_project_legacy_open_history(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "docsroot"
+    assert root.is_relative_to(tmp_path)
+    _git_repo(root, {"base.md": "# base\n**Status:** OPEN\n"})
+    seed_env = {**os.environ, "GIT_AUTHOR_DATE": "2026-11-17T12:00:00+00:00",
+                "GIT_COMMITTER_DATE": "2026-11-17T12:00:00+00:00"}
+    subprocess.run(["git", "commit", "--amend", "--no-edit", "--date", seed_env["GIT_AUTHOR_DATE"]],
+                   cwd=root, env=seed_env, check=True, capture_output=True)
+    legacy = root / "docs/dirused/bugs"
+    legacy.mkdir(parents=True, exist_ok=True)
+    (legacy / "one.md").write_text("# one\n**Priority:** P2\n**Status:** OPEN\n")
+    other = root / "docs/bugs"
+    other.mkdir(parents=True, exist_ok=True)
+    (other / "x.md").write_text("# x\n**Priority:** P1\n**Status:** OPEN\n")
+    subprocess.run(["git", "add", "docs"], cwd=root, check=True)
+    legacy_env = {**os.environ, "GIT_AUTHOR_DATE": "2026-11-18T12:00:00+00:00",
+                  "GIT_COMMITTER_DATE": "2026-11-18T12:00:00+00:00"}
+    subprocess.run(["git", "commit", "-qm", "add legacy"], cwd=root, env=legacy_env, check=True)
+    clone, _origin = _project_clone(tmp_path, docs={"seed.md": "# seed\n**Status:** OPEN\n"})
+    (clone / "docs/bugs/seed.md").unlink()
+    (clone / "docs/bugs").rmdir()
+    subprocess.run(["git", "add", "-A", "docs/bugs"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "remove in-repo bugs"], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+    registry = tmp_path / "projects.list"
+    registry.write_text(f"dirused|{clone}|wilddog64/dirused|tag|main\n")
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    requests = _stub_push(metrics, monkeypatch)
+    metrics._publish_registry_bugs(root, "HEAD")
+    history = next(r.data.decode() for r in requests
+                   if getattr(r, "data", None) and "/k3dm-bug-open-history/instance/dirused" in r.full_url)
+    assert 'priority="P2",date="2026-11-17"} 0' in history
+    assert 'priority="P2",date="2026-11-18"} 1' in history
+    assert 'priority="P1",date="2026-11-18"} 0' in history
+
+
+def test_project_missing_clone(metrics, monkeypatch, tmp_path, capsys):
+    requests = _stub_push(metrics, monkeypatch)
+    registry = tmp_path / "projects.list"
+    registry.write_text(f"absent|{tmp_path / 'missing'}|x/y|tag|main\n")
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    metrics._publish_registry_bugs(tmp_path)
+    assert not any("/metrics/job/" in r.full_url and "/instance/absent" in r.full_url
+                   for r in requests)
+    assert capsys.readouterr().err.count("project absent bug metrics skipped (missing clone)") == 1
+
+
+@pytest.mark.parametrize("registry_text", [
+    "bad|x|a/b|tag\n",
+    "bad name|x|a/b|tag|main\n",
+    "bad||a/b|tag|main\n",
+    "bad|x|a/b|tag|-main\n",
+    "bad|x|a/b|tag|main\nbad|y|a/b|tag|main\n",
+])
+def test_project_bad_registry(metrics, monkeypatch, tmp_path, capsys, registry_text):
+    registry = tmp_path / "projects.list"
+    registry.write_text(registry_text)
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    requests = _stub_push(metrics, monkeypatch)
+    metrics._publish_registry_bugs(tmp_path)
+    assert not any("/metrics/job/" in r.full_url and "/instance/bad" in r.full_url
+                   for r in requests)
+    assert capsys.readouterr().err.count("project bug metrics registry skipped") == 1
+
+
+def _manager_root(tmp_path):
+    root = tmp_path / "manager"
+    _git_repo(root, {"decoy.md": "# decoy\n**Status:** OPEN\n"})
+    return root
+
+
+def _registry_for(tmp_path, clone, name="sample"):
+    registry = tmp_path / f"{name}-projects.list"
+    registry.write_text(f"{name}|{clone}|wilddog64/{name}|tag|main\n")
+    return registry
+
+
+def _published(metrics, monkeypatch, root, clone, tmp_path, name="sample", ref=None):
+    registry = _registry_for(tmp_path, clone, name)
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    requests = _stub_push(metrics, monkeypatch)
+    metrics._publish_registry_bugs(root, ref)
+    return {r.full_url.split("/metrics/job/")[1]: r.data.decode()
+            for r in requests if getattr(r, "data", None)}
+
+
+def _live_bug(fix, evidence, status="LIVE-VERIFIED"):
+    return ("# fixed\n**Priority:** P1\n**Filed:** 2026-11-01\n**Status:** " + status +
+            "\n**Fix commit:** " + fix +
+            "\n**Live evidence:** 2026-11-17 · run 1 · env fixture · scenario check · commit " +
+            evidence + " · proves E2\n")
+
+
+def _set_clone_docs(clone, docs):
+    bug_dir = clone / "docs/bugs"
+    bug_dir.mkdir(parents=True, exist_ok=True)
+    for path in bug_dir.glob("*.md"):
+        path.unlink()
+    for name, body in docs.items():
+        (bug_dir / name).write_text(body)
+    subprocess.run(["git", "add", "docs/bugs"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "bug docs"], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+
+
+def _ancestry_fixture(tmp_path):
+    clone, _origin = _project_clone(tmp_path, docs={"seed.md": "# seed\n"})
+    seed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=clone, check=True,
+                          capture_output=True, text=True).stdout.strip()
+    subprocess.run(["git", "commit", "--allow-empty", "-qm", "fix"], cwd=clone, check=True)
+    fix = subprocess.run(["git", "rev-parse", "HEAD"], cwd=clone, check=True,
+                         capture_output=True, text=True).stdout.strip()
+    (clone / "proof-ok").write_text("proof\n")
+    subprocess.run(["git", "add", "proof-ok"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "proof after fix"], cwd=clone, check=True)
+    evidence_ok = subprocess.run(["git", "rev-parse", "HEAD"], cwd=clone, check=True,
+                                 capture_output=True, text=True).stdout.strip()
+    subprocess.run(["git", "checkout", "-q", "-b", "without-fix", seed], cwd=clone, check=True)
+    (clone / "proof-stale").write_text("proof\n")
+    subprocess.run(["git", "add", "proof-stale"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "proof without fix"], cwd=clone, check=True)
+    evidence_stale = subprocess.run(["git", "rev-parse", "HEAD"], cwd=clone, check=True,
+                                    capture_output=True, text=True).stdout.strip()
+    subprocess.run(["git", "checkout", "-q", "main"], cwd=clone, check=True)
+    _set_clone_docs(clone, {"ok.md": _live_bug(fix, evidence_ok),
+                            "stale.md": _live_bug(fix, evidence_stale)})
+    return clone, fix, evidence_ok, evidence_stale
+
+
+def test_project_ancestry_ok_and_stale(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    clone, fix, evidence_ok, evidence_stale = _ancestry_fixture(tmp_path)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    assert not subprocess.run(["git", "-C", str(root), "cat-file", "-e", fix], check=False).returncode == 0
+    pushes = _published(metrics, monkeypatch, root, clone, tmp_path)
+    rows = pushes["k3dm-bug-open/instance/sample"].splitlines()
+    found = {re.search(r'bug="([^"]+)"', line).group(1): line for line in rows
+             if line.startswith("k3dm_bug_info{")}
+    assert evidence_ok not in str(root) and evidence_stale not in str(root)
+    assert 'live_evidence="ok"' in found["ok"]
+    assert 'live_evidence="stale"' in found["stale"]
+
+
+def test_project_legacy_ancestry_ok_and_stale(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    clone, fix, evidence_ok, evidence_stale = _ancestry_fixture(tmp_path)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    subprocess.run(["git", "rm", "-rq", "docs/bugs"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "move bug docs out of project repo"], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+    legacy = root / "docs/sample/bugs"
+    legacy.mkdir(parents=True)
+    (legacy / "ok.md").write_text(_live_bug(fix, evidence_ok))
+    (legacy / "stale.md").write_text(_live_bug(fix, evidence_stale))
+    subprocess.run(["git", "add", "docs/sample"], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "add legacy project bugs"], cwd=root, check=True)
+    assert subprocess.run(["git", "-C", str(root), "cat-file", "-e", fix], check=False).returncode != 0
+    assert subprocess.run(["git", "-C", str(root), "cat-file", "-e", evidence_ok], check=False).returncode != 0
+    assert subprocess.run(["git", "-C", str(root), "cat-file", "-e", evidence_stale], check=False).returncode != 0
+    pushes = _published(metrics, monkeypatch, root, clone, tmp_path, ref="HEAD")
+    assert "k3dm-bug-releases/instance/sample" not in pushes
+    rows = pushes["k3dm-bug-open/instance/sample"].splitlines()
+    found = {re.search(r'bug="([^"]+)"', line).group(1): line for line in rows
+             if line.startswith("k3dm_bug_info{")}
+    assert 'live_evidence="ok"' in found["ok"]
+    assert 'live_evidence="stale"' in found["stale"]
+
+
+def _verification_docs():
+    return {
+        "verified.md": "# verified\n**Priority:** P1\n**Filed:** 2026-11-01\n**Status:** VERIFIED\n",
+        "live.md": _live_bug("abcdef1234567", "0123456789abc", "LIVE-VERIFIED"),
+        "landed.md": "# landed\n**Priority:** P1\n**Filed:** 2026-11-01\n**Status:** LANDED\n",
+    }
+
+
+def test_project_verified_values(metrics, monkeypatch, tmp_path):
+    expected = {"verified": ('verified="true"', 'live_verified="false"'),
+                "live": ('verified="true"', 'live_verified="true"'),
+                "landed": ('verified="false"', 'live_verified="false"')}
+    for mode in ("legacy", "in-repo"):
+        case = tmp_path / mode
+        case.mkdir()
+        root = _manager_root(case)
+        clone, _origin = _project_clone(case, name="sample", docs=_verification_docs())
+        if mode == "in-repo":
+            subprocess.run(["git", "tag", "v0.0.1"], cwd=clone, check=True)
+            subprocess.run(["git", "push", "-q", "origin", "--tags"], cwd=clone, check=True)
+        else:
+            (clone / "docs/bugs").rename(clone / "docs/old-bugs")
+            subprocess.run(["git", "add", "-A", "docs"], cwd=clone, check=True)
+            subprocess.run(["git", "commit", "-qm", "move bugs out of repo"], cwd=clone, check=True)
+            subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+            legacy = root / "docs/sample/bugs"
+            legacy.mkdir(parents=True)
+            for name, body in _verification_docs().items():
+                (legacy / name).write_text(body)
+            subprocess.run(["git", "add", "docs/sample"], cwd=root, check=True)
+            legacy_env = {**os.environ, "GIT_AUTHOR_DATE": "2027-01-15T00:00:00+00:00",
+                          "GIT_COMMITTER_DATE": "2027-01-15T00:00:00+00:00"}
+            subprocess.run(["git", "commit", "-qm", "legacy project bugs"], cwd=root,
+                           env=legacy_env, check=True)
+        assert case.is_relative_to(tmp_path) and root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+        pushes = _published(metrics, monkeypatch, root, clone, case, ref="HEAD")
+        rows = [line for line in pushes["k3dm-bug-open/instance/sample"].splitlines()
+                if line.startswith("k3dm_bug_info{")]
+        for key, labels in expected.items():
+            row = next(line for line in rows if f'bug="{key}"' in line)
+            assert labels[0] in row and labels[1] in row
+            assert not row.endswith(" -2") and not row.endswith(" n/a")
+            assert int(row.rsplit(" ", 1)[1]) >= 0
+            assert ('release="unassigned"' if mode == "legacy" else 'release="v0.0.1"') in row
+
+
+def test_project_in_repo_release(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    clone, _origin = _project_clone(tmp_path, docs={"release.md": "# release\n**Priority:** P2\n**Status:** OPEN\n"})
+    subprocess.run(["git", "tag", "v0.0.1"], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "--tags"], cwd=clone, check=True)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    pushes = _published(metrics, monkeypatch, root, clone, tmp_path)
+    assert 'bug="release",' in pushes["k3dm-bug-open/instance/sample"]
+    assert 'release="v0.0.1"' in pushes["k3dm-bug-open/instance/sample"]
+    assert "k3dm-bug-releases/instance/sample" in pushes
+
+
+def test_project_in_repo_late_tag(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    clone, origin = _project_clone(tmp_path, docs={"late.md": "# late\n**Priority:** P2\n**Status:** OPEN\n"})
+    subprocess.run(["git", "config", "remote.origin.tagOpt", "--no-tags"], cwd=clone, check=True)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path) and origin.is_relative_to(tmp_path)
+    first = _published(metrics, monkeypatch, root, clone, tmp_path)
+    assert 'release="v0.0.9"' not in first["k3dm-bug-open/instance/sample"]
+    subprocess.run(["git", "--git-dir", str(origin), "tag", "v0.0.9", "refs/heads/main"], check=True)
+    second = _published(metrics, monkeypatch, root, clone, tmp_path)
+    assert 'release="v0.0.9"' in second["k3dm-bug-open/instance/sample"]
+
+
+def test_project_fetch_timestamp(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    clone, _origin = _project_clone(tmp_path)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    pushes = _published(metrics, monkeypatch, root, clone, tmp_path)
+    assert "k3dm_project_clone_fetch_timestamp_seconds{repo=\"sample\"}" in pushes["k3dm-bug-docs/instance/sample"]
+    real_run = metrics.subprocess.run
+    def fail_fetch(args, **kwargs):
+        if len(args) > 4 and args[0:2] == ["git", "-C"] and args[3] == "fetch":
+            return subprocess.CompletedProcess(args, 1, "", "fetch refused")
+        return real_run(args, **kwargs)
+    monkeypatch.setattr(metrics.subprocess, "run", fail_fetch)
+    failed = _published(metrics, monkeypatch, root, clone, tmp_path)
+    assert "k3dm_project_clone_fetch_timestamp_seconds" not in failed["k3dm-bug-docs/instance/sample"]
+
+
+def test_project_scan_timestamp(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    clone, _origin = _project_clone(tmp_path)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    pushes = _published(metrics, monkeypatch, root, clone, tmp_path)
+    assert "k3dm_project_bug_scan_timestamp_seconds{repo=\"sample\"}" in pushes["k3dm-bug-docs/instance/sample"]
+
+
+def test_project_failed_fetch(metrics, monkeypatch, tmp_path, capsys):
+    root = _manager_root(tmp_path)
+    clone, _origin = _project_clone(tmp_path)
+    assert root.is_relative_to(tmp_path) and clone.is_relative_to(tmp_path)
+    real_run = metrics.subprocess.run
+    def fail_fetch(args, **kwargs):
+        if len(args) > 4 and args[0:2] == ["git", "-C"] and args[3] == "fetch":
+            return subprocess.CompletedProcess(args, 1, "", "fetch refused")
+        return real_run(args, **kwargs)
+    monkeypatch.setattr(metrics.subprocess, "run", fail_fetch)
+    pushes = _published(metrics, monkeypatch, root, clone, tmp_path)
+    stderr = capsys.readouterr().err
+    assert stderr.count("project sample bug fetch failed") == 1
+    assert 'bug="open"' in pushes["k3dm-bug-open/instance/sample"]
+
+
+def test_project_exception_isolated(metrics, monkeypatch, tmp_path, capsys):
+    root = _manager_root(tmp_path)
+    bad, _ = _project_clone(tmp_path, name="first")
+    good, _ = _project_clone(tmp_path, name="second")
+    assert root.is_relative_to(tmp_path) and bad.is_relative_to(tmp_path) and good.is_relative_to(tmp_path)
+    registry = tmp_path / "projects.list"
+    registry.write_text(f"first|{bad}|x/first|tag|main\nsecond|{good}|x/second|tag|main\n")
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    real_texts = metrics._bug_texts
+    def raise_for_first(root_arg, *args, **kwargs):
+        if Path(root_arg) == bad:
+            raise RuntimeError("fixture project failure")
+        return real_texts(root_arg, *args, **kwargs)
+    monkeypatch.setitem(metrics._publish_registry_bugs.__globals__, "_bug_texts", raise_for_first)
+    requests = _stub_push(metrics, monkeypatch)
+    metrics._publish_registry_bugs(root)
+    keys = [r.full_url for r in requests if getattr(r, "data", None)]
+    assert not any("instance/first" in key for key in keys), keys
+    assert any("instance/second" in key for key in keys)
+    assert capsys.readouterr().err.count("project first bug metrics skipped") == 1
+
+
+def test_project_no_change_to_existing_payloads(metrics, monkeypatch, tmp_path):
+    manager = tmp_path / "main-manager"
+    assert manager.is_relative_to(tmp_path)
+    _git_repo(manager, {"manager-open.md": "# manager open\n**Priority:** P2\n**Status:** OPEN\n"})
+    lib_root = tmp_path / "main-lib-foundation"
+    lib_root.mkdir()
+    lib_clone = _lib_foundation(lib_root)
+    project, _origin = _project_clone(tmp_path, name="registered")
+    empty_registry = tmp_path / "empty-projects.list"
+    empty_registry.write_text("")
+    populated_registry = _registry_for(tmp_path, project, "registered")
+    globals_ = metrics.main.__globals__
+    km_tally = {"releases": {"v1.43.0": _bucket()}, "fixed_in": {}}
+    def fixture_tally(_root, _ref=None, full=False, repo="k3d-manager", repo_dir=None):
+        payload = km_tally
+        return payload if full else payload["releases"]
+    monkeypatch.setitem(globals_, "ROOT", manager)
+    monkeypatch.setitem(globals_, "_status", lambda: {})
+    monkeypatch.setitem(globals_, "publish", lambda *_args: True)
+    monkeypatch.setitem(globals_, "_tally", fixture_tally)
+    monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(lib_clone))
+    def run_main(registry_path):
+        monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry_path))
+        requests = _stub_push(metrics, monkeypatch)
+        assert metrics.main() == 0
+        return {r.full_url.split("/metrics/job/")[1]: r.data.decode()
+                for r in requests if getattr(r, "data", None)}
+    empty_pushes = run_main(empty_registry)
+    project_pushes = run_main(populated_registry)
+    def existing(payloads):
+        return {job: re.sub(r"(?m)^.*(?:_scan_timestamp_seconds).*$\n?", "", body)
+                for job, body in payloads.items()
+                if job in ("k3dm-bug-docs", "k3dm-bug-open", "k3dm-bug-releases",
+                           "k3dm-bug-open-history/instance/k3d-manager",
+                           "k3dm-bug-docs/instance/lib-foundation",
+                           "k3dm-bug-open/instance/lib-foundation",
+                           "k3dm-bug-releases/instance/lib-foundation",
+                           "k3dm-bug-open-history/instance/lib-foundation")}
+    assert existing(empty_pushes) == existing(project_pushes)
+    assert not any("/instance/registered" in job for job in empty_pushes)
+    assert any("/instance/registered" in job for job in project_pushes)
+    changed = dict(existing(empty_pushes))
+    changed["k3dm-bug-docs"] += "positive-control 1\n"
+    assert changed != existing(empty_pushes)
+
+
+def test_publish_bug_metrics_never_reads_registry(metrics, monkeypatch, tmp_path):
+    root = _manager_root(tmp_path)
+    registry = tmp_path / "projects.list"
+    registry.write_text("sentinel registry content\n")
+    monkeypatch.setenv("K3DM_PROJECTS_LIST", str(registry))
+    original_open = Path.open
+    def checked_open(path, *args, **kwargs):
+        assert Path(path) != registry
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "open", checked_open)
+    globals_ = metrics.publish_bug_metrics.__globals__
+    monkeypatch.setitem(globals_, "_push_bug_group", lambda *_args, **_kwargs: True)
+    monkeypatch.setitem(globals_, "_tally", lambda *_args, **_kwargs: {"releases": {}, "fixed_in": {}})
+    monkeypatch.setitem(globals_, "_publish_lib_foundation_bugs", lambda: None)
+    metrics.publish_bug_metrics(root)

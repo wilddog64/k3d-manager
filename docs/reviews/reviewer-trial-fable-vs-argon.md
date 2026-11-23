@@ -189,3 +189,102 @@ Same diff (`main...k3d-manager-v1.44.2`, code only). Argon: one agy run, 9 findi
 **Pair 5 read:** Argon found the one secret-exposure bug; Fable found the one functional break in the DR path that Argon and
 CI both missed, plus more behaviour defects, at about 6% of the Fable weekly allowance. Fable's edge again came from running
 probes (real `_kubectl`, scratch dispatch roots) instead of reading. Supports Argon-first plus Fable on high-risk release diffs.
+
+## Pair 6 — 2026-11-18, release diff review: lib-foundation PR #89 (v0.5.7), Argon, Astra and Fable, all blind
+
+Same brief (`docs/plans/release-lib-foundation-pr89-v0.5.7-review.md`) and diff (`f8025a2..5492724 -- scripts`). Argon: agy
+`gemini-4-argon-medium`. Astra: codex `gpt-6.2-astra`, first trial (253,880 input of which 226,816 cached, 1,291 output).
+Fable: Agent subagent, 67,675 tokens, 102 s. Claude checked every finding against the code.
+
+| Reviewer | Findings | New in diff and real | New, not reproduced | Pre-existing real | Already accepted |
+|---|---|---|---|---|---|
+| Argon | 2 | 0 | 0 | 1 (RETURN-only trap) | 1 (old dir lock) |
+| Astra | 7 | 1 (noclobber accepts symlink->/dev/null; rated high, really low) | 0 | 6 | 0 |
+| Fable | 5 | 1 (same bug, both lock sites, rated low) | 1 (test `sort` locale; same order in C, C.UTF-8, en_US on macOS and ubuntu:26.04) | 3 (incl. unbounded claim loop, reproduced) | 0 |
+
+Claude reproduced the symlink bug (two claims rc 0 on bash 3.2 and 5; old `mkdir` rc 1). Pre-existing findings captured as
+two P3s (`docs/bugs/2026-11-18-lib-foundation-*`).
+
+**Pair 6 read:** Fable most accurate (correct severity, stated what it did not run); Astra matched Fable on the one new bug and
+read widest, but inflated severity and did not state its limits; Argon found nothing new. Operator verdict: "Fable is still
+the best of among three but Astra is also worth a try for second eye. Google's Gemini 4 is the weakest one." Medium/high-risk
+spec review switched to Fable + Astra (operator go 2026-11-18). Low-risk specs and routine diff review stay on Argon.
+
+## Pair 7 — 2026-11-18, spec review: multi-project M2 bug metrics, Argon and Fable, blind
+
+Operator picked Argon + Fable for this one. Same brief, same spec (`docs/plans/v1.45.0-multi-project-m2-bug-metrics.md` at
+`cb192a0a`). Fable: Agent subagent, 135,091 tokens, 336 s, 12 findings. Argon: agy `gemini-4-argon-medium`, 7 findings (first
+run lost to an agy flag-order error, re-run). Both "ready with changes".
+
+| Reviewer | Findings | Real, unique | Real, shared | Refuted / not adopted |
+|---|---|---|---|---|
+| Argon | 7 | 2 (fetch misses late tags, reproduced; empty `local path` → k3d-manager root) | 4 | 1 design choice (call site inside `publish_bug_metrics`) |
+| Fable | 12 | 7 (120 s Hermes kill, entry point/interface, must_not reds need mutants, verified/live_verified gap, `evidence_check=` reuse, branch label, naming) | 4 | 0 |
+
+Shared: FETCH_HEAD mtime advances on a failed fetch (both reproduced), legacy open-history counts k3d-manager docs, shared
+fixture must blank `K3DM_PROJECTS_LIST`, two dirused live-evidence lines unparseable.
+
+**Pair 7 read:** Fable again broader and better at testability and process gaps; Argon's two unique finds were both real
+and one (missing `--tags`) also exposed a pre-existing P3 in the lib-foundation pass. Argon's proofs were concrete
+reproducers this time. Argon worth keeping as the cheap second eye on specs.
+
+## Pair 8 — 2026-11-18, spec review: dispatch stall child C (headless Claude diagnosis), Fable and Astra, blind
+
+First Fable + Astra spec pair under the 2026-11-18 rule. Same brief, same spec (`docs/bugs/2026-11-14-dispatch-stall-c-diagnose.md`
+at `3e908a12`). Fable: Agent subagent, 142,335 tokens, 298 s, 20 tool uses, "ready with changes". Astra: codex `gpt-6.2-astra`
+read-only, 78,474 tokens, "not ready". Claude checked every finding against the code and the 2.1.328 captures.
+
+| Reviewer | Findings | Severity | Real, unique | Real, shared | Refuted |
+|---|---|---|---|---|---|
+| Astra | 14 | 3 blocker, 10 major, 1 minor | 6 (Acceptance YAML does not parse; backticked paths under `## Files` widen dispatch scope; `<run>/spec.md` snapshot must win for external-repo runs; Keychain dynamic readers machine-secrets/setup; model must be a `claude_models` key; path safety: O_NOFOLLOW, dot slugs, symlinked outputs) | 8 | 0 |
+| Fable | 14 | 0 blocker, 7 major, 7 minor | 4 (spend must be bounded before sending because `--max-budget-usd` is checked after the turn; exact argv never captured, closed by E9 $0.0015; redaction-echo test; unsafe evidence filenames) | 8 | 0 |
+
+Shared: E7 control contradicts the exporter (cost series emitted with value 0 without a diagnosis); per-stall lock and FORCE
+withdrawing the old correction; redaction before sending; Acceptance gaps (Slack lines, mode, classifier precedence, env
+exactly the allowlist); must_not controls via mutants; `_dispatch_open` and other ledger readers; citation drift.
+
+**Pair 8 read:** heavy overlap; neither produced a false finding. Astra caught the three mechanical blockers (YAML parse,
+scope gate, snapshot precedence) by running the parsers; Fable caught the money and proof gaps (post-turn cap, uncaptured
+argv). Astra rated severity higher and was cheaper (78K vs 142K). The pair found more together than either alone: keep
+Fable + Astra for medium/high-risk specs.
+
+## Pair 9 — 2026-11-18, spec review: browser SSH console behind Cloudflare Access (v1.45.0 plan 4, critical), Fable and Astra, blind
+
+Same brief, same spec (`docs/plans/v1.45.0-web-console-ssh-behind-cloudflare-access.md` at `00220305`). Fable: Agent subagent, 68,450
+tokens, 458 s, 30 tool uses, "not ready". Astra: codex `gpt-6.2-astra` read-only, 66,185 tokens, "not ready". Claude spot-checked
+the design blockers against the tree (no `## Files` or `## Contract readers`; `bin/cluster-up:1872-1876` re-render; Remote Login in
+`docs/howto/machine-setup.md:62,74`; sibling plan needs hub sshd).
+
+| Reviewer | Findings | Severity | Real, unique | Real, shared | Refuted |
+|---|---|---|---|---|---|
+| Astra | 14 | 9 blocker, 5 major | 2 (operator-only identity boundary: Access policy condition and origin JWT check unspecified; port/listener contract self-contradicts, IPv4-only vs optional IPv6) | 12 | 0 |
+| Fable | 17 | 7 blocker, 7 major, 3 minor | 4 (tmux lock bypasses proven by live scratch probes: reconnect, Ctrl-C, non-zero exit, session switch; console on the hub tunnel causes split-brain and dies with `make down`; intent line passes only because Filed predates the gate; `work` session absent leaves the groups split) | 12 | 0 |
+
+Shared: YAML parse failure; no `## Files`; Remote Login conflict; render/revoke undone by `cluster-up`; no external proof; forwarding
+outside ForceCommand; revoke leaves sessions; machine lists and secrets transfer; root ownership; acceptance gaps; scope split.
+
+**Pair 9 read:** both rejected the spec, with heavy overlap and no false findings. Fable was the stronger reviewer here because it
+proved the lock bypasses empirically instead of arguing them; Astra rated more items as blockers, at similar cost (66K vs 68K).
+Keep Fable + Astra for critical specs.
+
+## Pair 10 — 2026-11-18, spec review: remote promote approval (v1.45.0 plan 1, hub), Fable and Astra, blind
+
+Same brief, same spec (`docs/plans/v1.45.0-remote-promote-approval.md` at `cb3ef345`). Fable: Agent subagent, 162,178 tokens,
+316 s, 16 tool uses, "not ready". Astra: codex `gpt-6.2-astra` read-only, 87,701 tokens, "not ready". Claude checked the
+intent gate (rc 1), `cloud_actions.py` length (52), `not-installed.list:2`, the fetch-then-resolve order (`bin/k3dm-hub-promote:322-323`)
+and the platform-ops archive pattern (`Makefile:1392-1396`).
+
+| Reviewer | Findings | Severity | Real, unique | Real, shared | Refuted |
+|---|---|---|---|---|---|
+| Astra | 15 | 6 blocker, 8 major, 1 minor | 3 (equivalent mutants such as `expires <= now`; no captured commit is green; `--wait-final` and Slack completion readers missing) | 12 | 0 |
+| Fable | 18 | 3 blocker, 7 major, 8 minor | 5 (reinstalls agents the hub deliberately skips; ahead check blocks 2 of the last 14 ordinary promotes, measured from tags; resolve before fetch; intent paragraph silently skips the evidence check; otpauth URI in tmux scrollback) | 12 | 0 |
+
+Shared: same-user forgery; Part 1 reinstalls from a stale checkout; rerun skips launchd; expiry and single use at consume;
+rc 2 walks back; state-machine gaps; Acceptance insufficient for a verifier; `## Files` scoping; Part 3 300 s poll versus
+the TOTP window; citations wrong again.
+
+**Pair 10 read:** both rejected the spec, with heavy overlap and no false findings. Fable measured against repo history
+(the hub-promote tags) and found the operational defects. Astra found the test-design defects (equivalent mutants,
+fixtures without proof). Fable cost nearly twice as much (162K vs 88K). The completing agent's "corrected citations"
+were themselves wrong: concatenated `cat -n` output gave wrong line numbers. Next time, verify the drafting agent's
+citations before a blind review.

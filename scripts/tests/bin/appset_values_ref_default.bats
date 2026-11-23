@@ -131,6 +131,8 @@ run_hostinger() {
     _hostinger_load_argocd_plugin() { :; }
     _argocd_hub_kubectl_cmd() { printf "%s\n" kubectl; }
     _info() { :; }
+    _warn() { :; }
+    _run_command() { return 0; }
     _hostinger_reapply_gitops_applicationsets
     ' < /dev/null)
   else
@@ -142,6 +144,8 @@ run_hostinger() {
     _hostinger_load_argocd_plugin() { :; }
     _argocd_hub_kubectl_cmd() { printf "%s\n" kubectl; }
     _info() { :; }
+    _warn() { :; }
+    _run_command() { return 0; }
     _hostinger_reapply_gitops_applicationsets
     ' < /dev/null)
   fi

@@ -1,0 +1,149 @@
+#!/Library/Developer/CommandLineTools/usr/bin/python3 -IS
+"""Send one request to the installed promotion authority."""
+
+import json
+import re
+import socket
+import sys
+import time
+
+SOCKET = "/var/run/k3dm-promote/sock"
+OPS = {
+    "request": "sha branch channel requested_by",
+    "show": "id",
+    "promote": "id sha",
+    "status": "",
+    "approve": "id nonce approver totp check at sig",
+    "deny": "id nonce approver",
+}
+REFUSED = set(
+    (
+        "malformed_id not_found integrity not_pending not_approved expired clock_backwards locked nonce approver check "
+        "early_code totp too_many_codes sha_mismatch already_spent state_lost rate_limited bad_input signature envelope_stale "
+        "not_contained not_newest_branch not_green not_newest_green release_moved tag_exists deploy_moved witness_conflict"
+    ).split()
+)
+UNKNOWN = set("busy io state_dir_unsafe unconfigured lookup_failed push_unknown deadline unreachable protocol".split())
+KEYS = {
+    "request": "id nonce expires check",
+    "status": "daemon configured pending state ruleset audit",
+    "show": "id state sha branch channel requested_by created expires approver approved_at reason refusals push_at old new tag check",
+    "promote": "outcome old new tag",
+}
+
+
+def unique_fields(pairs):
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("duplicate JSON field")
+    return result
+
+
+def parse(args, stdin):
+    path = SOCKET
+    if args[:1] == ["--socket"]:
+        path, args = args[1], args[2:]
+    op, flags = args[0], args[1:]
+    keys = OPS[op].split()
+    if op in ("approve", "deny"):
+        if flags:
+            raise ValueError
+        line = stdin.read(4097)
+        if len(line.encode()) > 4096 or "\n" in line.removesuffix("\n"):
+            raise ValueError
+        fields = json.loads(line, object_pairs_hook=unique_fields)
+    else:
+        if len(flags) != 2 * len(keys):
+            raise ValueError
+        fields = {}
+        for flag, value in zip(flags[::2], flags[1::2]):
+            if flag not in {"--" + k.replace("_", "-") for k in keys}:
+                raise ValueError
+            fields[flag[2:].replace("-", "_")] = value
+    if not isinstance(fields, dict) or set(fields) != set(keys) or not all(isinstance(v, str) for v in fields.values()):
+        raise ValueError
+    return path, dict(op=op, v=1, **fields)
+
+
+def exchange(path, request):
+    with socket.socket(socket.AF_UNIX) as conn:
+        conn.settimeout(5)
+        conn.connect(path)
+        conn.sendall((json.dumps(request, separators=(",", ":")) + "\n").encode())
+        end = time.monotonic() + (240 if request["op"] == "promote" else 15)
+        line = bytearray()
+        while len(line) < 65536:
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError
+            conn.settimeout(remaining)
+            part = conn.recv(min(4096, 65536 - len(line)))
+            if not part:
+                if not line:
+                    raise ConnectionError
+                break
+            line.extend(part)
+            if b"\n" in part:
+                if line.count(b"\n") == 1 and line.endswith(b"\n"):
+                    return json.loads(line.decode("utf-8"), object_pairs_hook=unique_fields)
+                break
+        raise ValueError
+
+
+def valid(resp, req):
+    if not isinstance(resp, dict) or set(resp) != {"v", "result", "code", "message", "data"}:
+        return False
+    msg, data, code = resp["message"], resp["data"], resp["code"]
+    if (
+        type(resp["v"]) is not int
+        or resp["v"] != 1
+        or not isinstance(msg, str)
+        or len(msg) > 1024
+        or "\n" in msg
+        or "\r" in msg
+        or not isinstance(code, str)
+        or not isinstance(data, dict)
+    ):
+        return False
+    if resp["result"] == "refused":
+        return code in REFUSED and data in ({"approval": "kept"}, {"approval": "final"})
+    if resp["result"] == "unknown":
+        return code in UNKNOWN and data == {}
+    op = req["op"]
+    if resp["result"] != "ok" or code != "ok" or (op in KEYS and set(data) != set(KEYS[op].split())):
+        return False
+    if op == "promote":
+        return (
+            all(isinstance(v, str) for v in data.values())
+            and data["outcome"] in ("already", "moved")
+            and all(re.fullmatch("[0-9a-f]{40}|[0-9a-f]{64}", data[k]) for k in ("old", "new"))
+            and data["new"] == req["sha"]
+            and re.fullmatch(r"hub-promote/[0-9]{8}T[0-9]{6}Z", data["tag"])
+        )
+    return True
+
+
+def run(argv, stdin, stdout, stderr):
+    try:
+        path, req = parse(argv, stdin)
+    except (ValueError, KeyError, IndexError, RecursionError):
+        print("Invalid promotion command or input envelope", file=stderr)
+        return 2
+    try:
+        reply = exchange(path, req)
+        if not valid(reply, req):
+            raise ValueError
+    except (ValueError, OSError, RecursionError) as exc:
+        code = "unreachable" if isinstance(exc, OSError) else "protocol"
+        reply = dict(v=1, result="unknown", code=code, message=code, data={})
+    print(json.dumps(reply, separators=(",", ":")), file=stdout)
+    print(reply["message"], file=stderr)
+    if reply["result"] == "ok":
+        return 0
+    if reply["result"] == "unknown":
+        return 75
+    return 2 if reply["code"] == "bad_input" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(run(sys.argv[1:], sys.stdin, sys.stdout, sys.stderr))

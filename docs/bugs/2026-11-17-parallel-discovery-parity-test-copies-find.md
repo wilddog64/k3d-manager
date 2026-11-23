@@ -5,6 +5,7 @@
 **Introduced by:** 46ec5b36 (v1.44.0, `docs/plans/v1.44.0-parallel-offline-tests.md`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-only defect where the parallel discovery parity test compares against a pasted copy of the `find` logic instead of running the dispatcher's discovery.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold — exact-slug glob found nothing; `make find-similar-docs` not run (vector store needs the k3d-k3d-cluster context, absent on the M4)
 **Filed:** 2026-11-17 (found by the Part B independent verifier, 2026-11-15)

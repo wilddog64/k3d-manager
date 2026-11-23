@@ -1,5 +1,7 @@
 import importlib.machinery
 import importlib.util
+import os
+import plistlib
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -105,6 +107,7 @@ def test_success_marker_is_separate_and_bounded_to_the_success_group():
 
 
 def test_main_publishes_success_marker_only_after_a_success(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
     log = tmp_path / "run.log"
     log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
     calls = []
@@ -115,6 +118,7 @@ def test_main_publishes_success_marker_only_after_a_success(monkeypatch, tmp_pat
 
 
 def test_main_does_not_publish_success_marker_after_a_failure(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
     log = tmp_path / "run.log"
     log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
     calls = []
@@ -327,6 +331,7 @@ def test_run_complete_is_not_published_without_expected_stages():
 
 
 def test_main_publishes_run_complete_from_expected_stages_flag(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
     log = tmp_path / "run.log"
     log.write_text(
         "[test-all] stage-complete test\n"
@@ -342,9 +347,65 @@ def test_main_publishes_run_complete_from_expected_stages_flag(monkeypatch, tmp_
 
 
 def test_main_forwards_run_duration(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
     log = tmp_path / "run.log"
     log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
     pushed = []
     monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: pushed.append(payload))
     METRICS.main([str(log), "--target", "test-all", "--run-duration", "42"])
     assert 'k3dm_test_run_duration_seconds{target="test-all"} 42' in pushed[0]
+
+
+def test_main_without_pushgateway_url_publishes_nothing(capsys, monkeypatch, tmp_path):
+    monkeypatch.delenv("K3DM_PUSHGATEWAY_URL", raising=False)
+    assert "K3DM_PUSHGATEWAY_URL" not in os.environ
+    urlopen_calls = []
+    push_calls = []
+    monkeypatch.setattr(METRICS.urllib.request, "urlopen", lambda *args, **kwargs: urlopen_calls.append((args, kwargs)))
+    monkeypatch.setattr(METRICS, "push_metrics", lambda *args, **kwargs: push_calls.append((args, kwargs)))
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    rc = METRICS.main([str(log), "--target", "test-all", "--exit-code", "0"])
+    assert rc == 0
+    assert len(urlopen_calls) == 0
+    assert len(push_calls) == 0
+    captured = capsys.readouterr()
+    assert "[k3dm-test-metrics] metrics not published (K3DM_PUSHGATEWAY_URL unset)" in captured.out
+
+
+def test_main_with_blank_pushgateway_url_publishes_nothing(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "  ")
+    urlopen_calls = []
+    push_calls = []
+    monkeypatch.setattr(METRICS.urllib.request, "urlopen", lambda *args, **kwargs: urlopen_calls.append((args, kwargs)))
+    monkeypatch.setattr(METRICS, "push_metrics", lambda *args, **kwargs: push_calls.append((args, kwargs)))
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    rc = METRICS.main([str(log), "--target", "test-all", "--exit-code", "0"])
+    assert rc == 0
+    assert len(urlopen_calls) == 0
+    assert len(push_calls) == 0
+    captured = capsys.readouterr()
+    assert "[k3dm-test-metrics] metrics not published (K3DM_PUSHGATEWAY_URL unset)" in captured.out
+
+
+def test_main_with_explicit_pushgateway_url_publishes(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+    push_calls = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: push_calls.append((payload, args, kwargs)))
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    rc = METRICS.main([str(log), "--target", "test-all", "--exit-code", "0"])
+    assert rc == 0
+    assert len(push_calls) == 2
+    assert push_calls[1][2].get("group_suffix") == "-last-success"
+    captured = capsys.readouterr()
+    assert "metrics not published (K3DM_PUSHGATEWAY_URL unset)" not in captured.out
+
+
+def test_nightly_plist_sets_pushgateway_url():
+    template_path = ROOT / "scripts" / "etc" / "launchd" / "com.k3d-manager.test-metrics.plist.tmpl"
+    raw_content = template_path.read_text()
+    substituted = re.sub(r"\{\{[^}]+\}\}", "/test/path", raw_content)
+    parsed = plistlib.loads(substituted.encode("utf-8"))
+    assert parsed.get("EnvironmentVariables", {}).get("K3DM_PUSHGATEWAY_URL") == "http://localhost:9091"

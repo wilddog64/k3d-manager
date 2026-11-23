@@ -1,0 +1,34 @@
+## +0s 02:35:02
+tcp4       0      0  127.0.0.1.42723        127.0.0.1.62910        ESTABLISHED         7784         2886  405056  146988     sshd-session:60138  00182 0000000c 0000000003cb4f46 00000080 01000800      2      0 000000
+tcp4       0      0  127.0.0.1.62910        127.0.0.1.42723        ESTABLISHED         6344         3606  405760  146988              ssh:60133  00102 00000008 0000000003cb4f45 00000080 04000900      2      0 000000
+tcp4       0      0  127.0.0.1.62909        127.0.0.1.42723        TIME_WAIT           8676         3710  404736  146988                 :60121  02131 00000008 0000000003cb4f35 00000080 04000900      0      0 000000
+tcp4       0      0  127.0.0.1.62912        127.0.0.1.42723        TIME_WAIT            148            0  408300  146988                 :60143  02031 00000000 0000000003cb4f56 00000080 04000900      0      0 000000
+10112     1     0 Thu Nov 19 03:52:24 2026     sshd-session: <login> sshd-session: <login> [priv]  
+10115 10112   501 Thu Nov 19 03:52:25 2026     sshd-session: <login> sshd-session: <login>@ttys000  
+31009     1     0 Thu Nov 19 04:01:03 2026     sshd-session: <login> sshd-session: <login> [priv]  
+31012 31009   501 Thu Nov 19 04:01:03 2026     sshd-session: <login> sshd-session: <login>@ttys003  
+60135     1     0 Thu Nov 19 18:34:57 2026     sshd-session: <login> sshd-session: <login> [priv]     
+60138 60135   501 Thu Nov 19 18:34:57 2026     sshd-session: <login> sshd-session: <login>@notty     
+60139 60138   501 Thu Nov 19 18:34:57 2026     /bin/sleep       /bin/sleep 3600
+## +5s 02:35:07
+tcp4       0      0  127.0.0.1.42723        127.0.0.1.62910        ESTABLISHED         7784         2886  405056  146988     sshd-session:60138  00182 0000000c 0000000003cb4f46 00000080 01000800      2      0 000000
+tcp4       0      0  127.0.0.1.62910        127.0.0.1.42723        ESTABLISHED         6344         3606  405760  146988              ssh:60133  00102 00000008 0000000003cb4f45 00000080 04000900      2      0 000000
+tcp4       0      0  127.0.0.1.62909        127.0.0.1.42723        TIME_WAIT           8676         3710  404736  146988                 :60121  02131 00000008 0000000003cb4f35 00000080 04000900      0      0 000000
+tcp4       0      0  127.0.0.1.62912        127.0.0.1.42723        TIME_WAIT            148            0  408300  146988                 :60143  02031 00000000 0000000003cb4f56 00000080 04000900      0      0 000000
+10112     1     0 Thu Nov 19 03:52:24 2026     sshd-session: <login> sshd-session: <login> [priv]  
+10115 10112   501 Thu Nov 19 03:52:25 2026     sshd-session: <login> sshd-session: <login>@ttys000  
+31009     1     0 Thu Nov 19 04:01:03 2026     sshd-session: <login> sshd-session: <login> [priv]  
+31012 31009   501 Thu Nov 19 04:01:03 2026     sshd-session: <login> sshd-session: <login>@ttys003  
+60135     1     0 Thu Nov 19 18:34:57 2026     sshd-session: <login> sshd-session: <login> [priv]     
+60138 60135   501 Thu Nov 19 18:34:57 2026     sshd-session: <login> sshd-session: <login>@notty     
+60139 60138   501 Thu Nov 19 18:34:57 2026     /bin/sleep       /bin/sleep 3600
+## +35s 02:35:37
+tcp4       0      0  127.0.0.1.42723        127.0.0.1.62910        ESTABLISHED         7784         2886  405056  146988     sshd-session:60138  00182 0000000c 0000000003cb4f46 00000080 01000800      2      0 000000
+tcp4       0      0  127.0.0.1.62910        127.0.0.1.42723        ESTABLISHED         6344         3606  405760  146988              ssh:60133  00102 00000008 0000000003cb4f45 00000080 04000900      2      0 000000
+10112     1     0 Thu Nov 19 03:52:24 2026     sshd-session: <login> sshd-session: <login> [priv]  
+10115 10112   501 Thu Nov 19 03:52:25 2026     sshd-session: <login> sshd-session: <login>@ttys000  
+31009     1     0 Thu Nov 19 04:01:03 2026     sshd-session: <login> sshd-session: <login> [priv]  
+31012 31009   501 Thu Nov 19 04:01:03 2026     sshd-session: <login> sshd-session: <login>@ttys003  
+60135     1     0 Thu Nov 19 18:34:57 2026     sshd-session: <login> sshd-session: <login> [priv]     
+60138 60135   501 Thu Nov 19 18:34:57 2026     sshd-session: <login> sshd-session: <login>@notty     
+60139 60138   501 Thu Nov 19 18:34:57 2026     /bin/sleep       /bin/sleep 3600

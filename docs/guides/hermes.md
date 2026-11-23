@@ -74,10 +74,10 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 The relay worker records approval intent in Cloudflare KV; Hermes drains it on its next normal poll,
 up to ~5 minutes later. Every drained action still passes through `approve()`, which re-validates
 the precondition and preserves the one-attempt-per-incident invariant. Approvers are allowlisted by
-Slack user ID, separately from slash-command roles. `/hermes-auth` grants a 24-hour re-auth; enforce
-MFA at the Slack workspace or channel level. Deny dismisses only and writes no approval, so Hermes
-may re-propose the repair. Each incident carries a random nonce, and buttons from a previous incident
-are dropped.
+Slack user ID, separately from slash-command roles. `/hermes-auth` grants a 10-minute re-auth for one
+Approve or Deny decision. Enforce MFA at the Slack workspace or channel level. Deny dismisses only and
+writes no approval, so Hermes may re-propose the repair. Each incident carries a random nonce, and
+buttons from a previous incident are dropped.
 
 Operator setup (run in Terminal.app):
 
@@ -92,6 +92,9 @@ Operator setup (run in Terminal.app):
    Since 2026-11-08 the item holds a `k3d-manager` app webhook for `#grafana-notification`; a webhook URL carries
    its channel, so a rebuild that creates a new one must pick that channel.
 4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
+
+Dispatch recovery uses `d` action IDs in the same relay. The M4 worker needs Keychain copies of `k3dm-hermes-approval-drain-token` and `k3dm-slack-webhook` (the `k3d-manager` app webhook for `#grafana-notification`) to post cards and drain approvals. If the drain token is rotated on the M5, copy the new value to the M4 as well.
+
 
 `APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.
 To find one in Slack, open a profile, click ⋮ (More), then **Copy member ID**.

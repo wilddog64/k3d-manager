@@ -1,0 +1,6 @@
+## E14-final  2026-11-21T15:03:52Z
+ls: /etc/k3dm-web-console: No such file or directory
+ls: /Library/LaunchDaemons/com.k3d-manager.web-console-sshd.plist: No such file or directory
+ls: /Library/PrivilegedHelperTools/k3dm-web-console: No such file or directory
+-- .prev in LaunchDaemons
+none

@@ -1,0 +1,25 @@
+/private/var/db/k3dm-capture-2026-11-19:
+total 32
+drwxr-xr-x  12 root wheel  384 Nov 19 18:34 .
+drwxr-xr-x 135 root wheel 4320 Nov 19 18:34 ..
+-rw-r--r--   1 root wheel   92 Nov 19 18:34 ca.pub
+-rw-r--r--   1 root wheel  732 Nov 19 18:34 enabled-noforce.conf
+-rw-r--r--   1 root wheel  791 Nov 19 18:34 enabled.conf
+-rwxr-xr-x   1 root wheel  982 Nov 19 18:34 entry
+-rw-------   1 root wheel  399 Nov 19 18:34 host_key
+-rw-r--r--   1 root wheel   94 Nov 19 18:34 host_key.pub
+-rw-r--r--   1 root wheel  963 Nov 19 18:34 marker.conf
+-rw-r--r--   1 root wheel  959 Nov 19 18:34 prod.conf
+drwxr-xr-x   3 root wheel   96 Nov 19 18:34 zdot-marker
+drwxr-xr-x   2 root wheel   64 Nov 19 18:34 zdotdir
+
+/private/var/db/k3dm-capture-2026-11-19/zdot-marker:
+total 4
+drwxr-xr-x  3 root wheel  96 Nov 19 18:34 .
+drwxr-xr-x 12 root wheel 384 Nov 19 18:34 ..
+-rw-r--r--  1 root wheel  53 Nov 19 18:34 .zshenv
+
+/private/var/db/k3dm-capture-2026-11-19/zdotdir:
+total 0
+drwxr-xr-x  2 root wheel  64 Nov 19 18:34 .
+drwxr-xr-x 12 root wheel 384 Nov 19 18:34 ..

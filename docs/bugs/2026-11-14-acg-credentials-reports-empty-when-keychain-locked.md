@@ -1,10 +1,9 @@
 # `ACG_CREDENTIALS` reports `empty` when the login Keychain is locked
 
-**Status:** OPEN — captured, not triaged
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN — captured, not triaged
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The bug only affects diagnostic output by reporting `empty` instead of `locked` when the login Keychain is locked, while the login would fail regardless and unlocking the Keychain restores normal operation.)
-**Triage:** passed over, 1st — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-14
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — triage 2026-11-14, operator
 **Introduced by:** unknown
 **Should have been caught by:** spec
 **Severity:** low — misleading diagnosis only; the login fails either way, but the operator is pointed at the item

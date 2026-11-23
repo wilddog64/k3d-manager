@@ -1079,7 +1079,7 @@ data:
             }
           },
           "title": "Last update",
-          "description": "Time since bin/k3dm-dispatch-metrics last published the ledger. It runs after every bin/k3dm-codex-dispatch event (start, exit, land, resume, abandon) or make dispatch-metrics, so a large value means no wrapped dispatch since, not a broken exporter. Yellow above one day. (not release-scoped)",
+          "description": "Time since bin/k3dm-dispatch-metrics last published the ledger. It runs after dispatch ledger events, every 15 minutes from the com.k3d-manager.dispatch-metrics LaunchAgent, or on make dispatch-metrics; over about 20 minutes means pushes are failing (see DispatchMetricsStale). Yellow above one day. (not release-scoped)",
           "gridPos": {"h": 4, "w": 12, "x": 0, "y": 22},
           "datasource": {
             "type": "prometheus",

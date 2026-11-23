@@ -31,9 +31,26 @@ make hub-deploy REF=<commit-ish>
 
 It keeps the typed `promote` confirmation, reapplies ApplicationSets only when
 their manifests changed, checks their values branch, applies platform resources,
-and waits for the vulnerability exporter rollout. If a step fails, fix it and
-rerun the same command; an already-current `deploy/hub` ref continues with the
-remaining steps.
+and waits for the vulnerability exporter rollout. After `platform-ops`, changed
+launchd agents installed on this host with a wired installer are reinstalled from
+a checkout locked at the promoted commit; a pending reinstall is retried by the
+next `bin/k3dm-hub-deploy <ref>` run, including a rerun of the same ref. A changed
+template without a wired installer is listed as `unwired` in the summary and must
+be reinstalled with its own setup command. If a step fails, fix it and rerun the
+same command; an already-current `deploy/hub` ref continues with the remaining
+steps. The command fetches the promoted ref as part of promotion, fast-forwards
+the local hub checkout under repo-sync's lock when it is clean and behind, then
+re-executes the promoted copy before applying anything. If the checkout is dirty,
+diverged, or cannot catch up before its wait expires, nothing is applied; fix the
+checkout or let repo-sync resolve it, then rerun the same command.
+
+The first promote that delivers this handoff still runs the old copy; it is the
+last one that requires a second `make hub-deploy REF=<sha>`. `k3dm-require-role`
+and `k3dm-hub-promote` also run from the pre-promote checkout, so changes to
+those scripts take effect one promote later. Stage 1 writes state before
+promotion, so stage 2's missing-state path is reachable only when called
+directly with its handoff environment variable. A `deploy/hub` move between
+promotion and `platform-ops` remains guarded by the existing pin check.
 
 The individual commands remain available as a manual fallback:
 
@@ -44,6 +61,17 @@ make appsets-check
 make platform-ops
 kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter --timeout=180s
 ```
+
+### Approved promote
+
+Request an approval from the promote authority. The reply shows the approval id and four-character check value. Approve it with the TOTP code and check value shown on the card, then run:
+
+```sh
+bin/k3dm-hub-deploy <ref> --approval <id>
+```
+
+The approval travels as a signed envelope: the Worker signs the id, nonce, approver, check value, code and time with a key also held by the daemon; the daemon verifies the signature first. A `signature` refusal (for example, a missing signature after relay key rotation) or `envelope_stale` refusal leaves the record pending, so enter a fresh code. Exit 75 means the authority could not decide; inspect it with `bin/k3dm-promote-client show --id <id>` and rerun the same command. Reruns are safe. A superseded approval exits 1 and has nothing more to deploy. See [promote authority](promote-authority.md).
+
 
 ## Promote (manual sequence)
 

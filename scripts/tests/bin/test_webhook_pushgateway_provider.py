@@ -75,3 +75,34 @@ def test_publish_test_metrics_runs_repo_exporter_from_repo_root(monkeypatch, tmp
     assert Path(cwd) == ROOT
     assert command[3:] == ["--target", "test-all", "--exit-code", "2", "--run-duration", "42"]
     assert notices == []
+
+
+def test_publish_test_metrics_passes_pushgateway_url_explicitly(monkeypatch, tmp_path):
+    monkeypatch.delenv("K3DM_PUSHGATEWAY_URL", raising=False)
+    monkeypatch.setattr(WEBHOOK, "PUSHGATEWAY_URL", "http://pg.invalid:9091")
+    captured_env = {}
+
+    def fake_spawn(command, cwd, env, timeout):
+        captured_env.update(env)
+        return 0, "[k3dm-test-metrics] metrics pushed: test-all/local", False
+
+    monkeypatch.setattr(WEBHOOK, "_spawn_capture_text", fake_spawn)
+    monkeypatch.setattr(WEBHOOK, "_notify_job", lambda job_id, text: None)
+
+    WEBHOOK._publish_test_metrics("abcd1234", tmp_path / "make.log", 0, 10)
+
+    assert captured_env.get("K3DM_PUSHGATEWAY_URL") == "http://pg.invalid:9091"
+
+
+def test_publish_test_metrics_warns_when_metrics_not_published(monkeypatch, tmp_path):
+    def fake_spawn(command, cwd, env, timeout):
+        return 0, "[k3dm-test-metrics] metrics not published (K3DM_PUSHGATEWAY_URL unset)", False
+
+    notices = []
+    monkeypatch.setattr(WEBHOOK, "_spawn_capture_text", fake_spawn)
+    monkeypatch.setattr(WEBHOOK, "_notify_job", lambda job_id, text: notices.append(text))
+
+    WEBHOOK._publish_test_metrics("abcd1234", tmp_path / "make.log", 0, 10)
+
+    assert len(notices) == 1
+    assert "metrics publication was not confirmed" in notices[0]

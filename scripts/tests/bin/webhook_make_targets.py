@@ -260,10 +260,12 @@ class MakeTargetTests(unittest.TestCase):
         self.assertIn("/cluster-up", admin_help)
         self.assertIn("/cluster-down", admin_help)
         self.assertIn("Cluster lifecycle", admin_help)
+        self.assertNotIn("/hostinger-status", admin_help)
 
     def test_cluster_commands_are_role_filtered(self):
         reader_help = wh.make_target_help("reader", wh._role_allows)
         self.assertIn("/cluster-status", reader_help)
+        self.assertNotIn("/hostinger-status", reader_help)
         self.assertNotIn("/cluster-up", reader_help)
         self.assertNotIn("/cluster-refresh", reader_help)
         self.assertIn("/cluster-refresh", wh.make_target_help("operator", wh._role_allows))

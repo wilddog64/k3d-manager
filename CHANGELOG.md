@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-11-23
+
+### Added
+
+- **Remote promote approval.** A CI-green, not-yet-deployed commit can be approved from a Claude cloud session or a Slack button, and the hub moves `deploy/hub` itself. An approval store binds each request to its SHA and branch with a MAC, an expiry and a TOTP step (2a); `make hub-promote`/`hub-deploy` route through it (2b); a root-owned daemon on a 0600 peer-checked socket runs the reinstall with an isolated git environment and a fail-closed audit log (2c); a mover pushes the ref with `--force-with-lease` and a witness tag, after re-checking the approval (2d). See `docs/howto/promote-authority.md` and `docs/howto/hub-promote.md`.
+- **CVE overrides pinned on `cve-pins/hub`.** The CVE scan records each promoted image digest in `pins.json` on its own branch instead of merge-patching live Applications, so a resync or a hub-promote cannot silently undo a remediation and Argo CD no longer flaps. A run without `GIT_WRITE_TOKEN`, or with a failed pin lookup, fails loudly (`PINSYNC: FAILED`) rather than skipping (2e). See `docs/architecture/cve-remediation-pipeline.md`.
+- **Browser SSH console behind Cloudflare Access.** A loopback-only, certificate-only `sshd` reached through an outbound `cloudflared` connector, landing in a persistent tmux session, with a `revoke` emergency stop (part A), and a TOTP second factor in front of the shell with replay guard and lockout (part C). See `docs/howto/web-console-sshd.md` and `docs/howto/web-console-totp.md`.
+- **Dispatch stall diagnosis.** When a dispatch stalls, headless Claude diagnoses it from the evidence and proposes a correction that the operator approves or denies in Slack before the run resumes (child C; detector A and dashboard D shipped in v1.44.1).
+- **One-command laptop enrollment on the hub.** Add a recipient, publish for it immediately, and install the password bundle schedule with `make password-bundle-add-laptop`.
+- **Bug metrics for registered projects.** The scanner publishes each project's bug inventory, verification and open history from its clone or legacy k3d-manager docs, with fetch and scan freshness metrics.
+- **Encrypted travel password bundle.** Enrolled laptops can decrypt service passwords delivered through a shared folder; the hub republishes on changes and alerts when publishing is stale.
+
+### Changed
+
+- **Plan quotas beside Fable.** Codex and Claude weekly and 5-hour limits moved from Agent Activity to Agent Cost as gauge pairs beside Fable with neutral reset-time gauges, and quota reading age stats sit below them.
+- **lib-foundation v0.5.7.** Subtree pulled for exclusive lock claims.
+
+### Fixed
+
+- Password bundle show and enroll now prompt to unlock a locked login Keychain in a terminal and explain how to allow item access. Enrollment prints the one-step hub command, and recipient errors identify the invalid NAME or KEY.
+
+- **Agent Activity Codex panels stay aligned.** Untracked sessions, API prices, and unpriced sessions now share the top band above the four activity panels.
+- **Codex quota panels keep real Codex numbers when newest record is `premium`.** The session reader ignores rate-limit records with `limit_id: "premium"` or null limits so they do not blank the 5h and weekly quota panels or drop quota-efficiency observations.
+- **Web console sudo ticket check probes non-NOPASSWD commands.** `_wc_priv_open` and headless `_wc_revoke` verify sudo credentials with `/bin/sleep 0` and `/usr/bin/id -u` so hosts with k3d-manager's `NOPASSWD: /usr/bin/true` sudoers rule prompt for passwords at startup rather than proceeding without a ticket.
+- **Dispatch metrics single-flight push, retries, and stale alert.** Ledger-event pushes route through the single-flight scheduler (`bin/k3dm-codex-dispatch schedule-metrics`), `bin/k3dm-dispatch-metrics` retries failed pushes with backoff up to 30s timeout, a 15-minute LaunchAgent (`com.k3d-manager.dispatch-metrics`) re-pushes metrics periodically, and `DispatchMetricsStale` alerts when metrics have not reached the hub for over 90 minutes while the M4 is reachable.
+- **Slack job posts are tidier and safer.** Home paths show as `~/` and make output tails are scrubbed before posting.
+- **Hermes messages stay accurate.** A resolved message clears its names, still-degraded and no-data sensors are reported, and the token-expiry advisory says to regenerate the fine-grained token.
+- **Plan status is written at land.** `codex-dispatch land` sets the plan's Status, and pre-commit refuses an approved plan still marked DRAFT.
+- **CI installs `age` and `ripgrep`.** A test now checks that CI installs every tool the BATS suites call.
+
 ## [1.44.2] - 2026-11-17
 
 ### Added

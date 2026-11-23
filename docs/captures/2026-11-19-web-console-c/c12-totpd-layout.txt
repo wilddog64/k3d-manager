@@ -1,0 +1,13 @@
+## m4-air 2026-11-20T03:40:53Z macOS 26.5.2
+drwxr-xr-x  15 root  wheel  480 Nov 19 19:40 /private/var/db/k3dm-capture-2026-11-19c
+drwxr-xr-x   4 root  wheel  128 Nov 19 19:40 /private/var/db/k3dm-capture-2026-11-19c/run
+drwx------   3 root  wheel   96 Nov 19 19:40 /private/var/db/k3dm-capture-2026-11-19c/state
+drwxr-xr-x   3 root  wheel   96 Nov 19 19:40 /private/var/db/k3dm-capture-2026-11-19c/state/run
+/private/var/db/k3dm-capture-2026-11-19c/run:
+total 0
+srw-------  1 root  wheel  0 Nov 19 19:40 admin.sock
+srw-rw-rw-  1 root  wheel  0 Nov 19 19:40 totp.sock
+
+/private/var/db/k3dm-capture-2026-11-19c/state/run:
+total 0
+srw-rw-rw-  1 root  wheel  0 Nov 19 19:40 totp.sock

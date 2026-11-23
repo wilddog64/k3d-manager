@@ -1,10 +1,9 @@
 # Agent Cost context panel: "observed" is a stale outlier and "configured" shows the window, not the trigger
 
-**Status:** OPEN — found 2026-11-11 by the operator ("seems to be odd and not make sense"); root-caused by Claude from the transcripts
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN — found 2026-11-11 by the operator ("seems to be odd and not make sense"); root-caused by Claude from the transcripts
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The Agent Cost context panel's ceiling and threshold metrics are degraded and misleading across the Oct 16 settings change, but auto-compaction works normally (~167K daily max) and operators can work around it by narr…); Claude proposed P3. Higher stands until the operator decides.
-**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Introduced by:** `82c1d9c8` (v1.43.14, context ceiling, floor and configured threshold)
 **Should have been caught by:** spec
 **Prior art:** `docs/bugs/2026-11-11-claude-context-floor-and-ceiling-count-only-turns-since-last-export.md` — read, different root cause (that fix made the ceiling see all turns, which exposed this one)

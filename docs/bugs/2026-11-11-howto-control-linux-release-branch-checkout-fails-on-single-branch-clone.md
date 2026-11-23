@@ -1,10 +1,9 @@
 # Bug: The Linux control-node how-to's `git checkout <release branch>` step fails on setup's single-branch clone
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Documentation-only defect in a test step of a how-to guide with a straightforward git fetch/checkout workaround and explicit operator approval as P3); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator.
 **Introduced by:** `4bd764b9` (control-node-linux: the how-to's VM sequence)
 **Should have been caught by:** live check (the sequence was first run end to end in this E3 rerun)
 **Prior art:** exact-slug glob: none. `make find-similar-docs`: unavailable (vector store context `k3d-k3d-cluster` missing on the M4, 2026-11-11)

@@ -102,6 +102,22 @@ if [[ "${K3DM_SKIP_BUG_STATUS:-0}" != "1" && -f "${SCRIPT_DIR}/check-bug-status.
    fi
 fi
 
+# Guard: newly approved plan documents must not remain DRAFT.
+# Bypass: K3DM_SKIP_PLAN_STATUS=1
+if [[ "${K3DM_SKIP_PLAN_STATUS:-0}" != "1" && -f "${SCRIPT_DIR}/check-plan-status.py" ]]; then
+   staged_plan_docs=()
+   while IFS= read -r _f; do
+      [[ -n "${_f}" && -f "${_f}" ]] && staged_plan_docs+=("${_f}")
+   done < <(git diff --cached --name-only --diff-filter=ACMR -- ':(glob)docs/plans/*.md')
+   if (( ${#staged_plan_docs[@]} > 0 )); then
+      if ! python3 "${SCRIPT_DIR}/check-plan-status.py" "${staged_plan_docs[@]}"; then
+         echo "Pre-commit hook: approved plan Status cannot remain DRAFT" >&2
+         echo "  bypass: K3DM_SKIP_PLAN_STATUS=1 git commit ..." >&2
+         exit 1
+      fi
+   fi
+fi
+
 # Guard: test/job debris at the repo root, written by a path derived from an empty
 # variable (usually an unchecked "$(mktemp)"). Staged files only.
 # Bypass: K3DM_SKIP_ROOT_DEBRIS=1

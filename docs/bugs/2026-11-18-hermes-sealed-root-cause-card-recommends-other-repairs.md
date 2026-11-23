@@ -5,6 +5,7 @@
 **Introduced by:** fadf8438 (root-cause and Recommended lines, v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Fable spec review)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Cosmetic and UX contradiction on Hermes Slack cards where a sealed-Vault root-cause card still prints `Recommended: Approve` for r3/r4 and lists unshown withdrawn repairs.)
 **Waiting on:** operator decision
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18

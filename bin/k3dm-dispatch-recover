@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+"""Offer one Slack-approved correction resume for a stalled dispatch."""
+
+import fcntl
+import hashlib
+import json
+import os
+import re
+import secrets
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+from hermes.approvals import (  # noqa: E402
+    APPROVAL_DRAIN_SERVICE, DISPATCH_ACTION_ID_RE, fetch_approvals,
+    delete_approval, interactive_blocks,
+)
+from hermes.sensors import HERMES_USER_AGENT, _keychain_secret  # noqa: E402
+from hermes.slack import post_interactive, post_summary  # noqa: E402
+
+SLACK_SERVICE = "k3dm-slack-webhook"
+SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+HEX = re.compile(r"^[0-9a-f]{16}$")
+
+
+def _sha(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _atomic_write(path, state):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(state, stream, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, path)
+        os.chmod(path, 0o600)
+    finally:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+
+
+def _worktree_hash(worktree):
+    diff = subprocess.run(["git", "-C", str(worktree), "diff", "HEAD", "--binary"],
+                          capture_output=True, timeout=30, check=False)
+    if diff.returncode:
+        raise RuntimeError("cannot hash worktree diff")
+    untracked = subprocess.run(["git", "-C", str(worktree), "ls-files", "-o", "--exclude-standard", "-z"],
+                              capture_output=True, timeout=30, check=False)
+    if untracked.returncode:
+        raise RuntimeError("cannot list untracked worktree files")
+    digest = hashlib.sha256()
+    digest.update(diff.stdout)
+    for raw_path in untracked.stdout.split(b"\0"):
+        if not raw_path:
+            continue
+        path = os.fsdecode(raw_path)
+        hashed = subprocess.run(["git", "-C", str(worktree), "hash-object", "--no-filters", "--", path],
+                               capture_output=True, text=True, timeout=30, check=False)
+        if hashed.returncode:
+            raise RuntimeError("cannot hash untracked worktree file")
+        digest.update(hashed.stdout.encode("ascii"))
+    return digest.hexdigest()
+
+
+def _resume_count(run):
+    return len(list(run.glob("prompt-[0-9]*.md")))
+
+
+def _post_summary(relay, message):
+    if relay:
+        post_summary(relay, message)
+
+
+def _save(path, state):
+    _atomic_write(path, state)
+
+
+def _proposal_for(state, action_id):
+    for proposal in state["proposals"].values():
+        if proposal.get("action_id") == action_id:
+            return proposal
+    return None
+
+
+def _refusal(proposal, run, root, state):
+    if time.time() > proposal["expires_at"]:
+        proposal["status"] = "expired"
+        return "proposal expired"
+    if not (run / "exit").is_file() or (run / "landed").exists() or (run / "violation").exists():
+        return "dispatch is not exited cleanly"
+    pid_file = run / "pid"
+    if pid_file.is_file():
+        try:
+            pid = int(pid_file.read_text(encoding="utf-8").strip())
+            os.kill(pid, 0)
+            return "worker is running"
+        except (ValueError, ProcessLookupError, PermissionError, OSError):
+            pass
+    if _resume_count(run) != proposal["resume_count"]:
+        return "resume count changed"
+    correction = Path(proposal["stall_dir"]) / "correction.md"
+    if _sha(correction) != proposal["correction_sha256"]:
+        return "correction changed"
+    worktree = root / proposal["version"] / proposal["slug"]
+    if _worktree_hash(worktree) != proposal["worktree_sha256"]:
+        return "worktree changed"
+    branch = subprocess.run(["git", "-C", str(ROOT), "symbolic-ref", "--quiet", "--short", "HEAD"],
+                            capture_output=True, text=True, timeout=10, check=False)
+    if branch.returncode or branch.stdout.strip() != "k3d-manager-" + proposal["version"]:
+        return "wrong release branch"
+    if any(p.get("slug") == proposal["slug"] and p is not proposal and
+           p.get("status") in ("attempted", "attempting", "resumed") for p in state["proposals"].values()):
+        return "earlier proposal already attempted"
+    return ""
+
+
+def _health_probe(url, token):
+    request = Request(url, headers={"Authorization": f"Bearer {token}",
+                                    "User-Agent": HERMES_USER_AGENT})
+    try:
+        with urlopen(request, timeout=10):
+            return None
+    except HTTPError as error:
+        return error.code
+    except Exception:
+        return None
+
+
+def main():
+    drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
+    token = _keychain_secret(APPROVAL_DRAIN_SERVICE)
+    relay = _keychain_secret(SLACK_SERVICE)
+    if not drain_url or not token or not relay:
+        print("dispatch-recover: approvals not configured")
+        return 0
+    root = Path(os.environ.get("K3DM_WORKTREE_ROOT", str(Path.home() / ".local/share/k3d-manager/worktrees"))).expanduser()
+    state_path = Path(os.environ.get("K3DM_DISPATCH_RECOVER_STATE", str(Path.home() / ".local/state/k3d-manager/dispatch-recover.json"))).expanduser()
+    lock_path = state_path.with_name(state_path.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 0
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {"proposals": {}, "health_alert_at": 0}
+        except (OSError, ValueError):
+            state = {"proposals": {}, "health_alert_at": 0}
+        state.setdefault("proposals", {})
+        now = time.time()
+        for version_dir in root.iterdir() if root.exists() else ():
+            if not version_dir.is_dir():
+                continue
+            for run in version_dir.glob("*.run"):
+                slug = run.name[:-4]
+                for stall in run.glob("stall-*"):
+                    key = str(stall.resolve())
+                    if key in state["proposals"]:
+                        continue
+                    correction, diagnosis = stall / "correction.md", stall / "diagnosis.md"
+                    if not correction.is_file() or not diagnosis.is_file() or not SLUG_RE.fullmatch(slug):
+                        continue
+                    try:
+                        if not correction.resolve().is_relative_to(run.resolve()):
+                            continue
+                        size = correction.stat().st_size
+                        if not size or size >= 65536:
+                            continue
+                        if any(p.get("slug") == slug for p in state["proposals"].values()):
+                            state["proposals"][key] = {"status": "paged", "slug": slug}
+                            _save(state_path, state)
+                            _post_summary(relay, f"Dispatch {slug}, {stall.name}: second stall, no proposal, operator action needed")
+                            continue
+                        correction_hash = _sha(correction)
+                        worktree = root / version_dir.name / slug
+                        worktree_hash = _worktree_hash(worktree)
+                        action_id, nonce = "d1-" + secrets.token_hex(4), secrets.token_hex(8)
+                        summary = diagnosis.read_text(encoding="utf-8")[:2000]
+                        stamp = stall.name.removeprefix("stall-")
+                        text = (f"Stalled dispatch {slug} at {stamp}. Correction SHA256: {correction_hash[:12]}.\n"
+                                f"{summary}\nDeny or ignore to do nothing.")[:2900]
+                        item = {"action_id": action_id, "name": f"Resume stalled dispatch {slug} with Claude's correction",
+                                "blast_radius": f"one resume of {slug} in its own worktree, prompt = correction.md (sha256 {correction_hash[:12]} shown)"}
+                        if post_interactive(relay, text, interactive_blocks(text, [item], nonce)):
+                            state["proposals"][key] = {"stall_dir": key, "slug": slug, "version": version_dir.name,
+                                "action_id": action_id, "nonce": nonce, "proposed_at": now, "expires_at": now + 7200,
+                                "resume_count": _resume_count(run), "correction_sha256": correction_hash,
+                                "worktree_sha256": worktree_hash, "status": "proposed"}
+                            _save(state_path, state)
+                    except (OSError, RuntimeError, UnicodeError):
+                        continue
+        for proposal in state["proposals"].values():
+            if proposal.get("status") == "proposed" and proposal.get("expires_at", 0) < now:
+                proposal["status"] = "expired"
+        if any(p.get("status") == "proposed" and p.get("expires_at", 0) > now for p in state["proposals"].values()):
+            code = _health_probe(drain_url, token)
+            if code in (401, 403) and now - state.get("health_alert_at", 0) >= 86400:
+                _post_summary(relay, "dispatch-recover: the drain token on this Mac is rejected by the relay; rerun the Keychain copy (docs/guides/hermes.md)")
+                state["health_alert_at"] = now
+        approvals = fetch_approvals(drain_url, token, id_pattern=DISPATCH_ACTION_ID_RE)
+        for approval in approvals:
+            action_id, nonce = approval.get("action_id"), approval.get("nonce")
+            proposal = _proposal_for(state, action_id)
+            if proposal and proposal.get("nonce") != nonce:
+                delete_approval(drain_url, token, action_id, id_pattern=DISPATCH_ACTION_ID_RE)
+                _post_summary(relay, f"Dispatch {proposal['slug']} resume refused: wrong nonce (requested by <@{approval['approved_by']}>)")
+                continue
+            if proposal and proposal.get("nonce") == nonce and proposal.get("status") == "expired":
+                delete_approval(drain_url, token, action_id, id_pattern=DISPATCH_ACTION_ID_RE)
+                _post_summary(relay, f"Dispatch {proposal['slug']} resume refused: proposal expired (requested by <@{approval['approved_by']}>)")
+                continue
+            if not proposal or proposal.get("status") != "proposed":
+                delete_approval(drain_url, token, action_id, id_pattern=DISPATCH_ACTION_ID_RE)
+                _post_summary(relay, f"dispatch-recover: dropped stale or unknown approval {action_id}")
+                continue
+            run = root / proposal["version"] / (proposal["slug"] + ".run")
+            if time.time() > proposal.get("expires_at", 0):
+                proposal["status"] = "expired"
+                _save(state_path, state)
+                delete_approval(drain_url, token, action_id, id_pattern=DISPATCH_ACTION_ID_RE)
+                _post_summary(relay, f"Dispatch {proposal['slug']} resume refused: proposal expired (requested by <@{approval['approved_by']}>)")
+                continue
+            proposal["status"] = "attempting"
+            _save(state_path, state)
+            reason = _refusal(proposal, run, root, state)
+            if reason:
+                if proposal["status"] != "expired":
+                    proposal["status"] = "attempted"
+                _save(state_path, state)
+                line = f"Dispatch {proposal['slug']} resume refused: {reason} (requested by <@{approval['approved_by']}>)"
+            else:
+                command = [str(ROOT / "bin/k3dm-codex-dispatch"), "resume", "--slug", proposal["slug"],
+                           "--prompt-file", str(Path(proposal["stall_dir"]) / "correction.md"), "--reason", "correction",
+                           "--coordinator", "anthropic/claude-opus-5-5"]
+                try:
+                    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=300, check=False)
+                    if result.returncode == 0:
+                        proposal["status"] = "resumed"
+                        line = f"Dispatch {proposal['slug']} resumed with the approved correction (by <@{approval['approved_by']}>)"
+                    else:
+                        proposal["status"] = "resume_failed"
+                        stderr = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else f"exit {result.returncode}"
+                        for secret in (drain_url, token, relay):
+                            stderr = stderr.replace(secret, "[redacted]")
+                        line = f"Dispatch {proposal['slug']} resume failed: {stderr} (requested by <@{approval['approved_by']}>)"
+                except (OSError, subprocess.SubprocessError) as error:
+                    proposal["status"] = "resume_failed"
+                    line = f"Dispatch {proposal['slug']} resume failed: {type(error).__name__} (requested by <@{approval['approved_by']}>)"
+                _save(state_path, state)
+            delete_approval(drain_url, token, action_id, id_pattern=DISPATCH_ACTION_ID_RE)
+            _post_summary(relay, line)
+        _save(state_path, state)
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

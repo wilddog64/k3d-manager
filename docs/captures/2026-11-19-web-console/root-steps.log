@@ -1,0 +1,40 @@
+[root 02:34:53] start login=<login>
+[root 02:34:54] step 1: build R
+[root 02:34:54] step 2: prod profile (C6 live, C11 login 2, C12)
+[root 02:34:56] up prod:  state = running; pid = 59966; state = active; state = active;
+[root 02:34:56] ready 2
+[root 02:34:56] waiting go-3
+[root 02:35:37] ready 3
+[root 02:35:37] waiting go-4
+[root 02:35:38] step 4: registered-without-pid job com.k3d-manager.capture-idle
+[root 02:35:38] ready 4
+[root 02:35:38] waiting go-5
+[root 02:35:47] step 5: marker profile (C11 login 1)
+[root 02:35:49] up marker:  state = running; pid = 62856; state = active; state = active;
+[root 02:35:49] ready 5
+[root 02:35:49] waiting go-6
+[root 02:35:51] down
+[root 02:35:51] step 6: enabled profile (C17b)
+[root 02:35:53] up enabled:  state = running; pid = 63121; state = active; state = active;
+[root 02:35:53] ready 6
+[root 02:35:54] waiting go-7
+[root 02:36:04] down
+[root 02:36:06] up enabled-noforce:  state = running; pid = 64233; state = active; state = active;
+[root 02:36:06] ready 7
+[root 02:36:06] waiting go-8
+[root 02:36:07] down
+[root 02:36:07] step 8: prod profile (C17b production)
+[root 02:36:09] up prod:  state = running; pid = 64398; state = active; state = active;
+[root 02:36:09] ready 8
+[root 02:36:09] waiting go-9
+[root 02:36:51] down
+[root 02:36:51] teardown: removed /private/var/db/k3dm-capture-2026-11-19 (gone); launchctl: not-loaded
+[root 02:36:51] ready 9
+[root 02:42:08] start login=<login>
+[root 02:42:09] step 1: build R
+[root 02:42:09] rerun: prod profile, pre-auth connection + held session across bootout
+[root 02:42:11] up prod:  state = running; pid = 87780; state = active; state = active;
+[root 02:42:11] ready p
+[root 02:42:11] waiting go-p
+[root 02:43:02] rerun teardown: gone; launchctl: not-loaded
+[root 02:43:02] ready q

@@ -14,7 +14,7 @@ from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
 from webhook.log import get_logger
 from webhook.failure_notes import write_failure_note
-from webhook.redact import mask_env_values, scrub_credentials
+from webhook.redact import mask_env_values, scrub_credentials, tildify_home
 
 __all__ = [
     "_run_cleanup", "_run_make_target", "_run_upgrade", "_run_cluster",
@@ -100,7 +100,8 @@ def _sanitize_cluster_output(text, redact):
     """Apply registered-secret and credential-shape scrubbing to command output."""
     text = scrub_credentials(redact(text))
     text = mask_env_values(text)
-    return _SLACK_RESPONSE_URL_RE.sub("[SLACK_RESPONSE_URL_REDACTED]", text)
+    text = _SLACK_RESPONSE_URL_RE.sub("[SLACK_RESPONSE_URL_REDACTED]", text)
+    return tildify_home(text)
 
 
 def _cluster_output_excerpt(output_path, redact):
@@ -168,7 +169,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
 
     def _post_progress():
         elapsed = int((time.monotonic() - start) / 60)
-        tail = "\n".join(_read_job_tail(log_file)) or "—"
+        tail = _sanitize_cluster_output("\n".join(_read_job_tail(log_file)), _redact_secrets) or "—"
         _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed — job `{job_id}`\n```{tail}```")
 
     def _wait(pid):
@@ -202,7 +203,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             output = output.encode()[-1024 * 1024:].decode(errors="replace")
             log_file.write_text(output)
         lines = output.rstrip().splitlines()
-        tail = "\n".join(lines[-40:])[-3000:]
+        tail = _sanitize_cluster_output("\n".join(lines[-40:]), _redact_secrets)[-3000:]
         if timed_out:
             status, icon, verdict = "failed", "⏱️", f"timed out after {timeout}s"
         elif rc == 0:

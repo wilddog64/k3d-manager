@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -8,6 +9,42 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from webhook import redact, status
+
+
+def test_tildify_home_replaces_home_prefix(monkeypatch):
+    monkeypatch.setenv("HOME", "/Users/k3dm-fake-home")
+    assert os.environ["HOME"] == "/Users/k3dm-fake-home"
+    text = (
+        'File "/Users/k3dm-fake-home/src/x.py", line 4\n'
+        'cd /Users/k3dm-fake-home\n'
+        '/Users/k3dm-fake-home/a /Users/k3dm-fake-home/b'
+    )
+    expected = 'File "~/src/x.py", line 4\ncd ~\n~/a ~/b'
+    assert redact.tildify_home(text) == expected
+
+    monkeypatch.setenv("HOME", "/Users/k3dm-fake-home/")
+    assert os.environ["HOME"] == "/Users/k3dm-fake-home/"
+    assert redact.tildify_home(text) == expected
+
+
+def test_tildify_home_keeps_other_paths(monkeypatch):
+    monkeypatch.setenv("HOME", "/Users/k3dm-fake-home")
+    assert os.environ["HOME"] == "/Users/k3dm-fake-home"
+    text = (
+        "/Users/k3dm-fake-homeother/x /tmp/Users/k3dm-fake-home/x "
+        "x/Users/k3dm-fake-home/src /opt/homebrew/bin\nno path"
+    )
+    assert redact.tildify_home(text) == text
+    monkeypatch.delenv("HOME")
+    assert "HOME" not in os.environ
+    assert redact.tildify_home("/Users/k3dm-fake-home/src") == "/Users/k3dm-fake-home/src"
+    monkeypatch.setenv("HOME", "")
+    assert os.environ["HOME"] == ""
+    assert redact.tildify_home("/Users/k3dm-fake-home/src") == "/Users/k3dm-fake-home/src"
+    monkeypatch.setenv("HOME", "/")
+    assert os.environ["HOME"] == "/"
+    assert redact.tildify_home("/Users/k3dm-fake-home/src") == "/Users/k3dm-fake-home/src"
+    assert redact.tildify_home(None) is None
 
 
 @pytest.mark.parametrize("line, expected", [

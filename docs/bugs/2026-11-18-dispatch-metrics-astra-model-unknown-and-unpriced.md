@@ -1,0 +1,65 @@
+# dispatch-metrics: Astra 6.2 runs show as model `other` and cost $0
+
+**Status:** VERIFIED — fix `34502bfe` landed and offline-verified 2026-11-18 (captured while dispatching the first Astra review, lib-foundation PR #89)
+**Priority:** P3 — reporting only; tokens and run time are still exported
+**Introduced by:** pre-existing (codex added `gpt-6.2-astra` and `gpt-6.2-sol`; the allowlist and price file were never updated)
+**Should have been caught by:** none
+**Introducing change reviewed:** no
+**Waiting on:** scheduled run — since 2026-11-18 (identity row appears on the next Astra run that lands)
+**Prior art:** `docs/bugs/2026-11-10-agent-cost-shows-unpriced-claude-model-as-zero.md` (exact-slug review) — read, different root cause (Claude price); `docs/bugs/2026-11-16-dispatch-metrics-xhigh-tier-runs-unpriced.md` — read, different root cause (tier suffix not stripped). `make find-similar-docs` not run (vector store unreachable, 2026-11-18).
+**Filed:** 2026-11-18
+**Approval:** operator, 2026-11-18: "go ahead to file P3 bug" (after Claude reported the two gaps below)
+
+## Symptom
+
+The operator is trialling Astra (OpenAI, run through codex) for spec and bug review, comparing its findings and cost
+with Argon and Fable. Dispatch `lf-v057-review-astra` (2026-11-18) recorded `agent: codex`, `model: gpt-6.2-astra`,
+`model_source: explicit` in the ledger. On the Agent Dispatch dashboard:
+
+- **Model identity** shows `other` (corrected 2026-11-18; first filed as `unknown`): `MODEL_IDENTITY_ALLOWLIST` (`bin/k3dm-dispatch-metrics:41-47`) lists `gpt-6-astra`
+  but not `gpt-6.2-astra` (nor `gpt-6.2-sol`); `:1865-1866` map any valid name not on the list to `other`.
+- **Cost** is $0: `scripts/etc/agent/codex-model-prices.json` prices only `gpt-5.6-luna`, `gpt-6-luna`, `gpt-6.1-sol`,
+  `gpt-6.1-terra` among OpenAI models; `_render_cost` (`bin/k3dm-dispatch-metrics:~2057`) gives an unpriced model 0.
+
+The trial's question is whether Astra's cost is worth its findings, so the cost panel is the part that matters.
+
+## Fix (proposed; spec to follow once rates are known)
+
+1. Add `gpt-6.2-astra` and `gpt-6.2-sol` to `MODEL_IDENTITY_ALLOWLIST`.
+2. Add `gpt-6.2-astra` (and `gpt-6-astra`, `gpt-6.2-sol` if rates are known) to `codex-model-prices.json` with
+   `input`, `cached_input`, `output` per 1M tokens, and a dated source in its `source` string — rates from the operator
+   or a published page, never guessed.
+3. Test: a ledger fixture row with `model: gpt-6.2-astra` exports that model name on `k3dm_dispatch_model_identity`
+   and a nonzero cost (pre-fix: `unknown` and 0).
+
+The ledger keeps the 2026-11-18 Astra run's tokens, so its cost appears once the fix is live on the hub
+(`make hub-promote`).
+
+## Rates (Claude, web search 2026-11-18)
+
+- `gpt-6-astra`: $10.00 input / $1.00 cached input / $50.00 output per 1M tokens (standard, <=272K input), per
+  third-party trackers (eesel.ai, codersera.com, anotherwrapper.com); not confirmed on openai.com/api/pricing.
+- `gpt-6.2-astra`: no published rate found. The operator heard it is cheaper than Fable; unconfirmed.
+- For comparison, `claude-fable-5-2` in this file: $8.00 input / $0.20 cache read / $40.00 output.
+- The 2026-11-18 Astra review (`lf-v057-review-astra`): 253,880 input (226,816 cached), 1,291 output. At `gpt-6-astra`
+  rates that is about $0.56.
+
+Spec decision: price `gpt-6-astra` from the trackers above (as `gpt-6-luna` was), and leave `gpt-6.2-astra` allowlisted
+but unpriced until a rate is published or the operator supplies one. Do not price 6.2 with the 6.0 rate.
+
+## Outcome (2026-11-18)
+
+Landed `34502bfe`: `gpt-6.2-astra` and `gpt-6.2-sol` allowlisted, `gpt-6-astra` priced. Fable blind review noted the only
+Astra run in the ledger is `gpt-6.2-astra`, so Astra cost still shows $0 until a 6.2 rate is published or supplied.
+
+## Live check (Claude, 2026-11-18)
+
+- `make dispatch-metrics` from the M4 checkout at `76d92773` pushed to the hub Pushgateway (`localhost:19094`, ssh tunnel,
+  `/-/ready` 200). `k3dm_dispatch_codex_tokens_by_model{model="gpt-6.2-astra"}` is present for 1d/7d/30d (cached 226,816).
+  No hub-promote needed: the exporter runs from the working checkout, and nothing under `scripts/etc/argocd` changed.
+- **E2 as written cannot pass (spec defect, Claude):** `k3dm_dispatch_model_identity` rows are built only from landed tasks
+  (`bin/k3dm-dispatch-metrics:1503-1512`, `landed_selected`). `lf-v057-review-astra` was a review child and was abandoned
+  (operator, 2026-11-18), so it never gets an identity row. The identity fix applies to the next Astra run that lands.
+- Earlier pushes had timed out (38 `push failed: timed out` lines in `~/.local/share/k3d-manager/worktrees/metrics.log`),
+  likely while the tunnel was down. Not filed; noted for the stall/alerting work.
+

@@ -1,0 +1,11 @@
+## m4-air 2026-11-20T03:42:26Z ssh -tt ... client (through scratch sshd, ForceCommand entry)
+CLIENT self pid=5639 server LOCAL_PEERCRED uid=0 LOCAL_PEERPID=90709
+SOCKET totp
+LOCAL_PEERCRED version=0 uid=501
+LOCAL_PEERPID 5639
+ADMIT yes admitted
+CHAIN listener 90707
+CHAIN priv 5597 uid=0 args='sshd-session: <login> [priv]'
+CHAIN user 5630 uid=501 args='sshd-session: <login>@ttys006'
+CHAIN peer 5639 uid=501 comm='/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python' args='/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python -IS /private/var/db/k3dm-capture-2026-11-19c/entry'
+rc=0

@@ -11,11 +11,13 @@ const value = 'r2-0123abcd|0123456789abcdef'
 function fakeKv() {
   const values = new Map()
   const puts = []
+  let deleteError = null
   return {
     values, puts,
     async put(key, entry, opts) { values.set(key, entry); puts.push({ key, opts }) },
     async get(key) { return values.get(key) || null },
-    async delete(key) { values.delete(key) },
+    async delete(key) { if (deleteError) throw deleteError; values.delete(key) },
+    failDelete(error = new Error('delete failed')) { deleteError = error },
     async list({ prefix }) {
       return { keys: [...values.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name })), list_complete: true }
     },
@@ -149,6 +151,50 @@ test('deny dismisses without recording an approval', async () => {
   const reply = JSON.parse(worker.fetches[0].init.body)
   assert.equal(reply.replace_original, true)
   assert.match(reply.text, /r2-0123abcd denied by <@UAPPROVER1>/)
+  assert.equal(await kv.get('reauth:UAPPROVER1'), null)
+})
+
+test('an approval uses the re-auth grant once', async () => {
+  const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1')
+  const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+  await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', value)))
+  assert.ok(await kv.get('approval:r2-0123abcd'))
+  assert.equal(await kv.get('reauth:UAPPROVER1'), null)
+  worker.fetches.length = 0
+  await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_deny', value)))
+  assert.equal(await kv.get('approval:r2-0123abcd') !== null, true)
+  assert.equal(worker.fetches.filter(item => item.url === 'https://hooks.slack.test/resp').length, 1)
+  assert.equal(JSON.parse(worker.fetches[0].init.body).replace_original, false)
+})
+
+test('refused clicks leave an existing re-auth grant untouched', async () => {
+  for (const [userId, actionValue, allowlist, grantUserId] of [
+    ['UNOTALLOWED', value, 'UAPPROVER1', 'UNOTALLOWED'],
+    ['UAPPROVER1', 'malformed', 'UAPPROVER1', 'UAPPROVER1'],
+  ]) {
+    const kv = fakeKv(); await kv.put(`reauth:${grantUserId}`, '1')
+    const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: allowlist })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody(userId, 'hermes_approve', actionValue)))
+    assert.equal(await kv.get(`reauth:${grantUserId}`), '1')
+  }
+  const missingReauth = fakeKv()
+  const missingWorker = loadWorker({ APPROVALS_KV: missingReauth, APPROVER_ALLOWLIST: 'UAPPROVER1' })
+  await missingWorker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', value)))
+  assert.equal(await missingReauth.get('reauth:UAPPROVER1'), null)
+  const unconfigured = loadWorker({ APPROVALS_KV: undefined, APPROVER_ALLOWLIST: 'UAPPROVER1' })
+  await unconfigured.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', value)))
+  assert.equal(unconfigured.fetches.length, 1)
+  assert.match(JSON.parse(unconfigured.fetches[0].init.body).text, /not configured/i)
+})
+
+test('a failed re-auth deletion stores no approval and does not replace the card', async () => {
+  const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1'); kv.failDelete()
+  const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1' })
+  await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', value)))
+  assert.equal(await kv.get('approval:r2-0123abcd'), null)
+  const replies = worker.fetches.filter(item => item.url === 'https://hooks.slack.test/resp')
+  assert.equal(replies.length, 1)
+  assert.equal(JSON.parse(replies[0].init.body).replace_original, false)
 })
 
 test('DELETE rejects encoded path separators', async () => {
@@ -165,11 +211,14 @@ test('malformed interactivity values are ignored', async () => {
   }
 })
 
-test('/hermes-auth grants allowlisted users a 24h re-auth', async () => {
+test('/hermes-auth grants allowlisted users a 10-minute one-decision re-auth', async () => {
   const kv = fakeKv(); const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1,UAPPROVER2', APPROVAL_DRAIN_TOKEN: token })
   const body = 'command=/hermes-auth&user_id=UAPPROVER1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
   const response = await worker.dispatch(signed('/slack/commands', body))
-  assert.equal(kv.puts[0].opts.expirationTtl, 86400); assert.match(await response.text(), /Re-authenticated/)
+  const reply = await response.text()
+  assert.equal(kv.puts[0].opts.expirationTtl, 600)
+  assert.match(reply, /10 minutes/)
+  assert.match(reply, /next Approve or Deny/)
   const denied = await worker.dispatch(signed('/slack/commands', body.replace('UAPPROVER1', 'UOTHER')))
   assert.equal(kv.puts.length, 1); assert.match(await denied.text(), /not authorized/)
 })
@@ -181,6 +230,18 @@ test('cluster-status still relays and events GET is missing', async () => {
   assert.ok(call)
   assert.equal(JSON.parse(call.init.body).slack_user_id, 'UAPPROVER1')
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
+})
+
+test('retired hostinger-status is rejected while cluster-status hostinger still relays', async () => {
+  const retired = loadWorker()
+  const rejected = await retired.dispatch(signed('/slack/commands', 'command=%2Fhostinger-status&user_id=UREADER&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  assert.match(await rejected.text(), /Unknown command: \/hostinger-status/)
+  assert.equal(retired.fetches.length, 0)
+
+  const current = loadWorker()
+  await current.dispatch(signed('/slack/commands', 'command=%2Fcluster-status&text=hostinger&user_id=UREADER&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  assert.equal(current.fetches.length, 1)
+  assert.equal(current.fetches[0].url, 'https://webhook.test/api/v1/cluster-status')
 })
 
 test('cluster-down forwards the signed Slack caller identity', async () => {
@@ -548,4 +609,30 @@ test('/cluster-diagnose accepts namespace pod order as describe-pod', async () =
     channel_id: 'CDIAG',
     slack_user_id: 'UOP1',
   })
+})
+
+test('d action id approval is stored and listed by drain', async () => {
+  const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1')
+  const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+  const dValue = 'd1-0123abcd|0123456789abcdef'
+  await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', dValue)))
+  const stored = JSON.parse(await kv.get('approval:d1-0123abcd'))
+  assert.equal(stored.nonce, '0123456789abcdef')
+  assert.equal(kv.puts.at(-1).opts.expirationTtl, 3600)
+  const listed = await worker.dispatch(new Request('https://relay.test/hermes/approvals', { headers: { Authorization: `Bearer ${token}` } }))
+  assert.equal((await listed.json())[0].action_id, 'd1-0123abcd')
+})
+
+test('d action id rejects malformed, unauthorized and unauthenticated clicks', async () => {
+  for (const malformed of ['0123abcd|0123456789abcdef', 'x1-0123abcd|0123456789abcdef', 'd1-0123ABCd|0123456789abcdef', 'd1-123abcd|0123456789abcdef', 'd1-0123abcdx|0123456789abcdef', 'd1-0123abcd-extra|0123456789abcdef']) {
+    const kv = fakeKv(); const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', malformed)))
+    assert.equal(kv.puts.length, 0, malformed); assert.equal(worker.fetches.length, 0, malformed)
+  }
+  for (const [user, reauth] of [['UOTHER', true], ['UAPPROVER1', false]]) {
+    const kv = fakeKv(); if (reauth) await kv.put('reauth:UAPPROVER1', '1')
+    const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody(user, 'hermes_approve', 'd1-0123abcd|0123456789abcdef')))
+    assert.equal(await kv.get('approval:d1-0123abcd'), null)
+  }
 })

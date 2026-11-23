@@ -1,10 +1,9 @@
 # Bug: the sandbox reaper's Slack notice fails every time, and the reason is thrown away
 
-**Status:** OPEN — filed 2026-10-24; not dispatched
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN — filed 2026-10-24; not dispatched
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Sandbox deregistration still succeeds and logs locally (with `SLACK_WEBHOOK_URL` or log inspection available as workarounds), while only the Slack notification and its error reporting are degraded); Claude proposed P3. Higher stands until the operator decides.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Severity:** low — the reap itself works; only the notice that says it happened is missing
 **Release:** bug (does not count toward the five-plan cap); candidate for the vendor-LLM P2/P3 trial
 **Filed:** 2026-10-24, by Claude, during the bug-status cleanup, while verifying `docs/bugs/2026-10-09-expired-acg-sandbox-leaves-hub-registration-and-apps.md`

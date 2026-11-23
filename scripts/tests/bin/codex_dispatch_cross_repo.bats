@@ -3,6 +3,45 @@
 bats_require_minimum_version 1.5.0
 load codex_dispatch_helpers
 
+@test "codex dispatch: cross-repo land writes repo-qualified ref only in manager checkout" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null
+  git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com
+  git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-status >/dev/null
+  printf 'work base\n' >"$WORK_REPO/a.txt"
+  git -C "$WORK_REPO" add a.txt
+  git -C "$WORK_REPO" commit -m work-base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-status >/dev/null
+  local spec=docs/plans/v9.9.9-demo.md manager_before target_before
+  printf '# Test spec\n\n**Status:** READY — notes\n**Intent approved:** operator, 2026-11-19\n\n## Files\n\n| File |\n|---|\n| `a.txt` |\n' >"$FIXTURE/$spec"
+  git -C "$FIXTURE" add "$spec"
+  git -C "$FIXTURE" commit -m 'ready status fixture' >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+  manager_before="$(git -C "$FIXTURE" rev-parse HEAD)"
+  target_before="$(git -C "$WORK_REPO" rev-parse HEAD)"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/cross-status.argv" STUB_ENV="$BATS_TEST_TMPDIR/cross-status.env"
+  dispatch start --spec "$spec" --slug cross-status --repo "$WORK_REPO" --branch fix/cross-status >/dev/null
+  sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/cross-status"
+  printf 'work landed\n' >"$task/a.txt"
+  git -C "$task" add a.txt
+  git -C "$task" commit -m cross-status >/dev/null
+  local land_sha
+  land_sha="$(git -C "$task" rev-parse HEAD)"
+  run dispatch land --slug cross-status --test true
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"land: plan status set LANDED in $spec"* ]]
+  grep -Fqx "**Status:** LANDED — work-origin@${land_sha:0:8} (auto: land $(date +%F); verify pending); notes" "$FIXTURE/$spec"
+  [ "$(git -C "$FIXTURE" rev-parse HEAD^ )" = "$manager_before" ]
+  [ "$(git -C "$FIXTURE" show --pretty='' --name-only HEAD)" = "$spec" ]
+  [ "$(git -C "$WORK_REPO" rev-parse fix/cross-status)" = "$land_sha" ]
+  [ "$(git -C "$WORK_REPO" rev-parse origin/fix/cross-status)" = "$target_before" ]
+  [ "$(git -C "$WORK_REPO" rev-list --count fix/cross-status)" -eq 2 ]
+  [ "$(git -C "$WORK_REPO" show fix/cross-status:a.txt)" = 'work landed' ]
+}
+
 @test "codex dispatch: cross-repo start snapshots the spec and land targets only the named branch" {
   export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
   git init --bare "$WORK_ORIGIN" >/dev/null

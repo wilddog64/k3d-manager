@@ -1,0 +1,68 @@
+## sshd -t -f prod.conf
+rc=0
+## sshd -T -f prod.conf -C user=<login>,host=localhost,addr=127.0.0.1 (selected keys)
+usepam no
+logingracetime 30
+passwordauthentication no
+x11forwarding no
+allowtcpforwarding no
+allowagentforwarding no
+disableforwarding yes
+allowstreamlocalforwarding no
+forcecommand /private/var/db/k3dm-capture-2026-11-19/entry
+authorizedkeysfile none
+setenv ZDOTDIR=/private/var/db/k3dm-capture-2026-11-19/zdotdir
+permittunnel no
+permitopen none
+permitlisten none
+## sshd -t -f marker.conf
+rc=0
+## sshd -T -f marker.conf -C user=<login>,host=localhost,addr=127.0.0.1 (selected keys)
+usepam no
+logingracetime 30
+passwordauthentication no
+x11forwarding no
+allowtcpforwarding no
+allowagentforwarding no
+disableforwarding yes
+allowstreamlocalforwarding no
+forcecommand /private/var/db/k3dm-capture-2026-11-19/entry
+authorizedkeysfile none
+setenv ZDOTDIR=/private/var/db/k3dm-capture-2026-11-19/zdot-marker
+permittunnel no
+permitopen none
+permitlisten none
+## sshd -t -f enabled.conf
+rc=0
+## sshd -T -f enabled.conf -C user=<login>,host=localhost,addr=127.0.0.1 (selected keys)
+usepam no
+logingracetime 30
+passwordauthentication no
+x11forwarding yes
+allowtcpforwarding yes
+allowagentforwarding yes
+disableforwarding no
+allowstreamlocalforwarding yes
+forcecommand /private/var/db/k3dm-capture-2026-11-19/entry
+authorizedkeysfile none
+subsystem sftp internal-sftp
+permittunnel yes
+permitopen any
+permitlisten any
+## sshd -t -f enabled-noforce.conf
+rc=0
+## sshd -T -f enabled-noforce.conf -C user=<login>,host=localhost,addr=127.0.0.1 (selected keys)
+usepam no
+logingracetime 30
+passwordauthentication no
+x11forwarding yes
+allowtcpforwarding yes
+allowagentforwarding yes
+disableforwarding no
+allowstreamlocalforwarding yes
+forcecommand none
+authorizedkeysfile none
+subsystem sftp internal-sftp
+permittunnel yes
+permitopen any
+permitlisten any

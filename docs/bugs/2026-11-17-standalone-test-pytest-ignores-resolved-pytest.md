@@ -5,6 +5,7 @@
 **Introduced by:** 46ec5b36 (v1.44.0, `docs/plans/v1.44.0-parallel-offline-tests.md`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-runner hygiene issue where standalone `make test-pytest` ignores `K3DM_RESOLVED_PYTEST`, with a workaround of setting `PYTEST=`.)
 **Waiting on:** operator decision
 **Prior art:** `docs/bugs/2026-09-25-pytest-suites-unreachable-from-make.md` (exact-slug pass; `find-similar-docs` not run, no k3d-k3d-cluster context on the M4) — read, different root cause (suites not wired into make at all)
 **Filed:** 2026-11-17 (found by the Part B independent verifier, 2026-11-15)

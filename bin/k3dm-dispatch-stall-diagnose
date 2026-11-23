@@ -1,0 +1,731 @@
+#!/usr/bin/env python3
+"""Headless Claude diagnosis of a stalled dispatch, paid by API credit."""
+
+import fcntl
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import secrets
+import shlex
+import signal
+import stat
+import string
+import subprocess
+import sys
+import time
+from typing import Any, Dict, Optional
+
+VERSION_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+STALL_RE = re.compile(r"^stall-\d{8}T\d{6}Z(-\d+-\d+)?$")
+SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+API_TYPE_RE = re.compile(r"^[a-z_]{1,40}$")
+
+MODEL_IDENTITY_ALLOWLIST = {
+    "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-6.2-astra", "gpt-6.2-sol", "gpt-5.6-luna",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-fable-5-2",
+    "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+    "gemini-4-hydrogen-low", "gemini-4-hydrogen-medium", "gemini-4-hydrogen-high", "gemini-4-hydrogen-xhigh",
+    "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high",
+}
+
+STATUSES = {
+    "ok", "skipped_key_missing", "skipped_no_claude", "over_budget", "interrupted",
+    "key_rejected", "budget", "api_error", "timeout", "malformed", "no_correction", "claude_exit"
+}
+
+EXPORTER_SECRET_PATTERN = r"(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|hvs\.[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{10,}|xox[abpr]-[A-Za-z0-9-]{6,}|AKIA[0-9A-Z]{16}|hooks\.slack\.com/services/\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----)"
+SECRET_RE = re.compile(EXPORTER_SECRET_PATTERN)
+ANT_KEY_RE = re.compile(r"sk-ant-[A-Za-z0-9_-]{8,}")
+
+
+def redact(text: str, key: str = "") -> str:
+    if key:
+        text = text.replace(key, "[REDACTED]")
+    text = ANT_KEY_RE.sub("[REDACTED]", text)
+    text = SECRET_RE.sub("[REDACTED]", text)
+    return text
+
+
+def usage_error(msg: str) -> None:
+    sys.stderr.write(f"k3dm-dispatch-stall-diagnose: {msg}\n")
+    sys.exit(2)
+
+
+def safe_read_bytes(path: str) -> Optional[bytes]:
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            os.close(fd)
+            return None
+        with os.fdopen(fd, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def safe_read_text(path: str) -> Optional[str]:
+    b = safe_read_bytes(path)
+    if b is None:
+        return None
+    return b.decode("utf-8", errors="replace")
+
+
+def publish_file(stall_dir: str, name: str, data: bytes) -> None:
+    temp_name = f".diagnose-{name}.{os.getpid()}"
+    temp_path = os.path.join(stall_dir, temp_name)
+    target_path = os.path.join(stall_dir, name)
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(temp_path, flags, 0o600)
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+    os.replace(temp_path, target_path)
+
+
+def is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def inline_file_block(nonce: str, name: str, raw_bytes: bytes, cap: int, keep: str = "head") -> str:
+    orig_len = len(raw_bytes)
+    if orig_len > cap:
+        truncated = "yes"
+        if keep == "tail":
+            chunk = raw_bytes[-cap:]
+        else:
+            chunk = raw_bytes[:cap]
+    else:
+        truncated = "no"
+        chunk = raw_bytes
+    text = chunk.decode("utf-8", errors="replace")
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return f'<<<FILE {nonce} name="{name}" bytes={orig_len} truncated={truncated}>>>\n{text}<<<END {nonce}>>>'
+
+
+def append_ledger(root: str, line_obj: Dict[str, Any], key: str) -> None:
+    ledger_path = os.path.join(root, "ledger.jsonl")
+    try:
+        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(ledger_path, flags, 0o644)
+    except Exception as e:
+        sys.stderr.write(f"k3dm-dispatch-stall-diagnose: ledger open failed: {e}\n")
+        return
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            sys.stderr.write("k3dm-dispatch-stall-diagnose: ledger is not a regular file\n")
+            return
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            line_str = redact(json.dumps(line_obj, separators=(",", ":")), key) + "\n"
+            os.write(fd, line_str.encode("utf-8"))
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+    except Exception as e:
+        sys.stderr.write(f"k3dm-dispatch-stall-diagnose: ledger append failed: {e}\n")
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def get_hostname(helper_env: Dict[str, str], stall_dir: str) -> str:
+    try:
+        proc = subprocess.run(
+            ["hostname", "-s"],
+            env=helper_env,
+            cwd=stall_dir,
+            timeout=10,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if proc.returncode == 0:
+            h = proc.stdout.strip()
+            if h:
+                return h
+    except Exception:
+        pass
+    return "unknown"
+
+
+def send_slack(stall_dir: str, status: str, version: str, slug: str, host: str,
+               cap: float, estimate: float, cost: float,
+               api_status: Any, api_type: Any, timeout_s: int,
+               rc: int, helper_env: Dict[str, str], key: str) -> None:
+    if status == "ok":
+        return
+
+    if status == "skipped_key_missing":
+        line = f"diagnosis skipped on {host}: key k3dm-anthropic-api-key missing ({version}/{slug})"
+    elif status == "skipped_no_claude":
+        line = f"diagnosis skipped on {host}: claude binary not found ({version}/{slug})"
+    elif status == "over_budget":
+        line = f"diagnosis skipped on {host}: estimated ${estimate:.2f} over cap ${cap:.2f} ({version}/{slug})"
+    elif status == "interrupted":
+        line = f"diagnosis skipped on {host}: an earlier run was interrupted, spend unknown; rerun with K3DM_STALL_DIAGNOSE_FORCE=1 ({version}/{slug})"
+    elif status == "key_rejected":
+        line = f"diagnosis failed on {host}: API key rejected (401), rotate k3dm-anthropic-api-key ({version}/{slug})"
+    elif status == "budget":
+        line = f"diagnosis failed on {host}: budget cap ${cap:.2f} reached, spent ${cost:.4f} ({version}/{slug})"
+    elif status == "api_error":
+        status_str = str(api_status) if isinstance(api_status, int) else "none"
+        type_str = str(api_type) if (isinstance(api_type, str) and API_TYPE_RE.match(api_type)) else "unknown"
+        line = f"diagnosis failed on {host}: API error {status_str} {type_str} ({version}/{slug})"
+    elif status == "timeout":
+        line = f"diagnosis failed on {host}: timed out after {timeout_s}s, spend unknown ({version}/{slug})"
+    elif status == "malformed":
+        line = f"diagnosis failed on {host}: unreadable claude output ({version}/{slug})"
+    elif status == "no_correction":
+        line = f"diagnosis failed on {host}: no correction produced ({version}/{slug})"
+    elif status == "claude_exit":
+        line = f"diagnosis failed on {host}: claude exited {rc} ({version}/{slug})"
+    else:
+        return
+
+    redacted_line = redact(line, key)
+    slack_cmd = os.environ.get("K3DM_STALL_SLACK_CMD")
+    if not slack_cmd:
+        repo_root = Path(__file__).resolve().parent.parent
+        slack_cmd = str(repo_root / "bin/k3dm-slack-notify")
+
+    cmd_argv = shlex.split(slack_cmd)
+    try:
+        proc = subprocess.run(
+            cmd_argv,
+            input=(redacted_line + "\n").encode("utf-8"),
+            env=helper_env,
+            cwd=stall_dir,
+            timeout=30,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        if proc.returncode != 0:
+            sys.stderr.write(f"k3dm-dispatch-stall-diagnose: slack post failed with rc {proc.returncode}\n")
+    except Exception as e:
+        sys.stderr.write(f"k3dm-dispatch-stall-diagnose: slack post failed: {e}\n")
+
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        usage_error("usage: k3dm-dispatch-stall-diagnose <stall-dir>")
+
+    raw_arg = sys.argv[1]
+    root = os.path.realpath(os.environ.get("K3DM_WORKTREE_ROOT") or os.path.expanduser("~/.local/share/k3d-manager/worktrees"))
+
+    if os.path.islink(raw_arg):
+        usage_error("stall path is a symlink")
+    if not os.path.isdir(raw_arg):
+        usage_error("stall path is not a directory")
+
+    stall_dir = os.path.realpath(raw_arg)
+    try:
+        rel = os.path.relpath(stall_dir, root)
+    except ValueError:
+        usage_error("stall directory outside root")
+
+    if rel.startswith("..") or os.path.isabs(rel):
+        usage_error("stall directory outside root")
+
+    parts = Path(rel).parts
+    if len(parts) != 3:
+        usage_error("invalid stall directory path structure")
+
+    version, run_name, stall_name = parts
+    if not VERSION_RE.match(version):
+        usage_error(f"invalid version format: {version}")
+
+    if not run_name.endswith(".run"):
+        usage_error(f"invalid run directory name: {run_name}")
+
+    slug = run_name[:-4]
+    if not SLUG_RE.match(slug) or slug.startswith("."):
+        usage_error(f"invalid slug: {slug}")
+
+    if not STALL_RE.match(stall_name):
+        usage_error(f"invalid stall name: {stall_name}")
+
+    run_dir = os.path.join(root, version, run_name)
+    actual_stall_dir = os.path.join(run_dir, stall_name)
+
+    if os.path.islink(run_dir) or not os.path.isdir(run_dir):
+        usage_error("run directory is a symlink or not a directory")
+    if os.path.islink(actual_stall_dir) or not os.path.isdir(actual_stall_dir):
+        usage_error("stall directory is a symlink or not a directory")
+
+    worktree = os.path.join(root, version, slug)
+
+    # 2. Config
+    budget_str = os.environ.get("K3DM_STALL_DIAGNOSE_BUDGET_USD", "0.50")
+    if not re.match(r"^\d+(\.\d{1,2})?$", budget_str):
+        usage_error(f"invalid budget format: {budget_str}")
+    budget_val = float(budget_str)
+    if not (0 < budget_val <= 5.0):
+        usage_error(f"budget out of range (0, 5]: {budget_val}")
+
+    model = os.environ.get("K3DM_STALL_DIAGNOSE_MODEL", "claude-opus-5-5")
+    if model not in MODEL_IDENTITY_ALLOWLIST:
+        usage_error(f"model not in allowlist: {model}")
+
+    prices_path = Path(__file__).resolve().parent.parent / "scripts/etc/agent/codex-model-prices.json"
+    if not prices_path.is_file():
+        usage_error("model prices file not found")
+    try:
+        with open(prices_path, "r", encoding="utf-8") as f:
+            prices_data = json.load(f)
+    except Exception as e:
+        usage_error(f"failed to load model prices: {e}")
+
+    claude_models = prices_data.get("claude_models", {})
+    if model not in claude_models:
+        usage_error(f"model not in claude_models: {model}")
+
+    model_pricing = claude_models[model]
+    input_rate = model_pricing.get("input")
+    output_rate = model_pricing.get("output")
+    if not (isinstance(input_rate, (int, float)) and not isinstance(input_rate, bool) and
+            isinstance(output_rate, (int, float)) and not isinstance(output_rate, bool)):
+        usage_error("model pricing not numeric")
+
+    timeout_str = os.environ.get("K3DM_STALL_DIAGNOSE_TIMEOUT_S", "300")
+    if not re.match(r"^\d+$", timeout_str):
+        usage_error(f"timeout must be an integer: {timeout_str}")
+    timeout_s = int(timeout_str)
+    if not (30 <= timeout_s <= 1800):
+        usage_error(f"timeout out of range [30, 1800]: {timeout_s}")
+
+    helper_env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "TMPDIR") if k in os.environ}
+    force = os.environ.get("K3DM_STALL_DIAGNOSE_FORCE") == "1"
+
+    # 3. Claim
+    lock_path = os.path.join(stall_dir, "diagnose.lock")
+    held_lock = False
+    status: Optional[str] = None
+
+    try:
+        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(lock_path, flags, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(f"{os.getpid()} {int(time.time())}\n")
+        held_lock = True
+    except FileExistsError:
+        lock_content = safe_read_text(lock_path)
+        parts_lock = lock_content.strip().split() if lock_content else []
+        pid_alive = False
+        if parts_lock and parts_lock[0].isdigit():
+            lock_pid = int(parts_lock[0])
+            pid_alive = is_pid_alive(lock_pid)
+
+        if pid_alive:
+            sys.stdout.write(f"running {stall_dir}\n")
+            sys.exit(0)
+
+        # Lock exists, its pid is dead or unreadable
+        publish_file(stall_dir, "diagnose.lock", f"{os.getpid()} {int(time.time())}\n".encode("utf-8"))
+        held_lock = True
+        if not force:
+            status = "interrupted"
+
+    try:
+        api_key = ""
+        obj: Optional[Dict[str, Any]] = None
+        stderr_bytes = b""
+        child_ran = False
+        child_rc = 0
+        timed_out = False
+        estimate = 0.0
+
+        if status is None:
+            # 4. Idempotence
+            status_file = os.path.join(stall_dir, "diagnose.status")
+            status_bytes = safe_read_bytes(status_file)
+            if status_bytes is not None:
+                status_word = status_bytes.decode("utf-8", errors="replace").strip()
+                if status_word not in STATUSES:
+                    usage_error("corrupt diagnose.status")
+                if not force:
+                    sys.stdout.write(f"{status_word} {stall_dir}\n")
+                    return
+                for name in ("correction.md", "diagnosis.md", "diagnose.status"):
+                    try:
+                        os.unlink(os.path.join(stall_dir, name))
+                    except OSError:
+                        pass
+
+        if status is None:
+            # 5. Key
+            try:
+                proc = subprocess.run(
+                    ["security", "find-generic-password", "-s", "k3dm-anthropic-api-key", "-a", "k3dm", "-w"],
+                    cwd=stall_dir,
+                    env=helper_env,
+                    timeout=10,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                if proc.returncode != 0 or not proc.stdout.strip():
+                    status = "skipped_key_missing"
+                else:
+                    api_key = proc.stdout.strip()
+            except (subprocess.TimeoutExpired, OSError):
+                status = "skipped_key_missing"
+
+        if status is None:
+            # 6. Binary
+            claude_bin = os.environ.get("K3DM_CLAUDE_BIN") or os.path.expanduser("~/.local/bin/claude")
+            if not (os.path.isfile(claude_bin) and os.access(claude_bin, os.X_OK)):
+                status = "skipped_no_claude"
+
+        if status is None:
+            # 7. Prompt
+            nonce = secrets.token_hex(8)
+
+            # SPEC
+            spec_md_path = os.path.join(run_dir, "spec.md")
+            spec_sha_path = os.path.join(run_dir, "spec-sha256")
+            spec_rel_ptr = os.path.join(run_dir, "spec")
+
+            spec_bytes = safe_read_bytes(spec_md_path)
+            if spec_bytes is not None:
+                sha_bytes = safe_read_bytes(spec_sha_path)
+                expected_sha = sha_bytes.decode("utf-8", errors="replace").strip() if sha_bytes else ""
+                actual_sha = hashlib.sha256(spec_bytes).hexdigest()
+                if expected_sha and actual_sha != expected_sha:
+                    spec_block = f'<<<FILE {nonce} name="spec.md" bytes=0 truncated=no>>>\nspec snapshot hash mismatch\n<<<END {nonce}>>>'
+                else:
+                    spec_block = inline_file_block(nonce, "spec.md", spec_bytes, 48 * 1024, keep="head")
+            else:
+                spec_ptr_bytes = safe_read_bytes(spec_rel_ptr)
+                if spec_ptr_bytes is not None:
+                    rel_str = spec_ptr_bytes.decode("utf-8", errors="replace").strip()
+                    if rel_str and not os.path.isabs(rel_str) and ".." not in Path(rel_str).parts:
+                        target_path = os.path.join(worktree, rel_str)
+                        worktree_real = os.path.realpath(worktree)
+                        target_real = os.path.realpath(target_path)
+                        if target_real == worktree_real or target_real.startswith(worktree_real + os.sep):
+                            target_bytes = safe_read_bytes(target_path)
+                            if target_bytes is not None:
+                                spec_block = inline_file_block(nonce, os.path.basename(rel_str), target_bytes, 48 * 1024, keep="head")
+                            else:
+                                spec_block = "spec unavailable"
+                        else:
+                            spec_block = "spec unavailable"
+                    else:
+                        spec_block = "spec unavailable"
+                else:
+                    spec_block = "spec unavailable"
+
+            # LAST_PROMPT
+            prompt_files = []
+            try:
+                for entry in os.listdir(run_dir):
+                    m = re.match(r"^prompt-(\d+)\.md$", entry)
+                    if m:
+                        prompt_files.append((int(m.group(1)), entry))
+            except OSError:
+                pass
+
+            if prompt_files:
+                prompt_files.sort(key=lambda x: x[0], reverse=True)
+                chosen_prompt = prompt_files[0][1]
+                chosen_path = os.path.join(run_dir, chosen_prompt)
+                p_bytes = safe_read_bytes(chosen_path)
+                if p_bytes is not None:
+                    prompt_block = inline_file_block(nonce, chosen_prompt, p_bytes, 16 * 1024, keep="head")
+                else:
+                    prompt_block = "prompt unavailable"
+            else:
+                chosen_path = os.path.join(run_dir, "prompt.md")
+                p_bytes = safe_read_bytes(chosen_path)
+                if p_bytes is not None:
+                    prompt_block = inline_file_block(nonce, "prompt.md", p_bytes, 16 * 1024, keep="head")
+                else:
+                    prompt_block = "prompt unavailable"
+
+            # EVIDENCE
+            excluded_names = {
+                "diagnosis.md", "correction.md", "diagnose.json", "diagnose.status",
+                "diagnose.err", "diagnose-prompt.md", "diagnose.lock", "notified"
+            }
+            try:
+                raw_entries = sorted(os.listdir(stall_dir))
+            except OSError:
+                raw_entries = []
+
+            safe_candidates = []
+            unsafe_or_non_regular_count = 0
+            for name in raw_entries:
+                if name in excluded_names or name.startswith(".diagnose-"):
+                    continue
+                if not SAFE_NAME_RE.match(name):
+                    unsafe_or_non_regular_count += 1
+                    continue
+                file_path = os.path.join(stall_dir, name)
+                data = safe_read_bytes(file_path)
+                if data is None:
+                    unsafe_or_non_regular_count += 1
+                    continue
+                safe_candidates.append((name, data))
+
+            inlined_blocks = []
+            over_limit_names = []
+            for idx, (name, data) in enumerate(safe_candidates):
+                if idx < 8:
+                    keep = "tail" if (name.endswith(".txt") or name.endswith(".log")) else "head"
+                    inlined_blocks.append(inline_file_block(nonce, name, data, 16 * 1024, keep=keep))
+                else:
+                    over_limit_names.append(name)
+
+            n_over = len(over_limit_names)
+            names_str = ", ".join(over_limit_names[:16])
+            omitted_line = f"omitted: {n_over} over the file limit ({names_str}), {unsafe_or_non_regular_count} unsafe or non-regular"
+            evidence_text = "\n\n".join(inlined_blocks)
+            if evidence_text:
+                evidence_text += "\n\n" + omitted_line
+            else:
+                evidence_text = omitted_line
+
+            # Template render
+            template_path = Path(__file__).resolve().parent.parent / "scripts/etc/dispatch/stall-diagnose-prompt.md"
+            if not template_path.is_file():
+                usage_error(f"template not found: {template_path}")
+            template_text = template_path.read_text(encoding="utf-8")
+            rendered_prompt = string.Template(template_text).safe_substitute(
+                NONCE=nonce,
+                SLUG=slug,
+                VERSION=version,
+                SPEC=spec_block,
+                LAST_PROMPT=prompt_block,
+                EVIDENCE=evidence_text
+            )
+            redacted_prompt = redact(rendered_prompt, api_key)
+            prompt_bytes = redacted_prompt.encode("utf-8")
+
+            # Spend bound
+            tokens_in = math.ceil(len(prompt_bytes) / 3)
+            estimate = (tokens_in * input_rate + 8000 * output_rate) / 1000000.0
+            if estimate > budget_val:
+                status = "over_budget"
+            else:
+                publish_file(stall_dir, "diagnose-prompt.md", prompt_bytes)
+
+        if status is None:
+            # 8. Run
+            child_ran = True
+            claude_env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "TMPDIR") if k in os.environ}
+            claude_env["ANTHROPIC_API_KEY"] = api_key
+            argv = [
+                claude_bin,
+                "-p",
+                "--bare",
+                "--output-format", "json",
+                "--max-budget-usd", f"{budget_val:.2f}",
+                "--model", model,
+                "--tools", "",
+                "--permission-mode", "dontAsk",
+                "--permission-prompts", "none",
+                "--strict-mcp-config",
+                "--no-session-persistence"
+            ]
+
+            proc = subprocess.Popen(
+                argv,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=stall_dir,
+                env=claude_env,
+                start_new_session=True
+            )
+
+            try:
+                stdout_bytes, stderr_bytes = proc.communicate(input=prompt_bytes, timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except OSError:
+                    pass
+                try:
+                    stdout_bytes, stderr_bytes = proc.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except OSError:
+                        pass
+                    stdout_bytes, stderr_bytes = proc.communicate()
+
+            child_rc = proc.returncode
+
+            # 9. Classify
+            if timed_out:
+                status = "timeout"
+            else:
+                try:
+                    parsed_json = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
+                    if isinstance(parsed_json, dict) and parsed_json.get("type") == "result":
+                        obj = parsed_json
+                    else:
+                        obj = None
+                except Exception:
+                    obj = None
+
+                if obj is None:
+                    status = "claude_exit" if child_rc != 0 else "malformed"
+                elif obj.get("api_error_status") == 401:
+                    status = "key_rejected"
+                elif obj.get("subtype") == "error_max_budget_usd":
+                    status = "budget"
+                elif obj.get("is_error") is True:
+                    status = "api_error"
+                elif child_rc != 0:
+                    status = "claude_exit"
+                else:
+                    res_val = obj.get("result")
+                    err_val = obj.get("is_error")
+                    cost_val = obj.get("total_cost_usd")
+
+                    valid_res = isinstance(res_val, str)
+                    valid_err = isinstance(err_val, bool)
+                    valid_cost = (isinstance(cost_val, (int, float)) and not isinstance(cost_val, bool) and
+                                  math.isfinite(cost_val) and cost_val >= 0)
+
+                    if not (valid_res and valid_err and valid_cost):
+                        status = "malformed"
+                    else:
+                        lines = res_val.splitlines()
+                        diag_indices = [i for i, l in enumerate(lines) if l == "=== DIAGNOSIS ==="]
+                        corr_indices = [i for i, l in enumerate(lines) if l == "=== CORRECTION ==="]
+
+                        if len(diag_indices) == 1 and len(corr_indices) == 1 and diag_indices[0] < corr_indices[0]:
+                            diag_section = "\n".join(lines[diag_indices[0] + 1 : corr_indices[0]]).strip()
+                            corr_section = "\n".join(lines[corr_indices[0] + 1 :]).strip()
+                            if not diag_section or not corr_section:
+                                status = "no_correction"
+                            elif len(corr_section.encode("utf-8")) >= 65536:
+                                status = "no_correction"
+                            else:
+                                status = "ok"
+                        else:
+                            status = "no_correction"
+
+        # 10. Outputs
+        if obj is not None:
+            raw_json = json.dumps(obj, indent=2)
+            publish_file(stall_dir, "diagnose.json", (redact(raw_json, api_key) + "\n").encode("utf-8"))
+
+        if child_ran:
+            truncated_err = stderr_bytes[-8192:] if len(stderr_bytes) > 8192 else stderr_bytes
+            err_text = redact(truncated_err.decode("utf-8", errors="replace"), api_key)
+            publish_file(stall_dir, "diagnose.err", err_text.encode("utf-8"))
+
+        if status == "ok" and obj is not None:
+            res_val = obj.get("result", "")
+            lines = res_val.splitlines()
+            diag_idx = [i for i, l in enumerate(lines) if l == "=== DIAGNOSIS ==="][0]
+            corr_idx = [i for i, l in enumerate(lines) if l == "=== CORRECTION ==="][0]
+            diag_section = "\n".join(lines[diag_idx + 1 : corr_idx]).strip()
+            corr_section = "\n".join(lines[corr_idx + 1 :]).strip()
+            publish_file(stall_dir, "diagnosis.md", redact(diag_section, api_key).encode("utf-8"))
+            publish_file(stall_dir, "correction.md", redact(corr_section, api_key).encode("utf-8"))
+        else:
+            for name in ("diagnosis.md", "correction.md"):
+                try:
+                    os.unlink(os.path.join(stall_dir, name))
+                except OSError:
+                    pass
+
+        # 11. Ledger
+        repo_name_bytes = safe_read_bytes(os.path.join(run_dir, "repo-name"))
+        repo_str = repo_name_bytes.decode("utf-8", errors="replace").strip() if repo_name_bytes else ""
+        repo = repo_str if repo_str else "k3d-manager"
+
+        cost_usd = 0
+        if obj is not None:
+            c = obj.get("total_cost_usd")
+            if isinstance(c, (int, float)) and not isinstance(c, bool) and math.isfinite(c) and c >= 0:
+                cost_usd = c
+
+        ledger_entry: Dict[str, Any] = {
+            "ts": int(time.time()),
+            "event": "stall_diagnosis",
+            "version": version,
+            "slug": slug,
+            "repo": repo,
+            "stall": stall_name,
+            "status": status,
+            "cost_usd": cost_usd,
+            "model": model
+        }
+
+        project_bytes = safe_read_bytes(os.path.join(run_dir, "project"))
+        if project_bytes is not None:
+            p_val = project_bytes.decode("utf-8", errors="replace").strip()
+            if p_val and p_val != "k3d-manager":
+                ledger_entry["project"] = p_val
+
+        append_ledger(root, ledger_entry, api_key)
+
+        # 12. Slack
+        if status != "ok":
+            host = get_hostname(helper_env, stall_dir)
+            api_status = obj.get("api_error_status") if obj else None
+            api_type = obj.get("api_error_type") if obj else None
+            cost_for_slack = cost_usd if isinstance(cost_usd, (int, float)) else 0.0
+            send_slack(
+                stall_dir=stall_dir,
+                status=status,
+                version=version,
+                slug=slug,
+                host=host,
+                cap=budget_val,
+                estimate=estimate,
+                cost=float(cost_for_slack),
+                api_status=api_status,
+                api_type=api_type,
+                timeout_s=timeout_s,
+                rc=child_rc,
+                helper_env=helper_env,
+                key=api_key
+            )
+
+        # 13. Publish status last of all
+        publish_file(stall_dir, "diagnose.status", f"{status}\n".encode("utf-8"))
+
+        sys.stdout.write(f"{status} {stall_dir}\n")
+        sys.exit(0)
+
+    finally:
+        if held_lock:
+            try:
+                os.unlink(lock_path)
+            except OSError:
+                pass
+
+
+if __name__ == "__main__":
+    main()

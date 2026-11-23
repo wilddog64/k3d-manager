@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing (approval flow on `main`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Defense-in-depth flaw where re-running a cycle before approval overwrites the pending proposal's digest and expiry timestamp while preconditions still hold.)
 **Waiting on:** operator decision
 **Prior art:** docs/bugs/2026-11-18-hermes-resolve-during-approval-resample-skips-withdraw.md — read; same re-sample call, different defect. `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18

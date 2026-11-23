@@ -53,8 +53,9 @@ discards anything else (the doc stays a candidate and counts as a failed attempt
 **Quota guard** (before every doc, not only at run start). agy has no quota command and Google's limits are not
 stored locally, so the guard measures our own use: open each `~/.gemini/antigravity-cli/conversations/*.db`
 read-only (`file:<path>?mode=ro` URI) and read `gen_metadata` (one protobuf blob per model call). Inferred field map
-(proven 2026-11-12 on the M4, `docs/ideas.md:58`): `1.21` model display name (`Gemini 4 Argon (Medium)`), `1.4.1`
-input, `1.4.2` cached input, `1.4.3` output. Sum output tokens of Argon rows over the last 5 h and 7 d. The job never
+(proven 2026-11-12 on the M4, `docs/ideas.md:58`; corrected 2026-11-21, see `## Quota calibration evidence`): `1.21`
+model display name (`Gemini 4 Argon (Medium)`), `1.4.2` input, `1.4.3` output. The reader itself now comes from
+`docs/plans/agy-quota-dashboard.md` child A; this job imports it. Sum output tokens of Argon rows over the last 5 h and 7 d. The job never
 selects, reads or prints the `steps` table's blobs (they hold prompt text). Rules:
 1. Skip the run (exit 0, `skipped_reason=budget`) when 5 h or 7 d output tokens plus the per-doc estimate would pass
    `K3DM_CLASSIFY_BUDGET_5H` or `K3DM_CLASSIFY_BUDGET_7D`. The budgets already hold back the operator headroom: they
@@ -164,6 +165,29 @@ from a real read-only capture on the M4 (host, date, agy version in a comment), 
 a small `gen_metadata` sample with Argon and non-Argon rows (field map confirmed, not just inferred), and the real
 agy stderr and exit code for a quota error (not yet seen; if it cannot be captured, M4 stays unproven and the phrase
 list is a guess to flag). Fixtures assert their target first (scratch HOME, stub agy on PATH, temp repo).
+
+## Quota calibration evidence
+
+**Point 1 — 2026-11-21 16:28 PST, M4** (operator screenshot of agy `Models & Quota`; tokens decoded read-only from copies of
+`~/.gemini/antigravity-cli/conversations/*.db`, `gen_metadata`).
+
+| Pool (agy panel) | Window | Remaining | Refreshes in | Window start (derived) | Our use in window |
+|---|---|---|---|---|---|
+| Gemini (Neon, Hydrogen, Orchestrator, 3.8 Flash) | 5 h | 97.69% | 2h 43m | 14:11 | 1 conversation (Flash audit, 19 calls): input 187,402, output 112,326 (97,127 thinking), cache read 1,751,464 |
+| Gemini | weekly | 96.40% | 155h 50m | 04:18 (11-21) | 2 conversations, 236 Flash calls: input 918,723, output 254,426 |
+| Claude and GPT (Opus 5.5, Sonnet 5.5, GPT-OSS 120B) | 5 h / weekly | 100% / 100% | — | — | none |
+| Gemini 4 Argon (separate on Pro) | weekly only | 100% | — | — | none in window |
+
+Findings:
+- Windows start at the first call, not on a clock: the derived starts match the creation times of the two conversation DBs
+  exactly (04:18 and 14:11). A window with no use shows "Quota available" and no refresh time.
+- Estimated Gemini budgets from this one point (input + output, cache reads excluded): 5 h ≈ 299,728 / 2.31% ≈ 13.0M;
+  weekly ≈ 1,173,149 / 3.60% ≈ 32.6M. Treat as ±30% until more points: whether cache reads or thinking tokens are weighted
+  differently is unknown, and the panel rounds to 0.01%.
+- Argon has its own weekly bucket with no 5 h limit shown; the quota guard for Argon classification needs a weekly budget only.
+- Field map correction: `gen_metadata` 1.4.2 is input tokens (it equals agy JSON `input_tokens`), not cached input.
+- Next points: record the panel again after a heavier Flash day and after an Argon batch, with the time, so the estimate can
+  be checked against a second and third point.
 
 ## Open questions
 

@@ -1494,6 +1494,19 @@ function _argocd_retire_legacy_observability_acg_apps() {
    done
 }
 
+function _argocd_services_pin_guard() {
+   local filename="$1" pin_lookup_rc=0
+   [[ "$filename" == services-git.yaml ]] || return 0
+   GIT_TERMINAL_PROMPT=0 _run_command --soft -- git ls-remote --exit-code https://github.com/wilddog64/k3d-manager refs/heads/cve-pins/hub >/dev/null || pin_lookup_rc=$?
+   (( pin_lookup_rc == 0 )) && return 0
+   if (( pin_lookup_rc == 2 )); then
+      _warn "[argocd] Refusing to apply services-git.yaml: pin branch cve-pins/hub not found (exit $pin_lookup_rc)"
+   else
+      _warn "[argocd] Refusing to apply services-git.yaml: pin branch lookup failed (rc $pin_lookup_rc)"
+   fi
+   return 1
+}
+
 function _argocd_deploy_applicationsets() {
    local stage="${1:-all}" prepared="${2:-}"
    if [[ "$prepared" != prepared ]]; then
@@ -1535,6 +1548,7 @@ function _argocd_deploy_applicationsets() {
 
       _argocd_retire_legacy_observability_acg_apps "${filename}" || return 1
 
+      _argocd_services_pin_guard "$filename" || { failed_count=$((failed_count + 1)); continue; }
       local _vars _v _name _unset=""
       _vars="$(grep -oh '\${[A-Za-z_][A-Za-z0-9_]*}' "$file" 2>/dev/null \
          | tr -d '${}' | sort -u | sed 's/^/$/' | tr '\n' ' ')"

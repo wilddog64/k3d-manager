@@ -81,25 +81,27 @@ Full text. `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` carry a short summary in the
 ### The hub reads deploy/hub; promote to reach it
 
 - **The hub reads `deploy/hub`; promote to reach it (operator, 2026-11-07; supersedes the 2026-07-24 release-branch tracking).**
-  A release or feature branch does not reach the running hub until the operator runs `make hub-promote REF=<commit-ish>`
-  (CI-green commit on `origin`, typed confirmation, `hub-promote/<UTC>` tag), then `make appsets-check` and
-  `make platform-ops`. Before asking for a live check of anything ArgoCD or platform-ops deploys, confirm with
-  `make hub-promote-status` that the commit is promoted, and ask for a promote if not: config on the release branch
-  is inert until then. `make appsets-reapply` pins both stages to `deploy/hub` (hub first, `APPSETS_STAGE=hub` stops
-  there to soak); rerun it only when ApplicationSet manifests change. A new ApplicationSet must carry
-  `k3dm.k3d.io/rollout-stage`. `make platform-ops` applies the promoted tree, not the checkout, and fails closed when
-  `deploy/hub` is missing: the first promote is the bootstrap in `docs/howto/hub-promote.md`. Run it from the
-  operator's tmux (Keychain), then confirm `kubectl -n platform-ops rollout status deploy/vulnerability-inventory-exporter`.
-  Rollback: `make hub-rollback`.
+  A release or feature branch does not reach the running hub until the operator runs `make hub-deploy REF=<commit-ish>`
+  from the operator's tmux (Keychain). The command requires typed confirmation, tags the promotion, reapplies
+  ApplicationSets only when changed, runs `appsets-check` and `platform-ops`, checks the exporter rollout, and
+  reinstalls changed installed launchd agents with a wired installer. Before asking for a live check, confirm with
+  `make hub-promote-status` that the commit is promoted, and ask for a promote if not. A new ApplicationSet must carry
+  `k3dm.k3d.io/rollout-stage`. The manual fallback is `make hub-promote REF=<commit-ish>`, `make appsets-reapply`
+  when ApplicationSets changed, `make appsets-check`, and `make platform-ops`; see `docs/howto/hub-promote.md`.
+  `make appsets-reapply` pins both stages to `deploy/hub`; `APPSETS_STAGE=hub` stops after the hub stage to soak.
+  `make platform-ops` applies the promoted tree and fails closed when `deploy/hub` is missing; the howto describes the
+  first-promote bootstrap. Rollback: `make hub-rollback`.
 
-Hub promote enforcement (moved from `CLAUDE.md` 2026-11-14; the rule is operator 2026-11-07, superseding 2026-07-24): green check runs and typed confirmation are enforced by `bin/k3dm-hub-promote` (`check_runs`, `show_and_confirm`); `k3dm.k3d.io/rollout-stage` on every ApplicationSet by `scripts/tests/plugins/argocd_appset_rollout_stage.bats`.
+Hub promote enforcement for `make hub-deploy REF=<commit-ish>` (moved from `CLAUDE.md` 2026-11-14; the rule is operator 2026-11-07, superseding 2026-07-24): green check runs and typed confirmation are enforced by `bin/k3dm-hub-promote` (`check_runs`, `show_and_confirm`); `k3dm.k3d.io/rollout-stage` on every ApplicationSet by `scripts/tests/plugins/argocd_appset_rollout_stage.bats`.
+
+Promote can also use an approval from the root promote authority (`bin/k3dm-promote-client`): a Worker-signed envelope is checked there for signature, nonce, approver, TOTP code and check value, and evaluation and push run there; user-side scripts only ask. Until the GitHub ruleset in `docs/howto/promote-authority.md` is enabled after Part 2e, this authority is a gate on the honest path, not a barrier.
 
 ## Environment Constraints
 
 <a id="environment-constraints"></a>
 ### Context management
 
-- **Context Management:** Sessions run in a 200K context window, and auto-compaction runs at about 167K. The 2026-10-22 trial of `autoCompactWindow: 400000` never applied, because the setting cannot exceed the window; it was set back to 200000 on 2026-11-01. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
+- **Context Management:** Sessions ran in a 200K context window until 2026-11-21, with auto-compaction at about 167K. From 2026-11-21 the window is 1M and `autoCompactWindow` is 400000 as a trial (see `docs/metrics/context-window-experiment.md`); the expected compaction point (~330K) is unconfirmed until the Observed compaction point panel shows it. The 2026-10-22 trial of `autoCompactWindow: 400000` never applied, because the setting cannot exceed the window; it was set back to 200000 on 2026-11-01. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
 
 ## Docs Conventions
 
@@ -123,8 +125,10 @@ escape rate of reviewed and unreviewed changes; the verdict on whether agent rev
 taken at the v1.46.0 cut, after two releases of data.
 
 **Review tiering (operator, 2026-11-15).** Spec review of a medium- or high-risk change (Makefile, hub,
-dispatch tooling, a shared contract) goes to Argon and Fable in parallel, each blind to the other; Claude
-verifies every finding against the code, drops refuted ones and sends one merged list. A low-risk spec (docs,
+dispatch tooling, a shared contract) goes to Fable and Astra (codex `gpt-6.2-astra`) in parallel, each blind to the
+other; Claude verifies every finding against the code, drops refuted ones and sends one merged list. (Argon and Fable
+until 2026-11-18; switched by the operator after Pair 6: "Fable is still the best of among three but Astra is also worth
+a try for second eye. Google's Gemini 4 is the weakest one", then "default-reviewer go as you suggested".) A low-risk spec (docs,
 a value pin, a single-file fix) goes to Argon only. Diff review after the verifier passes goes to Argon; Fable
 only for a high-risk land call. On a spec Claude wrote, Claude rejects a reviewer finding only when the code
 shows it is wrong. Each dual review is logged as a trial pair in `docs/reviews/reviewer-trial-fable-vs-argon.md`.
@@ -141,7 +145,7 @@ whenever the bug moves, and only write what you can support: leave it out rather
 <a id="status-first-word"></a>
 ### Status first word
 
-**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified, and `LIVE-VERIFIED` once live evidence is recorded; anything still open starts `OPEN`. The pre-commit hook refuses an `OPEN` Status that says the fix landed.
+**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified, and `LIVE-VERIFIED` once live evidence is recorded; anything still open starts `OPEN`. The pre-commit hook refuses an `OPEN` Status that says the fix landed. Land writes a plan's Status as `LANDED`; pre-commit refuses a `DRAFT` plan with approved intent.
 
 <a id="acceptance-block"></a>
 ### Acceptance block

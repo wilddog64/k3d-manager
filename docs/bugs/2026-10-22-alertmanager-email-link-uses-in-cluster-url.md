@@ -1,11 +1,10 @@
 # Bug: alert email "View In Alertmanager" link points at the in-cluster service address
 
 **Filed:** 2026-10-22 (Claude, from the operator's HubDataExportFailed email)
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3 — cosmetic; the alert state is reachable at `https://alertmanager.3ai-talk.org`
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The "View In Alertmanager" email button link is broken outside the cluster, but operators can still receive alerts and manually open Alertmanager via `https://alertmanager.3ai-talk.org` or `http://127.0.0.1:9093`); Claude proposed P3. Higher stands until the operator decides.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes" (file as P3)
 **Release:** v1.43.5 (bug; exempt from the plan cap)

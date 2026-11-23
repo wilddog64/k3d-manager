@@ -1,10 +1,9 @@
 # Bug: machine-setup N3 tests read an `install-*` token from the temp path, so a dispatch slug starting `install-` fails the land gate
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Test-only defect in `machine_setup_acceptance.bats` (`grep` matching `install-*` in `TMPDIR` instead of only the `make` target), with no production impact and a simple `TMPDIR`/slug workaround for the land gate); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator.
 **Severity:** test-only. A false red in the land fast gate; no product effect. Workaround: run `scripts/ci/fast_gate.sh` with a neutral `TMPDIR`, then land with `K3DM_SKIP_FAST_GATE=1`.
 **Introduced by:** `bd68d6ff` (v1.43.12, N3 tests added)
 **Should have been caught by:** review

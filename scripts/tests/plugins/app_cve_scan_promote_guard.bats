@@ -1,69 +1,56 @@
 #!/usr/bin/env bats
-
 bats_require_minimum_version 1.5.0
 
 setup() {
-  export TEST_SCAN_SCRIPT="${BATS_TEST_TMPDIR}/app-cve-scan-functions.sh"
-  sed '/^# === MAIN ===/,$d' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan.sh" >"${TEST_SCAN_SCRIPT}"
-  cat >>"${TEST_SCAN_SCRIPT}" <<'EOF'
+  export TEST_LOG="$BATS_TEST_TMPDIR/events" TEST_SCAN_SCRIPT="$BATS_TEST_TMPDIR/promote"
+  : >"$TEST_LOG"
+  sed '/^# === MAIN ===/,$d' "$BATS_TEST_DIRNAME/../../etc/argocd/platform-ops/app-cve-scan.sh" >"$TEST_SCAN_SCRIPT"
+  cat >>"$TEST_SCAN_SCRIPT" <<'SH'
 _rc=0
-_event_count=0
-_hub_kubectl() {
-  case "$*" in
-    *" patch application "*)
-      printf '%s\n' "$*" >>"${TEST_LOG}"
-      [ "${TEST_PATCH_RESULT}" -eq 0 ]
-      ;;
-    *" annotate application "*)
-      return 0
-      ;;
-  esac
-}
-_emit_remediation_event() {
-  _event_count=$((_event_count + 1))
-}
-_app_target_branch() { printf '%s\n' main; }
-_git_persist_promotion() { [ "${TEST_PERSIST_RESULT:-0}" -eq 0 ]; }
-_notify() { :; }
-_promote_image shopping-cart-frontend ghcr.io/wilddog64/shopping-cart-frontend sha-new sha256:testdigest old-image CVE-1
-printf 'rc=%s events=%s\n' "${_rc}" "${_event_count}"
-EOF
-  chmod +x "${TEST_SCAN_SCRIPT}"
-  export TEST_LOG="${BATS_TEST_TMPDIR}/promote.log"
-  : >"${TEST_LOG}"
+_hub_kubectl() { echo "$*" >>"$TEST_LOG"; }
+_git_persist_promotion() { echo persist >>"$TEST_LOG"; [ "$RESULT" = 0 ] && echo abc; }
+_emit_remediation_event() { echo event >>"$TEST_LOG"; }
+_notify() { echo "$*" >>"$TEST_LOG"; }
+_promote_image shopping-cart-frontend ghcr.io/wilddog64/shopping-cart-frontend sha-new sha256:d old CVE-1
+exit "$_rc"
+SH
+  [[ "$TEST_LOG" == "$BATS_TEST_TMPDIR/events" ]]
 }
 
-@test "missing Application logs a failed promotion and returns zero" {
-  run env TEST_PATCH_RESULT=1 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"PROMOTION shopping-cart-frontend: FAILED"* ]]
-  [[ "$output" == *"rc=1 events=0"* ]]
+@test "no token reports NOT APPLIED" {
+  run env GIT_WRITE_TOKEN='' RESULT=0 sh "$TEST_SCAN_SCRIPT"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"NOT APPLIED — no GIT_WRITE_TOKEN"* ]]
+  grep -F 'App CVE Promotion NOT applied: shopping-cart-frontend' "$TEST_LOG"
+  run ! grep -E '^(event|persist)$|application ' "$TEST_LOG"
 }
 
-@test "missing Application emits no remediation event" {
-  run env TEST_PATCH_RESULT=1 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"events=0"* ]]
+@test "persist failure emits no event and no application patch" {
+  run env GIT_WRITE_TOKEN=fixture RESULT=1 sh "$TEST_SCAN_SCRIPT"
+  [ "$status" -eq 1 ]
+  grep -qx persist "$TEST_LOG"
+  run ! grep -E '^event$|application ' "$TEST_LOG"
 }
 
-@test "successful Application patch emits one remediation event" {
-  run env TEST_PATCH_RESULT=0 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
+@test "success orders persistence refresh and one event" {
+  run env GIT_WRITE_TOKEN=fixture RESULT=0 sh "$TEST_SCAN_SCRIPT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"rc=0 events=1"* ]]
+  [ "$(sed -n '1p' "$TEST_LOG")" = persist ]
+  [[ "$(sed -n '2p' "$TEST_LOG")" == *"annotate application ubuntu-hostinger-shopping-cart-frontend argocd.argoproj.io/refresh=hard"* ]]
+  [ "$(sed -n '3p' "$TEST_LOG")" = event ]
+  [ "$(grep -cx event "$TEST_LOG")" = 1 ]
 }
 
-@test "git-persisted promotion clears the live image override" {
-  run env TEST_PATCH_RESULT=0 TEST_PERSIST_RESULT=0 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
+@test "successful pin never patches or clears application images" {
+  run env GIT_WRITE_TOKEN=fixture RESULT=0 sh "$TEST_SCAN_SCRIPT"
   [ "$status" -eq 0 ]
-  grep -qF -- '--type json -p [{"op":"remove","path":"/spec/source/kustomize/images"}]' "${TEST_LOG}"
-  [[ "$output" == *"cleared live image override"* ]]
-  [[ "$output" == *"persisted to git main@already-pinned"* ]]
+  grep -F 'annotate application' "$TEST_LOG"
+  run ! grep -F 'patch application' "$TEST_LOG"
 }
 
-@test "live-patch-only promotion keeps the live image override" {
-  run env TEST_PATCH_RESULT=0 TEST_PERSIST_RESULT=1 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
+@test "success reports pin branch and sha" {
+  run env GIT_WRITE_TOKEN=fixture RESULT=0 sh "$TEST_SCAN_SCRIPT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"rc=0 events=1"* ]]
-  run grep -cF '/spec/source/kustomize/images' "${TEST_LOG}"
-  [ "$output" = "0" ]
+  [[ "$output" == *"pinned ghcr.io/wilddog64/shopping-cart-frontend@sha256:d on cve-pins/hub@abc"* ]]
+  grep -F 'git=cve-pins/hub@abc' "$TEST_LOG"
 }

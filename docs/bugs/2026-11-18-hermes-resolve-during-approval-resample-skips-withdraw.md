@@ -5,6 +5,7 @@
 **Introduced by:** pre-existing in shape; `withdraw_on_resolve` (v1.44.x R7) kept the default on re-samples by design
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Rare timing window where an incident resolving during an approval re-sample skips posting the withdrawal and resolved notice.)
 **Waiting on:** operator decision
 **Prior art:** docs/bugs/2026-11-17-hermes-r7-signing-restore-offered-when-vault-sealed.md (keyword) — read; its test 13 deliberately keeps pending repairs on an approval re-sample. Different question (what happens to the resolved notice). `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18

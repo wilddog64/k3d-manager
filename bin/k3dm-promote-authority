@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
+# shellcheck source=/dev/null
+source "$repo/scripts/lib/system.sh"
+py=/Library/Developer/CommandLineTools/usr/bin/python3
+gitbin=/Library/Developer/CommandLineTools/usr/bin/git
+label=com.k3d-manager.promote-authority
+lib=/usr/local/libexec/k3dm-promote
+daemon=$lib/k3dm-promote-daemon.py
+base=/var/db/k3dm-promote
+conf=/etc/k3dm-promote
+plist=/Library/LaunchDaemons/$label.plist
+sources=(scripts/libexec/k3dm-promote-daemon.py scripts/lib/hub_approval.py scripts/lib/promote_mover.py
+         "scripts/etc/launchd-daemons/$label.plist.tmpl" scripts/etc/promote/promote.conf.tmpl)
+plan=0
+die() { echo "$*" >&2; exit 1; }
+priv() {
+    if (( plan )); then
+        printf '%q ' "$@"
+        printf '\n'
+    else
+        _run_command --interactive-sudo -- "$@"
+    fi
+}
+action=${1:-}
+shift || true
+case "$action" in
+    status)
+        rc=0
+        "$repo/bin/k3dm-promote-client" status || rc=$?
+        _run_command --soft -- /bin/launchctl print "system/$label" || true
+        exit "$rc" ;;
+    enrol)
+        [[ -z ${TMUX+x} && -z ${STY+x} && -t 0 ]] || die 'Use the physical console outside tmux or screen.'
+        case "$*" in
+            --reset-state) priv "$py" -IS "$daemon" reset-state ;;
+            '') priv "$py" -IS "$daemon" enrol ;;
+            *) [[ $# == 2 && $1 == --rotate && $2 =~ ^(totp|relay-key|deploy-key|token|host-key)$ ]] || die 'Invalid rotation'
+               priv "$py" -IS "$daemon" enrol --rotate "$2" ;;
+        esac
+        exit ;;
+    ruleset-verified)
+        [[ $# == 1 && $1 == PROBE_FILE=?* ]] || die 'Expected PROBE_FILE=path'
+        priv /usr/bin/true
+        priv "$py" -IS "$daemon" mark-ruleset < "${1#PROBE_FILE=}"
+        exit ;;
+    probe-deploy-key) priv "$py" -IS "$daemon" probe-deploy-key; exit ;;
+    uninstall)
+        _run_command --interactive-sudo --soft -- /bin/launchctl bootout "system/$label" || true
+        priv /bin/rm -f "$plist"
+        priv /bin/rm -rf "$lib"
+        exit ;;
+    print-plan) plan=1 ;;
+    install) ;;
+    *) die 'Expected install, enrol, status, uninstall, print-plan, probe-deploy-key or ruleset-verified' ;;
+esac
+ids='' ref=''
+for arg in "$@"; do
+    case "$arg" in
+        OPERATOR_IDS=*) ids=${arg#*=} ;;
+        INSTALL_REF=*) ref=${arg#*=} ;;
+        *) die 'Unknown install option' ;;
+    esac
+done
+tmp='/tmp/<operator-staging>'
+stage="$base/staging.<UTC>"
+hashes=()
+if ((!plan)); then
+    [[ $ids =~ ^(cli|[A-Z0-9]{2,32})(,(cli|[A-Z0-9]{2,32}))*$ ]] || die 'Invalid OPERATOR_IDS'
+    if [[ -z $ref ]]; then
+        _run_command -- "$gitbin" -C "$repo" fetch origin refs/heads/deploy/hub:refs/remotes/origin/deploy/hub
+        ref=origin/deploy/hub
+    fi
+    commit=$(_run_command -- "$gitbin" -C "$repo" rev-parse --verify --end-of-options "$ref^{commit}")
+    tmp=$(mktemp -d)
+    trap '/bin/rm -rf -- "$tmp"' EXIT
+    stage="$base/staging.$(/bin/date -u +%Y%m%dT%H%M%SZ)"
+    mkdir "$tmp/rendered"
+    for src in "${sources[@]}"; do
+        blob=$(_run_command -- "$gitbin" -C "$repo" rev-parse "$commit:$src")
+        hashes+=("$blob")
+        _run_command -- "$gitbin" -C "$repo" cat-file blob "$blob" > "$tmp/${src##*/}"
+    done
+    printf '{"operator_uid":"%s","operator_gid":"%s","operator_ids":"%s"}\n' "$(id -u)" "$(id -g)" "$ids" > "$tmp/values.json"
+    _run_command -- "$py" -IS "$tmp/k3dm-promote-daemon.py" render "$tmp"
+fi
+# Check parents before installing into them. stat reports a symlink's own metadata.
+check_existing() {
+    local path=$1 mode=${2:-} actual uid gid bits kind listing
+    if ((plan)); then
+        priv /bin/ls -lde "$path"
+        priv /usr/bin/stat -f '%u %g %Lp %HT' "$path"
+        if [[ $path == "$py" || $path == "$frame/python3" ]]; then priv /usr/bin/readlink "$path"; fi
+        return
+    fi
+    listing=$(priv /bin/ls -lde "$path")
+    [[ $listing != *$'\n'* ]] || die "ACL: $path"
+    actual=$(priv /usr/bin/stat -f '%u %g %Lp %HT' "$path")
+    read -r uid gid bits kind <<< "$actual"
+    [[ $uid == 0 && $bits =~ ^[0-7]+$ ]] || die "Unsafe owner: $path"
+    if [[ $kind == 'Symbolic Link' ]]; then
+        case "$path" in
+            "$py") [[ $(priv /usr/bin/readlink "$path") == ../../Library/Frameworks/Python3.framework/Versions/3.9/bin/python3 ]] || die "$path" ;;
+            "$frame/python3") [[ $(priv /usr/bin/readlink "$path") == python3.9 ]] || die "$path" ;;
+            *) die "Symlink: $path" ;;
+        esac
+    else
+        (( (8#$bits & 022) == 0 )) || die "Writable: $path"
+        [[ -z $mode || ( $kind == Directory && $bits == "$mode" && $gid == 0 ) ]] || die "Unsafe directory: $path"
+    fi
+}
+exists() {
+    # Evaluate these positional arguments inside the privileged shell.
+    # shellcheck disable=SC2016
+    priv /bin/sh -c 'if test -e "$1" || test -L "$1"; then echo present; fi' sh "$1"
+}
+ensure_dir() {
+    local path=$1 mode=$2 state
+    if ((plan)); then
+        exists "$path"
+        check_existing "$path" "$mode"
+        priv /usr/bin/install -d -m "$mode" -o root -g wheel "$path"
+    else
+        state=$(exists "$path")
+        if [[ $state == present ]]; then
+            check_existing "$path" "$mode"
+        else
+            priv /usr/bin/install -d -m "$mode" -o root -g wheel "$path"
+        fi
+    fi
+}
+priv /usr/bin/true
+clt=/Library/Developer/CommandLineTools
+frame=$clt/Library/Frameworks/Python3.framework/Versions/3.9/bin
+for path in /Library /Library/LaunchDaemons /Library/Developer "$clt" "$clt/usr" "$clt/usr/bin" "$py" "$clt/Library" \
+    "$clt/Library/Frameworks" "$clt/Library/Frameworks/Python3.framework" "$clt/Library/Frameworks/Python3.framework/Versions" \
+    "${frame%/bin}" "$frame" "$frame/python3" "$frame/python3.9" /usr /usr/local; do
+    check_existing "$path"
+done
+ensure_dir "$base" 700
+for name in creds state mirror.git; do ensure_dir "$base/$name" 700; done
+ensure_dir "$conf" 755
+ensure_dir /usr/local/libexec 755
+ensure_dir "$lib" 755
+priv /bin/mkdir -m 700 "$stage"
+if ((!plan)); then
+    cleanup() { priv /bin/rm -rf -- "$stage"; /bin/rm -rf -- "$tmp"; }
+    trap cleanup EXIT
+fi
+priv /usr/bin/ditto --noacl --noextattr "$tmp" "$stage"
+# The copied tree must contain only directories and independent regular files.
+# Reject aliases before any recursive ownership change or execution from staging.
+priv "$py" -IS -c 'import os, stat, sys
+root = sys.argv[1]
+for parent, dirs, files in os.walk(root):
+    for name in dirs + files:
+        st = os.lstat(os.path.join(parent, name))
+        if not (stat.S_ISDIR(st.st_mode) or (stat.S_ISREG(st.st_mode) and st.st_nlink == 1)):
+            sys.exit("unsafe staged entry: " + name)' "$stage"
+priv /usr/sbin/chown -R 0:0 "$stage"
+priv /bin/chmod -RN "$stage"
+priv /bin/chmod -R go-w "$stage"
+cd /
+for i in "${!sources[@]}"; do
+    src=${sources[i]}
+    cmd=(/usr/bin/env -i PATH=/usr/bin:/bin HOME=/var/empty GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null "$gitbin" hash-object --no-filters "$stage/${src##*/}")
+    if ((plan)); then priv "${cmd[@]}"; else
+        actual=$(priv "${cmd[@]}")
+        [[ $actual == "${hashes[i]}" ]] || die "Staged blob mismatch: $src"
+    fi
+done
+priv "$py" -IS "$stage/k3dm-promote-daemon.py" render-check "$stage"
+for file in "$daemon" "$lib/hub_approval.py" "$lib/promote_mover.py" "$conf/promote.conf" "$plist"; do
+    if ((plan)); then
+        exists "$file"
+        state=present
+    else
+        state=$(exists "$file")
+    fi
+    if [[ $state == present ]]; then
+        check_existing "$file"
+    fi
+done
+for name in k3dm-promote-daemon.py hub_approval.py promote_mover.py; do
+    mode=644
+    [[ $name != k3dm-promote-daemon.py ]] || mode=755
+    priv /usr/bin/install -m "$mode" -o root -g wheel "$stage/$name" "$lib/$name"
+done
+priv /usr/bin/install -m 644 -o root -g wheel "$stage/rendered/promote.conf" "$conf/promote.conf"
+priv /usr/bin/install -m 644 -o root -g wheel "$stage/rendered/$label.plist" "$plist"
+priv /bin/chmod -RN "$daemon" "$lib/hub_approval.py" "$lib/promote_mover.py" "$conf/promote.conf" "$plist"
+if ((plan)); then
+    priv /bin/launchctl bootstrap system "$plist"
+    priv /bin/launchctl kickstart -k "system/$label"
+    priv /bin/rm -rf -- "$stage"
+elif _run_command --soft -- /bin/launchctl print "system/$label" >/dev/null 2>&1; then
+    priv /bin/launchctl kickstart -k "system/$label"
+else
+    priv /bin/launchctl bootstrap system "$plist"
+fi

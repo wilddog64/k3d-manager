@@ -535,8 +535,17 @@ function _cluster_preflight_apply_argocd_resources() {
 
   _info "[preflight] Applying preflight ApplicationSet clones..."
   _kubectl apply -f "$platform_render" >/dev/null
-  _kubectl apply -f "$services_render" >/dev/null
   _kubectl apply -f "$observability_render" >/dev/null
+  local pin_lookup_rc=0
+  GIT_TERMINAL_PROMPT=0 _run_command --soft -- git ls-remote --exit-code https://github.com/wilddog64/k3d-manager refs/heads/cve-pins/hub >/dev/null || pin_lookup_rc=$?
+  if (( pin_lookup_rc != 0 )); then
+    if (( pin_lookup_rc == 2 )); then
+      _err "[preflight] Refusing to apply services-git: pin branch cve-pins/hub not found (exit $pin_lookup_rc)"
+    else
+      _err "[preflight] Refusing to apply services-git: pin branch lookup failed (rc $pin_lookup_rc)"
+    fi
+  fi
+  _kubectl apply -f "$services_render" >/dev/null
 }
 
 if [[ "${PREFLIGHT_REUSE}" -eq 1 ]]; then

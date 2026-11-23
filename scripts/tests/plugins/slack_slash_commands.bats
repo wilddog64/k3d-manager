@@ -10,8 +10,13 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   run grep -F -- '/cluster-diagnose' "${DOC}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- '/hostinger-status' "${DOC}"
+  run head -n 4 "${DOC}"
   [ "${status}" -eq 0 ]
+  [[ "${output}" != *'/hostinger-status'* ]]
+
+  run grep -F -- '| `reader` |' "${DOC}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *'/hostinger-status'* ]]
 
   run grep -F -- '/cluster-refresh' "${DOC}"
   [ "${status}" -eq 0 ]
@@ -37,7 +42,7 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '"command": "/hostinger-status"' "${DOC}"
-  [ "${status}" -eq 0 ]
+  [ "${status}" -ne 0 ]
 
   run grep -F -- '"usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger"' "${DOC}"
   [ "${status}" -eq 0 ]
@@ -73,6 +78,8 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '| `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` |' "${DOC}"
+  [ "${status}" -ne 0 ]
+  run grep -F -- 'Hostinger status: `/cluster-status hostinger` (`/hostinger-status` was retired 2026-11-08).' "${DOC}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '| `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` |' "${DOC}"
@@ -93,7 +100,7 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   [ "${status}" -eq 0 ]
 }
 
-@test "slack relay allowlist includes cluster-status and hostinger-status" {
+@test "slack relay allowlist includes cluster-status without hostinger-status" {
   run grep -F -- 'const ALLOWED_COMMANDS = new Set([' "${WORKER}"
   [ "${status}" -eq 0 ]
 
@@ -102,13 +109,41 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
 
   local _cmd
   for _cmd in /cluster-up /cluster-down /cluster-status /cluster-diagnose \
-              /cluster-refresh /cluster-resume /hostinger-status /ask /claude \
+              /cluster-refresh /cluster-resume /ask /claude \
               /gemini /codex /argocd-upgrade; do
     if [[ "${_allowlist}" != *"'${_cmd}'"* ]]; then
       echo "ALLOWED_COMMANDS is missing ${_cmd}: ${_allowlist}"
       return 1
     fi
   done
+
+  [[ "${_allowlist}" != *"'/hostinger-status'"* ]]
+
+  run grep -F -- "'/hostinger-status': 'reader'" "${WORKER}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "the hostinger-status API stays while protected webhook files remain unchanged" {
+  local _repo _expected
+  _repo="$(git -C "${BATS_TEST_DIRNAME}/../../.." rev-parse --show-toplevel)"
+  _expected="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd -P)"
+  [ "${_repo}" = "${_expected}" ]
+
+  run grep -F -- '"/api/v1/hostinger-status": {"handler": "hostinger_status", "min_role": "reader"' "${_repo}/bin/k3dm-webhook"
+  [ "${status}" -eq 0 ]
+
+  run git -C "${_repo}" diff --name-only -- bin/k3dm-webhook scripts/lib/webhook/policy.py scripts/lib/webhook/cloud_actions.py scripts/lib/webhook/status.py
+  [ "${status}" -eq 0 ]
+  [ -z "${output}" ]
+}
+
+@test "relay architecture allowlist omits hostinger-status and API route stays documented" {
+  local _architecture="${BATS_TEST_DIRNAME}/../../../docs/architecture/cloudflare-slack-relay.md"
+  run grep -F -- "'/cluster-resume'" "${_architecture}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *'/hostinger-status'* ]]
+  run grep -F -- '/api/v1/hostinger-status' "${_architecture}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "slack relay assigns remote-operator roles to cluster commands" {

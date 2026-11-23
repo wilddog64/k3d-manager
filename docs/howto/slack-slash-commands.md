@@ -1,7 +1,7 @@
 # Slack Slash Commands & Webhook Server
 
 Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-diagnose`, `/cluster-refresh`,
-`/cluster-resume`, `/hostinger-status`, `/cleanup-stale-sandbox`, `/k3dm`, `/ask-docs`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
+`/cluster-resume`, `/cleanup-stale-sandbox`, `/k3dm`, `/ask-docs`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
 that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
 and job control via thread replies.
 
@@ -67,7 +67,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 
 | Role | Allowed commands |
 |------|------------------|
-| `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/ask-docs`, `/claude`, `/gemini`, `/codex` |
+| `reader` | `/cluster-status`, `/cluster-diagnose`, `/ask`, `/ask-docs`, `/claude`, `/gemini`, `/codex` |
 | `operator` | `/cluster-refresh`, `/k3dm smoke` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
 
@@ -162,13 +162,6 @@ Run once per machine. Safe to re-run.
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Resume cluster provision from last checkpoint",
         "usage_hint": "[aws|gcp|az]  e.g. aws",
-        "should_escape": false
-      },
-      {
-        "command": "/hostinger-status",
-        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Check Hostinger app cluster status",
-        "usage_hint": "e.g. no args",
         "should_escape": false
       },
       {
@@ -343,11 +336,10 @@ bin/k3dm-webhook-setup --uninstall
 |---------|--------|---------|-------|
 | `/cluster-up <aws\|gcp\|az\|hostinger>` | Provision cluster | `/cluster-up hostinger` | Cluster is **required** — there is no default. Hostinger is the permanent app cluster; others are lab sandboxes |
 | `/cluster-down <aws\|gcp\|az\|hostinger>` | Tear down cluster | `/cluster-down hostinger` | Cluster is **required** — there is no default. An unrecognized name is rejected, never resolved to a fallback |
-| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` | kubectl nodes + ArgoCD app status + smoke test |
+| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` | kubectl nodes + ArgoCD app status + smoke test. Hostinger status: `/cluster-status hostinger` (`/hostinger-status` was retired 2026-11-08). |
 | `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `/cluster-diagnose hostinger pods shopping-cart-apps` | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
-| `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
 | `/ask-docs [--sources] <question>` | Search the documentation corpus | `/ask-docs --sources how is retrieval evaluated?` | Reader-only; answers are advisory and include sources |
 | `/argocd-upgrade <chart-version> [acg\|infra] [confirm]` | Upgrade the ArgoCD Helm chart | `/argocd-upgrade 7.9.1 acg` | Admin-only; the `infra` stage changes shared infrastructure and is refused without `confirm` |
 | `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |

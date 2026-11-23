@@ -1,0 +1,4 @@
+## absent label: launchctl print system/com.k3d-manager.capture-sshd (operator)
+Bad request.
+Could not find service "com.k3d-manager.capture-sshd" in domain for system
+rc=113

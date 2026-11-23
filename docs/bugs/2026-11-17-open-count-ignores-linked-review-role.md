@@ -5,6 +5,7 @@
 **Introduced by:** 6972d10a (multi-project M1: `open --count`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (`open --count` overstates WIP when a review role is attached via `link` after start, with a workaround of passing `--role` at `start` or counting from `open`.)
 **Waiting on:** operator decision
 **Prior art:** not run (vector store unreachable; exact-slug glob found none)
 

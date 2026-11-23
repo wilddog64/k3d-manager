@@ -1,0 +1,72 @@
+# C17b profile=prod 2026-11-20T02:36:10Z
+## -L
+POKE fail: [Errno 54] Connection reset by peer
+LISTENER none: timed out
+debug1: Local connections to LOCALHOST:45111 forwarded to remote address 127.0.0.1:45101
+debug1: Local forwarding listening on ::1 port 45111.
+debug1: channel 0: new port-listener [port listener] (inactive timeout: 0)
+debug1: Local forwarding listening on 127.0.0.1 port 45111.
+debug1: channel 1: new port-listener [port listener] (inactive timeout: 0)
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Connection to port 45111 forwarding to 127.0.0.1 port 45101 requested.
+## -D
+SOCKS reply b''
+SOCKS data b''
+LISTENER none: timed out
+debug1: Local connections to LOCALHOST:45112 forwarded to remote address socks:0
+debug1: Local forwarding listening on ::1 port 45112.
+debug1: channel 0: new port-listener [port listener] (inactive timeout: 0)
+debug1: Local forwarding listening on 127.0.0.1 port 45112.
+debug1: channel 1: new port-listener [port listener] (inactive timeout: 0)
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Connection to port 45112 forwarding to socks port 0 requested.
+## -R
+POKE fail: [Errno 61] Connection refused
+LISTENER none: timed out
+debug1: Remote protocol version 2.0, remote software version OpenSSH_10.2
+debug1: Remote connections from LOCALHOST:45113 forwarded to local address 127.0.0.1:45103
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: Server has disabled port forwarding.
+debug1: remote forward failure for: listen 45113, connect 127.0.0.1:45103
+Warning: remote port forwarding failed for listen port 45113
+## -W
+ (client stdout above)
+LISTENER none: timed out
+debug1: channel_connect_stdio_fwd: 127.0.0.1:45104
+debug1: channel 0: new stdio-forward [stdio-forward] (inactive timeout: 0)
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+channel 0: open failed: administratively prohibited: open failed
+stdio forwarding failed
+## stream-local -L
+POKE fail: [Errno 54] Connection reset by peer
+ULISTENER none: timed out
+debug1: Local connections to LOCALHOST:45115 forwarded to remote address /private/tmp/k3dm-captures-2026-11-19/u.sock:-2
+debug1: Local forwarding listening on ::1 port 45115.
+debug1: channel 0: new port-listener [port listener] (inactive timeout: 0)
+debug1: Local forwarding listening on 127.0.0.1 port 45115.
+debug1: channel 1: new port-listener [port listener] (inactive timeout: 0)
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Connection to port 45115 forwarding to /private/tmp/k3dm-captures-2026-11-19/u.sock port -2 requested.
+## -s sftp
+sftp rc=255
+debug1: channel 0: new session [client-session] (inactive timeout: 0)
+debug1: channel 0: setting env LANG = "en_US.UTF-8"
+debug1: channel 0: setting env LC_TERMINAL_VERSION = "3.7.7"
+debug1: channel 0: setting env LC_TERMINAL = "iTerm2"
+debug1: Sending subsystem: sftp
+subsystem request failed on channel 0
+## -A on ssh -tt
+ENTRY cmd='info'
+ENTRY SSH_AUTH_SOCK set=False
+debug1: get_agent_identities: bound agent to hostkey
+debug1: get_agent_identities: agent returned 1 keys
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: cert: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Requesting authentication agent forwarding.
+debug1: pledge: agent
+## -X: no xauth on stock macOS (none); evidence is the readback
