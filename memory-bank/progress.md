@@ -1,4 +1,5 @@
 # Progress — v1.45.0 (older entries: `memory-bank/archive/progress-2026-11-22.md`, then `-2026-11-21.md`, `-2026-11-20.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
+- 2026-11-23: hoverfocus PR #1 opened (m1-base → main, head a4d9abb, not draft); blind Argon review spec `docs/plans/review-hoverfocus-pr1-v0.0.1.md` dispatched (agy, role review).
 - [ ] hoverfocus v0.0.1: PR m1-base → main, Argon blind review, merge, tag; bugs → v0.0.2.
 - [ ] hoverfocus: E-L1 done 2026-11-23 (1-2 pass, 3 known limitation, bug filed); next M1 PR decision.
 - [ ] hoverfocus E-L1: steps 1-2 pass 2026-11-23; step 3 pending; iTerm hollow-cursor P3 filed.

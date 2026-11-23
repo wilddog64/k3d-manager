@@ -1,4 +1,5 @@
 ## Update — 2026-11-22 ~19:30 PST — 2b LANDED e3eb53ca (code bb5b6aa9); CI pending on head
+- 2026-11-23: hoverfocus PR #1 opened (m1-base → main, head a4d9abb, not draft); blind Argon review spec `docs/plans/review-hoverfocus-pr1-v0.0.1.md` dispatched (agy, role review).
 - **2026-11-23 hoverfocus ship decision (operator):** ship v0.0.1 with E-L1 as is; 3 hoverfocus bugs (same-app switch, terminal cursor, install/TCC gaps) carry → v0.0.2. README limitations updated on m1-base `a4d9abb`; M1 PR next.
 - **2026-11-23 hoverfocus E-L1 complete:** steps 1-2 pass; step 3 FAIL as spec-known limitation (same-app window switch has no effect) — filed P2-proposed `docs/bugs/2026-11-23-hoverfocus-same-app-window-switch-no-effect.md`; unfocused-cursor P3 also seen on Terminal.app. Operator decides whether same-app blocks M1 PR / v0.0.1.
 - **2026-11-23 hoverfocus E-L1 (m2):** step 1 PASS (TextEdit behind iTerm, focus without raise), step 2 PASS (menu Running after `tccutil reset` + regrant + kickstart); step 3 (two TextEdit windows) pending. Filed P3 `docs/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md`.
