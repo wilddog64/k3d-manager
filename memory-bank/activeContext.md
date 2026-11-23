@@ -143,3 +143,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: CodeQL #38/#39 (totpctl enroll secret to /dev/tty) — false positive, operator approved dismissal; classifier blocked Claude dismissing → operator dismisses. Issue doc written. Argon review + CI running.
 
 - 2026-11-23: hoverfocus bootstrap error 5 root cause = SSH pane is launchd Background session vs plist LimitLoadToSessionType Aqua. Claude sent `open HoverFocus.app` to m2 pane work:2.0 (operator asked): running pid 86349; E-L1 needs operator at m2 (Accessibility + hover test).
+
+- 2026-11-23: hoverfocus agent loaded on m2 via sudo launchctl asuser bootstrap (operator typed password): state running pid 86556. E-L1 pending operator hover test.
