@@ -11,8 +11,8 @@
 **Approval:** operator, 2026-11-10: "also can you schedule the label fix?"
 **Intent approved:** operator, 2026-11-23
 **Intent approval words:** "yes, go ahead to file a P3 spec" (2026-11-23); first approved 2026-11-10 ("go with your suggestion")
-**Waiting on:** dispatch — since 2026-11-23
-**Dispatch:** next free slot after 2026-11-23 (`--agent codex --model gpt-6-luna`); the 2026-11-10 agy dispatch never ran
+**Waiting on:** fix running — since 2026-11-23
+**Dispatch:** codex gpt-6-luna, started 2026-11-23 (task/v1.45.1/2026-11-10-human-continuation-prompts-panel-counts-coordinator-resumes)
 **Filed:** 2026-11-10
 **Detected by:** operator, 2026-11-07 (v1.43.14 retro); re-raised 2026-11-10
 **Branch:** `k3d-manager-v1.45.1`
