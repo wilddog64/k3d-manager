@@ -5,7 +5,7 @@
 **Introduced by:** `4c5d3556` (v1.16.0, services-git Application name became `'{{.name}}-{{.path.basename}}'`)
 **Should have been caught by:** offline test (the render function is stubbed out in `cluster_preflight_pin_guard.bats:12`; nothing renders it)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — blocked until R1 lands (see Routing)
+**Waiting on:** fix running — since 2026-11-23 (R1 landed 5f7ef7be; services-git.yaml:51 still `'{{.name}}-{{.path.basename}}'`)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-preflight-services-appset-name-rename-no-longer-matches.md`: none; `make find-similar-docs` not run (vector store unavailable); [`v1.1.1-bugfix-preflight-cluster-name-label.md`](v1.1.1-bugfix-preflight-cluster-name-label.md) (name grep) — read, different defect in the same render family
@@ -49,6 +49,11 @@ evidence:
     red_control: on current code the rendered file still contains name '{{.name}}-{{.path.basename}}'
     intent: A preflight run creates its own clearly-labelled copies of the shopping-cart apps, so the preflight waits for and cleans up the right apps and never touches production ones.
 ```
+
+## Files
+
+- `bin/cluster-preflight` — match the current Application name line in `_cluster_preflight_render_services_appset`; fail the render when an expected substitution matched nothing
+- `scripts/tests/bin/cluster_preflight_render.bats` — new: E1 (real template render, doctored template without the name line)
 
 ## Routing
 
