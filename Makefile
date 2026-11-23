@@ -512,8 +512,9 @@ sync-main:
 ## Reapply every ApplicationSet pinned to deploy/hub (APPSETS_STAGE=hub|all)
 appsets-reapply:
 	@bin/k3dm-require-role hub
-	@set -eo pipefail; source "$(CURDIR)/scripts/lib/foundation/scripts/lib/system.sh"; \
+	@set -eo pipefail; \
 	_sha=""; if [ -n "$${APPSETS_SHA:-}" ]; then \
+	  source "$(CURDIR)/scripts/lib/foundation/scripts/lib/system.sh"; \
 	  printf '%s' "$${APPSETS_SHA}" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$$' || { echo '[appsets-reapply] invalid APPSETS_SHA' >&2; exit 2; }; \
 	  _run_command --soft -- git -C "$(CURDIR)" fetch --no-tags origin refs/heads/deploy/hub; \
 	  _got="$$( _run_command --soft -- git -C "$(CURDIR)" rev-parse --verify 'FETCH_HEAD^{commit}' )"; \
