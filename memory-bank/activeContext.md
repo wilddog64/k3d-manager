@@ -3,7 +3,7 @@
 - 2b landed on k3d-manager-v1.45.0: c1def92c (Luna tree, Claude-committed), 44b37351 (E7 HEAD cmp removed), bb5b6aa9 (appsets source only on pinned path), e3eb53ca plan LANDED. Overrides: --allow-instruction-files (copilot-instructions), --allow-out-of-scope (3 E7 fixtures), both operator-approved and on the spec.
 - Next: CI green on e3eb53ca, then operator runs make hub-deploy REF=e3eb53ca (tmux), then live check. Did NOT run make hub-sync (outward-facing; hub reads deploy/hub).
 - Raw web-console B captures moved to ~/.local/share/k3d-manager/captures/2026-11-22-web-console-b-raw/ (24) and 2026-11-22-root-scratch/ (3); write-up still owed.
-- Open: P3 docs/bugs/2026-11-22-hub-promote-tty-driver-10s-deadline-fails-under-load.md (triage). M1b landed (bef450c). M1a rev 4 READY, Luna dispatch running (hoverfocus-m1a-focus-core). Operator 2026-11-22: tag hoverfocus v0.0.1 initial release with the M1 PR.
+- Open: P3 docs/bugs/2026-11-22-hub-promote-tty-driver-10s-deadline-fails-under-load.md (triage). M1b landed (bef450c). M1a LANDED m1-base 4cbd377; awaiting operator OK for m2 install + E-L1. Operator 2026-11-22: tag hoverfocus v0.0.1 initial release with the M1 PR.
 
 ## Update — 2026-11-22 ~15:20 PST — order PR #109 ready to merge; 2b resume 6 running
 
