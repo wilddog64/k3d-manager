@@ -151,3 +151,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: CodeQL #38/#39 dismissed false positive by Claude (operator "yes"). Pushed 3810d909; CI pending.
 
 - 2026-11-23: m2 dr-drill with istioctl 1.31.4: Phase 2 PASSED (istio pin confirmed); Phase 3 restore failed: empty age identity, login Keychain locked over SSH. Filed docs/bugs/2026-11-23-dr-drill-restore-empty-age-identity-locked-keychain.md. Workaround: security unlock-keychain then rerun.
+
+- 2026-11-23: filed P3 docs/bugs/2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md (operator go). Deleted leftover dr-drill cluster on m2; drill rerun in progress in work:2.0.
