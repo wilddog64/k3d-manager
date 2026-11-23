@@ -90,6 +90,11 @@ A forged unsigned deny can stop a promotion. The Worker asserts the Slack identi
 reduces the protection to TOTP and the public check. Root compromise defeats the authority. The integrity checks begin
 after Python startup, and the rules protect remote refs while the hub checkout remains writable by its owner.
 
+An install, upgrade or uninstall is a root-trust decision in the checkout: the installers source `scripts/lib/system.sh`
+from the working tree, so a process running as the operator can change what runs under sudo. Until
+[the fix](../bugs/2026-11-23-root-installers-source-writable-checkout.md) lands, install from a fresh clone of the protected remote
+ref at a commit checked on a second channel.
+
 ### Hub evidence to record
 
 For each GitHub and Cloudflare credential, enter the observed permission set and date. Capture permission names and HTTP status only.
