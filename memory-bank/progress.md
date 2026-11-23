@@ -10,7 +10,8 @@
   (E9/E10); remote-promote 2a, 2c `c17eae59`, 2d (E11); hub-deploy self-update `3b541f3b`; multi-project; agy repo/mode
   P3 `1e237612` (E6-E8); web-console C `1026dbe2`/`c79c8ec0` (live after hub-deploy). All need a hub-deploy first.
 - **Running (Luna):** 2b promote wiring (resume 2). Correlator P3 `f99f59f4` and reauth P3 `e1972118` landed (E2 intent approved).
-- **Not started:** web-console B (operator captures), red-team gate (intents approved, after 2b and B), release PR
+- **Carried out (operator 2026-11-22):** web-console B, to the next grooming; Claude runs C2/C6-unpriv/C8-offline/C10.
+- **Not started:** red-team gate (intents approved, after 2b and B), release PR
   (Argon review; Copilot capped until 12-01).
 - **Carried out of v1.45.0:** make-up-app-none (`93fe6b62`), to this grooming.
 - **app-cve-scan auth fixed 2026-11-22:** classic PAT `k3dm-app-cve-scan` (repo, read:packages), expires 2027-02-20.
