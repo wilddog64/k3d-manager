@@ -76,7 +76,7 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
   run grep -F -- 'group: image-updater' "${RULE}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)"' "${RULE}"
+  run grep -F -- 'name=~"(.+-)?shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)"' "${RULE}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'increase(argocd_app_sync_total{' "${RULE}"
