@@ -5,6 +5,11 @@
       "digest": "sha256:7df6c74afe7856d6c0440f0c714748c44d97d30adf8d62ef944f83b1c4f63659",
       "base": "sha256:97d0b172db3bfeaaabb8e4d75b6183369be87d080b2f3d564779b38b2f7fe18c",
       "at": "2026-11-23T09:03:11Z"
+    },
+    "shopping-cart-payment": {
+      "digest": "sha256:5224b69d6e772d8f4762e2f54f005aeea62dc2d02e54dcab7d4049b813df1ff5",
+      "base": "sha256:34497a00fbe72dd51e7ed9636d704479a8ced7d54db467d7003d71b7a1965cc5",
+      "at": "2026-11-23T09:09:09Z"
     }
   }
 }
