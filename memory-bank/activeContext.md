@@ -131,3 +131,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: ideas row added: self-diagnosing DR drill (headless Claude on API credit + Slack approve; operator yes). dr-drill workaround steps given to operator (istioctl 1.31.4 on PATH); Claude download on m2 was denied by permission classifier.
 
 - 2026-11-23: operator go — independent Acceptance verifiers started for 2c (root daemon) and 2e (CVE-pin branch): Sonnet, worktree-isolated, sandbox-exec deny sudo/launchctl, scratch HOME. After both PASS: release PR (CI, Argon review, smoke, scope).
+
+- 2026-11-23: 2c VERIFIED (independent Acceptance PASS; Claude re-ran 90 pytest + 9 bats on b036afc2). 2e verifier still running.
