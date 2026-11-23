@@ -106,3 +106,18 @@ reviewed blind by Argon (no Copilot on OOB repos), merged by the operator.
 This is the first parallel Luna + Flash dispatch on one feature. Record per child: resumes, land refusals, verify
 result, and whether the interface held (any request to change `Interface.swift` counts as a miss). Note it in
 `project_complex_bug_decomposition_trial` memory at the end.
+
+## Rev 2 additions (operator, 2026-11-22)
+
+- **Icon:** concept B "Dwell" chosen ("B Dwell looks good"); source on the design canvas
+  https://claude.ai/artifact/32Ju85vZ7YBvnzW2Uart3W (boards "hoverfocus icon concepts" and "B · Dwell — menu bar
+  setting"). M1b turns it into `packaging/AppIcon.icns` (`iconutil`) and a menu bar glyph drawn in code or a template
+  PDF; `Info.plist` gains `CFBundleIconFile`.
+- **Menu bar icon is configurable** ("Can we make light bar and Dark bar configurable?"): `Config.menuBarIcon`
+  (`MenuBarIconStyle`: `auto` default, `color`, `light`, `dark`), added to `Interface.swift` on `m1-base` at `92ab158`.
+  `auto` = template image (macOS recolours it); `color` = non-template, teal dwell arc (#0B8F7C on light bars, #4FD8BF
+  on dark, chosen from the effective appearance); `light` = always the dark glyph; `dark` = always the white glyph.
+  Paused or Off draws the glyph at 40% in every style. M1a: `ConfigLoader` rejects any other string as
+  `ConfigError.invalid` naming `menuBarIcon`. M1b: a `Menu Bar Icon` submenu with the four choices (checkmark on the
+  current one; applies at once, in memory only, like `Enabled`), redraw on appearance change, `docs/config.md` and
+  `config.example.json` gain the key. Acceptance additions land with the full rev 2.
