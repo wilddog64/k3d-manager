@@ -43,7 +43,9 @@ report json, no error message in the pane. Same result in runs 3 and 4 (26m44s),
 ## Notes
 
 - Kept cluster `dr-drill` is still up on m2-air for further diagnosis; delete it (`k3d cluster delete dr-drill`)
-  before the next drill, or the preflight refuses (see `2026-11-23-dr-dri## Fix (spec rev 2, Claude, 2026-11-23) — defect 2 only
+  before the next drill, or the preflight refuses (see `2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md`).
+
+## Fix (spec rev 2, Claude, 2026-11-23) — defect 2 only
 
 Defect 1 (which admin password wins after a restore) needs an operator decision (see Open question). Defect 2 makes
 the drill report the failure instead of vanishing.
@@ -123,9 +125,7 @@ A stub at the helper (as B4-R3 does) goes green on rev 1's broken fix.
 
 ## Routing
 
-Luna. One task together with the empty-identity fix (same two files).
-
-ix: one task for both (recommended), or serial.
+Luna. Serial after the empty-identity fix (same two files), which landed as `77d5a836` on 2026-11-23; dispatch from that base.
 
 ## Open question (operator) — defect 1
 

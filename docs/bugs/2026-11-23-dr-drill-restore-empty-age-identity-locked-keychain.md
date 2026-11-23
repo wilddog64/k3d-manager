@@ -1,11 +1,11 @@
 # Bug: `make dr-drill` restore fails with an opaque `age: no identities found` when the login Keychain is locked
 
-**Status:** OPEN — spec rev 2 (Fable rev 1: NEEDS FIXES, 0 blockers, 5 should-fix, 5 nits; all applied)
+**Status:** LANDED — `77d5a836` on k3d-manager-v1.45.1 (2026-11-23), Sonnet acceptance verify pass; E6 live (operator, m2-air drill) pending; was: OPEN — spec rev 2
 **Priority:** P2 (Claude's proposal; the drill cannot run from an SSH session, workaround: unlock the Keychain first)
 **Introduced by:** edfc9a5c (v1.43.0, hub data restore)
 **Should have been caught by:** offline test (empty identity from `_secret_load_data` is not rejected)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-23 (Fable spec review)
+**Waiting on:** live check — since 2026-11-23
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
