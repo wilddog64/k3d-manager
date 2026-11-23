@@ -1,13 +1,13 @@
 # Bug: `make dr-drill` (and any fresh `hub-up`) fails: unpinned Homebrew istioctl 1.32 rejects the pinned k3s v1.32 image
 
-**Status:** OPEN — spec rev 1 (Fable review pending); captured 2026-11-23 by Claude from the operator's m2-air run
+**Status:** OPEN — spec rev 2 (Fable rev 1 review: NEEDS FIXES, 1 blocker, 5 should-fix, 5 nits; all applied); captured 2026-11-23 by Claude from the operator's m2-air run
 **Priority:** P2 (operator, 2026-11-23; flagged — it blocks the DR drill and a from-scratch hub rebuild on this Mac)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23); pin target: match the live hub — corrected 2026-11-23 to k3s v1.32.0 + Istio 1.31.x (pin 1.31.4, the first CVE-free 1.31; hub's 1.31.1 to be raised to match)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** pre-existing (istioctl never pinned); exposed by Homebrew upgrading istioctl to 1.32.0 on m2-air 2026-11-12
 **Should have been caught by:** live check (the weekly drill; not run 2026-11-04 → 2026-11-23)
 **Introducing change reviewed:** no
-**Waiting on:** dispatch — since 2026-11-23 (Fable spec review)
+**Waiting on:** dispatch — since 2026-11-23 (operator intent approval; m4-air istioctl 1.30.0 must be replaced before its next deploy, see Rollout survey)
 **Approval:** pending (operator decision 2026-11-23: pin 1.31.4, no k3s bump, archive + SHA-256, refuse other minors)
 **Intent approved:** pending
 **Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause; `CHANGELOG.md:2565` — recurrence: k3s was raised to v1.32.0-k3s1 in July "to satisfy the istioctl precheck floor" (same class)
@@ -94,7 +94,7 @@ removes the duplicate and keeps future pin bumps to one file. rigor-cli and shop
 
 | Child | Repo / branch | Worker | Files | Depends on |
 |---|---|---|---|---|
-| **A** | `lib-foundation`, new branch off `main` (v0.5.7 → **v0.5.8**) | **Luna** | 2 | — |
+| **A** | `lib-foundation` branch `release/v0.5.8` (exists locally and on origin, equal to `main` `15d5001`, clean; v0.5.7 → **v0.5.8**) | **Luna** | 3 | — |
 | **B** | `k3d-manager` `k3d-manager-v1.45.1` | **Luna** | 2 (+ subtree pull) | A merged and tagged v0.5.8; Claude runs the subtree pull first |
 | **C** | `k3d-manager` `k3d-manager-v1.45.1` | **Flash** | 1 | B landed |
 
@@ -107,9 +107,10 @@ series.
 | Child | File | Change |
 |---|---|---|
 | A | `lib-foundation/scripts/lib/core.sh` | Rewrite `_install_istioctl` (Behaviour 1–7). Add `_istioctl_pinned_sha256`. Add the header comment ("comment on touch"). |
-| A | `lib-foundation/scripts/tests/lib/install_istioctl.bats` (new) | Offline BATS for M1–M6 and N1–N4, using stubbed `istioctl`, `curl`, `shasum`/`sha256sum` and `tar` on PATH. |
+| A | `lib-foundation/scripts/tests/lib/install_istioctl.bats` (new) | Offline BATS for M1–M5 and N1–N4, using stubbed `istioctl`, `curl`, `shasum`/`sha256sum`, `uname` and `rm` on PATH. `tar` is the real one (it extracts the fixture tarball). |
+| A | `lib-foundation/docs/api/functions.md` | Update the `_install_istioctl` row (pinned archive + SHA-256, refuses another minor) and add a `_istioctl_pinned_sha256` row, next to `_install_promtool` (`:81`). |
 | B | `scripts/lib/core.sh` | Delete the local `_install_istioctl` (lines 457–493) so the subtree v0.5.8 definition is live. Nothing else. |
-| B | `scripts/tests/lib/install_istioctl_dispatch.bats` (new) | Proves that the definition the dispatcher loads is the pinned one: no `downloadIstioCandidate`, and it refuses a 1.32 PATH stub. |
+| B | `scripts/tests/lib/install_istioctl_dispatch.bats` (new) | Proves that the definition the dispatcher loads is the pinned one (no `downloadIstioCandidate`, refuses a 1.32 PATH stub), and that `_provider_k3d_configure_istio` / the k3s Istio deploy never call `_istioctl` after a refusal (N5). |
 | B | `scripts/lib/foundation/**` | Arrives only through Claude's subtree pull. The worker does not edit it. |
 | C | `CHANGELOG.md` | v1.45.1 entry: istioctl pinned to 1.31.4, how to override the pin, and the error message with its fix. |
 
@@ -121,10 +122,16 @@ series.
 2. **Pinned checksums.** `_istioctl_pinned_sha256 <version> <os> <arch>` prints the SHA-256 for `1.31.4` and
    `osx|linux` × `arm64|amd64` (table in *External behaviour*). For any other combination it returns non-zero. This
    follows the `_promtool_pinned_sha256` precedent.
-3. **PATH istioctl, same minor → accept.** If `istioctl` is on PATH, read `istioctl version --remote=false` and parse
-   `client version: X.Y.Z`. If `X.Y` equals the pin's `X.Y`, print `istioctl <found> at <path> matches pin
-   <ISTIOCTL_VERSION> (minor <X.Y>)` and return 0. Patch skew, such as 1.31.1 against a 1.31.4 pin, is accepted.
-4. **PATH istioctl, other minor or unparsable → refuse.** Fail non-zero and download nothing. Print one `ERROR:` line
+3. **Existing istioctl, same minor → accept.** Check, in order, `"${install_dir}/istioctl"` (if executable) and then
+   `command -v istioctl`, following the `_install_promtool` precedent of checking `$target` first (`system.sh:811`). The
+   install-dir check matters because `k3d.sh:59` installs into `~/.local/bin` before `k3d.sh:63-66` adds it to PATH, so a
+   PATH-only check would re-download about 105 MB on every run. For the first candidate found, run
+   `"<path>" version --remote=false`, read stdout only (stderr discarded), and match the anchored pattern
+   `^client version: ([0-9]+)\.([0-9]+)\.` on its first matching line. If `X.Y` equals the pin's `X.Y`, print
+   `istioctl <found> at <path> matches pin <ISTIOCTL_VERSION> (minor <X.Y>)` and return 0. Patch skew, such as 1.31.1
+   against a 1.31.4 pin, is accepted.
+4. **Existing istioctl, other minor or unparsable → refuse with `_err` (exits).** Anything that does not match the
+   anchored pattern counts as `unknown` and is refused (fail closed). Download nothing. Call `_err` with one message
    that names:
    - the found version, or `unknown`;
    - its resolved path;
@@ -133,23 +140,35 @@ series.
      istioctl', or set ISTIOCTL_VERSION to deliberately move the pin`.
 
    Example: `ERROR: istioctl 1.32.0 at /opt/homebrew/bin/istioctl does not match the pinned 1.31.4 (minor 1.31) ...`.
+
+   **Why `_err` (exit) and not `return 1`.** `scripts/k3d-manager` has no `set -e` and runs
+   `$function_name "$@" || exit_code=$?` (`:574-578`), so errexit is off for the whole call tree, and all four call sites
+   are bare calls (`k3d.sh:59`, `:61`, `:104`, `k3s.sh:88`). A `return 1` would be ignored: `k3d.sh:105-106` /
+   `k3s.sh:89-90` would go on to run `_istioctl x precheck` and `install` with the refused binary, and a mismatched minor
+   whose support range covers k8s 1.32 would pass precheck and install the wrong control plane. Today's function already
+   ends in `exit 1` on its failure path (`core.sh:478`), so exiting keeps the contract. Rejected alternative (b): add
+   `|| return 1` at the four call sites and check `_provider_k3d_install` at `k3d.sh:189/191`. That widens child B to
+   two more files, and the callers of `_provider_k3d_install` are themselves unchecked, so it would not stop the run
+   either without a wider change. Behaviour 5 and 6 failures use `_err` for the same reason.
 5. **Absent → pinned archive.** Detect `os` from `uname -s` (Darwin→`osx`, Linux→`linux`) and `arch` from `uname -m`
    (arm64|aarch64→`arm64`, x86_64|amd64→`amd64`). Then:
-   - Look up the checksum. If there is none, fail non-zero naming `<version>-<os>-<arch>`, without any download.
+   - Look up the checksum. If there is none, `_err` naming `<version>-<os>-<arch>`, without any download.
    - Download
      `${ISTIOCTL_BASE_URL:-https://github.com/istio/istio/releases/download}/<v>/istioctl-<v>-<os>-<arch>.tar.gz`
      with `curl -fsSL` into a private `mktemp -d`.
-   - Verify it with `shasum -a 256`, or `sha256sum` as a fallback; with neither tool, fail.
-   - On a mismatch, fail with `expected` and `actual` and install nothing.
+   - Verify it with `shasum -a 256 "<tarball>"`, or `sha256sum "<tarball>"` as a fallback; with neither tool, `_err`.
+   - On a mismatch, remove the temp dir and `_err` with `expected` and `actual`; install nothing.
    - Only after a match, extract `istioctl` and install it to `install_dir`. Keep the existing behaviour: default
      `/usr/local/bin`, `mkdir -p` with a `_run_command --prefer-sudo` fallback, and `cp` with `--prefer-sudo` when the
      directory is not writable.
-6. **Post-install check.** The installed binary's `version --remote=false` must report the pinned version. Otherwise fail.
+6. **Post-install check.** Run the installed binary by full path, `"${install_dir}/istioctl" version --remote=false`
+   (not the PATH lookup, because `install_dir` may not be on PATH yet). It must report the pinned version through the
+   same anchored pattern. Otherwise `_err`.
 7. **No side effects on the caller.**
    - Never fetch `raw.githubusercontent.com/istio/istio/master/...` or `downloadIstioCandidate.sh`.
    - Do not install a global `trap ... EXIT` (the current code replaces the caller's EXIT trap with
      `rm -rf /tmp/istio-*`). Clean up the private temp dir before returning.
-   - No `cd`/`pushd` into `/tmp`.
+   - No `cd`/`pushd` into `/tmp`, and no `rm` outside the private temp dir.
    - Bash 3.2 compatible.
    - Every expansion is quoted.
 
@@ -178,7 +197,25 @@ series.
 - **Support range:** istio.io supported-releases, read 2026-11-23: 1.31 supports k8s 1.32–1.37, so it accepts k3s
   `v1.32.0+k3s1`, and 1.32 needs k8s ≥ 1.33. That explains IST0142 above.
 
+Not independently re-checked by the Fable reviewer (no network in that review): the four checksums and the istio.io
+support ranges. Claude re-fetched the four published `.sha256` assets on m4-air, 2026-11-23, and they match the table.
+
 BATS stubs reproduce these captured lines verbatim, with a comment naming m4-air or m2-air and 2026-11-23.
+
+## Rollout survey (read-only, Claude, 2026-11-23T16:54Z)
+
+After the fix, every `deploy_cluster` / Istio deploy refuses an existing istioctl whose minor is not 1.31.
+
+| Host | Role | `command -v istioctl` | `istioctl version --remote=false` | After the fix |
+|---|---|---|---|---|
+| m2-air | DR drill host | `/opt/homebrew/bin/istioctl` (Evidence above) | `client version: 1.32.0` | refused (E6) until `brew unlink istioctl` |
+| m4-air | dev / worker | `/Users/cliang/.local/bin/istioctl` | `client version: 1.30.0` | **refused**: replace it (delete it so the pinned archive installs, or install 1.31.4) before the next Istio deploy from this Mac |
+| m5-air (`ssh -o BatchMode=yes m5-air.local`) | live hub | `/Users/cliang/.local/bin/istioctl` | `client version: 1.31.1` | accepted (patch skew) |
+
+CI: `grep -rn istioctl .github/workflows` finds nothing (2026-11-23), so no workflow installs or runs istioctl; the BATS
+suites stub `_install_istioctl` (`k3d_install.bats:18`). The e2e runner path calls `deploy_cluster` on the M2 only.
+The m4-air 1.30.0 binary is in `~/.local/bin`, which Behaviour 3 now checks first, so it is refused even if another
+istioctl sits on PATH. The operator should know this before the release lands.
 
 ## Contract readers
 
@@ -198,10 +235,18 @@ These were found by `git grep -n -E "_install_istioctl|function _istioctl|ISTIOC
   install during `_provider_k3d_install`.
 - `scripts/lib/providers/k3d.sh:104`: k3d Istio deploy, which runs `_istioctl x precheck` (`:105`) and `install` (`:106`).
 - `scripts/lib/providers/k3s.sh:88`: k3s Istio deploy, which runs precheck (`:89`) and install (`:90`).
+- Entry callers of those: `scripts/lib/providers/k3d.sh:189`, `:191`, `:197` and `scripts/lib/providers/orbstack.sh:61`,
+  `:66`. With Behaviour 4 exiting, a refusal ends these runs too, which is the intent.
 
 **Readers of the installed binary:**
 - `scripts/lib/foundation/scripts/lib/system.sh:1307` (`_istioctl`). Unchanged; it runs whichever `istioctl` is on PATH.
   `_install_istioctl` runs first at every call site above, so the minor check guards it.
+
+**Unguarded direct users of PATH `istioctl` (unchanged, out of scope):** `bin/istio-sanity-check:4` and
+`bin/inspect-cert:126,133` call `istioctl` straight from PATH without `_install_istioctl`. They are read-only diagnostics;
+note them, do not change them in this patch.
+
+**Docs:** `lib-foundation/docs/api/functions.md:77-84` lists the install functions; child A updates it.
 
 **Tests:**
 - `scripts/tests/lib/k3d_install.bats:18` replaces `_install_istioctl` with `{ :; }`. It is unaffected, and B must keep it
@@ -221,10 +266,12 @@ must:
         verifies it against the pinned SHA-256, and installs istioctl into install_dir.
   - M2: _istioctl_pinned_sha256 prints the four published 1.31.4 checksums verbatim and returns non-zero for any other
         version or os/arch.
-  - M3: A PATH istioctl reporting "client version: 1.31.x" (stub 1.31.1 and 1.31.4) is accepted, with rc 0, no download
-        and a line naming the found version and the pin.
-  - M4: A PATH istioctl of another minor (stub "client version: 1.32.0", and also unparsable output) fails non-zero. One
-        ERROR line names the found version (or "unknown"), its path, the pin 1.31.4 and the fix (release URL,
+  - M3: An existing istioctl reporting "client version: 1.31.x" (stub 1.31.1 and 1.31.4), either on PATH or at
+        ${install_dir}/istioctl when install_dir is not on PATH, is accepted, with rc 0, no download and a line naming
+        the found version and the pin.
+  - M4: An existing istioctl of another minor (stub "client version: 1.32.0" and "client version: 1.30.0"), or with
+        output not matching ^client version: X.Y. (e.g. "1.32.0" alone, or the line only on stderr), exits non-zero via
+        _err. One ERROR line names the found version (or "unknown"), its path, the pin 1.31.4 and the fix (release URL,
         'brew unlink istioctl', ISTIOCTL_VERSION).
   - M5: ISTIOCTL_VERSION overrides the pin. With ISTIOCTL_VERSION=1.32.0 the 1.32.0 PATH stub is accepted, and with
         istioctl absent it fails on "no pinned checksum for 1.32.0-<os>-<arch>" without any download.
@@ -239,25 +286,36 @@ must_not:
         Red today: there is no checksum step, so the current code copies the binary the candidate script reports.
   - N4: Must not replace the caller's EXIT trap.
         Red today: after the call, `trap -p EXIT` shows "rm -rf /tmp/istio-*" instead of the caller's sentinel trap.
+  - N5: _istioctl is never invoked after a refusal. Sourcing the provider Istio deploy (k3d.sh:102-107 and
+        k3s.sh:86-91) with a 1.32.0 istioctl stub and an _istioctl function that logs its arguments, inside
+        `run bash -c`, the run exits non-zero and the _istioctl log is empty.
+        Red today: the old function returns 0 for 1.32.0 ("already exists, skip installation") and the log shows
+        "x precheck" and "install -y -f ..." (and with only rc 1, the bare call would still continue to them).
 evidence:
-  - {id: E1, proves: [M1, M2, N2, N3], kind: offline, intent: pending, command: "lib-foundation: env -i HOME=$BATS_TMP PATH=/usr/bin:/bin bats scripts/tests/lib/install_istioctl.bats", red_control: "the N2 and N3 cases fail against lib-foundation main@15d5001 core.sh (candidate-script URL in the curl log; cp called on a bad hash)"}
-  - {id: E2, proves: [M3, M4, N1], kind: offline, intent: pending, command: "same suite, the PATH-version cases (stub istioctl prints the captured m4-air/m2-air lines)", red_control: "the N1 case fails on main@15d5001: rc 0 and 'already exists, skip installation' for the 1.32.0 stub"}
+  - {id: E1, proves: [M1, M2, N2, N3], kind: offline, intent: pending, command: "lib-foundation: env -i HOME=\"$BATS_TMP\" PATH=\"<stub dir>:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin\" TMPDIR=\"$TMPDIR\" bash --norc --noprofile -c 'bats scripts/tests/lib/install_istioctl.bats' (lib-foundation CLAUDE.md:110-111 form, stub dir first; each case asserts command -v istioctl resolves to the stub or to nothing)", red_control: "the N2 and N3 cases fail against lib-foundation main@15d5001 core.sh: the curl stub serves, for the downloadIstioCandidate.sh URL, a script that creates istio-1.31.4/bin/istioctl and prints the captured 'add the ... directory' line (host and date in a comment), so the old code reaches cp and the N3 'no cp, no file in install_dir' assertion fails; the candidate URL appears in the curl log for N2"}
+  - {id: E2, proves: [M3, M4, N1], kind: offline, intent: pending, command: "same suite, the existing-istioctl cases (stub istioctl prints the captured m4-air/m2-air/m5-air lines; one case puts the 1.31.4 stub only in install_dir, not on PATH)", red_control: "the N1 case fails on main@15d5001: rc 0 and 'already exists, skip installation' for the 1.32.0 stub"}
   - {id: E3, proves: [M5], kind: offline, intent: pending, command: "same suite, the ISTIOCTL_VERSION override cases", red_control: "positive control for M4: the same 1.32.0 stub is refused when the variable is unset"}
-  - {id: E4, proves: [N4], kind: offline, intent: pending, command: "same suite, a case that sets trap 'echo sentinel' EXIT, calls _install_istioctl with stubs, then asserts trap -p EXIT still contains sentinel", red_control: "fails on main@15d5001 (trap replaced by rm -rf /tmp/istio-*)"}
-  - {id: E5, proves: [M6, N1, N2], kind: offline, intent: pending, command: "k3d-manager: env -i HOME=$BATS_TMP PATH=/usr/bin:/bin bats scripts/tests/lib/install_istioctl_dispatch.bats scripts/tests/lib/k3d_install.bats", red_control: "fails on k3d-manager-v1.45.1@a6968d2c: the loaded definition still contains downloadIstioCandidate and accepts the 1.32.0 stub"}
-  - {id: E6, proves: [M4, N1], kind: live, intent: pending, command: "operator on m2-air (Homebrew istioctl 1.32.0 still linked): make dr-drill; expect the Behaviour 4 ERROR naming 1.32.0, /opt/homebrew/bin/istioctl and 1.31.4, not IST0142", red_control: "today's run ends in IST0142 at x precheck (Evidence above)"}
-  - {id: E7, proves: [M1, M3], kind: live, intent: pending, command: "operator on m2-air after 'brew unlink istioctl': make dr-drill; hub-up Step 1/5 passes x precheck with istioctl 1.31.4 installed from the archive", red_control: "E6 on the same machine minutes earlier"}
+  - {id: E4, proves: [N4], kind: offline, intent: pending, command: "same suite, run bash -c 'trap \"echo sentinel\" EXIT; source core.sh; _install_istioctl \"$dir\"; trap -p EXIT' with stubs, asserting the output still contains sentinel (inside run bash -c so the BATS EXIT trap is never touched)", red_control: "fails on main@15d5001 (trap replaced by rm -rf /tmp/istio-*)"}
+  - {id: E5, proves: [M6, N1, N2, N5], kind: offline, intent: pending, command: "k3d-manager: the same env -i form with bats scripts/tests/lib/install_istioctl_dispatch.bats scripts/tests/lib/k3d_install.bats", red_control: "fails on k3d-manager-v1.45.1@a6968d2c: the loaded definition still contains downloadIstioCandidate, accepts the 1.32.0 stub, and the _istioctl log shows x precheck"}
+  - {id: E6, proves: [M4, N1, N5], kind: live, intent: pending, command: "operator on m2-air (Homebrew istioctl 1.32.0 still linked, any manually placed 1.31.4 removed from PATH and ~/.local/bin first): make dr-drill; expect the Behaviour 4 ERROR naming 1.32.0, /opt/homebrew/bin/istioctl and 1.31.4, and no 'x precheck' output after it", red_control: "today's run ends in IST0142 at x precheck (Evidence above)"}
+  - {id: E7, proves: [M1], kind: live, intent: pending, command: "operator on m2-air after 'brew unlink istioctl' and with no 1.31.x istioctl in PATH or ~/.local/bin (check with command -v istioctl and ls ~/.local/bin/istioctl first; if one is there, E7 proves M3 instead, and say so): make dr-drill; hub-up Step 1/5 downloads the 1.31.4 archive, verifies it and passes x precheck", red_control: "E6 on the same machine minutes earlier"}
 interface:
-  - "_install_istioctl [install_dir]: same signature and default (/usr/local/bin); rc 0 means an istioctl of the pinned minor is on PATH or installed"
+  - "_install_istioctl [install_dir]: same signature and default (/usr/local/bin); rc 0 means an istioctl of the pinned minor is in install_dir, on PATH, or installed; any refusal or failure exits via _err"
   - "_istioctl_pinned_sha256 <version> <os> <arch>: new; os is osx|linux, arch is arm64|amd64"
   - "ISTIOCTL_VERSION (default 1.31.4), ISTIOCTL_BASE_URL (default https://github.com/istio/istio/releases/download): new env vars, read only by _install_istioctl"
 ```
 
 The stubs live in `$BATS_TEST_TMPDIR/bin`, which is first on `PATH`.
 - Each stub's output reproduces a capture under *External behaviour*, with a comment naming the host and date.
-- The `curl` stub logs its URL and writes a fixture tarball, never touching the network. The fixture holds a stub
-  `istioctl` printing `client version: 1.31.4`.
-- The checksum stub returns the pinned value, or a wrong value for N3, which proves the verify step reads the tool's output.
+- The `curl` stub logs its URL and never touches the network. For a release-archive URL it writes a fixture tarball
+  (built with the real `tar`) holding a stub `istioctl` printing `client version: 1.31.4`. For the
+  `downloadIstioCandidate.sh` URL (red runs only) it writes a script that creates `istio-1.31.4/bin/istioctl` and prints
+  the captured "add the ... directory" line, so the old code reaches its `cp` and the red controls really fail.
+- The checksum stub asserts that its argument is the downloaded tarball path (exit 97 otherwise), then returns the
+  pinned value, or a wrong value for N3, which proves the verify step reads the tool's output.
+- An `rm` stub (logging, refusing any path outside `$BATS_TEST_TMPDIR`) is on PATH in every red-control run, because
+  the old function runs `pushd /tmp` and `trap 'rm -rf /tmp/istio-*' EXIT TERM`, which would delete real `/tmp/istio-*`
+  on the worker's machine.
 - `uname` is stubbed per os/arch case.
 - `install_dir` is a scratch dir. The fixture asserts it lives under `$BATS_TEST_TMPDIR` before any call.
 
@@ -271,10 +329,15 @@ are never reached (`feedback_mutation_harness_sudo_guard`, `feedback_never_run_i
 - Offline only: no network, no cluster, no real `istioctl`/`curl` download, no real `sudo`, scratch `HOME`.
 - Show each new test red against the pre-fix code first (N1–N4 on lib-foundation `main@15d5001`, E5 on
   `k3d-manager-v1.45.1@a6968d2c`), then green.
+- Because refusals now `_err` (exit), every refusal case runs under `run bash -c '...'` (or `run` on a sourced
+  wrapper), never directly in the test shell.
 - Mutation checks (A). Each mutation must turn its test red:
   - remove the checksum comparison → N3;
   - compare the full version instead of the minor → the 1.31.1 case of M3;
-  - drop the `ISTIOCTL_VERSION` default → M1.
-- Run `shellcheck` on the touched `.sh` files, and the full BATS suite with `env -i` as in lib-foundation `CLAUDE.md`.
+  - drop the `ISTIOCTL_VERSION` default → M1;
+  - replace `_err` with `return 1` in the refusal → N5 (B's dispatch test);
+  - drop the `${install_dir}/istioctl` check → the install-dir case of M3.
+- Run `shellcheck` on the touched `.sh` files, and the full BATS suite with the `env -i` form from lib-foundation
+  `CLAUDE.md:110-111` (PATH includes `/opt/homebrew/bin`; the stub dir goes first for the istioctl suite).
 - Paste each command with its rc and the proving lines. Leave changes uncommitted. No live checks: E6 and E7 are the
   operator's.

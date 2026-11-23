@@ -39,7 +39,7 @@
   - R3 TOTP: spec rev 1 written (children B RevokedKeys Luna → A lock/log/socket Luna → C collector+alerts Flash). Open: same-uid DoS limit, permanent vs 24h lock, cert validity probe.
   - R1 pins: spec rev 1 (services-git.yaml index/kindIs guard, applicationsSync create-update, clusters generator first; ArgoCD v3.5.5 proof). Open O1-O3.
   - DR empty age identity: spec rev 1 (preflight presence check). DR V4: spec rev 1 for defect 2 (_err→printf+return); defect 1 (which admin password wins) = operator decision, Claude recommends restore Secret from backup.
-  - Next: Fable blind review of all 6 specs.
+  - Specs committed 918a148d. Fable review DR/istioctl DONE: all NEEDS FIXES. V4 blocker (bind helper's _kubectl exits before the ||; fix: --no-exit at :1000 and :1014) and age-identity → rev 2 applied by Claude (uncommitted). istioctl rev 2 done (refusal → _err; N5; survey: hub 1.31.1 ok, m4 1.30.0 REFUSED after fix, m2 1.32.0 refused). R1/R3/R4 Fable review still running.
   - Need operator decisions: R2 design (root installers source checkout), DR V4 LDAP bind, DR empty age identity.
 - Carried: Argon classification of red-team + drill bugs; PR #158; weekly-live-check plan; E3 ordering; web-console B
   write-up (raw captures in `~/.local/share/k3d-manager/captures/2026-11-22-*`); delete probe branch; hub Istio ≥1.31.4;
