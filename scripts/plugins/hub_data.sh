@@ -991,16 +991,16 @@ function hub_data_verify_keycloak() {
   want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
   if jq -e 'has("keycloak_usernames_sha256")' "$inventory" >/dev/null 2>&1; then
     expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"; digest="$(_hub_data_keycloak_user_digest _kubectl --context "$context")"
-    [[ "$expected" == "$digest" ]] || { _err '[hub-data] Keycloak usernames digest mismatch'; return 1; }
+    [[ "$expected" == "$digest" ]] || { printf '%s\n' 'ERROR: [hub-data] Keycloak usernames digest mismatch' >&2; return 1; }
   fi
 }
 function hub_data_verify_ldap() {
   local inventory="$1" context="$2" want actual expected digest
   want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
-  _hub_data_ldap_admin_bind _kubectl --context "$context" || { _err '[hub-data] LDAP admin bind failed with the openldap-admin password'; return 1; }
+  _hub_data_ldap_admin_bind _kubectl --no-exit --context "$context" || { printf '%s\n' 'ERROR: [hub-data] LDAP admin bind failed with the openldap-admin password' >&2; return 1; }
   if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null 2>&1; then
     expected="$(jq -r '.ldap_dns_sha256' "$inventory")"; digest="$(_hub_data_ldap_dn_digest _kubectl --context "$context")"
-    [[ "$expected" == "$digest" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }
+    [[ "$expected" == "$digest" ]] || { printf '%s\n' 'ERROR: [hub-data] LDAP DN digest mismatch' >&2; return 1; }
   fi
 }
 function hub_data_verify_placement() {
@@ -1010,7 +1010,7 @@ function hub_data_verify_placement() {
   [[ -r "$metadata" ]] || { printf '%s\n' "[hub-data] V5: no readable pv-pvc.yaml (set by the drill stage or K3DM_HUB_DATA_EXPORT_DIR): '${metadata}'" >&2; return 1; }
   postgres="$(_kubectl --context "$context" -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"; [[ -n "$postgres" ]] || return 1
   while IFS=$'\t' read -r ns pod claim; do
-    _kubectl --context "$context" -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null || return 1
+    _kubectl --no-exit --context "$context" -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null || return 1
     expected="$(_hub_data_meta_field "$metadata" "$ns" "$claim" logicalNode)"; actual="$(_kubectl --context "$context" -n "$ns" get pod "$pod" -o jsonpath='{.spec.nodeName}')"; logical="$(_hub_recovery_logical_node "$actual")"; [[ "$logical" == "$expected" ]] || return 1
   done <<EOF
 secrets	vault-0	data-vault-0

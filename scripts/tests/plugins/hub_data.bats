@@ -1375,6 +1375,89 @@ STUB
   [[ "$stderr" == *"LDAP admin bind failed"* ]]
 }
 
+_setup_v_check_failure_case() {
+  source_plugin
+  printf '%s\n' '{"keycloak_realm_user_count":3,"ldap_entry_count":2,"keycloak_usernames_sha256":"want-keycloak","ldap_dns_sha256":"want-ldap"}' > "$TEST_ROOT/inventory.json"
+  export HUB_DATA_VERIFY_REPORT="$TEST_ROOT/verify-report.json"
+  _hub_data_pin_context() { :; }
+  _vault_exec() { printf '{"sealed":false}\n'; }
+  hub_data_verify_vault_paths() { :; }
+  hub_data_verify_unsealed() { :; }
+  hub_data_verify_externalsecrets() { :; }
+  _hub_data_keycloak_user_count() { printf 3; }
+  _hub_data_keycloak_user_digest() { printf '%s' "${DR_TEST_KEYCLOAK_DIGEST:-want-keycloak}"; }
+  _hub_data_ldap_entry_count() { printf 2; }
+  _hub_data_ldap_dn_digest() { printf '%s' "${DR_TEST_LDAP_DIGEST:-want-ldap}"; }
+  _hub_data_meta_field() { printf agent-0; }
+  _hub_recovery_logical_node() { printf agent-0; }
+  _kubectl() {
+    local soft=0
+    if [[ "${1:-}" == --no-exit ]]; then soft=1; shift; fi
+    case "$*" in
+      *'get pods -l app.kubernetes.io/name=postgres-keycloak'*) printf postgres-0; return 0 ;;
+      *'wait --for=condition=Ready pod/openldap-0'*)
+        [[ "${DR_TEST_FAIL_READY:-0}" != 1 ]] && return 0
+        (( soft == 1 )) && { printf 'pod not ready\n' >&2; return 1; }
+        printf 'pod not ready\n' >&2
+        exit 1
+        ;;
+      *'exec statefulset/openldap'*)
+        [[ "${DR_TEST_FAIL_BIND:-0}" != 1 ]] && return 0
+        (( soft == 1 )) && { printf 'invalid credentials\n' >&2; return 1; }
+        printf 'invalid credentials\n' >&2
+        exit 1
+        ;;
+      *'get pod'*'-o jsonpath={.spec.nodeName}'*) printf k3d-dr-drill-agent-0; return 0 ;;
+    esac
+    return 0
+  }
+  mkdir -p "$TEST_ROOT/export"
+  : > "$TEST_ROOT/export/pv-pvc.yaml"
+  export K3DM_HUB_DATA_EXPORT_DIR="$TEST_ROOT/export" DR_DRILL_METADATA="$TEST_ROOT/export/pv-pvc.yaml"
+}
+
+@test "verify V4: hard kubectl bind failure is reported and later checks run" {
+  _setup_v_check_failure_case
+  export DR_TEST_FAIL_BIND=1
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V4\tfalse'* ]]
+  [[ "$output" == *$'V5\ttrue'* ]]
+  [[ "$output" == *$'V8\ttrue'* ]]
+  [ "$stderr" = 'ERROR: [hub-data] LDAP admin bind failed with the openldap-admin password' ]
+  [ "$(jq -r .V4 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
+@test "verify V4: LDAP DN digest mismatch is reported and later checks run" {
+  _setup_v_check_failure_case
+  export DR_TEST_LDAP_DIGEST=wrong
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V4\tfalse'* && "$output" == *$'V5\ttrue'* && "$output" == *$'V8\ttrue'* ]]
+  [ "$stderr" = 'ERROR: [hub-data] LDAP DN digest mismatch' ]
+  [ "$(jq -r .V4 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
+@test "verify V3: Keycloak digest mismatch is reported and later checks run" {
+  _setup_v_check_failure_case
+  export DR_TEST_KEYCLOAK_DIGEST=wrong
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V3\tfalse'* && "$output" == *$'V5\ttrue'* && "$output" == *$'V8\ttrue'* ]]
+  [ "$stderr" = 'ERROR: [hub-data] Keycloak usernames digest mismatch' ]
+  [ "$(jq -r .V3 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
+@test "verify V5: hard kubectl wait failure is reported and V8 runs" {
+  _setup_v_check_failure_case
+  export DR_TEST_FAIL_READY=1
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V5\tfalse'* && "$output" == *$'V8\ttrue'* ]]
+  [[ "$stderr" == *'pod not ready'* ]]
+  [ "$(jq -r .V5 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
 @test "recover B4-R4: resume failure is logged and report records false" {
   source_plugin; mkdir -p "$TEST_ROOT/run"
   printf '%s' '{"prune":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"
