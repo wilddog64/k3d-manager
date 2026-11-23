@@ -369,7 +369,7 @@ M10b.
 | Child | must | must_not | evidence |
 |---|---|---|---|
 | M10b1 | B1-M1..M3 | B1-N1..N3 | E-B1 (offline, Portable) |
-| M10b2 | B2-M1..M9 | B2-N1..N5 | E-B2 (offline, Portable) |
+| M10b2 | B2-M1..M10 | B2-N1..N5 | E-B2 (offline, Portable) |
 | M10b3 | B3-M1..M8 | B3-N1..N5 | E-B3 (offline, Portable), E-B3W (offline, windows-latest), E-B3L1 and E-B3L2 (live) |
 | M10b4 | B4-M1 | — | E-B4 (offline) |
 
