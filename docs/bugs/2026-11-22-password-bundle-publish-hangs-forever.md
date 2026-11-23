@@ -1,11 +1,11 @@
 # Bug: password-bundle publish can hang forever and silently stop every later run
 
-**Status:** LANDED — `e3f2bcaf` 2026-11-22 (gpt-6-luna; verified offline by Claude)
+**Status:** LIVE-VERIFIED — `e3f2bcaf` 2026-11-22 (gpt-6-luna; verified offline by Claude; E6 live PASS 2026-11-22)
+**Fix commit:** e3f2bcaf
 **Priority:** P2
 **Introduced by:** ddd9329e (travel bundle, v1.45.0 plan 2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-22 (E6 after `make hub-deploy`)
 **Prior art:** `docs/bugs/2026-11-22-test-all-failures-not-attributable-to-host.md` (slug grep, not scored) — read, different root cause; `make find-similar-docs` not run (vector store unreachable from m4-air).
 **Approval:** operator, 2026-11-22: "go ahead to file a P2 bug then dispatch to Luna" (dispatch without waiting for triage); Fable spec review requested by the operator, folded in (rev 2).
 **Intent approved:** operator, 2026-11-22
@@ -211,3 +211,7 @@ Terminal delivers the bundle.
 - Extra mutants: kill pid instead of process group: RED (test 16; orphans held the run, cleaned up); no KILL escalation: RED (test 16).
 - Commit note: `_password_bundle_cleanup_temps` given the `function` keyword so the agent audit's if-count parser stops counting its embedded perl against the function above (false 9 > 8).
 - Owed: E6 live, after `make hub-deploy REF=<head>`.
+
+**Live evidence:** 2026-11-22 · run e6-samples-1441-1541 · env m5-air-hub · scenario five-15min-launchd-samples · commit e3f2bcaf · proves E6
+
+Live evidence E6 detail (Claude, read-only over ssh to m5-air hub, 2026-11-22 14:41–15:41 PT, five samples 15 min apart): `launchctl list` showed `com.k3d-manager.password-bundle` with PID `-` and last exit 0 every time (no hung run); the published bundle timestamp advanced every cycle (14:27:42, 14:42:44, 14:57:46, 15:12:48, 15:27:50). The log-mtime column failed to capture (`stat -f` resolved to GNU stat on the hub PATH), so it is not part of this evidence.
