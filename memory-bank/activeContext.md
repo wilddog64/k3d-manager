@@ -33,7 +33,14 @@
 - m2 remote shell is zsh: use `ssh m2 bash -s < script`, not `$VAR` word splitting.
 
 **4. Owed specs / decisions**
-- v1.45.1 spec: pin istioctl 1.31.4 (lib-foundation upstream first, then subtree pull). Not written.
+- v1.45.1 = security + DR release (operator 2026-11-23): R1-R4 red-team P2s + 3 DR-drill bugs. Flow: Claude specs → Fable blind review → operator intents → Luna (logic) / Flash (docs) dispatch.
+  - R4 token-in-argv: spec rev 1 written in bug doc (kubeconfig 0600, E1-E6; Luna). Open q: refuse insecure TLS?
+  - istioctl pin 1.31.4: spec rev 1 written (children A lib-foundation Luna → subtree pull → B k3d-manager Luna → C changelog Flash); 4 sha256 checked by Claude against release assets.
+  - R3 TOTP: spec rev 1 written (children B RevokedKeys Luna → A lock/log/socket Luna → C collector+alerts Flash). Open: same-uid DoS limit, permanent vs 24h lock, cert validity probe.
+  - R1 pins: spec rev 1 (services-git.yaml index/kindIs guard, applicationsSync create-update, clusters generator first; ArgoCD v3.5.5 proof). Open O1-O3.
+  - DR empty age identity: spec rev 1 (preflight presence check). DR V4: spec rev 1 for defect 2 (_err→printf+return); defect 1 (which admin password wins) = operator decision, Claude recommends restore Secret from backup.
+  - Next: Fable blind review of all 6 specs.
+  - Need operator decisions: R2 design (root installers source checkout), DR V4 LDAP bind, DR empty age identity.
 - Carried: Argon classification of red-team + drill bugs; PR #158; weekly-live-check plan; E3 ordering; web-console B
   write-up (raw captures in `~/.local/share/k3d-manager/captures/2026-11-22-*`); delete probe branch; hub Istio ≥1.31.4;
   old m2 cluster on EOL Istio; v1.46.0 swaps for 3a/3b drafts.
