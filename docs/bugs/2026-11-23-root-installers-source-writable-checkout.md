@@ -5,7 +5,7 @@
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (re-approval of the rev 3 intents listed under [Re-approval needed](#re-approval-done-2026-11-23); P12 probe at home)
+**Waiting on:** investigation — since 2026-11-23 (P12 `sudo -V` timestamp probe at home; rev 3 intents re-approved, see [Re-approval](#re-approval-done-2026-11-23))
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
