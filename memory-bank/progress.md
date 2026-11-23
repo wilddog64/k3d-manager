@@ -62,3 +62,4 @@
 - 2026-11-22 ~20:00 PST: operator hub-deploy REF=948e5e7d (first attempt used stale history REF=74ff9a6f, 142 behind; promoter refused, no change). deploy/hub=948e5e7d, tag hub-promote/20261123T035950Z. Deploy steps running; live check after operator done.
 - 2026-11-22 ~20:15 PST: 2b LIVE-VERIFIED (hub 948e5e7d clean; state appsets+launchd pinned 948e5e7d; 30/30 apps Synced/Healthy). Next: red-team gate, release PR (Argon).
 - 2026-11-22: hoverfocus installed on m2 (operator go; clone m1-base 87322d6, make install, ~/Applications, agent running). Operator uninstalls from m4. Relicensed Apache-2.0 (was MIT), bef450c on m1-base (operator request); GitHub license badge appears after M1 merges to main.
+- 2026-11-22: hoverfocus main protection: build required (operator go); PUT restated all other rules, read back unchanged (admins on, 0 approvals, conversation resolution, no force-push/deletion).
