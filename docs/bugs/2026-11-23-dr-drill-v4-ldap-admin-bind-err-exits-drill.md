@@ -1,11 +1,11 @@
 # Bug: dr-drill dies silently at V4 — restored LDAP rejects the admin password and `_err` exits the drill
 
-**Status:** OPEN — spec rev 2 for defect 2 (Fable rev 1: NEEDS FIXES, 1 blocker, 3 should-fix, 1 nit; all applied); defect 1 waiting on operator decision
+**Status:** OPEN — defect 2 LANDED `da956fbd` (2026-11-23, Sonnet acceptance verify pass x2; E4 live pending); defect 1 waiting on spec (operator chose option a)
 **Priority:** P2 (proposed) — the DR drill cannot pass, so there is no current restore proof; no workaround
 **Introduced by:** unknown (the `_err` inside `hub_data_verify_ldap`; last full drill pass 2026-11-04)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-23 (Fable spec review)
+**Waiting on:** investigation — since 2026-11-23 (defect 1 read-only inventory check before its spec)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
