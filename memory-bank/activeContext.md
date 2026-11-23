@@ -25,7 +25,7 @@
 - Done: blind Argon review (no change needed), CodeQL #38/#39 dismissed; hub-promote-status (57 ahead, docs only, no
   promote needed); Claude hub smoke PASS 08:30 via `ssh m5-air.local` (30/30 apps Synced/Healthy, 4 nodes Ready);
   scope check PASS (8 out-of-plan fix/tooling commits added to CHANGELOG).
-- Remaining: CI green on new head; live 2d E11 + M2 (operator, home); enforce_admins DELETE, operator merges,
+- Remaining: (CI green a219635f; enforce_admins OFF since 08:45) live 2d E11 + M2 (operator); operator merges; re-enable enforce_admins,
   `/post-merge` tags v1.45.0.
 - Every push to the branch restarts CI: batch docs commits.
 
