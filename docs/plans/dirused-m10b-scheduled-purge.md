@@ -156,9 +156,9 @@ unless marked "operator's call".
 - **Elevation.** `whoami /groups` shows `Medium Mandatory Level` (S-1-16-8192): the shell was **not elevated**. So a
   non-elevated user can create a task folder (`\dirused-probe\`) with `schtasks /create`, which is P10 part 1. The
   XML security descriptor is still unproven.
-- **`sudo` (2026-11-23).** In the same session, `sudo` started a new Clink-enabled `cmd`. Windows `sudo` may be enabled
-  and the operator may be a local admin with a filtered token. Not yet proven: the integrity level of the new session
-  was not captured.
+- **`sudo` (2026-11-23).** In the same session, `sudo` started a new Clink-enabled `cmd`. `sudo` here is gsudo (operator,
+  2026-11-23), not Windows' built-in sudo. Elevation is not needed for any dirused work, and the operator does not
+  run it for this; whether the account can elevate is irrelevant to M10b.
   - Spec change (b2): `/schedule` refuses when the process token is elevated (High integrity), with
     `/schedule: run from a normal (not elevated) window`. Reasons:
     - from an elevated shell the default owner of new folders is Administrators, so every plan would fail the owner
