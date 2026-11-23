@@ -90,3 +90,5 @@
 - 2026-11-23: v1.45.0 CHANGELOG promoted (+promote, CVE pins, console, stall entries); README/releases rows; release PR opening. Owed live before merge: 2d E11, M2 live check (travel E3/E5 event-driven).
 
 - 2026-11-23: PR #164 opened (v1.45.0 release, not draft). Argon review spec docs/plans/release-pr164-v1.45.0-review.md written; dispatching agy role review.
+
+- 2026-11-23: CodeQL #38/#39 (totpctl enroll secret to /dev/tty) — false positive, operator approved dismissal; classifier blocked Claude dismissing → operator dismisses. Issue doc written. Argon review + CI running.
