@@ -100,6 +100,43 @@ unless marked "operator's call".
 | P12 | `AllowStartOnDemand false` blocks `schtasks /run /tn ...` (expect a non-zero exit and the task not started). | operator, jump box | b3 | On the P1 task before it fires: `schtasks /run /tn ...`; record the exit code (`echo %ERRORLEVEL%`) and that the marker stays absent. |
 | P11 | Where `dirused.exe` lives on the jump box and who can write it and its folder. | operator, jump box | b2 (O7) | `where dirused`; `icacls <exe>`; `icacls <exe folder>`. |
 
+### Probe results
+
+**2026-11-23, jump box (operator screenshot, about 11:40 PT), quick probe `\dirused-probe\t1`:**
+
+- **P11, partial: the exe ACL is too broad.** `icacls bin\dirused.exe`, run from the profile root, shows all entries
+  inherited (`(I)`), with full control for each of:
+  - SYSTEM;
+  - Administrators;
+  - the operator;
+  - an unresolved domain SID (`S-1-5-21-…-8249`);
+  - a second named domain account.
+
+  So another account can replace the exe, which confirms the Fable B1 risk on this host. O7's default would refuse
+  to schedule. The folder ACL (`icacls bin`) and where the inheritance comes from are not yet captured.
+- **Quick-task creation.** `schtasks /create … /sc once /st 23:00 /it /f` succeeded as the operator. A non-default
+  task folder (`\dirused-probe\`) was created by it. Whether the shell was elevated is not yet captured, so this does
+  not yet prove P10's standard-user folder creation.
+- **P8 (b), partial.** `/query /xml` output declares `encoding="UTF-16"` and `Task version="1.2"`, with namespace
+  `http://schemas.microsoft.com/windows/2004/02/mit/task`. The bytes on redirection are not yet captured.
+- **Defaults the switches leave**, read back, which confirms the switch-vs-XML table:
+  - `StartBoundary` `2026-11-23T23:00:00` has **no offset**;
+  - there is no `EndBoundary`;
+  - there is no `AllowStartOnDemand` element, so the default allows a manual start;
+  - there is no `StartWhenAvailable` element, so the default is false;
+  - there is no `ExecutionTimeLimit` element, so the default applies;
+  - `DisallowStartIfOnBatteries` and `StopIfGoingOnBatteries` are `true`;
+  - `MultipleInstancesPolicy IgnoreNew`;
+  - Principal `LogonType InteractiveToken` with the user SID, and no `RunLevel` element.
+
+  Production XML must set `DisallowStartIfOnBatteries`/`StopIfGoingOnBatteries` false explicitly, and the read-back
+  compare must include them.
+- **Not a defect: `%date% %time%` expanded at create time.** cmd expands it inside the quoted `/tr`, so the action
+  echoes the creation time. P1's fire evidence is the output file's last-write time plus `/query /v` Last Run Time,
+  not the file's text.
+- **P1 itself is pending.** It is answered after 23:00 with the session disconnected.
+
+
 ## Behaviour
 
 ### Why schtasks.exe with an XML file (design change 2026-11-23)
