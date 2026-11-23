@@ -308,7 +308,7 @@ Test fixtures, for every child:
 - The existing `test_N1_and_M2_lockout_and_hmac_calls` asserts the flat reset (`:236`, `WAIT 300` at about `:305`). It
   is updated to the escalation, because that assertion is the bug.
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-23
 
 ## Routing
 
@@ -372,3 +372,9 @@ More than 3 files, so the work splits into three child specs, one dispatch per f
    climbing toward the 24 h level. With decay, an attacker who pauses 24 h between bursts drops a level each time, but
    that pacing already limits them to about 5 guesses a day, the same rate as level 4, so decay costs little security.
    Claude leans to decay; operator decision. The answer adds one line to B1 and one evidence case to E1.
+
+## Operator decisions (2026-11-23)
+
+- Q3: final level is a 24-hour timed lock (`LOCK_SECONDS = [300, 1800, 14400, 86400]`), reusing `WAIT <n>`.
+- Q4: the lock level decays (Claude's recommendation, accepted).
+- New request: an unlock path from the console that does not need root on the hub. Design pending; child A waits for it. Child B (RevokedKeys) can dispatch now.

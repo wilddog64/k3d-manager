@@ -8,7 +8,7 @@
 **Waiting on:** operator decision — since 2026-11-23 (intent approval)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "distribute tasks across flash and luna")
 **Branch:** k3d-manager-v1.45.1
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-23
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match
 **Detected by:** v1.45.0 red-team gate, 2026-11-22, on `7dfb7238` — see [docs/issues/2026-11-23-v1.45.0-red-team.md](../issues/2026-11-23-v1.45.0-red-team.md)
 **Severity:** breaks the repository rule "no tokens in arguments"; visible in the process list inside the job pod or on its node.

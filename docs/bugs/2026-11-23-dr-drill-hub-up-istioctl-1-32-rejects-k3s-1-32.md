@@ -9,7 +9,7 @@
 **Introducing change reviewed:** no
 **Waiting on:** dispatch — since 2026-11-23 (operator intent approval; m4-air istioctl 1.30.0 must be replaced before its next deploy, see Rollout survey)
 **Approval:** pending (operator decision 2026-11-23: pin 1.31.4, no k3s bump, archive + SHA-256, refuse other minors)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-23
 **Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause; `CHANGELOG.md:2565` — recurrence: k3s was raised to v1.32.0-k3s1 in July "to satisfy the istioctl precheck floor" (same class)
 **Detected by:** operator, `make dr-drill` on m2-air, 2026-11-23 ~03:55 PST; also explains the failing daily `Hub DR drill freshness` workflow in `wilddog64/k3dm-hub-data` (stale since 2026-11-04 result)
 
@@ -341,3 +341,9 @@ are never reached (`feedback_mutation_harness_sudo_guard`, `feedback_never_run_i
   `CLAUDE.md:110-111` (PATH includes `/opt/homebrew/bin`; the stub dir goes first for the istioctl suite).
 - Paste each command with its rc and the proving lines. Leave changes uncommitted. No live checks: E6 and E7 are the
   operator's.
+
+## Operator decisions (2026-11-23)
+
+- Keep the `ISTIOCTL_VERSION` override (Claude's recommendation, accepted).
+- Delete the local `_install_istioctl` copy in `scripts/lib/core.sh` (child B).
+- Operator live steps at home: replace m4-air istioctl 1.30.0; raise hub istiod to 1.31.4.

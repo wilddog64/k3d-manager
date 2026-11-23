@@ -8,7 +8,7 @@
 **Waiting on:** dispatch — since 2026-11-23 (Fable spec review)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-23
 **Prior art:** `docs/bugs/2026-11-14-acg-credentials-reports-empty-when-keychain-locked.md` (exact-slug glob + grep; vector store unavailable) — same class (locked Keychain read as empty), different component; closed there as P3, recurrence here in a release-gating path
 **Detected by:** Claude, `make dr-drill` on m2-air sent by Claude to the operator's SSH pane (operator asked), 2026-11-23 ~05:00 PST
 

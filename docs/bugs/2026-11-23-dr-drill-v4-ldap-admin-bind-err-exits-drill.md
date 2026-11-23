@@ -8,7 +8,7 @@
 **Waiting on:** dispatch — since 2026-11-23 (Fable spec review)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-23
 **Prior art:** `docs/bugs/2026-10-16-cluster-up-ldap-seed-admin-bind-invalid-credentials.md` (dedup pass 1 by slug) — read, different root cause (cluster-up seed, not a restore)
 **Filed:** 2026-11-23
 **Detected by:** dr-drill runs 3 and 4 on m2-air (run 4 with `DR_DRILL_KEEP=1`), diagnosed by Claude read-only against the kept `k3d-dr-drill` cluster
@@ -135,3 +135,7 @@ After a restore, which admin password is the truth?
 - (b) The drill's: after restore, reset the `cn=ldap-admin` `userPassword` to the Secret via `ldapmodify -Y EXTERNAL`.
   Simpler, but the drill no longer proves the backed-up credentials work.
 Claude's recommendation: (a). First check, read-only, whether the export already carries the Secret (inventory list only, no values).
+
+## Operator decisions (2026-11-23)
+
+- Defect 1: option (a), restore the `openldap-admin` Secret from the export (Claude's recommendation, accepted). Spec for defect 1 follows after a read-only inventory check; it dispatches after the defect 2 task lands (same file).
