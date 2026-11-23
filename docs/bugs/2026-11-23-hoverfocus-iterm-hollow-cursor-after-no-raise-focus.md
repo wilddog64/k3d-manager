@@ -1,4 +1,4 @@
-# Bug: HoverFocus — iTerm2 shows its unfocused (hollow) cursor after hover focus returns to it
+# Bug: HoverFocus — terminals (iTerm2 and Terminal.app) show an unfocused cursor after hover focus returns to them
 
 **Status:** OPEN
 **Priority:** P3 — cosmetic; keystrokes reach iTerm, one click restores the solid cursor
@@ -14,13 +14,15 @@
 
 E-L1 step 1 passed: hovering a TextEdit window behind iTerm2 sent typing to TextEdit without raising it. When the
 pointer moved back over iTerm2, typing went to iTerm2, but its cursor was drawn hollow (iTerm2's "window not key"
-style). One click in iTerm2 made it solid again. Terminal.app not yet tested.
+style). One click in iTerm2 made it solid again. Terminal.app behaves the same (operator, 2026-11-23: typed
+"hello from terminal" into TextEdit, then back over Terminal the input went to Terminal with an unfocused cursor),
+so this is not iTerm2-specific.
 
 ## Likely cause (unproven)
 
 `Controller.applyDecision` focuses without raising through `hf_focus_without_raise` (SkyLight front-process call). It
-makes the process frontmost for input but iTerm2 does not appear to receive the key-window change it redraws its
-cursor from. Needs a capture of iTerm2's key-window state (AX `AXFocusedWindow`/`AXMain`) before and after a hover.
+makes the process frontmost for input but the terminal apps do not appear to receive the key-window change it redraws its
+cursor from. Needs a capture of the app's key-window state (AX `AXFocusedWindow`/`AXMain`) before and after a hover.
 
 ## Expected
 
@@ -28,5 +30,5 @@ After hover focus, the app's window looks active (solid cursor) as well as recei
 
 ## Next
 
-- Test Terminal.app the same way to tell whether this is iTerm2-specific.
+- Terminal.app tested 2026-11-23: same. Check whether TextEdit's own focus ring/caret shows the same lag.
 - Not an M1 blocker (operator to confirm at triage).
