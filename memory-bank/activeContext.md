@@ -147,3 +147,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: hoverfocus agent loaded on m2 via sudo launchctl asuser bootstrap (operator typed password): state running pid 86556. E-L1 pending operator hover test.
 
 - 2026-11-23: Argon PR #164 review read (operator OK): 2 low, both no-change (docs/issues/2026-11-23-argon-pr164-review-findings.md). Argon gate passed.
+
+- 2026-11-23: CodeQL #38/#39 dismissed false positive by Claude (operator "yes"). Pushed 3810d909; CI pending.
