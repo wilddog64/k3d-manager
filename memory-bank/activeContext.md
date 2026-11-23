@@ -1,4 +1,4 @@
-## Handoff — 2026-11-23 07:40 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 PR #164 open — START HERE
+## Handoff — 2026-11-23 08:10 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 PR #164 open — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
 
@@ -9,7 +9,7 @@
   print `tccutil reset`), P1 live probe on m2 with operator ~15:30 (same-app key window without raise: AX
   `kAXMainAttribute`/`kAXFocusedAttribute`; check raise + terminal cursor), L2 Luna (`Controller.swift`/CSkyLight after
   P1 + AX element cache eviction). NOTHING dispatched.
-- DONE 07:40: L1+F1 specs rev 1 written, v0.0.2 branch pushed. Was: write L1 and F1 child specs (Acceptance, must_not red on v0.0.1, `## Files`, intent lines
+- DONE 08:10: L1+F1 specs rev 2 (Fable reviewed, all findings applied), v0.0.2 branch pushed. Operator at home: approve intents, GUI `launchctl managername` on m2 (F1 gate), go. L1-EL gates the v0.0.2 merge. Was: write L1 and F1 child specs (Acceptance, must_not red on v0.0.1, `## Files`, intent lines
   `pending`), branch `v0.0.2` from `main` d426f18 on hoverfocus origin, Fable spec review. Then ask operator: approve
   intents + dispatch go. Open question for operator: create a local signing identity (stable TCC grant) or keep
   printing the reset step.

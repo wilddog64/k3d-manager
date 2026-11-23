@@ -1,6 +1,8 @@
 # hoverfocus v0.0.2 F1 — install: wait for unload, detect a non-GUI session, safe paths, re-grant hint
 
-**Status:** spec rev 1 — not dispatched (Fable spec review, then operator intent approval and go)
+**Status:** spec rev 2 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 6 should-fix, 4 nits; all applied, Claude
+reproduced the plutil blocker and the vacuous grep); not dispatched (GUI `managername` capture, operator intent approval
+and go)
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.2-bug-batches.md`](hoverfocus-v0.0.2-bug-batches.md) (batch F1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.2` (cut from `main` at `d426f18`, tag `v0.0.1`)
@@ -29,8 +31,10 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
 - `launchctl print gui/<uid>/<label>` → rc **113** when the service is not loaded, rc **0** when loaded
   (`com.apple.Finder`).
 - `launchctl managername` over SSH → `Background`, rc 0 (matches the m2 report in the B3 doc).
-- Not yet captured: the value in a GUI Terminal session. launchd's session type for a logged-in GUI session is `Aqua`
-  (the same word as `LimitLoadToSessionType`); live evidence F1-EL confirms it on m2 before merge.
+- Not yet captured: the value in a GUI Terminal session (expected `Aqua`, the same word as `LimitLoadToSessionType`).
+  If it differs, every GUI install would skip bootstrap with rc 0. **Dispatch gate:** the operator captures
+  `launchctl managername` in a GUI Terminal on m2 (read-only) before F1 is dispatched, and the value is recorded here
+  (Fable 15).
 - Whether `bootout` returns before the job is fully gone is not proven; the wait below is defensive and costs one
   `print` call when `bootout` is synchronous.
 
@@ -42,22 +46,29 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
 
 ## Behaviour
 
-1. **Paths are never re-parsed (Argon #3).** `export APPDIR AGENTDIR LAUNCHCTL` in the Makefile and refer to them in
-   recipes as shell variables (`"$$APPDIR"`), not `$(APPDIR)` text. The LaunchAgent plist is written by copying the
-   template and setting the program path with
-   `plutil -replace ProgramArguments.0 -string "$$APPDIR/HoverFocus.app/Contents/MacOS/hoverfocus" <plist>` (plutil
-   does the XML escaping); `sed` and the `__PROGRAM__` placeholder are no longer used for it (keep the placeholder in
-   the template so the file stays a valid plist). The empty-variable guards use the shell variables too.
-2. **Session check (B3 part 2).** Before any `bootout`/`bootstrap`, install reads `$$LAUNCHCTL managername`. If it is
-   not exactly `Aqua`, install still copies the bundle and writes the plist, then skips `bootout`/`bootstrap`, prints
+1. **Paths are never re-parsed (Argon #3).** `export APPDIR AGENTDIR LAUNCHCTL CODESIGN_IDENTITY` in the Makefile and
+   refer to them in recipes as shell variables (`"$$APPDIR"`), not `$(APPDIR)` text. The LaunchAgent plist is written
+   by copying the template, then
+   `plutil -replace ProgramArguments -array <plist>` followed by
+   `plutil -insert ProgramArguments.0 -string "$$APPDIR/HoverFocus.app/Contents/MacOS/hoverfocus" <plist>` (plutil
+   does the XML escaping). **Not** `plutil -replace ProgramArguments.0`: on an array index it inserts and leaves
+   `__PROGRAM__` as a second argument (Fable 9, reproduced by Claude on macOS 26.5.2). Not PlistBuddy `Set` (drops
+   `'`). `sed` is no longer used for it; keep the placeholder in the template so the file stays a valid plist. The
+   empty-variable guards use the shell variables too.
+   Session check, `bootout`, poll and `bootstrap` (Behaviour 2-3) share state, so they are **one `\`-joined shell
+   block** in the recipe (each make recipe line is its own shell), with `"$$LAUNCHCTL"` quoted.
+2. **Session check (B3 part 2).** Before any `bootout`/`bootstrap`, install reads `"$$LAUNCHCTL" managername`. A
+   failing command or empty output counts as non-`Aqua`. If it is not exactly `Aqua`, install still copies the bundle and writes the plist, then skips `bootout`/`bootstrap`, prints
    to stderr:
 
    ```
    hoverfocus: not a GUI login session (launchctl managername: <value>); files are installed but the agent is not loaded.
    To load it from this session, run:
      sudo launchctl asuser <uid> launchctl bootout gui/<uid>/com.wilddog64.hoverfocus
-     sudo launchctl asuser <uid> launchctl bootstrap gui/<uid> <absolute plist path>
+     sudo launchctl asuser <uid> launchctl bootstrap gui/<uid> '<absolute plist path>'
    ```
+
+   (the plist path single-quoted, since `AGENTDIR` may contain spaces)
 
    (the first line may fail harmlessly when nothing is loaded) and exits 0. Uninstall does the same check: in a
    non-`Aqua` session it removes the files, skips `bootout` and prints the `asuser … bootout` line. Neither target runs
@@ -67,7 +78,8 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
    most `BOOTOUT_WAIT_TRIES` tries (`BOOTOUT_WAIT_TRIES ?= 50`, exported, i.e. 5 s). Then `bootstrap`. If it is still
    loaded after the last try, print `hoverfocus: agent still loaded after bootout; not bootstrapping` to stderr and exit
    non-zero without calling `bootstrap`. Uninstall runs `bootout` only (no wait needed).
-4. **Re-grant hint (B3 part 4).** After a successful install, when `CODESIGN_IDENTITY` is `-` (ad hoc), print:
+4. **Re-grant hint (B3 part 4).** After the files are installed, on both the `Aqua` and the non-`Aqua` path (the SSH
+   case needs it most), when `"$$CODESIGN_IDENTITY"` is `-` (ad hoc), print to stdout:
 
    ```
    hoverfocus: ad-hoc signed build. If the menu shows "Needs Accessibility permission" although HoverFocus is enabled
@@ -81,24 +93,38 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
    and extend the stub `launchctl`:
    - `managername` prints the contents of `$root/managername` (default file content `Aqua`), rc 0;
    - `print …` exits 0 while the integer in `$root/print_loaded` is > 0 (decrementing it each call), else 113;
-   - every call is still appended to `$root/launchctl.log`, and the stub still exits 97 without the marker.
-   Replace the fixed-line-number log checks with order checks over the log. New cases, each with its own scratch
-   state reset:
+   - every call is still appended to `$root/launchctl.log`, and the stub still exits 97 without the marker;
+   - the stub carries a comment naming its source capture: `m4-air, macOS 26.5.2, 2026-11-23: print of a missing
+     service rc 113; managername over SSH prints Background`.
+   Add a stub `sudo` in `$root/bin` (first on `PATH`) that appends to `$root/sudo.log` and exits 97; every case asserts
+   `sudo.log` is absent or empty (Fable 12: hosted runners have passwordless sudo, and the sandbox profile is local
+   only). Replace the fixed-line-number log checks with order checks over the bootout/print/bootstrap lines that
+   ignore `managername` lines. New cases, each with its own scratch state reset:
    - **wait:** `print_loaded=3` → log has `bootout …`, then 4 `print` calls, then `bootstrap gui/<uid> <plist>`;
    - **timeout:** `print_loaded=1000`, `BOOTOUT_WAIT_TRIES=3` → install exits non-zero, stderr has `still loaded`,
      no `bootstrap` in the log;
    - **SSH session:** `managername=Background` → install rc 0, bundle and plist exist, no `bootout`/`bootstrap` in the
      log, stderr has `sudo launchctl asuser <uid> launchctl bootstrap gui/<uid> <plist>` with the real plist path;
      uninstall in the same state removes both files, logs no `bootout`, prints the `asuser … bootout` line;
-   - **odd path:** `APPDIR="$root/home/Apps & Co|x <y> 'z'"` → install rc 0; `plutil -lint` passes on the installed
-     plist; `plutil -extract ProgramArguments.0 raw` equals `$APPDIR/HoverFocus.app/Contents/MacOS/hoverfocus`
-     exactly; the bundle exists at that path; uninstall removes it and the snapshot check still holds;
+   - **odd path:** `APPDIR="$root/home/Apps & Co|x <y> 'z'"`, created **before** the case's snapshot (install
+     `mkdir -p`s it and uninstall leaves the directory, as in v0.0.1) → install rc 0; `plutil -lint` passes on the
+     installed plist; `plutil -extract ProgramArguments raw` is `1` (one element); `plutil -extract
+     ProgramArguments.0 raw` equals `$APPDIR/HoverFocus.app/Contents/MacOS/hoverfocus` exactly; `grep -c __PROGRAM__`
+     on the installed plist is 0; the bundle exists at that path; uninstall removes it and the snapshot check holds.
+     The default-path case asserts the same count and no `__PROGRAM__`;
    - **hint:** the default (ad-hoc) install output has `tccutil reset Accessibility com.wilddog64.hoverfocus`. The
      named-identity branch is not run (CI has no signing identity and `bundle` would fail); it is checked by code
      reading.
 6. **README.** Installation: the SSH case and the printed `asuser` commands; re-installing is safe (waits for the old
    agent). Granting Accessibility: grant in System Settings or via the menu; HoverFocus notices within a few seconds
    (L1); after a rebuild of an ad-hoc build run the `tccutil reset` line. Known limitations: keep the ad-hoc line.
+7. **`docs/config.md:6`** (L1 contract reader): replace "keeps the defaults, reports the error … and continues
+   running" with: on an invalid file HoverFocus shows `Error: config <reason>` and stops focusing until a valid file
+   is loaded with Reload Config.
+
+**Land order:** L1 and F1 both land on `v0.0.2` before the release PR to `main`; the README and `docs/config.md` text
+describe L1's behaviour, so `v0.0.2` is not merged with F1 alone. Test runtime: each `make install` re-runs `bundle`
+(icon render + codesign), about seven runs; acceptable.
 
 ## Files
 
@@ -107,6 +133,7 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
 | `Makefile` | Behaviour 1-4 |
 | `tests/install_test.sh` | Behaviour 5 |
 | `README.md` | Behaviour 6 |
+| `docs/config.md` | Behaviour 7 (one sentence) |
 
 ## Contract readers
 
@@ -146,22 +173,24 @@ must_not:
   - id: F1-N3
     text: "a path with | or & corrupts the plist or the program path (paired: the default path still installs and extracts equal)"
   - id: F1-N4
-    text: "install or uninstall touches any path outside APPDIR and AGENTDIR (paired: the expected files appear and disappear under the scratch root)"
+    text: "regression guard (already green on v0.0.1): install or uninstall touches any path outside APPDIR and AGENTDIR (paired: the expected files appear and disappear under the scratch root)"
+  - id: F1-N5
+    text: "the installed plist keeps __PROGRAM__ or has more than one ProgramArguments entry (paired: ProgramArguments.0 equals the installed binary path)"
 evidence:
   - id: F1-E1
     proves: [F1-M1, F1-N1, F1-N4]
     kind: offline
-    command: "bash tests/install_test.sh rc 0 under the sandbox profile, showing the wait, timeout and v0.0.1 snapshot checks. Red controls, each restored byte-identical: remove the print poll loop (v0.0.1 behaviour) — the wait case fails; make the loop ignore BOOTOUT_WAIT_TRIES exhaustion and bootstrap anyway — the timeout case fails; hard-code AGENTDIR to $root/outside in the install recipe — the snapshot or expected-path check fails"
+    command: "bash tests/install_test.sh rc 0 under the sandbox profile, showing the wait, timeout and v0.0.1 snapshot checks. Red controls, each restored byte-identical: remove the print poll loop (v0.0.1 behaviour) — the wait case fails; make the loop ignore BOOTOUT_WAIT_TRIES exhaustion and bootstrap anyway — the timeout case fails; hard-code the plist destination to $$HOME/outside in the install recipe — the snapshot or expected-path check fails"
     intent: pending
   - id: F1-E2
     proves: [F1-M2, F1-N2]
     kind: offline
-    command: "same run: SSH-session case passes. Red controls: remove the managername check (v0.0.1 behaviour) — the SSH case fails because bootout/bootstrap are logged; change the printed bootstrap line to drop asuser — the stderr check fails. git grep -nE '^\\s*[^#]*\\bsudo\\b' Makefile shows sudo only inside echo/printf strings"
+    command: "same run: SSH-session case passes. Red controls: remove the managername check (v0.0.1 behaviour) — the SSH case fails because bootout/bootstrap are logged; change the printed bootstrap line to drop asuser — the stderr check fails; add a real `sudo true` line to the install recipe — the sudo.log check fails. grep -nw sudo Makefile shows sudo only inside echo/printf strings (not git grep -E '\\b', which matched nothing on macOS; Fable 11)"
     intent: pending
   - id: F1-E3
-    proves: [F1-M3, F1-N3]
+    proves: [F1-M3, F1-N3, F1-N5]
     kind: offline
-    command: "same run: odd-path case passes. Red control: restore the v0.0.1 sed line for the plist — the odd-path case fails (plutil -lint or the extract check), while the default-path checks still pass"
+    command: "same run: odd-path case passes. Red controls: restore the v0.0.1 sed line for the plist — the odd-path case fails (sed 'bad flag' or the extract check), while the default-path checks still pass; use plutil -replace ProgramArguments.0 instead of replace-array + insert — the element-count and __PROGRAM__ checks fail"
     intent: pending
   - id: F1-E4
     proves: [F1-M4]
