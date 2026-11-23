@@ -206,7 +206,23 @@ function _hostinger_set_active_app_cluster() {
 function _hostinger_deregister_cluster() {
   local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
   local secret_name="cluster-${_HOSTINGER_KUBE_CONTEXT}"
+  local server=""
+  server="$(_kubectl -n "${argocd_ns}" get secret "${secret_name}" \
+    -o jsonpath='{.data.server}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
+  [[ "${server}" == "https://kubernetes.default.svc" ]] && server=""
   _kubectl delete secret "${secret_name}" -n "${argocd_ns}" --ignore-not-found=true >/dev/null 2>&1 || true
+  local app
+  while IFS= read -r app; do
+    [[ -z "${app}" ]] && continue
+    _kubectl -n "${argocd_ns}" patch "${app}" --type=merge \
+      -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
+    _kubectl -n "${argocd_ns}" delete "${app}" --ignore-not-found >/dev/null 2>&1 || true
+  done < <(
+    _kubectl -n "${argocd_ns}" get applications -o json 2>/dev/null \
+      | jq -r --arg ctx "${_HOSTINGER_KUBE_CONTEXT}" --arg server "${server}" \
+        '.items[]? | select(.spec.destination.name == $ctx or ($server != "" and .spec.destination.server == $server)) | "application/" + .metadata.name' \
+        2>/dev/null
+  )
   _info "[k3s-hostinger] Deregistered ${secret_name} from hub ArgoCD"
 }
 

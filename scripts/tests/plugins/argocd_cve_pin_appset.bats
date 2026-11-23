@@ -13,20 +13,47 @@ s = yaml.safe_load(open(sys.argv[1]))['spec']
 assert any(x.get('name') == 'payment-db-credentials' for x in s['template']['spec']['ignoreDifferences'])
 assert 'ignoreApplicationDifferences' not in s
 repo = 'https://github.com/wilddog64/k3d-manager'
-dirs, clusters = s['generators'][0]['matrix']['generators']
+clusters, dirs = s['generators'][0]['matrix']['generators']
 assert clusters == {'clusters': {'selector': {'matchLabels': {'k3d-manager/role': 'app-cluster', 'k3d-manager/shopping-cart': 'true'}}}}
+assert s['syncPolicy'] == {'applicationsSync': 'create-update', 'preserveResourcesOnDeletion': True}
 directories, pins = dirs['matrix']['generators']
 assert directories['git'] == dict(repoURL=repo, revision='${K3D_MANAGER_BRANCH}', directories=[{'path':'services/*'}, {'path':'services/shopping-cart-identity','exclude':True}])
 assert pins['git'] == dict(repoURL=repo, revision='cve-pins/hub', pathParamPrefix='cvePinsFile', files=[{'path':'pins.json'}])
+assert pins['selector'] == {'matchExpressions': [
+    {'key':'name','operator':'DoesNotExist'},
+    {'key':'nameNormalized','operator':'DoesNotExist'},
+    {'key':'server','operator':'DoesNotExist'},
+    {'key':'project','operator':'DoesNotExist'},
+    {'key':'path.path','operator':'DoesNotExist'},
+    {'key':'path.basename','operator':'DoesNotExist'},
+    {'key':'metadata.labels.k3dm.k3d.io/e2e-profile','operator':'DoesNotExist'},
+]}
 app = s['template']['spec']
 assert app['source']['repoURL'] == repo and 'sources' not in app
 assert app['source']['targetRevision'] == '${K3D_MANAGER_BRANCH}'
 assert app['destination'] == {'name':'{{.name}}', 'namespace':'shopping-cart-apps'}
 assert s['template']['metadata']['name'] == '{{.name}}-{{.path.basename}}'
 patch = s['templatePatch']
-assert 'with index .cvePins .path.basename' in patch
-assert 'regexMatch "^sha256:[0-9a-f]{64}$" (toString (index . "digest"))' in patch
+assert '{{- $pins := index . "cvePins" }}' in patch
+assert 'kindIs "map" $pins' in patch and 'kindIs "map" $pin' in patch
+assert 'regexMatch "^sha256:[0-9a-f]{64}$" (toString (index $pin "digest"))' in patch
 assert patch.count('images:') == 1
+PY
+}
+
+@test "malformed pin parameter shapes render no patch successfully" {
+  export GOCACHE="${BATS_SUITE_TMPDIR}/go-cache"
+  "$python" - "$manifest" "${BATS_TEST_TMPDIR}/patch" "${BATS_TEST_DIRNAME}/../fixtures/cve-pin-render/main.go" <<'PY'
+import json, subprocess, sys, yaml
+manifest, path, fixture = sys.argv[1:]
+open(path, 'w').write(yaml.safe_load(open(manifest))['spec']['templatePatch'])
+service = 'shopping-cart-frontend'
+shapes = [{}, {'v': 1}, {'cvePins': None}, {'cvePins': 'oops'}, {'cvePins': []}, {'cvePins': 7}, {'cvePins': {service: 'not-a-map'}}]
+for params in shapes:
+    params['path'] = {'basename': service}
+    result = subprocess.run(['go', 'run', fixture, path], input=json.dumps(params), text=True, capture_output=True)
+    assert result.returncode == 0, (params, result.stderr)
+    assert result.stdout == '', (params, result.stdout)
 PY
 }
 

@@ -11,6 +11,11 @@ spec:
   generators:
     - matrix:
         generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  k3d-manager/role: app-cluster
+                  k3d-manager/shopping-cart: "true"
           - matrix:
               generators:
                 - git:
@@ -26,15 +31,20 @@ spec:
                     pathParamPrefix: cvePinsFile
                     files:
                       - path: pins.json
-          - clusters:
-              selector:
-                matchLabels:
-                  k3d-manager/role: app-cluster
-                  k3d-manager/shopping-cart: "true"
+                  selector:
+                    matchExpressions:
+                      - {key: name, operator: DoesNotExist}
+                      - {key: nameNormalized, operator: DoesNotExist}
+                      - {key: server, operator: DoesNotExist}
+                      - {key: project, operator: DoesNotExist}
+                      - {key: path.path, operator: DoesNotExist}
+                      - {key: path.basename, operator: DoesNotExist}
+                      - {key: metadata.labels.k3dm.k3d.io/e2e-profile, operator: DoesNotExist}
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
   syncPolicy:
+    applicationsSync: create-update
     preserveResourcesOnDeletion: true
   template:
     metadata:
@@ -85,12 +95,16 @@ spec:
         syncOptions:
           - CreateNamespace=true
   templatePatch: |
-    {{- with index .cvePins .path.basename }}
-    {{- if regexMatch "^sha256:[0-9a-f]{64}$" (toString (index . "digest")) }}
+    {{- $pins := index . "cvePins" }}
+    {{- if kindIs "map" $pins }}
+    {{- $pin := index $pins .path.basename }}
+    {{- if kindIs "map" $pin }}
+    {{- if regexMatch "^sha256:[0-9a-f]{64}$" (toString (index $pin "digest")) }}
     spec:
       source:
         kustomize:
           images:
-            - 'ghcr.io/wilddog64/{{ $.path.basename }}@{{ index . "digest" }}'
+            - 'ghcr.io/wilddog64/{{ .path.basename }}@{{ index $pin "digest" }}'
     {{- end }}
     {{- end }}
+    {{- end -}}
