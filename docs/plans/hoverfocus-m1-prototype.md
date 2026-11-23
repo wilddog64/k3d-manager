@@ -13,7 +13,7 @@ API shim, event tap) and [`hoverfocus-m1b-app-shell.md`](hoverfocus-m1b-app-shel
 install, CI, docs). They run in parallel against the fixed interface below.
 **Filed:** 2026-11-22
 **Spec reviewed:** pending (Fable; operator 2026-11-22: "be sure to have Fable review it before you dispatch out")
-**Intent approved:** pending
+**Intent approved:** operator 2026-11-22 ("your intents approved"), for the evidence intent lines as written in rev 1; rev 2 keeps them verbatim
 **Approval:** operator 2026-11-22 ("go ahead to write a spec but it should have its own repo, and track like
 dirused"; "might be a good test to split task between two")
 

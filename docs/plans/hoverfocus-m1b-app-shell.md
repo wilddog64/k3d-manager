@@ -11,7 +11,7 @@ only against a scratch HOME with `launchctl` stubbed.
 the interface stubs, so the app runs but does nothing until M1a lands. **Verifier:** Claude (Sonnet verifier from
 `## Acceptance` only).
 **Filed:** 2026-11-22
-**Intent approved:** pending
+**Intent approved:** operator 2026-11-22 ("your intents approved"), for the evidence intent lines as written in rev 1; rev 2 keeps them verbatim
 **Approval:** operator 2026-11-22 (see parent)
 
 ## Before You Start

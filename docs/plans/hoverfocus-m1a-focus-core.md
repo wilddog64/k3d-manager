@@ -9,7 +9,7 @@
 **Implementer:** Luna (logic). Runs in parallel with M1b (Flash); no shared files. **Verifier:** Claude (Sonnet
 verifier from `## Acceptance` only).
 **Filed:** 2026-11-22
-**Intent approved:** pending
+**Intent approved:** operator 2026-11-22 ("your intents approved"), for the evidence intent lines as written in rev 1; rev 2 keeps them verbatim
 **Approval:** operator 2026-11-22 (see parent)
 
 ## Before You Start
