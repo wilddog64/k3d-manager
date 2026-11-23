@@ -11,7 +11,8 @@ Where this spec and parent fact 3 differ, this spec wins (see Focus technique be
 **Risk:** low (user space; no sudo; no network); the private-API part can break on macOS updates and must fail closed
 **Implementer:** Luna (logic). **Verifier:** Claude (independent verifier from `## Acceptance` only).
 **Filed:** 2026-11-22
-**Intent approved:** operator 2026-11-22 ("your intents approved"), for the evidence intent lines as written in rev 1; revs 2–4 keep them verbatim
+**Intent approved:** operator, 2026-11-22
+**Intent note:** operator said "your intents approved" for the evidence intent lines as written in rev 1; revs 2–4 keep them verbatim
 **Approval:** operator 2026-11-22 (see parent); "execute the steps … to make hoverfocus moving" 2026-11-22 (rev 2, Fable review, dispatch)
 
 ## Focus technique (proof of external behaviour)
