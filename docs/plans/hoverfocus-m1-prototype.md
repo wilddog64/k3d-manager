@@ -1,9 +1,9 @@
 # hoverfocus M1 — focus follows mouse without raise (macOS), prototype: umbrella
 
-**Status:** DRAFT rev 1, 2026-11-22 — Fable spec review pending; repo not created yet
+**Status:** DRAFT rev 1, 2026-11-22 — Fable reviewed ("ready after fixes"); rev 2 pending. Repo created 2026-11-22 (public), interface commit `007879f` on `main` and `m1-base`; `main` protected (PR required, admins included, no force-push or delete, conversations resolved; CI check to be required once M1b adds CI)
 **Tracked:** hoverfocus (OOB repo, like dirused), not a k3d-manager release; no `docs/ideas.md` row. Bugs go in
 `docs/hoverfocus/bugs/`, ideas in `docs/hoverfocus/ideas.md`, specs in `docs/plans/hoverfocus-*.md`.
-**Repo / branch:** `wilddog64/hoverfocus` (name and visibility: operator decision pending) / base branch `m1-base`
+**Repo / branch:** `wilddog64/hoverfocus` (public; operator 2026-11-22) / base branch `m1-base`
 (created by Claude from the interface commit below; the dispatcher refuses `main`)
 **Version:** v0.1.0
 **Risk:** low for the system (a user-space menu-bar app, user LaunchAgent, no sudo), medium for maintenance (private
