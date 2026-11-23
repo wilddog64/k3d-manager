@@ -75,6 +75,9 @@ or `Sources/HoverFocusCore/Interface.swift`; a change to either is a spec change
 | `Sources/hoverfocus/**` | M1b |
 | `Makefile`, `packaging/**`, `tests/**`, `.github/**`, `README.md`, `docs/**`, `config.example.json` | M1b |
 
+After M1b landed (`87322d6`), ownership of `Sources/hoverfocus/MenuModel.swift`, `docs/config.md` and `README.md`
+passes to M1a rev 3 (2026-11-22).
+
 Public names the shell may use (M1b) and M1a must keep: `Config`, `PauseModifier`, `ConfigError`,
 `ConfigLoader.load(from:)`, `ControllerError`, `FocusControlling`, `HoverFocusController(config:)`,
 `AccessibilityPermission.isTrusted(prompt:)`. The full text of `Interface.swift` is in the interface commit; summary:

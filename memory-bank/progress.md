@@ -66,3 +66,4 @@
 - 2026-11-22: hoverfocus M1a spec rev 2 written (variant B only, MenuModel.loadConfig via ConfigLoader, StartChecks order test, N5 no event records, selftest SkyLight check); Fable spec review next.
 - 2026-11-22: hoverfocus M1a rev 2 pushed 4a26a803; Fable spec review agent running (read-only).
 - 2026-11-22: v1.45.0 red-team gate started on 7dfb7238 (quota Fable 0.09 / Claude 0.25 / Codex 0.07); Fable + Astra blind, reports to scratchpad/redteam/. M1a Fable spec review still running.
+- 2026-11-22: hoverfocus M1a Fable review of rev 2: needs rework (3 blockers: selftest cannot reach MenuModel, E2 grep vs selftest literals, untestable resolve-failed clause). All 19 findings verified against code and taken in rev 3 (public trial tap instead of CGPreflightListenEventAccess; AXFrontmost+AXRaise instead of activate()). Fable re-check of rev 3 next.
