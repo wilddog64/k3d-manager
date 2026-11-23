@@ -83,5 +83,5 @@ evidence:
 interface: none
 ```
 
-**Intent approved:** operator, 2026-11-15 (standing rule: non-Copilot PRs get a blind Argon diff review)
-**Approval words and scope:** "ship v0.0.1 and fix bugs in v0.0.2" (operator, 2026-11-23); this review gates hoverfocus PR #1.
+**Intent approved:** operator, 2026-11-15
+**Approval words and scope:** standing rule (2026-11-15): non-Copilot PRs get a blind Argon diff review; "ship v0.0.1 and fix bugs in v0.0.2" (operator, 2026-11-23); this review gates hoverfocus PR #1.
