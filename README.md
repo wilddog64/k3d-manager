@@ -348,11 +348,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-11-23 | [Argon PR #164 review findings](docs/issues/2026-11-23-argon-pr164-review-findings.md) | v1.45.0 release diff / no change |
 | 2026-11-23 | [CodeQL PR #164: totpctl enrollment secret](docs/issues/2026-11-23-codeql-pr164-totpctl-enroll-secret.md) | False positive / TOTP enroll |
 | 2026-11-23 | [v1.45.0 red-team report](docs/issues/2026-11-23-v1.45.0-red-team.md) | Release security gate |
 | 2026-11-18 | [Argon PR #163 review findings](docs/issues/2026-11-18-argon-pr163-review-findings.md) | v1.44.2 release diff / xtrace |
 | 2026-11-17 | [Argon PR #162 review findings](docs/issues/2026-11-17-argon-pr162-review-findings.md) | v1.44.1 release diff |
-| 2026-11-12 | [Copilot PR #160 review findings](docs/issues/2026-11-12-copilot-pr160-review-findings.md) | Test helpers / bash 3.2 |
 
 [All issues →](docs/issues/)
 
