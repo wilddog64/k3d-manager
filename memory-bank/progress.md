@@ -65,3 +65,4 @@
 - 2026-11-22: hoverfocus main protection: build required (operator go); PUT restated all other rules, read back unchanged (admins on, 0 approvals, conversation resolution, no force-push/deletion).
 - 2026-11-22: hoverfocus M1a spec rev 2 written (variant B only, MenuModel.loadConfig via ConfigLoader, StartChecks order test, N5 no event records, selftest SkyLight check); Fable spec review next.
 - 2026-11-22: hoverfocus M1a rev 2 pushed 4a26a803; Fable spec review agent running (read-only).
+- 2026-11-22: v1.45.0 red-team gate started on 7dfb7238 (quota Fable 0.09 / Claude 0.25 / Codex 0.07); Fable + Astra blind, reports to scratchpad/redteam/. M1a Fable spec review still running.
