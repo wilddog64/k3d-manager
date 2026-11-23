@@ -1,21 +1,29 @@
 # Bug: "Human continuation prompts" counts Claude's resumes of dispatched agents, not human turns
 
-**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
+**Status:** OPEN — reopened on recurrence 2026-11-23 (operator); was: CLOSED at grooming 2026-11-22 ("reopen on recurrence")
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic wording fix renaming a dashboard panel title, description, and related documentation without changing underlying queries or behavior); Claude proposed P3. Agreed.
-**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
+**Triage:** patch → v1.45.1 (operator, 2026-11-23: "yes, go ahead to file a P3 spec"); was: close — grooming 2026-11-22, operator; before that: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
 **Introduced by:** pre-existing (the panel title and description since the reason bars; see CHANGELOG "Agent Dispatch Human continuation prompts")
 **Should have been caught by:** review
 **Prior art:** `make find-similar-docs` unavailable (vector store unreachable from the M4: `context "k3d-k3d-cluster" does not exist`, 2026-11-10); exact-slug glob: none; `docs/plans/human-operator-turns.md` covers the same panel (read: this doc takes only its rename step; the plan keeps the real turn counting)
 **Severity:** cosmetic, misleading. The operator read the bars (correction, clarification, continue) as their own effort; they are Claude's coordinator → sub-agent resume prompts recorded in the ledger.
 **Approval:** operator, 2026-11-10: "also can you schedule the label fix?"
-**Intent approved:** operator, 2026-11-10
-**Intent approval words:** "go with your suggestion"
-**Dispatch:** operator go 2026-11-10 ("go with your suggestion"), `--agent agy --model gemini-3.8-flash-medium`, slug `human-continuation-prompts-rename`; queued behind control-node-linux (WIP limit 3)
+**Intent approved:** operator, 2026-11-23
+**Intent approval words:** "yes, go ahead to file a P3 spec" (2026-11-23); first approved 2026-11-10 ("go with your suggestion")
+**Waiting on:** dispatch — since 2026-11-23
+**Dispatch:** next free slot after 2026-11-23 (`--agent codex --model gpt-6-luna`); the 2026-11-10 agy dispatch never ran
 **Filed:** 2026-11-10
 **Detected by:** operator, 2026-11-07 (v1.43.14 retro); re-raised 2026-11-10
-**Branch:** `k3d-manager-v1.43.15`
+**Branch:** `k3d-manager-v1.45.1`
 **Release:** P3 batch
+
+## Recurrence — 2026-11-23
+
+Operator, from a dashboard screenshot: "should we change the title Human continuation prompts? I remembered you said
+this is primary you interact with other agents". Ledger check the same day: 215 `intervention` events (correction
+162, clarification 27, continue_prompt 24, other 2), every one written by `resume --reason` (`bin/k3dm-codex-dispatch:1780`),
+which Claude runs as coordinator. Line numbers below refreshed 2026-11-23 by grep.
 
 ## Symptom
 
@@ -37,21 +45,21 @@ recorded operator events by reason". The ledger `intervention` events behind it 
 | File | Change |
 |---|---|
 | `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` | panel 85 title and description |
-| `scripts/tests/plugins/agent_dispatch_dashboard.bats` | lines 187 and 1036 look the panel up by the new title; a test that the old title is gone |
+| `scripts/tests/plugins/agent_dispatch_dashboard.bats` | lines 277 and 1130 look the panel up by the new title; a test that the old title is gone |
 | `docs/guides/grafana-dashboards/k3dm-agent-cost.md` | line 69 wording |
-| `docs/howto/codex-dispatch.md` | line 162 wording |
+| `docs/howto/codex-dispatch.md` | line 168 wording |
 
 ## Contract readers
 
 | Reader | Changes? |
 |---|---|
-| `scripts/tests/plugins/agent_dispatch_dashboard.bats:187,1036` (panel lookup by title) | Yes |
-| `docs/guides/grafana-dashboards/k3dm-agent-cost.md:69`, `docs/howto/codex-dispatch.md:162` | Yes |
+| `scripts/tests/plugins/agent_dispatch_dashboard.bats:277,1130` (panel lookup by title) | Yes |
+| `docs/guides/grafana-dashboards/k3dm-agent-cost.md:69`, `docs/howto/codex-dispatch.md:168` | Yes |
 | `CHANGELOG.md:338`, `docs/retro/2026-11-07-v1.43.14-retrospective.md:24` | No: history |
 | `docs/plans/human-operator-turns.md` | Yes: rename step removed (Claude, at filing) |
 
 Writers: `bin/k3dm-codex-dispatch resume` writes the `intervention` events; unchanged. Found by
-`git grep -n "Human continuation prompts"`, 2026-11-10.
+`git grep -n "Human continuation prompts"`, 2026-11-10; re-run 2026-11-23. The metric name `k3dm_dispatch_human_continuation_prompts` (`bin/k3dm-dispatch-metrics:1841`, `scripts/tests/bin/test_dispatch_metrics.py:502,508`) is unchanged: renaming it would split the series.
 
 ## Acceptance
 

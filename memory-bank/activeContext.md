@@ -144,3 +144,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: dispatched totp-a2 and age-identity (WIP 3 with argocd). V4 defect 2 held: shares hub_data.sh with age-identity, goes after it lands.
 - 2026-11-23: filed P3 agy-dashboard-print-mode-label-unclear (display-only rename print→headless, label value kept); queued for next free slot.
 - 2026-11-23: argocd-alert-regex LANDED 400041df (--allow-out-of-scope: servicemonitor bats grep pin; spec Files fixed b0159a81), verify pass; L1 live after promote. Dispatching mode-label spec (agy-dashboard-print-mode-label-unclear, intents approved).
+- 2026-11-23: reopened P3 2026-11-10-human-continuation-prompts-panel-counts-coordinator-resumes on recurrence (operator: file the P3); rename to 'Coordinator → agent prompts', metric name kept; queued for next free slot (after mode-label/totp-a2/age-identity).
