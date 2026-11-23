@@ -6,7 +6,7 @@
 **Should have been caught by:** live check (the weekly drill; not run 2026-11-04 → 2026-11-23)
 **Introducing change reviewed:** no
 **Waiting on:** operator decision
-**Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause
+**Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause; `CHANGELOG.md:2565` — recurrence: k3s was raised to v1.32.0-k3s1 in July "to satisfy the istioctl precheck floor" (same class)
 **Detected by:** operator, `make dr-drill` on m2-air, 2026-11-23 ~03:55 PST; also explains the failing daily `Hub DR drill freshness` workflow in `wilddog64/k3dm-hub-data` (stale since 2026-11-04 result)
 
 ## Evidence
@@ -38,3 +38,17 @@ official Istio release archive, and re-run `make dr-drill` in Terminal.
    runs, so first record the hub's server version and Istio version (read-only) and match them.
 
 Either way the istioctl that `hub-up` uses should be the version the live hub's control plane runs.
+
+## Triage input (2026-11-23; decision pending with the operator)
+
+- **Fable (blind, from this doc and the repo):** P2; `patch → v1.45.1`. Pin istioctl from the tagged release archive with
+  checksum, refuse a PATH istioctl of another minor; lib-foundation first, then the local `scripts/lib/core.sh` (sourced
+  last, `scripts/k3d-manager:81-86`, so it is the live definition). `_istioctl install` (`k3d.sh:106`, `k3s.sh:90`)
+  also picks the control-plane version; no hub Istio version is pinned anywhere. Carry any k3s bump to v1.46.0.
+  Proposed 1.31.4 (istio.io supported-releases, fetched through a summary 2026-11-23: 1.31 → k8s 1.32–1.37).
+- **Claude:** P2 agreed. Fable did not see the live versions: the hub runs k8s 1.31.5 + Istio 1.28.3, which a
+  1.31.x pin would not match (1.31 does not list k8s 1.31). The pin choice is either "match the hub" (1.28.x, if its
+  range covers the drill's k3s) or "pin forward" (1.31.x) with a hub upgrade in v1.46.0. Re-read the istio.io table
+  directly before the spec.
+- Adjacent, not this bug (Fable): ambient Istio pinned at an end-of-life 1.24.2 (`scripts/etc/argocd/vars.sh:76`); k3d
+  installed from `k3d-io/k3d` `main` unpinned (`scripts/lib/providers/k3d.sh:75`).
