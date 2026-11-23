@@ -44,3 +44,5 @@
 - 2b resume 7 checked by Claude: 131/131 under sandbox-exec (sudo/launchctl denied), shellcheck clean; stop() exit-75 condition now path-dependent per Part 1 B14. Next: independent verify from Acceptance, then land (--allow-instruction-files copilot-instructions only).
 - hoverfocus icon concepts A/B/C on design canvas https://claude.ai/artifact/32Ju85vZ7YBvnzW2Uart3W; operator pick pending.
 - hoverfocus: operator chose icon B Dwell; menu bar icon configurable via Config.menuBarIcon (auto|color|light|dark), interface 92ab158 on m1-base; preview board added to the icon canvas. Folds into spec rev 2.
+- [x] 2026-11-22 hoverfocus M1b rev 2 + Flash dispatch (`hoverfocus-m1b-app-shell-r2`); hoverfocus registered in projects.list
+- [ ] hoverfocus M1a rev 2, operator focus probe, Luna dispatch
