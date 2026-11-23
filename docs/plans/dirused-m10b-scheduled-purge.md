@@ -153,6 +153,12 @@ unless marked "operator's call".
   - On this jump box that refuses today. Scheduling waits until the profile ACL is corrected, which is the operator's
     or the domain admin's call (why the account has it is unknown), or until a plan root outside the profile is found
     whose whole ancestor chain passes.
+- **`icacls C:\Users` (2026-11-23).** Stock ACL only: SYSTEM and Administrators full; Users and Everyone RX. So the
+  two extra full-control entries are set on the profile root `C:\Users\cliang`, not inherited machine-wide. The fix
+  is local to the operator's profile, and running it is the operator's call. Removing the two grants on the profile
+  root propagates to the inherited copies. Save the folder ACL first, so the change can be undone with
+  `icacls … /restore`. After the fix, P11 is re-run (`icacls` of the exe, `bin`, the profile root and the plan root)
+  and the ancestor walk must pass.
 - **Elevation.** `whoami /groups` shows `Medium Mandatory Level` (S-1-16-8192): the shell was **not elevated**. So a
   non-elevated user can create a task folder (`\dirused-probe\`) with `schtasks /create`, which is P10 part 1. The
   XML security descriptor is still unproven.
