@@ -2,6 +2,8 @@
 
 **Status:** OPEN
 **Priority:** P2 (proposed) — a wrong answer, not just a miss: Slack names v1.43.4 as the current release while the branch is v1.44.1. Workaround: ask with a count word ("how many bugs fixed in current release").
+**Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown

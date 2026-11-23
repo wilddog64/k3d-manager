@@ -1,10 +1,9 @@
 # Bug: Linux Homebrew installer download or run failure exits before cleanup and its report line
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Error-path hygiene and cosmetic output issue: the script already exits with the expected non-zero status on installer failure, only skipping temp-file cleanup in `TMPDIR` and the formatted report message); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator.
 **Introduced by:** `4bd764b9` (v1.43.15, `bin/k3dm-machine-setup:85,90`)
 **Should have been caught by:** offline test (N6 tests checked that nothing ran, not the cleanup or the report line)
 **Prior art:** `docs/bugs/2026-11-10-machine-setup-linux-exits-on-first-missing-formula.md` (same `_run_command` without `--soft` shape, lines 102-103, fixed in `d2cae3a6`) — read, same pattern at different lines; `make find-similar-docs` not run (vector store unreachable from the M4)

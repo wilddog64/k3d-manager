@@ -37,14 +37,14 @@
   sandbox-exec (exclude machine_setup test 187: `tty_limited` `ps` denied, P3 `eef73df5`), push, then land; never commit
   on the release branch while a land runs (ff-only merge).
 
-**Grooming 2026-11-22 (in progress, operator asked 2026-11-22):**
+**Grooming 2026-11-22 (DONE, see docs/grooming/2026-11-22.md):**
 - Argon classified the 53 unclassified OPEN bugs (committed `7ababe12`; 3a/3b drafts `2b15ede0`); 10
   Argon P3→P2; Claude would accept 3 (promote-waiting false alert, Hermes r7 first ESO group, ACG ssh config).
 - 109 OPEN bugs: 8 P2, 101 P3; 36 P3 on second pass (close candidates); 15 carry a stale `carry → v1.44.0`.
 - Fable blind ideas review done (ranks: weekly live-check session 1, verifier-first 2, stall watch for Claude jobs 3,
   promote CVE pin sync 4, ACG login 5, dev-hub gate 6; drops: sprint dashboard, CVE research, web console, /clear graph,
   WIP>3 row; v1.46.0: move out bounded-index + bug-lifecycle-metrics).
-- Drafts (untracked, not reviewed): `docs/plans/v1.46.0-remote-promote-3a-cloud-request-card.md` (Q1 early policy
+- Drafts (untracked, not reviewed): `docs/plans/remote-promote-3a-cloud-request-card.md` (Q1 early policy
   check location blocks dispatch) and `...-3b-relay-totp-signed-approval.md` (11 open questions; key hex-decode,
   id regex keeps `d`, skew window). Operator: draft now, implement on the release timeline.
 - v1.46.0 is 7/5 before 3a/3b; needs swaps, operator decides.
@@ -113,3 +113,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-22: operator carried web-console part B out of v1.45.0 (roadmap close-out + B spec status updated); Claude runs agent-only captures C2, C6 unpriv, C8 offline, C10 on m4. Operator works from M2 via SSH into M4, rarely at M5.
 - 2026-11-22: B agent-only captures (C2 schema, C6 unpriv, C8 offline, C10) recorded in the B spec; finding: Access apps delete-only (no disable), console reader _wc_check_routes defaults need a spec decision.
 - 2026-11-22: 2b independent verify: E1-E7 offline PASS, but gaps (platform-ops superseded mapping untested, M2 exit-2 malformed->75 vs spec 2, E7 doc test partial, Makefile mutants not run). Ledger verify needs a landed task, so not recorded there. Luna resume 8 (correction) running. B captures recorded in B spec.
+- 2026-11-22: Groom 2026-11-22: next release v1.46.0 5/5 (+2 travel exceptions; no swaps, 3a/3b to backlog 1-2); this week 2b land, red-team gate, v1.45.0 release PR; must-do 11 P2 carried to v1.46.0, 37 closed; ideas 1 promoted, 5 kept, 5 dropped. Recorded in docs/grooming/2026-11-22.md.

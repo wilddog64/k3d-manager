@@ -1,10 +1,9 @@
 # Plans table "Blocked by" misses open dispatches: hub exporter has no ledger, and a late agent exit reopens an abandoned task
 
-**Status:** OPEN — captured 2026-11-12
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN — captured 2026-11-12
 **Priority:** P3 (proposed: the column says "ready to dispatch" for plans that share files with a running dispatch; Claude checks `dispatch open` before dispatching, so no wrong dispatch has happened)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The dashboard's dispatch overlap reporting is degraded due to missing hub ledger visibility and incorrect lifecycle state parsing, but a workaround exists by running the exporter directly on `m4-air` or checking `bin/k3dm-codex-dispatch open`.)
-**Triage:** passed over, 1st, as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st, as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
 **Introduced by:** unknown (overlap check from `docs/plans/v1.43.8-plans-table-dispatch-waves-and-file-overlaps.md`)
 **Should have been caught by:** spec
 **Prior art:** not run (`make find-similar-docs` from m4-air: "vector store error: context k3d-k3d-cluster does not exist"); exact slug: none

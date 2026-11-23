@@ -1,10 +1,9 @@
 # Bug: the bug dashboard counts offline-only fixes as "not live-verified" forever
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3 — the Verified vs Live-verified gap overstates outstanding live work; no fix is wrong, and the list can be read by hand.
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Internal bug-tracking dashboard metric hygiene issue where offline/test-only fixes remain counted as not live-verified with no production or functional impact); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
 **Severity:** low
 **Release:** v1.43.6 (bug; exempt from the plan cap)
 **Filed:** 2026-10-24, by Claude, during the verified-not-live sweep the operator approved ("go ahead")

@@ -1,11 +1,10 @@
 # Bug: lib-foundation `foundation_ensure_vcluster_cli` concurrency test fails intermittently (two callers stage the same `.vcluster.$$`)
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3 — test-only so far; it flakes CI on unrelated PRs. Separate processes stage different files and end with the same binary
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Intermittent CI test-only failure caused by bats `set -T` and subshell `$$` sharing, with no production impact); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator.
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator.
 **Approval:** pending (filed by Claude 2026-11-01 while gating lib-foundation PR #74)
-**Waiting on:** operator decision — since 2026-11-12
 **Affected:** lib-foundation `scripts/lib/system.sh` `foundation_ensure_vcluster_cli` (staging at ~line 2025, `staged_binary="${managed_dir}/.vcluster.$$"`); `_foundation_vcluster_lock` (~line 1965); test `scripts/tests/lib/system.bats` "concurrent callers leave one binary and no lock" (~line 566)
 
 ## Symptom

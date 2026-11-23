@@ -1,10 +1,9 @@
 # Bug: Agent Dispatch "Per spec" shows a blank Agent when the spec is not under `docs/plans/` or `docs/bugs/`
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (The Agent Dispatch dashboard table is missing the Agent value for specs outside `docs/plans/` and `docs/bugs/`, while the data remains available via the ledger and other per-task metric series); Claude proposed P3. Higher stands until the operator decides.
-**Triage:** passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over (v1.43.16 was not cut; this does not count as a pass-over: it was picked 2026-11-09) — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Introduced by:** `d0c247dc` (v1.43.7, Agent read from the spec series)
 **Should have been caught by:** offline test
 **Severity:** low — display only; the ledger records the agent correctly

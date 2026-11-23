@@ -2,6 +2,8 @@
 
 **Status:** OPEN — filed 2026-11-22
 **Priority:** P2 (a promoted fix silently does not take effect; workaround `make restart-webhook`)
+**Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** pre-existing (`bin/k3dm-hub-deploy` launchd reconcile, lines 186-222, keys only on plist template changes)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown

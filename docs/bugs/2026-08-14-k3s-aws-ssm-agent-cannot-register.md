@@ -1,10 +1,9 @@
 # k3s-aws provisioning waits for an SSM agent that never registers
 
-**Status:** OPEN — mitigated (SSH fallback); not a bring-up blocker
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN — mitigated (SSH fallback); not a bring-up blocker
 **Priority:** P3 — the sandbox comes up over the autossh tunnel; SSM is optional
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (SSM tunnel bring-up fails due to delayed agent credential registration, but provisioning automatically falls back to an SSH tunnel workaround); Claude proposed P3. Higher stands until the operator decides.
-**Triage:** passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st — grooming 2026-11-12, operator. Priority: operator kept Claude's P3 over Argon's P2.
 **Discovered:** 2026-08-14
 **Component:** `scripts/lib/providers/k3s-aws.sh` SSM tunnel bring-up
 

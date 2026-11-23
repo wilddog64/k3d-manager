@@ -3,7 +3,7 @@
 **Status:** OPEN — parent filed 2026-11-09; child specs C1–C4 written and intents approved; children dispatch on `k3d-manager-v1.43.16`
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Offline `make test-all` is degraded on the M4 with 35 failing cases across four root causes (including an unstubbed test attempting to act on the live host's launchctl agent), though mitigated by the tripwire, CI, and…); Claude proposed P2. Agreed.
-**Triage:** carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator.
+**Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator.
 **Waiting on:** operator decision — since 2026-11-21 (recheck below: nothing reproduces on the M4)
 **Introduced by:** unknown (four root causes, each with its own origin; see the table)
 **Should have been caught by:** unknown
@@ -20,7 +20,7 @@ launch agent and only the tripwire stops it.
 **Filed:** 2026-11-09
 **Detected by:** Claude, 2026-11-09, serial `make test-all` baseline and a per-file parallel run on the M4
 **Release:** v1.43.16 (bug-only; does not use a plan slot)
-**Branch:** filed on `k3d-manager-v1.43.15`; fixes go on `k3d-manager-v1.43.16`
+**Branch:** `k3d-manager-v1.46.0`
 
 ## Symptom
 

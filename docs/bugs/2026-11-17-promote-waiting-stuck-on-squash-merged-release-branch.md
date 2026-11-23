@@ -1,7 +1,9 @@
 # Bug: K3dmPromoteWaiting keeps firing for a commit on the squash-merged release branch
 
 **Status:** OPEN
-**Priority:** P3 (proposed: a false warning email every cycle after each release merge; no wrong deploy)
+**Priority:** P2 (Argon P2 accepted, grooming 2026-11-22, operator; was: P3 (proposed: a false warning email every cycle after each release merge; no wrong deploy))
+**Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** `46ec5b36` (v1.44.0, promotable lookup in `bin/k3dm-repo-sync`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown

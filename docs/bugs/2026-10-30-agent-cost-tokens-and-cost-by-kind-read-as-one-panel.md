@@ -1,10 +1,9 @@
 # Bug: Agent Cost tokens-by-kind and cost-by-kind panels read as the same panel
 
-**Status:** OPEN
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (grooming 2026-11-22, operator); was: OPEN
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic dashboard layout and presentation issue where both panels display accurate metrics but look visually redundant side-by-side); Claude proposed P3. Agreed.
-**Triage:** passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
-**Waiting on:** operator decision — since 2026-11-12
+**Triage:** close — grooming 2026-11-22, operator; was: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
 **Approval:** operator, 2026-10-30 ("go ahead to file P3 bug", after proposing the merged table)
 **Filed:** 2026-10-30
 **Detected by:** operator (reading Agent Cost on the hub)

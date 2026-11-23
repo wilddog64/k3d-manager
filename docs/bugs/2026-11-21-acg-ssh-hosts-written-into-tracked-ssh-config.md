@@ -1,7 +1,9 @@
 # ACG sandbox SSH hosts are written into `~/.ssh/config`, which is a tracked dotfile
 
 **Status:** OPEN — captured 2026-11-21, not triaged.
-**Priority:** P3
+**Priority:** P2 (Argon P2 accepted, grooming 2026-11-22, operator; was: P3)
+**Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** dd54b653 (2026-06-26, `_acg_upsert_ssh_host`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
