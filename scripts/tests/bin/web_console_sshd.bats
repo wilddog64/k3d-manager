@@ -12,7 +12,7 @@ $GUARD_BIN/launchctl" ]
 
 setup() {
   REPO="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
-  SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/wc-test.XXXXXX")"
+  SCRATCH="$(mktemp -d "${BATS_TEST_TMPDIR:-${TMPDIR:-/tmp}}/wc-test.XXXXXX")"
   [ -d "$SCRATCH" ]
   GUARD_BIN="$SCRATCH/guard-bin"
   GUARD_HITS="$SCRATCH/guard-hits"
@@ -56,6 +56,7 @@ PermitRootLogin no
 PubkeyAuthentication yes
 AuthenticationMethods publickey
 TrustedUserCAKeys /etc/k3dm-web-console/access_ca.pub
+RevokedKeys /etc/k3dm-web-console/revoked_keys
 AuthorizedKeysFile none
 AllowUsers {{CONSOLE_USER}}
 DisableForwarding yes
@@ -380,6 +381,7 @@ if tool in {'install','mv','rm','mkdir','touch','tee','mktemp','cp','kill'}:
     for arg in args:
         if arg.startswith('/') and not Path(arg).resolve().is_relative_to(root.resolve()):
             die(99)
+if tool == 'ssh-keygen' and '-k' in args and fail('krl'): die(1)
 if fail(tool): die(1)
 if tool == 'uname': print(get('platform', 'Darwin'))
 elif tool == 'id':
@@ -410,6 +412,8 @@ elif tool == 'install':
     if '-d' in args: p.mkdir(exist_ok=True)
     else: shutil.copyfile(args[-2],p)
     p.chmod(mode)
+elif tool == 'chmod':
+    Path(args[-1]).chmod(int(args[-2], 8))
 elif tool == 'mkdir': Path(args[-1]).mkdir()
 elif tool == 'mktemp':
     pat=Path(args[-1]); print(tempfile.mkdtemp(prefix='.stage.',dir=pat.parent))
@@ -454,7 +458,10 @@ elif tool == 'shasum':
     if len(args)>2 and '.stage.' in args[-1] and fail('rehash'): digest='0'*64
     print(digest+'  -')
 elif tool == 'ssh-keygen':
-    if '-l' in args:
+    if '-k' in args:
+        # Captured with OpenSSH ssh-keygen on m4-air, 2026-11-23.
+        p=Path(args[args.index('-f')+1]); p.write_bytes(bytes.fromhex('5353484b524c0a00000000010000000000000000000000006b04855c00000000000000000000000000000000')); p.chmod(0o644)
+    elif '-l' in args:
         if fail('second-fingerprint'): print('256 SHA256:second two (ED25519)')
         data=sys.stdin.read()
         if not data.startswith('ssh-ed25519 '): die(1)
@@ -508,10 +515,79 @@ elif tool=='yq':
 elif tool not in ('true','touch','plutil','sleep','kill'): die(2)
 PY
   chmod +x "$root/shim"
-  for tool in install stat ls cp mv rm mkdir touch tee mktemp launchctl sshd ssh-keygen netstat ps shasum plutil id kill sleep true git uname head date yq sed; do ln -s ../shim "$root/bin/$tool"; done
+  for tool in install stat ls cp mv rm mkdir touch tee mktemp launchctl sshd ssh-keygen chmod netstat ps shasum plutil id kill sleep true git uname head date yq sed; do ln -s ../shim "$root/bin/$tool"; done
   printf 'ssh-ed25519 QUFB fixture-comment\n' > "$HOME/ca.pub"
   WC_BIN="$REPO/bin/k3dm-web-console-sshd"
   [ -x "$WC_BIN" ]
+}
+
+@test "[M8] [N5] [N6] [N7] revoked_keys is installed, preserved, validated, and retained by uninstall" {
+  wc_fixture
+  local root="$K3DM_WC_ROOT" dir="$K3DM_WC_ROOT/etc/k3dm-web-console" config
+  [[ "$root" = "$BATS_TEST_TMPDIR/"* ]]
+  config=$(sed -e 's/{{CONSOLE_PORT}}/42722/g' -e 's/{{CONSOLE_USER}}/someone/g' "$REPO/scripts/etc/ssh/k3dm-web-console_sshd_config.tmpl")
+  grep -Fxq 'RevokedKeys /etc/k3dm-web-console/revoked_keys' <<< "$config"
+  run "$WC_BIN" install --ca-file "$HOME/ca.pub"
+  [ "$status" = 0 ] || { echo "$output"; return 1; }
+  [ -f "$dir/revoked_keys" ]
+  [ "$(wc -c < "$dir/revoked_keys" | tr -d ' ')" = 44 ]
+  [ "$(stat -c '%a' "$dir/revoked_keys" 2>/dev/null || stat -f '%Lp' "$dir/revoked_keys")" = 644 ]
+  run ssh-keygen -Q -f "$dir/revoked_keys" "$HOME/ca.pub"
+  [ "$status" = 0 ] && [[ "$output" = *': ok' ]]
+  printf 'preseeded KRL survives reinstall\n' > "$dir/revoked_keys"
+  run "$WC_BIN" install --ca-file "$HOME/ca.pub"
+  [ "$status" = 0 ]
+  [ "$(cat "$dir/revoked_keys")" = 'preseeded KRL survives reinstall' ]
+  source "$WC_BIN"; wc_library; _wc_fixture_gate
+  _WC_PREFIX="$root"
+  _wc_files_healthy
+  mv "$dir/revoked_keys" "$dir/saved-krl"
+  run _wc_files_healthy; [ "$status" = 1 ]
+  mv "$dir/saved-krl" "$dir/revoked_keys"
+  mv "$dir/revoked_keys" "$dir/saved-krl"; ln -s saved-krl "$dir/revoked_keys"
+  run _wc_files_healthy; [ "$status" = 1 ]
+  rm "$dir/revoked_keys"; mv "$dir/saved-krl" "$dir/revoked_keys"
+  chmod 0600 "$dir/revoked_keys"
+  run _wc_files_healthy; [ "$status" = 1 ]
+  chmod 0644 "$dir/revoked_keys"
+  run "$WC_BIN" uninstall
+  [ "$status" = 0 ]
+  [ -f "$dir/revoked_keys" ]
+  run "$WC_BIN" uninstall --purge
+  [ "$status" = 0 ]
+  [ ! -e "$dir/revoked_keys" ]
+}
+
+@test "[M8] [N6] revoked_keys survives reinstall without replacing operator data" {
+  wc_fixture
+  local root="$K3DM_WC_ROOT" dir="$K3DM_WC_ROOT/etc/k3dm-web-console"
+  [[ "$root" = "$BATS_TEST_TMPDIR/"* ]]
+  run "$WC_BIN" install --ca-file "$HOME/ca.pub"
+  [ "$status" = 0 ] || { echo "$output"; return 1; }
+  [ -f "$dir/revoked_keys" ]
+  printf 'preseeded KRL survives reinstall\n' > "$dir/revoked_keys"
+  run "$WC_BIN" install --ca-file "$HOME/ca.pub"
+  [ "$status" = 0 ]
+  [ "$(cat "$dir/revoked_keys")" = 'preseeded KRL survives reinstall' ]
+}
+
+@test "[M8] [N7] revoked_keys must exist before healthy config activation" {
+  wc_fixture
+  local root="$K3DM_WC_ROOT" dir="$K3DM_WC_ROOT/etc/k3dm-web-console"
+  [[ "$root" = "$BATS_TEST_TMPDIR/"* ]]
+  touch "$root/fail.krl"
+  run "$WC_BIN" install --ca-file "$HOME/ca.pub"
+  [ "$status" -ne 0 ]
+  [ ! -e "$dir/sshd_config" ]
+  [ ! -e "$root/Library/LaunchDaemons/com.k3d-manager.web-console-sshd.plist" ]
+  rm "$root/fail.krl"
+  run "$WC_BIN" install --ca-file "$HOME/ca.pub"
+  [ "$status" = 0 ] || { echo "$output"; return 1; }
+  source "$WC_BIN"; wc_library; _wc_fixture_gate
+  _WC_PREFIX="$root"
+  rm "$dir/revoked_keys"
+  run _wc_files_healthy
+  [ "$status" = 1 ]
 }
 
 @test "[M2] [M4] [M10] [M11] [N3] [N5] [N6] [N7] fixture installs, checks, rotates only the CA, and reinstalls idempotently" {

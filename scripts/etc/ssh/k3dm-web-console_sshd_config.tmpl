@@ -12,6 +12,7 @@ PermitRootLogin no
 PubkeyAuthentication yes
 AuthenticationMethods publickey
 TrustedUserCAKeys /etc/k3dm-web-console/access_ca.pub
+RevokedKeys /etc/k3dm-web-console/revoked_keys
 AuthorizedKeysFile none
 AllowUsers {{CONSOLE_USER}}
 DisableForwarding yes
