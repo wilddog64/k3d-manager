@@ -132,7 +132,7 @@ _run_verify_access_probe() {
   local probe="$1" mode="$2" server="$3" config="$4"
   local server_b64
   if [ "$server" = __newline__ ]; then server_b64="$(printf 'https://192.0.2.30:6443\n' | base64)"; else server_b64="$(printf '%s' "$server" | base64)"; fi
-  run env -i TMPDIR="$TMPDIR" PATH="$probe/wrappers:$PATH" \
+  run env -i TMPDIR="${TMPDIR:-/tmp}" PATH="$probe/wrappers:$PATH" \
     VERIFY_FUNCTIONS="$probe/functions.sh" VERIFY_KUBECTL_BIN="$probe/kubectl" \
     APP_KUBECONFIG_TMPDIR="$BATS_TEST_TMPDIR/kubeconfig-tmp" \
     TEST_SERVER_B64="$server_b64" TEST_CONFIG_B64="$(printf '%s' "$config" | base64)" \

@@ -79,6 +79,7 @@ STUB
   cat > "$STUB_BIN/secret-tool" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
+  *'service k3dm-hub-data-age'*) printf '%s' "${DR_TEST_AGE_IDENTITY-AGE-SECRET-KEY-1FAKE}" ;;
   *'name secrets/vault:count'*) printf '%s' "${DR_TEST_SHARD_COUNT-1}" ;;
   *'name secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
   *'name secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
