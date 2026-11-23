@@ -7,7 +7,7 @@
 **Introducing change reviewed:** unknown
 **Waiting on:** dispatch
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "change print to headless session", then "or make them look the same", "consistency across vendor model")
-**Intent approved:** operator, 2026-11-23
+**Intent approved:** operator, 2026-11-23 ("approve your intents", after reviewing E1, E2 and L1 intents for the cross-vendor version)
 **Prior art:** Pass 1 `ls docs/bugs/*-agy-dashboard-print-mode-label-unclear.md`: none; `make find-similar-docs` not run; [`2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md`](2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md) (name grep) — read, different defect (repo/mode detection), same panels
 **Filed:** 2026-11-23
 **Detected by:** operator, 2026-11-23 (screenshot of "agy untracked by repo": "what does print mean?")
