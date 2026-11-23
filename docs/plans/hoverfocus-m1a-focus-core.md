@@ -1,6 +1,6 @@
 # hoverfocus M1a — decision engine, config loader, private API shim, event tap
 
-**Status:** DRAFT rev 3, 2026-11-22 — Fable review of rev 2: needs rework (3 blockers, 12 should-fix, 4 nits), all taken in rev 3; dispatch-ready pending Claude check (rev 2 → rev 3: M8/N6 proved through `--print-config`, selftest may name symbols, untestable resolve-failure clause made code-read, engine traps, tick semantics, idempotent start, AX timeout/throttle, public tap check and raise, docs ranges, red controls; rev 1 → rev 2: focus technique fixed to variant B from
+**Status:** READY rev 4, 2026-11-22 — Fable re-check of rev 3: "ready after should-fix" (E2 `-w` grep, confirmed by Claude on a fixture) plus 6 nits, all taken in rev 4. Fable review of rev 2: needs rework (3 blockers, 12 should-fix, 4 nits), all taken in rev 3 (rev 2 → rev 3: M8/N6 proved through `--print-config`, selftest may name symbols, untestable resolve-failure clause made code-read, engine traps, tick semantics, idempotent start, AX timeout/throttle, public tap check and raise, docs ranges, red controls; rev 1 → rev 2: focus technique fixed to variant B from
 the operator's probe; base is `m1-base` with M1b landed; `MenuModel.loadConfig` routed through `ConfigLoader`; start
 order tested through `StartChecks`; no event records)
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release; no `docs/ideas.md` row.
@@ -11,7 +11,7 @@ Where this spec and parent fact 3 differ, this spec wins (see Focus technique be
 **Risk:** low (user space; no sudo; no network); the private-API part can break on macOS updates and must fail closed
 **Implementer:** Luna (logic). **Verifier:** Claude (independent verifier from `## Acceptance` only).
 **Filed:** 2026-11-22
-**Intent approved:** operator 2026-11-22 ("your intents approved"), for the evidence intent lines as written in rev 1; rev 2 keeps them verbatim
+**Intent approved:** operator 2026-11-22 ("your intents approved"), for the evidence intent lines as written in rev 1; revs 2–4 keep them verbatim
 **Approval:** operator 2026-11-22 (see parent); "execute the steps … to make hoverfocus moving" 2026-11-22 (rev 2, Fable review, dispatch)
 
 ## Focus technique (proof of external behaviour)
@@ -111,6 +111,7 @@ checked live (E-L1 step 3); do not "fix" them with event records.
     Accessibility timer). The tap's run-loop source and a 50 ms timer go on the main run loop; C callbacks enter
     through `MainActor.assumeIsolated`. The timer calls `Engine.tick` with `MonotonicClock.nowMs()`. When the tap is
     disabled by timeout or user input, it re-enables it. `isRunning` is true only after a successful start. Swift 6
+    trial tap uses a no-op C callback and is released with `CFMachPortInvalidate`. Swift 6
     hints: use the literal key `"AXTrustedCheckOptionPrompt"` (the global `kAXTrustedCheckOptionPrompt` is a `var`);
     recording stubs in `@Sendable` closures need a lock-guarded `final class … : @unchecked Sendable` (`Mutex` is
     macOS 15+, target is macOS 14).
@@ -138,15 +139,16 @@ checked live (E-L1 step 3); do not "fix" them with event records.
     `pid <= 0`), and item 13 with stub `StartChecks` whose closures record that they were called, plus the engine
     trap cases of item 2 (tick earlier than start, `dwellMs: -1`). The self-test imports `CSkyLight`; if SwiftPM does
     not expose it through `HoverFocusPlatform`, stop and report. The self-test may name the private symbols only as
-    string literals.
+    string literals. The self-test never invokes the `liveChecks` closures (a trial tap can raise a permission prompt).
 18. The SkyLight check (`hf_skylight_resolve().available == true`) runs by default, so the existing CI step
     `swift run hoverfocus-selftest` on `macos-26` catches a runner image whose macOS dropped a symbol. `HOVERFOCUS_SELFTEST_SKIP_SKYLIGHT=1`
-    skips only that check and prints `skylight: skipped`.
+    skips every assert that needs a healthy resolve (item 8 availability, item 11 override and the later-resolve
+    check) and prints `skylight: skipped`; the NULL and `pid <= 0` guard tests still run.
 
 **Docs:** `docs/config.md` changes the `dwellMs` range (line 12) to `0`–`5000` and the `stillnessPx` range (line 19)
 to `0`–`200`, and states that the app rejects unknown keys, wrong types and out-of-range values (naming the key in the
-menu status line). `README.md` gains a "Known limitations" section (self-raising apps; same-app and non-key windows
-until live-checked).
+menu status line). `README.md`: add bullets to the existing `## Known Limitations` section (line 89; do not add a
+second heading): self-raising apps; same-app and non-key windows until live-checked.
 
 ## Files
 
@@ -184,11 +186,11 @@ until live-checked).
 - No edit to `Package.swift`, `Interface.swift`, `CSkyLight.h` or any file outside the table. No new dependency.
 - No code copied from AutoRaise, yabai or any other project; read for the method only.
 - No `SLPSPostEventRecordTo`, no synthetic event records, no `kCPSUserGenerated`.
-- No `sudo`, no `launchctl`, no writes outside the worktree and the system temp dir. Do not run the app; the event
-  tap needs Accessibility trust, which only the operator grants (live evidence).
+- No `sudo`, no `launchctl`, no writes outside the worktree and the system temp dir.
 - No `fatalError`, `precondition` or force-unwrap on any path that depends on the system (permissions, symbols,
   AX results, file contents). No unchecked `UInt64` subtraction or `UInt64(Int)` conversion of config values.
-- Do not run the app, except `.build/debug/hoverfocus --print-config` with `HOVERFOCUS_CONFIG` pointing at a temp file
+- Do not run the app (the event tap needs Accessibility trust, which only the operator grants; live evidence), except
+  `.build/debug/hoverfocus --print-config` with `HOVERFOCUS_CONFIG` pointing at a temp file
   (it reads the config and exits; it creates no tap).
 
 ## Acceptance
@@ -204,7 +206,7 @@ must:
   - id: M4
     text: "a raiseApps target yields .focusAndRaise; every other firing yields .focus"
   - id: M5
-    text: "ConfigLoader: missing file gives defaults; partial file fills defaults; non-JSON, top-level array, wrong type, unknown key, unknown pauseModifier or menuBarIcon value, dwellMs 5001 or -1, stillnessPx 201 give ConfigError.invalid naming the key; unreadable gives ConfigError.unreadable; a Config written by JSONEncoder loads back equal"
+    text: "ConfigLoader: missing file gives defaults; partial file fills defaults; non-JSON, top-level array, wrong type, unknown key, unknown pauseModifier or menuBarIcon value, dwellMs 5001 or -1, stillnessPx 201 give ConfigError.invalid naming the key (non-JSON and top-level array: a reason saying so); unreadable gives ConfigError.unreadable; a Config written by JSONEncoder loads back equal"
   - id: M6
     text: "hf_skylight_resolve returns available=true with missing_symbol NULL on this Mac and, with one symbol overridden to a bad name, available=false naming that symbol (pointer into the shim's table), while a later hf_skylight_resolve still returns available=true; hf_ax_window_id returns non-zero for a NULL element or out pointer and hf_focus_without_raise(-1, 0) returns non-zero, neither calling through; the resolve-failed early returns are shown by code reading"
   - id: M7
@@ -230,12 +232,12 @@ evidence:
   - id: E1
     proves: [M1, M2, M3, M4, M5, M6, M8, M9, N1, N2, N4, N6]
     kind: offline
-    command: "swift build && swift run hoverfocus-selftest, rc 0, final line 'selftest: <p> passed, 0 failed'. Then, with temp files: HOVERFOCUS_CONFIG=<unknown-key file> .build/debug/hoverfocus --print-config gives rc 2 naming the key on stderr; HOVERFOCUS_CONFIG=<partial file> gives rc 0 with defaults filled; HOVERFOCUS_CONFIG=config.example.json gives rc 0. Red controls, each restored byte-identical (git diff --stat empty after): engine mutant '>= dwellMs' to '>= 0' turns M1/N4 tests red; removing the fired latch turns the N4 fires-twice test red; removing the buttonsDown gate turns N2 red; returning .focusAndRaise for every target turns N1 red; dropping the unknown-key check turns M5 red; restoring the whole m1-base MenuModel.swift (with PartialConfig) makes the unknown-key --print-config give rc 0 (N6 red); replacing the saturating elapsed-time difference with plain subtraction makes the M9 test trap"
+    command: "swift build && swift run hoverfocus-selftest, rc 0, final line 'selftest: <p> passed, 0 failed'. Then, with temp files: HOVERFOCUS_CONFIG=<unknown-key file> .build/debug/hoverfocus --print-config gives rc 2 naming the key on stderr; HOVERFOCUS_CONFIG=<partial file> gives rc 0 with defaults filled; HOVERFOCUS_CONFIG=config.example.json gives rc 0. Red controls, each restored byte-identical (git diff --stat empty after): engine mutant 'fire regardless of elapsed time' turns M1/N4 tests red; removing the fired latch turns the N4 fires-twice test red; removing the buttonsDown gate turns N2 red; returning .focusAndRaise for every target turns N1 red; dropping the unknown-key check turns M5 red; restoring the whole m1-base MenuModel.swift (with PartialConfig) makes the unknown-key --print-config give rc 0 (N6 red); replacing the saturating elapsed-time difference with plain subtraction makes the M9 test trap"
     intent: "The rules that decide when a window gets focus (wait time, drags, the pause key, menus, ignore and raise lists, the config file) are tested without needing your screen."
   - id: E2
     proves: [N3, N5, M6]
     kind: offline
-    command: "git grep -nE '_SLPS|SLPS|SLS[A-Z]|GetProcessForPID|_AXUIElementGetWindow' -- Sources ':!Sources/CSkyLight' ':!Sources/hoverfocus-selftest' prints nothing, and under Sources/hoverfocus-selftest the names appear only inside string literals; git grep -nwE 'PostEventRecord[A-Za-z]*|0x200|UserGenerated' -- Sources prints nothing (comments must not cite variant A's flag value); the three symbols appear under Sources/CSkyLight only as string literals in the symbol table; otool -L on .build/debug/hoverfocus-selftest and .build/debug/hoverfocus lists no SkyLight; red controls: an extern declaration of _SLPSSetFrontProcessWithOptions added to a Platform file is found by the first grep; a dlsym of SLPSPostEventRecordTo added to CSkyLight.c is found by the second"
+    command: "git grep -nE '_SLPS|SLPS|SLS[A-Z]|GetProcessForPID|_AXUIElementGetWindow' -- Sources ':!Sources/CSkyLight' ':!Sources/hoverfocus-selftest' prints nothing, and under Sources/hoverfocus-selftest the names appear only inside string literals; git grep -nE 'PostEventRecord|UserGenerated|0x200([^0-9A-Fa-f]|$)' -- Sources prints nothing (no -w: it would miss SLPSPostEventRecordTo and kCPSUserGenerated) (comments must not cite variant A's flag value); the three symbols appear under Sources/CSkyLight only as string literals in the symbol table; otool -L on .build/debug/hoverfocus-selftest and .build/debug/hoverfocus lists no SkyLight; red controls: an extern declaration of _SLPSSetFrontProcessWithOptions added to a Platform file is found by the first grep; a dlsym of SLPSPostEventRecordTo added to CSkyLight.c is found by the second"
     intent: "The fragile private macOS calls live in one small file and are looked up at runtime, so a macOS update that removes them disables the tool instead of crashing it."
   - id: E3
     proves: [M7]
