@@ -124,3 +124,4 @@
 - 2026-11-23: CI green on PR #164 head a219635f (19/19). enforce_admins DELETEd on main at operator request ("allow admin override for v1.45.0"); live E11 + M2 still owed unless operator waives. Re-enable in /post-merge.
 - 2026-11-23: v1.45.0 merged (PR #164, 0c27b830), tagged v1.45.0, GitHub release created, enforce_admins restored, next branch k3d-manager-v1.45.1, retro written.
 - 2026-11-23: v1.45.1 mode-label landed 9f953c0b, totp-a2 landed 93ecfb83, both verify pass; live checks (L1, L2) pending after promote.
+- 2026-11-23: CI-red Linux test fix 7a84f90d landed; awaiting green CI then hub promote.

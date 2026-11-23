@@ -1,0 +1,59 @@
+# Bug: v1.45.1 CI red on Linux: dr_drill secret-tool stub lacks the age identity; verifier test needs TMPDIR
+
+**Status:** LANDED — test-only fix `7a84f90d` on `k3d-manager-v1.45.1`, 2026-11-23 (Claude); CI on the pushed head pending
+**Priority:** P1 (proposed: CI red on the release branch blocks `make hub-deploy`, which requires green checks; also blocks the release PR)
+**Introduced by:** `77d5a836` (age-identity fix, dr_drill.bats) and `4b831c81` (cve-scan private kubeconfig, cve_remediation_verify.bats)
+**Should have been caught by:** review (both lands were verified on macOS only, where `uname -s` is Darwin and `TMPDIR` is always set)
+**Introducing change reviewed:** yes (Claude land review plus a Sonnet acceptance verifier, both macOS)
+**Waiting on:** live check — since 2026-11-23 (green CI on the pushed head)
+**Prior art:** `docs/bugs/2026-11-12-dev-hub-bats-tmpdir-unset-on-linux-ci.md` (name grep, read) — same escape class and same TMPDIR fix; `make find-similar-docs` not run
+**Detected by:** operator, 2026-11-23: `make hub-deploy REF=7b690cd3` refused, "GitHub check runs are pending or failed"; CI run 45288874536 had test (2) and test (3) red
+**Fix commit:** 7a84f90d
+
+## What is wrong
+
+1. `scripts/tests/bin/dr_drill.bats`: `_secret_load_data` reads from `security` on macOS and from `secret-tool` on
+   Linux (`scripts/lib/foundation/scripts/lib/system.sh:612-618`). The age-identity check added in `77d5a836` reads
+   `k3dm-hub-data-age`. The test's `security` stub answers it, but the `secret-tool` stub has no case for it and prints
+   the shard sentinel. On Linux the drill therefore sees a non-`AGE-SECRET-KEY-1` identity and refuses with exit 2:
+   25 of 35 tests red on test (3).
+2. `scripts/tests/plugins/cve_remediation_verify.bats:135` passes `TMPDIR="$TMPDIR"` under `set -u`. The ubuntu runner
+   does not set `TMPDIR`, so tests 4–9 abort with `TMPDIR: unbound variable` on test (2). Test 8 skips on macOS
+   (BSD sed), so only 5 reproduce locally.
+
+## Fix (landed)
+
+- `secret-tool` stub: add `*'service k3dm-hub-data-age'*) printf '%s' "${DR_TEST_AGE_IDENTITY-AGE-SECRET-KEY-1FAKE}"`,
+  mirroring the `security` stub.
+- Line 135: `TMPDIR="${TMPDIR:-/tmp}"`, as in `6202cc45`.
+
+Evidence on m4, 2026-11-23, Linux simulation (a `uname` shim printing `Linux` for `-s`, `TMPDIR` unset):
+
+| Suite | Pre-fix | Fixed |
+|---|---|---|
+| dr_drill.bats (Linux sim) | 25/35 red (matches CI) | 0/35 |
+| cve_remediation_verify.bats (Linux sim) | 5/9 red (test 8 skipped: BSD sed) | 0/9 |
+| dr_drill.bats (macOS) | — | 0/35 |
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: dr_drill.bats passes on the ubuntu CI runner (secret-tool path) and on macOS
+  - id: M2
+    text: cve_remediation_verify.bats passes on the ubuntu CI runner with TMPDIR unset
+must_not:
+  - id: N1
+    text: no CI shard on the release head may be red from these two suites
+    red_on_current: run 45288874536 on 7b690cd3, test (2) and test (3) red
+evidence:
+  - {id: E1, proves: [M1, M2], kind: offline, intent: "Both suites pass under a Linux simulation and fail as CI did before the fix (table above)."}
+  - {id: E2, proves: [M1, M2, N1], kind: live, intent: "The CI run on the pushed head is green on all four BATS shards, so make hub-deploy accepts it."}
+```
+
+## Process note
+
+Third Linux-only escape from a macOS-verified land (after `2026-11-12-dev-hub-bats-tmpdir-unset-on-linux-ci.md` and
+`2026-11-11-makefile-agent-load-tests-call-macos-plutil-on-linux-ci.md`). Candidate for grooming: land verification
+runs touched bats suites a second time under the uname/TMPDIR Linux simulation used here.
