@@ -46,3 +46,4 @@
 - hoverfocus: operator chose icon B Dwell; menu bar icon configurable via Config.menuBarIcon (auto|color|light|dark), interface 92ab158 on m1-base; preview board added to the icon canvas. Folds into spec rev 2.
 - [x] 2026-11-22 hoverfocus M1b rev 2 + Flash dispatch (`hoverfocus-m1b-app-shell-r2`); hoverfocus registered in projects.list
 - [ ] hoverfocus M1a rev 2, operator focus probe, Luna dispatch
+- 2026-11-22: operator "go with your recommendation": no hub-deploy now (deploy/hub aa920a6f current; only projects.list differs); next promote REF = 2b land commit. Order entries order-ci-workflow-dispatch, review-order-pr109 abandoned (finished out of band, PR #109). 2b independent verify agent started (Acceptance only, sandbox-exec).
