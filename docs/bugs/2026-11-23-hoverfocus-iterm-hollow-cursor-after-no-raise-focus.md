@@ -5,7 +5,7 @@
 **Introduced by:** `4cbd377` (hoverfocus M1a, no-raise focus via `_SLPSSetFrontProcessWithOptions`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** dispatch
+**Waiting on:** investigation — since 2026-11-23 (P1 probe)
 **Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
 **Prior art:** none above threshold (no earlier hoverfocus bug docs)
 **Filed:** 2026-11-23
@@ -33,3 +33,17 @@ After hover focus, the app's window looks active (solid cursor) as well as recei
 
 - Terminal.app tested 2026-11-23: same. Check whether TextEdit's own focus ring/caret shows the same lag.
 - Not an M1 blocker (operator, 2026-11-23).
+
+## Recurrence — 2026-11-23: menu shortcuts (Cmd-W) do nothing in Safari after hover focus
+
+Operator: after hovering Safari (it became the active app, TextEdit above it went inactive), "hotkey like cmd-w does
+not apply to safari". Same root cause as the hollow cursor, now with a functional impact: the SkyLight call makes the
+process frontmost, so plain keystrokes reach it, but no window of the app becomes key. Menu shortcuts like Close Tab
+(Cmd-W), New Tab (Cmd-T) and Find (Cmd-F) act on the key window, so with none they are disabled and nothing happens.
+B1 (same-app switch) is the same gap seen from the other side.
+
+**Priority:** proposed P3 → P2 (degraded: menu shortcuts fail until you click; one click is the workaround). Operator
+to confirm.
+
+**To check (no code change):** after a hover, does Cmd-W close TextEdit's window, or Cmd-T open an iTerm tab? If not,
+the symptom is general, not Safari's. The fix is the same P1 probe: make the target window key without raising it.
