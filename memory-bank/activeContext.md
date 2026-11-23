@@ -153,3 +153,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: m2 dr-drill with istioctl 1.31.4: Phase 2 PASSED (istio pin confirmed); Phase 3 restore failed: empty age identity, login Keychain locked over SSH. Filed docs/bugs/2026-11-23-dr-drill-restore-empty-age-identity-locked-keychain.md. Workaround: security unlock-keychain then rerun.
 
 - 2026-11-23: filed P3 docs/bugs/2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md (operator go). Deleted leftover dr-drill cluster on m2; drill rerun in progress in work:2.0.
+
+- 2026-11-23: m2 dr-drill run 3 (Keychain unlocked, leftover deleted): Phase 2 + Phase 3 PASS; Phase 4 printed V1-V3 true then script exited 1 during V4 (hub_data_verify_ldap) with no message and no report json; teardown clean. Last full pass 2026-11-04 (all V true). Next: diagnose V4 via DR_DRILL_KEEP=1 run (operator go needed).
