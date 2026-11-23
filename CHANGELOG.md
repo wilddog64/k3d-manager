@@ -17,6 +17,7 @@
 ### Changed
 
 - **Plan quotas beside Fable.** Codex and Claude weekly and 5-hour limits moved from Agent Activity to Agent Cost as gauge pairs beside Fable with neutral reset-time gauges, and quota reading age stats sit below them.
+- **lib-foundation v0.5.7.** Subtree pulled for exclusive lock claims.
 
 ### Fixed
 
@@ -26,6 +27,10 @@
 - **Codex quota panels keep real Codex numbers when newest record is `premium`.** The session reader ignores rate-limit records with `limit_id: "premium"` or null limits so they do not blank the 5h and weekly quota panels or drop quota-efficiency observations.
 - **Web console sudo ticket check probes non-NOPASSWD commands.** `_wc_priv_open` and headless `_wc_revoke` verify sudo credentials with `/bin/sleep 0` and `/usr/bin/id -u` so hosts with k3d-manager's `NOPASSWD: /usr/bin/true` sudoers rule prompt for passwords at startup rather than proceeding without a ticket.
 - **Dispatch metrics single-flight push, retries, and stale alert.** Ledger-event pushes route through the single-flight scheduler (`bin/k3dm-codex-dispatch schedule-metrics`), `bin/k3dm-dispatch-metrics` retries failed pushes with backoff up to 30s timeout, a 15-minute LaunchAgent (`com.k3d-manager.dispatch-metrics`) re-pushes metrics periodically, and `DispatchMetricsStale` alerts when metrics have not reached the hub for over 90 minutes while the M4 is reachable.
+- **Slack job posts are tidier and safer.** Home paths show as `~/` and make output tails are scrubbed before posting.
+- **Hermes messages stay accurate.** A resolved message clears its names, still-degraded and no-data sensors are reported, and the token-expiry advisory says to regenerate the fine-grained token.
+- **Plan status is written at land.** `codex-dispatch land` sets the plan's Status, and pre-commit refuses an approved plan still marked DRAFT.
+- **CI installs `age` and `ripgrep`.** A test now checks that CI installs every tool the BATS suites call.
 
 ## [1.44.2] - 2026-11-17
 

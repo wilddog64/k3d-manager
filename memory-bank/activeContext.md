@@ -1,4 +1,4 @@
-## Handoff — 2026-11-23 08:10 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 PR #164 open — START HERE
+## Handoff — 2026-11-23 08:40 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 PR #164 open — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
 
@@ -21,10 +21,12 @@
 - Rules: hoverfocus personal machines only; no AutoRaise/yabai code; Fable review before dispatch; sandbox-exec deny
   sudo/launchctl for any install_test run.
 
-**2. v1.45.0 release — PR #164 (head `7e26d0ad`, mergeable; CI re-running on the docs push)**
-- Done: blind Argon review (no change needed), CodeQL #38/#39 dismissed.
-- Remaining in order: CI green on every check-run of head; `make hub-promote-status`; Claude read-only hub smoke;
-  scope check; live 2d E11 + M2 (operator, home); then enforce_admins DELETE, operator merges, `/post-merge` tags v1.45.0.
+**2. v1.45.0 release — PR #164 (CI re-running on the CHANGELOG push; was all green on `24191520`)**
+- Done: blind Argon review (no change needed), CodeQL #38/#39 dismissed; hub-promote-status (57 ahead, docs only, no
+  promote needed); Claude hub smoke PASS 08:30 via `ssh m5-air.local` (30/30 apps Synced/Healthy, 4 nodes Ready);
+  scope check PASS (8 out-of-plan fix/tooling commits added to CHANGELOG).
+- Remaining: CI green on new head; live 2d E11 + M2 (operator, home); enforce_admins DELETE, operator merges,
+  `/post-merge` tags v1.45.0.
 - Every push to the branch restarts CI: batch docs commits.
 
 **3. DR drill on the m2**
