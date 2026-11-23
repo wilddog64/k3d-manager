@@ -5,7 +5,8 @@
 **Introduced by:** `4cbd377` (hoverfocus M1a, variant B no-raise focus; documented known limitation)
 **Should have been caught by:** spec (the probe skipped same-app targets; `docs/plans/hoverfocus-m1a-focus-core.md:33-35`)
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** operator decision
+**Waiting on:** dispatch
+**Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
 **Prior art:** `docs/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (filed same day, no score run) — read, related mechanism (key-window state), different symptom
 **Filed:** 2026-11-23
 **Detected by:** operator, E-L1 step 3 on m2-air (2026-11-23)
@@ -29,7 +30,6 @@ Hovering a non-key window of the front app makes that window key, without raisin
 
 ## Notes
 
-- E-L1 steps 1-2 pass; step 3 records this limitation as the spec required. Whether it blocks the M1 PR / v0.0.1 is
-  the operator's call.
+- E-L1 steps 1-2 pass; step 3 records this limitation as the spec required. Operator 2026-11-23: does not block; ship v0.0.1, fix in v0.0.2.
 - A fix needs a new probe (per "prove external behaviour before dispatch"), e.g. AX `kAXMainAttribute` /
   `kAXFocusedAttribute` set on the target window, checked for raise.

@@ -5,7 +5,8 @@
 **Introduced by:** `4cbd377` (hoverfocus M1a, no-raise focus via `_SLPSSetFrontProcessWithOptions`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** investigation
+**Waiting on:** dispatch
+**Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
 **Prior art:** none above threshold (no earlier hoverfocus bug docs)
 **Filed:** 2026-11-23
 **Detected by:** operator, E-L1 on m2-air (2026-11-23), build at pid 578
@@ -31,4 +32,4 @@ After hover focus, the app's window looks active (solid cursor) as well as recei
 ## Next
 
 - Terminal.app tested 2026-11-23: same. Check whether TextEdit's own focus ring/caret shows the same lag.
-- Not an M1 blocker (operator to confirm at triage).
+- Not an M1 blocker (operator, 2026-11-23).
