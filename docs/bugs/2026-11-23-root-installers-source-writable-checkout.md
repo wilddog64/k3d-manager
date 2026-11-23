@@ -5,11 +5,11 @@
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (re-approval of the rev 3 intents listed under [Re-approval needed](#re-approval-needed); P12 probe at home)
+**Waiting on:** operator decision — since 2026-11-23 (re-approval of the rev 3 intents listed under [Re-approval needed](#re-approval-done-2026-11-23); P12 probe at home)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
-**Intent approved:** pending
-**Approval:** operator, 2026-11-23 — intents of spec rev 2 approved ("approved"); dispatch after the Fable round-2 review findings are applied. Operator, 2026-11-23, on Fable round 2: scope cut to about 8 files, direct-run hardening deferred to a P3 ("Cut to ~8 files"); `run` is allowed inside tmux, with Ctrl-Z blocked and the sudo ticket cleared afterwards ("Allow, block Ctrl-Z").
+**Intent approved:** operator, 2026-11-23
+**Approval:** operator, 2026-11-23 — intents of spec rev 2 approved ("approved"); dispatch after the Fable round-2 review findings are applied. Operator, 2026-11-23, on Fable round 2: scope cut to about 8 files, direct-run hardening deferred to a P3 ("Cut to ~8 files"); `run` is allowed inside tmux, with Ctrl-Z blocked and the sudo ticket cleared afterwards ("Allow, block Ctrl-Z"). Rev 3 changed intents (E1-E5, E7, E9, E12, E15) re-approved by the operator, 2026-11-23 ("approved"); dispatch of child A also waits on the P12 probe.
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match
 **Detected by:** v1.45.0 red-team gate, 2026-11-22, on `7dfb7238` — see [docs/issues/2026-11-23-v1.45.0-red-team.md](../issues/2026-11-23-v1.45.0-red-team.md)
 **Severity:** a same-uid process becomes root at the operator's next install; defeats the promote authority's goal of surviving a compromised operator uid.
@@ -380,10 +380,9 @@ interface:
 
 Ids keep rev 2's numbering. Removed in rev 3 with the scope cut (moved to the P3): M8, N7, N9, E6, E8, E13 (E7 now covers M7).
 
-## Re-approval needed
+## Re-approval (done 2026-11-23)
 
-The operator approved rev 2's intents. Rev 3 changes the meaning of these, so `**Intent approved:**` is `pending` until the
-operator re-approves them:
+The operator approved rev 2's intents. Rev 3 changed the meaning of these, and the operator re-approved them on 2026-11-23:
 
 - **E1:** owner/group constants and trust top replace the chown seam (test setup only; result unchanged).
 - **E2:** refusals are tested through sourced `main`, plus a new exit-3 check for an executed copy outside the installed path.
