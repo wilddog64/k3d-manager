@@ -1,4 +1,4 @@
-# Bug: agy dashboard panels label headless sessions "print", which reads as nothing
+# Bug: agent dashboard mode labels are unclear and differ per agent ("print" for agy, "exec" for codex)
 
 **Status:** OPEN
 **Priority:** P3 — cosmetic; the operator had to ask what "print" meant
@@ -6,7 +6,7 @@
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Waiting on:** dispatch
-**Triage:** patch → v1.45.1 (operator, 2026-11-23: "change print to headless session")
+**Triage:** patch → v1.45.1 (operator, 2026-11-23: "change print to headless session", then "or make them look the same")
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-agy-dashboard-print-mode-label-unclear.md`: none; `make find-similar-docs` not run; [`2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md`](2026-11-21-agy-transcript-sessions-always-unknown-repo-and-mode.md) (name grep) — read, different defect (repo/mode detection), same panels
 **Filed:** 2026-11-23
@@ -18,52 +18,58 @@
 (a headless `-p` run, for example an Argon review). Two panels in
 `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml` show that value raw through `{{mode}}`:
 "agy sessions by mode" (legend `{{mode}}`, ~line 1065) and "agy untracked by repo" (legend `{{repo}} {{mode}}`,
-~line 1116). "print" means nothing to a reader.
+~line 1116). "print" means nothing to a reader. The codex panels "Untracked by repo" (~line 464, legend `{{repo}} {{mode}}`) and
+"Sessions by mode" (~line 520, legend `{{mode}}`) show the same kind of session as `exec` (`bin/k3dm-dispatch-metrics:680`),
+so the two agents use different words for one thing.
 
 ## Fix
 
-Display-only. Rename `print` to `headless` in those two panels with a Grafana `renameByRegex` transformation, so a
-legend reads `headless` / `k3d-manager headless`. Do **not** change the metric label value: `mode="print"` is read by
-`scripts/tests/bin/test_dispatch_metrics.py` and by Prometheus history, and changing it would split the series.
+Display-only. In all four panels add a Grafana `renameByRegex` transformation with regex `^(.* )?(exec|print)$` and
+renamePattern `$1headless`, so every panel uses the same three words: `headless`, `interactive`, `other` (legends read
+`headless` / `k3d-manager headless`). Do **not** change the metric label values: `mode="print"` and `mode="exec"` are read
+by `scripts/tests/bin/test_dispatch_metrics.py` and by Prometheus history, and changing them would split the series.
 
 ## Contract readers
 
-None change. The `mode` label value stays `print`; readers by grep: `bin/k3dm-dispatch-metrics:2333,2641`,
-`scripts/tests/bin/test_dispatch_metrics.py`. Only the two panels' display changes.
+None change. The `mode` label values stay `print` (agy) and `exec` (codex); writers by grep:
+`bin/k3dm-dispatch-metrics:680,2333,2641`; reader `scripts/tests/bin/test_dispatch_metrics.py`. Only the four panels'
+display changes.
 
 ## Acceptance
 
 ```yaml
 must:
   - id: M1
-    text: the "agy sessions by mode" and "agy untracked by repo" panels each carry a renameByRegex transformation mapping a display name ending in "print" to the same name ending in "headless"
+    text: the four mode panels ("Untracked by repo", "Sessions by mode", "agy sessions by mode", "agy untracked by repo") each carry a renameByRegex transformation mapping a display name ending in "exec" or "print" (whole word) to the same name ending in "headless"
   - id: M2
-    text: the panels' targets (expr, legendFormat) are unchanged, and no other panel in the dashboard gains or loses a transformation (positive control on scope)
+    text: '"interactive", "other" and repo prefixes pass through unchanged (e.g. "k3d-manager interactive" stays as is, "k3d-manager print" becomes "k3d-manager headless") (positive control)'
+  - id: M3
+    text: the panels' targets (expr, legendFormat) are unchanged, and no other panel gains or loses a transformation (scope control)
 must_not:
   - id: N1
-    text: the two agy panels must not display the raw value "print"
-    red_on_current: neither panel has a transformation, so the legend shows "print"
+    text: no mode panel may display the raw value "print" or "exec"
+    red_on_current: none of the four panels has a transformation, so legends show "print" and "exec"
   - id: N2
-    text: bin/k3dm-dispatch-metrics must not change (the mode label value stays print)
+    text: bin/k3dm-dispatch-metrics must not change (the mode label values stay print and exec)
     red_on_current: n/a (scope guard)
 evidence:
   - id: E1
-    proves: [M1, M2, N1, N2]
+    proves: [M1, M2, M3, N1, N2]
     kind: offline
-    command: a new test in scripts/tests/plugins/agent_dispatch_dashboard.bats that parses the dashboard JSON and asserts, by panel title, the renameByRegex transformation (regex matching "print" at the end, renamePattern ending "headless") on both agy panels, their unchanged expr and legendFormat, and no transformation on the codex "Untracked by repo" and "Sessions by mode" panels; plus git diff showing bin/k3dm-dispatch-metrics untouched
+    command: a new test in scripts/tests/plugins/agent_dispatch_dashboard.bats that parses the dashboard JSON and asserts, by panel title, the renameByRegex transformation on all four panels; applies each panel's regex and renamePattern (JS replace semantics, unmatched group = empty) to the sample names "print", "exec", "interactive", "other", "k3d-manager print", "k3d-manager exec", "k3d-manager interactive", "codexec" and checks the results; asserts expr and legendFormat unchanged and the count of panels with transformations is exactly four more than before; plus git diff showing bin/k3dm-dispatch-metrics untouched
     red_control: on the current dashboard the transformation assertions fail
-    intent: The agy panels say "headless" instead of "print", so the operator can read them without asking.
+    intent: Every agent panel calls a headless run "headless" (not "print" or "exec"), so codex and agy read the same way without asking.
   - id: L1
     proves: [N1]
     kind: live
-    command: operator or Claude, read-only, after promote - open the Agent Activity dashboard and check both agy panels' legends read "headless"
-    red_control: a legend still showing "print"
+    command: operator or Claude, read-only, after promote - open the Agent Activity dashboard and check all four mode panels' legends read "headless"
+    red_control: a legend still showing "print" or "exec"
     intent: The live dashboard on the hub shows the new wording.
 ```
 
 ## Files
 
-- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml` — add the transformation to the two agy panels
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml` — add the transformation to the four mode panels
 - `scripts/tests/plugins/agent_dispatch_dashboard.bats` — the E1 test
 
 ## Routing
