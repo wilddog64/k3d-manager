@@ -1,4 +1,5 @@
 ## Update — 2026-11-22 ~19:30 PST — 2b LANDED e3eb53ca (code bb5b6aa9); CI pending on head
+- **2026-11-23 dr-drill V4 root cause:** restored LDAP rejects drill `openldap-admin` password (bind rc=49, 12 DNs restored); `_err` in `hub_data_verify_ldap` exits drill before report. Filed `docs/bugs/2026-11-23-dr-drill-v4-ldap-admin-bind-err-exits-drill.md` (P2 proposed). Kept `dr-drill` cluster still up on m2.
 
 - 2b landed on k3d-manager-v1.45.0: c1def92c (Luna tree, Claude-committed), 44b37351 (E7 HEAD cmp removed), bb5b6aa9 (appsets source only on pinned path), e3eb53ca plan LANDED. Overrides: --allow-instruction-files (copilot-instructions), --allow-out-of-scope (3 E7 fixtures), both operator-approved and on the spec.
 - Next: CI green on e3eb53ca, then operator runs make hub-deploy REF=e3eb53ca (tmux), then live check. Did NOT run make hub-sync (outward-facing; hub reads deploy/hub).

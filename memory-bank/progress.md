@@ -1,4 +1,5 @@
 # Progress — v1.45.0 (older entries: `memory-bank/archive/progress-2026-11-22.md`, then `-2026-11-21.md`, `-2026-11-20.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
+- [ ] dr-drill V4: LDAP admin bind mismatch after restore + `_err` exit (bug filed 2026-11-23, Waiting on operator decision); delete kept m2 `dr-drill` cluster before next run.
 
 ## v1.45.0 status (compressed 2026-11-22)
 
