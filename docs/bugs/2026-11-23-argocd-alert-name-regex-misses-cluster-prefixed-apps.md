@@ -34,6 +34,7 @@ cluster-prefixed series.
 |---|---|
 | `scripts/etc/argocd/platform-ops/prometheusrule.yaml` | `ArgoCDAppDegraded` and `ArgoCDAppOutOfSync` name regex: optional cluster prefix on the shopping-cart alternative |
 | `scripts/tests/plugins/argocd_app_alert_regex.bats` | new: `promtool test rules` over a heredoc test file (follow `scripts/tests/plugins/dispatch_alert_rules.bats` for extracting the rule group and handling a missing promtool) |
+| `scripts/tests/plugins/argocd_metrics_servicemonitor.bats` | added after dispatch (spec defect: missed reader): its `grep -F` pins the literal regex string and must follow the new text |
 
 Read only: `scripts/etc/argocd/applicationsets/services-git.yaml`.
 
