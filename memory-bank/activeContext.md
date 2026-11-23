@@ -133,3 +133,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23: operator go — independent Acceptance verifiers started for 2c (root daemon) and 2e (CVE-pin branch): Sonnet, worktree-isolated, sandbox-exec deny sudo/launchctl, scratch HOME. After both PASS: release PR (CI, Argon review, smoke, scope).
 
 - 2026-11-23: 2c VERIFIED (independent Acceptance PASS; Claude re-ran 90 pytest + 9 bats on b036afc2). 2e verifier still running.
+
+- 2026-11-23: 2e VERIFIED (independent Acceptance; M13 FAIL was stale spec text vs operator 2026-11-20 fail-loud decision — M13 amended). v1.45.0 ready for release PR.
