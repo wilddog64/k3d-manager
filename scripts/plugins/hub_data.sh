@@ -629,6 +629,10 @@ function _hub_data_restore_one() {
     fi
     identity="$(_secret_load_data k3dm-hub-data-age identity age)"
   fi
+  if [[ -z "$identity" ]]; then
+    printf '%s\n' 'ERROR: [hub-data] age identity is empty (locked Keychain?)' >&2
+    return 1
+  fi
   if [[ "${DR_DRILL_MODE:-0}" == 1 && "${HUB_DATA_RESTORE_TARGET:-drill}" != hub && "k3d-${cluster}-${node}" != k3d-dr-drill-* ]]; then
     _err '[hub-data] refusing: target is not the drill cluster (docker restore target)'
     return 2

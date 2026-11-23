@@ -269,6 +269,19 @@ freeze_clock() {
   [ "$(grep -c IDENTITY-SENTINEL "$VLOG" || true)" -eq 0 ]; [ "$(printf '%s' "$output" | grep -c IDENTITY-SENTINEL || true)" -eq 0 ]; grep -q IDENTITY-SENTINEL "$STDIN_LOG"
 }
 
+@test "hub data restore: empty identity returns an error without exiting or invoking age" {
+  make_fixture; source_plugin
+  local encrypted="$TEST_ROOT/empty.tar.age"
+  : > "$encrypted"
+  _secret_load_data() { :; }
+  run _hub_data_restore_one secrets data-vault-0 "$encrypted" node-a /data
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'ERROR: [hub-data] age identity is empty (locked Keychain?)'* ]]
+  if grep -q '^age ' "$CALL_LOG"; then return 1; fi
+  printf 'shell-kept-running\n' >> "$TEST_ROOT/continued"
+  [ "$(cat "$TEST_ROOT/continued")" = shell-kept-running ]
+}
+
 @test "hub data restore: node mismatch stops before extraction" {
   make_fixture; source_plugin; export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage" DR_TEST_MISMATCH=1
   run hub_data_restore; [ "$status" -ne 0 ]; [ "$(grep -c docker "$CALL_LOG" || true)" -eq 0 ]

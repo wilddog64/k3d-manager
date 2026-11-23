@@ -69,6 +69,7 @@ cat > "$STUB_BIN/security" <<'STUB'
 #!/usr/bin/env bash
 { printf 'security'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
 case "$*" in
+  *'k3dm-hub-data-age'*) printf '%s' "${DR_TEST_AGE_IDENTITY-AGE-SECRET-KEY-1FAKE}" ;;
   *'secrets/vault:count'*) printf '%s' "${DR_TEST_SHARD_COUNT-1}" ;;
   *'secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
   *'secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
@@ -157,6 +158,32 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   for pair in "1 2" "2 3" "3 4" "4 5" "5 6"; do read -r before after <<<"$pair"; [ "$(grep -n "Phase $before/6" <<<"$output" | cut -d: -f1)" -lt "$(grep -n "Phase $after/6" <<<"$output" | cut -d: -f1)" ]; done
   result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
   [ "$(jq -r .success "$result")" = true ]
+}
+
+@test "dr drill: empty age identity refuses before export clone and hub-up" {
+  export DR_TEST_AGE_IDENTITY=""
+  run_drill
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"login Keychain locked over SSH"* ]]
+  [[ "$output" == *"security unlock-keychain ~/Library/Keychains/login.keychain-db"* ]]
+  if grep -q 'git clone' "$PHASE_LOG"; then return 1; fi
+  if grep -q '^hub-up ' "$PHASE_LOG"; then return 1; fi
+}
+
+@test "dr drill: valid age identity stays private under bash trace" {
+  export DR_TEST_AGE_IDENTITY='AGE-SECRET-KEY-1DRILL-SENTINEL'
+  run bash -x "$PWD/bin/dr-drill"
+  [ "$status" -ne 2 ]
+  [[ "$output" == *'Phase 2/6'* ]]
+  [[ "$output" != *'AGE-SECRET-KEY-1DRILL-SENTINEL'* ]]
+  if grep -R -q 'AGE-SECRET-KEY-1DRILL-SENTINEL' "$TEST_ROOT" "$HOME" 2>/dev/null; then return 1; fi
+}
+
+@test "dr drill: supplied age identity skips the Keychain read" {
+  run env K3DM_HUB_DATA_AGE_IDENTITY=AGE-SECRET-KEY-1SUPPLIED "$PWD/bin/dr-drill"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Phase 2/6'* ]]
+  if grep -q 'k3dm-hub-data-age' "$PHASE_LOG"; then return 1; fi
 }
 
 @test "dr drill: hub-up inherits its dedicated Vault cache service and teardown purges it" {

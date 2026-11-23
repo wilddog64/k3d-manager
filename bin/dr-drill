@@ -177,9 +177,23 @@ _dr_drill_preflight() {
     mkdir -p "$DR_DRILL_STAGE"
   fi
   _dr_drill_install_credential_guard "$DR_DRILL_STAGE"
+  _no_trace _dr_drill_identity_ok || _dr_drill_refuse '[dr-drill] age identity unreadable (login Keychain locked over SSH?): run security unlock-keychain ~/Library/Keychains/login.keychain-db'
   if ! _dr_drill_latest_export "$DR_DRILL_STAGE"; then
     _dr_drill_refuse '[dr-drill] newest export is missing or older than 26h'
   fi
+}
+
+_dr_drill_identity_ok() {
+  local identity="${K3DM_HUB_DATA_AGE_IDENTITY:-}"
+  if [[ -z "$identity" ]]; then
+    identity="$(_secret_load_data k3dm-hub-data-age identity age || true)"
+  fi
+  if [[ "$identity" == AGE-SECRET-KEY-1* ]]; then
+    unset identity
+    return 0
+  fi
+  unset identity
+  return 1
 }
 
 _dr_drill_v0_one() {
