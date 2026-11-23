@@ -47,3 +47,6 @@ to confirm.
 
 **To check (no code change):** after a hover, does Cmd-W close TextEdit's window, or Cmd-T open an iTerm tab? If not,
 the symptom is general, not Safari's. The fix is the same P1 probe: make the target window key without raising it.
+
+**Checked 2026-11-23 (operator):** TextEdit behaves the same, Cmd-W does nothing after hover focus. General, not
+Safari's. Live test of any fix when the operator is home.

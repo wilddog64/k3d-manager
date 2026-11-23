@@ -117,3 +117,4 @@
 - 2026-11-23: closed review runs release-pr164-v1.45.0-review and review-hoverfocus-pr1-v0.0.1 (abandon, worktrees clean). Filed docs/bugs/2026-11-23-hoverfocus-safari-no-focus.md (operator report; suspect 8-level AX parent walk in Controller.lookup; Waiting on: investigation, probe with P1).
 - 2026-11-23: Safari bug update: operator screenshot shows hover focus works on Safari (video area, no raise); location-dependence still to check, else close not reproducible.
 - 2026-11-23: B2 (hoverfocus window-not-key) recurrence: Cmd-W does nothing in Safari after hover focus; proposed P3→P2 (operator to confirm); folded into P1 probe.
+- 2026-11-23: operator confirmed Cmd-W also fails in TextEdit after hover focus (general window-not-key gap, B2). Operator at work; live tests at home.
