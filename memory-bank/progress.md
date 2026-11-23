@@ -48,3 +48,4 @@
 - [x] 2026-11-22 hoverfocus M1b rev 2 + Flash dispatch (`hoverfocus-m1b-app-shell-r2`); hoverfocus registered in projects.list
 - [ ] hoverfocus M1a rev 2, operator focus probe, Luna dispatch
 - 2026-11-22: operator "go with your recommendation": no hub-deploy now (deploy/hub aa920a6f current; only projects.list differs); next promote REF = 2b land commit. Order entries order-ci-workflow-dispatch, review-order-pr109 abandoned (finished out of band, PR #109). 2b independent verify agent started (Acceptance only, sandbox-exec).
+- 2026-11-22: 2b independent verify: E1-E7 offline PASS, but gaps (platform-ops superseded mapping untested, M2 exit-2 malformed->75 vs spec 2, E7 doc test partial, Makefile mutants not run). Ledger verify needs a landed task, so not recorded there. Luna resume 8 (correction) running. B captures recorded in B spec.
