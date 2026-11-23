@@ -1,6 +1,6 @@
 # hoverfocus M1b — menu bar app, icon, bundle, install, CI, docs
 
-**Status:** READY rev 2, 2026-11-22 — Fable reviewed rev 1 ("ready after fixes"); rev 2 applies findings 2, 4, 10–14,
+**Status:** LANDED — hoverfocus@87322d61 (auto: land 2026-11-22; verify pending); , 2026-11-22 — Fable reviewed rev 1 ("ready after fixes"); rev 2 applies findings 2, 4, 10–14,
 17 and the operator's icon and menu bar choices (adjudication table at the end)
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release; no `docs/ideas.md` row.
 **Parent:** [`hoverfocus-m1-prototype.md`](hoverfocus-m1-prototype.md) (design, facts, interface, file ownership)
