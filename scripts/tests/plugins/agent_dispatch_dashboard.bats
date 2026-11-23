@@ -1073,7 +1073,7 @@ from pathlib import Path
 text=Path(sys.argv[1]).read_text()
 panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
 by_title={p["title"]:p for p in panels}
-for title,group,metric,legend in (("Untracked by repo","repo, mode","k3dm_codex_untracked_sessions","{{repo}} {{mode}}"),("Tokens by repo","repo","k3dm_codex_tokens","{{repo}}")):
+for title,group,metric,legend in (("Codex untracked by repo","repo, mode","k3dm_codex_untracked_sessions","{{repo}} {{mode}}"),("Tokens by repo","repo","k3dm_codex_tokens","{{repo}}")):
     panel=by_title[title]
     base=f'sum by ({group}) ({metric}{{window="$window"}})'
     named,other=panel["targets"]
@@ -1515,13 +1515,19 @@ PY
 }
 
 @test "agent activity: Codex layout and non-position panel fields match the contract" {
-  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
 import hashlib, json, sys
 from pathlib import Path
 text = Path(sys.argv[1]).read_text().split('  agent-activity.json: |\n', 1)[1]
 panels = json.loads('\n'.join(line[4:] for line in text.splitlines()))['panels']
-# SHA-256 of all panel fields except gridPos on the dispatched base commit.
-content = [{k: v for k, v in panel.items() if k != 'gridPos'} for panel in panels]
+approved = {'Codex untracked by repo': 'Untracked by repo', 'Codex sessions by mode': 'Sessions by mode', 'agy sessions by mode': 'agy sessions by mode', 'agy untracked by repo': 'agy untracked by repo'}
+content = []
+for panel in panels:
+    normalized = {k: v for k, v in panel.items() if k != 'gridPos'}
+    if panel['title'] in approved:
+        normalized['title'] = approved[panel['title']]
+        normalized.pop('transformations', None)
+    content.append(normalized)
 digest = hashlib.sha256(json.dumps(content, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 assert digest == '0c9000fd40a49743831a416aca47f0e9e6674280b3882bf23d8e819b69cc1d7f', 'panel content changed'
 by_id = {panel['id']: panel for panel in panels}
@@ -1529,6 +1535,33 @@ for pid, x in ((53, 0), (58, 8), (83, 16)):
     assert by_id[pid]['gridPos'] == {'h': 6, 'w': 8, 'x': x, 'y': 20}, (pid, by_id[pid]['gridPos'])
 for pid, x in ((54, 0), (55, 6), (56, 12), (57, 18)):
     assert by_id[pid]['gridPos'] == {'h': 12, 'w': 6, 'x': x, 'y': 26}, (pid, by_id[pid]['gridPos'])
+print('ok')
+PYTEST
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "agent activity: mode panels share clear display labels" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json, re, sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text().split('  agent-activity.json: |\n', 1)[1]
+panels = json.loads('\n'.join(line[4:] for line in text.splitlines()))['panels']
+titles = ('Codex untracked by repo', 'Codex sessions by mode', 'agy sessions by mode', 'agy untracked by repo')
+by_title = {p['title']: p for p in panels}
+assert all(title in by_title for title in titles)
+renames = [t for p in panels for t in p.get('transformations', []) if t.get('id') == 'renameByRegex']
+assert len(renames) == 4
+assert sorted(p['title'] for p in panels if p.get('transformations')) == sorted(titles)
+for title in titles:
+    rename, = [t for t in by_title[title].get('transformations', []) if t.get('id') == 'renameByRegex']
+    assert rename['options'] == {'regex': '^(.* )?(exec|print)$', 'renamePattern': '$1headless'}
+    regex = re.compile(rename['options']['regex'])
+    pattern = rename['options']['renamePattern']
+    def apply(name):
+        return regex.sub(lambda m: pattern.replace('$1', m.group(1) or '').replace('$2', m.group(2) or ''), name)
+    for sample, expected in (('print','headless'), ('exec','headless'), ('interactive','interactive'), ('other','other'), ('k3d-manager print','k3d-manager headless'), ('k3d-manager exec','k3d-manager headless'), ('k3d-manager interactive','k3d-manager interactive'), ('codexec','codexec')):
+        assert apply(sample) == expected, (title, sample, apply(sample), expected)
+    assert all(not re.search(r'(^| )(exec|print)$', apply(name)) for name in ('print', 'exec', 'k3d-manager print', 'k3d-manager exec'))
 print('ok')
 PY
   [ "$status" -eq 0 ] || { echo "$output"; false; }
