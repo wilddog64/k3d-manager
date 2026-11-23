@@ -54,6 +54,12 @@ Look for:
 1. `git -C /Users/cliang/src/gitrepo/personal/hoverfocus log --oneline -1 origin/m1-base` shows a4d9abb.
 2. Read the changed hunks, then enough of each surrounding function to judge them.
 
+## Files
+
+| File | Change |
+|---|---|
+| every file in `git -C /Users/cliang/src/gitrepo/personal/hoverfocus diff --name-only origin/main...a4d9abb -- Sources Makefile packaging tests .github` | read only |
+
 ## What NOT to Do
 
 - Do NOT edit, commit, push or comment on the PR, in either repo.
