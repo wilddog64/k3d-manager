@@ -33,7 +33,7 @@ def run(argv=None, admin_sock=DEFAULT_ADMIN_SOCK, tty_in=None, tty_out=None, che
         sys.stderr.write("totpctl: root privileges required\n")
         return 1
     if not argv:
-        sys.stderr.write("usage: totpctl status [--wire] | enroll | rotate\n")
+        sys.stderr.write("usage: totpctl status [--wire] | enroll | rotate | unlock\n")
         return 1
     cmd = argv[0]
     if cmd == "status":
@@ -60,6 +60,20 @@ def run(argv=None, admin_sock=DEFAULT_ADMIN_SOCK, tty_in=None, tty_out=None, che
             sys.stdout.write("state damaged\n")
         sys.stdout.flush()
         return 0
+    if cmd == "unlock":
+        try:
+            resp = send_admin_cmd(admin_sock, "UNLOCK")
+        except OSError:
+            resp = "UNAVAILABLE"
+        if resp == "UNLOCKED":
+            sys.stdout.write("unlocked\n")
+            sys.stdout.flush()
+            return 0
+        if resp == "NOT_ENROLLED":
+            sys.stderr.write("totpctl: not enrolled\n")
+        else:
+            sys.stderr.write("totpctl: state unavailable\n")
+        return 1
     if cmd in ("enroll", "rotate"):
         opened_tty = False
         fin = tty_in

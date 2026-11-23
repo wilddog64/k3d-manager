@@ -254,6 +254,7 @@ def test_N1_and_M2_lockout_and_hmac_calls():
         with open(os.path.join(state_dir, "state.json"), "w") as f:
             json.dump(initial_state, f)
         cur_time = [59.0]
+        mono_time = [10.0]
         def clock_fn():
             return cur_time[0]
         hmac_count = [0]
@@ -271,6 +272,7 @@ def test_N1_and_M2_lockout_and_hmac_calls():
                 runner=make_stub_runner(),
                 peer_cred_fn=lambda s: (os.getuid(), 30001),
                 clock=clock_fn,
+                monotonic=lambda: mono_time[0],
                 expected_conf_owner=os.getuid(),
                 expected_dir_owner=os.getuid(),
                 exit_on_idle=False,
@@ -305,16 +307,17 @@ def test_N1_and_M2_lockout_and_hmac_calls():
         assert resp_locked == "WAIT 300"
         assert hmac_count[0] == before_lock_hmac
         cur_time[0] = 358.0
+        mono_time[0] = 309.0
         resp_locked_1 = send_verify("287082")
         assert resp_locked_1 == "WAIT 1"
         assert hmac_count[0] == before_lock_hmac
-        cur_time[0] = 359.0
+        mono_time[0] = 310.0
         resp_after_expiry_wrong = send_verify("000000")
         assert resp_after_expiry_wrong == "NO"
         with open(os.path.join(state_dir, "state.json")) as f:
             st = json.load(f)
         assert st["failures"] == 1
-        assert st["locked_until"] == 0
+        assert st["locked_until"] == 359  # agent-audit: allow assert-removed expired deadline now retained for escalation (M1/N1)
         resp_after_expiry_ok = send_verify("481090")
         assert resp_after_expiry_ok == "OK"
         with open(os.path.join(state_dir, "state.json")) as f:
@@ -844,6 +847,8 @@ class VerifierFixture:
         self.root = Path(root)
         assert self.root.name.startswith("wct.") and self.root.is_dir()
         self.state_dir, self.run_dir = make_state_and_run_dirs(root)
+        assert Path(self.state_dir).is_relative_to(self.root)
+        assert Path(self.run_dir).is_relative_to(self.root)
         self.config = self.root / "totp.conf"
         self.config.write_text("uid=501\ntmux=/usr/bin/tmux\nidle_seconds=120\nconsole_port=42722\n")
         self.state = Path(self.state_dir, "state.json")
@@ -882,6 +887,8 @@ class VerifierFixture:
             assert self.condition.wait_for(lambda: self.events.count(name) >= count, timeout=4), self.events
 
     def start(self):
+        assert Path(self.state_dir).is_relative_to(self.root)
+        assert Path(self.run_dir).is_relative_to(self.root)
         self.stop.clear()
         self.events.clear()
         self.result = []
@@ -1732,6 +1739,148 @@ def test_N3_M3_admin_refuses_unprivileged_peer(verifier):
     assert receive(client) == b"ENROLLED\n"
 
 
+def test_escalating_lock_decay_and_expiry_reset(verifier):
+    verifier.start()
+    def verify(code="000000"):
+        client = verifier.connect()
+        client.sendall(f"VERIFY {code}\n".encode())
+        return receive(client).strip().decode()
+    level = 0
+    for expected in (300, 1800, 14400, 86400, 86400):
+        for _ in range(4 if expected != 300 else 5):
+            assert verify() == "NO"
+        level = min(4, level + 1)
+        state = totpd.load_state(verifier.state_dir)
+        assert state["lock_level"] == level
+        assert state["locked_until"] - verifier.wall == expected
+        verifier.tick += expected
+        verifier.wall += expected
+        assert verify() == "NO"
+        state = totpd.load_state(verifier.state_dir)
+        assert state["failures"] == 1 and state["locked_until"] > 0
+        verifier.wall += 5
+
+
+def test_decay_after_full_days(verifier):
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=2, locked_until=verifier.wall - 1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.wall += 86400
+    verifier.start()
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 1
+    verifier.finish()
+    verifier.wall += 86400
+    verifier.start()
+    state = totpd.load_state(verifier.state_dir)
+    assert state["lock_level"] == 0 and state["locked_until"] == 0
+    assert set(json.loads(verifier.state.read_text())) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
+
+
+def test_level4_reply(verifier):
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall + 86400)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    assert receive(client) == b"WAIT 86400\n"
+    gate_source = (Path(__file__).parents[2] / "libexec" / "k3dm-console-gate.py").read_text()
+    assert 'Too many attempts; try again later' in gate_source
+
+
+def test_restart_keeps_level(verifier):
+    verifier.start()
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    verifier.finish()
+    state = totpd.load_state(verifier.state_dir)
+    state["locked_until"] = verifier.wall - 1
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    state = totpd.load_state(verifier.state_dir)
+    assert state["lock_level"] == 2 and state["locked_until"] - verifier.wall == 1800
+
+
+def test_monotonic_deadline_once_and_success_resets(verifier):
+    verifier.start()
+    def request(code):
+        client = verifier.connect()
+        client.sendall(f"VERIFY {code}\n".encode())
+        return receive(client).strip()
+    for _ in range(5):
+        assert request("000000") == b"NO"
+    verifier.wall += 301
+    assert request("000000") == b"WAIT 300"
+    state = totpd.load_state(verifier.state_dir)
+    assert state["locked_until"] > 0
+    verifier.tick += 300
+    code = totpd.compute_hotp(base64.b32decode(verifier.secret), verifier.wall // 30)
+    assert request(code) == b"OK"
+    state = totpd.load_state(verifier.state_dir)
+    assert (state["failures"], state["locked_until"], state["lock_level"]) == (0, 0, 0)
+
+
+def test_unlock_migration_and_level0_five_keys(verifier):
+    legacy = {"secret": verifier.secret, "last_counter": 0, "failures": 5,
+              "locked_until": verifier.wall + 300, "enrolled": True}
+    totpd.commit_state(verifier.state_dir, legacy)
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 1
+    assert totpd.load_state(verifier.state_dir)["locked_until"] == verifier.wall + 300
+    verifier.start()
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    assert receive(client) == b"WAIT 300\n"
+    verifier.tick += 300
+    verifier.wall += 300
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 2
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    assert receive(client) == b"WAIT 1800\n"
+    client = verifier.connect("admin")
+    client.sendall(b"UNLOCK\n")
+    assert receive(client) == b"UNLOCKED\n"
+    assert set(json.loads(verifier.state.read_text())) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 0
+    level_zero = dict(legacy, lock_level=0)
+    totpd.commit_state(verifier.state_dir, level_zero)
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 0
+    assert totpd.load_state(verifier.state_dir)["locked_until"] == legacy["locked_until"]
+    assert totpd.load_state(verifier.state_dir) is not False
+    for level in (True, -1, 5, "1"):
+        totpd.commit_state(verifier.state_dir, dict(legacy, lock_level=level))
+        assert totpd.load_state(verifier.state_dir) is False
+    totpd.commit_state(verifier.state_dir, dict(legacy, extra="refused"))
+    assert totpd.load_state(verifier.state_dir) is False
+
+
+def test_totpctl_unlock_cli(monkeypatch, capsys):
+    monkeypatch.setattr(totpctl, "send_admin_cmd", lambda _sock, command: "UNLOCKED" if command == "UNLOCK" else "UNAVAILABLE")
+    assert totpctl.run(["unlock"], check_root=False) == 0
+    assert capsys.readouterr().out == "unlocked\n"
+
+
+def test_structured_log_and_level4_reply(verifier):
+    verifier.start()
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    log = (verifier.root / "log").read_text()
+    assert "event=totp-failure failures=5 lock_level=1" in log
+    assert "event=totp-lock lock_level=1 seconds=300" in log
+    assert "000000" not in log and verifier.secret not in log
+
+
 @pytest.mark.parametrize("operation", ["enroll", "rotate"])
 def test_N9_M8_pending_secret_lifetime(verifier, operation):
     if operation == "enroll":
@@ -1907,7 +2056,7 @@ def test_N1_N8_M4_failed_prompt_limit(verifier, start_gate, failure):
             message = b"Invalid code"
         else:
             if failure == "NO":
-                verifier.wall += 301
+                verifier.tick += 86401
             code = b"000000"
             message = b"Too many attempts" if failure == "WAIT" and i >= 5 else b"Invalid code"
         instance.send(code + b"\n")
@@ -2056,6 +2205,7 @@ def test_N1_M2_restart_persists_gate_decision(verifier, sequence):
     verifier.start()
     assert verify(b"287082") == (b"WAIT 300\n" if sequence == "lockout" else b"NO\n")
     verifier.wall = 359
+    verifier.tick += 300
     assert verify(b"481090") == b"OK\n"
 
 

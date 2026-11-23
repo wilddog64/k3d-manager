@@ -148,13 +148,18 @@ def load_state(state_dir):
         if not isinstance(data, dict):
             return False
         required = {"secret", "last_counter", "failures", "locked_until", "enrolled"}
-        if set(data) != required or type(data["enrolled"]) is not bool:
+        if set(data) not in (required, required | {"lock_level"}) or type(data["enrolled"]) is not bool:
             return False
         for field in ("failures", "last_counter", "locked_until"):
             if type(data[field]) is not int or data[field] < 0:
                 return False
         if not re.fullmatch(r"[A-Z2-7]{32}", data["secret"]):
             return False
+        if "lock_level" in data:
+            if type(data["lock_level"]) is not int or not 0 <= data["lock_level"] <= 4:
+                return False
+        else:
+            data["lock_level"] = 1 if data["locked_until"] > 0 else 0
         return data
     except Exception:
         return False
@@ -348,6 +353,59 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
         log_event("clock-unavailable")
         return None
 
+    lock_seconds = [300, 1800, 14400, 86400]
+    lock_deadline_mono = [None]
+    deadline_locked_until = [None]
+    active_lock_logged = [False]
+
+    def state_for_commit(state):
+        result = dict(state)
+        level = result.pop("lock_level", 0)
+        if level:
+            result["lock_level"] = level
+        return result
+
+    def structured(event, **fields):
+        try:
+            timestamp = wall_time()
+            if timestamp is None:
+                stamp = "unknown"
+            else:
+                stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(timestamp))
+            log_event(" ".join([stamp, f"event={event}"] + [f"{key}={value}" for key, value in fields.items()]))
+        except Exception:
+            pass
+
+    def sync_lock_deadline(state, now):
+        level = state.get("lock_level", 0)
+        locked_until = state.get("locked_until", 0)
+        if locked_until <= 0:
+            lock_deadline_mono[0] = None
+            deadline_locked_until[0] = locked_until
+            return
+        if lock_deadline_mono[0] is None or deadline_locked_until[0] != locked_until:
+            duration = lock_seconds[max(0, min(level, 4) - 1)] if level else 300
+            remaining = max(0, min(locked_until - now, duration))
+            lock_deadline_mono[0] = monotonic() + remaining
+            deadline_locked_until[0] = locked_until
+
+    def decay_state(state, now):
+        level = state.get("lock_level", 0)
+        until = state.get("locked_until", 0)
+        if lock_deadline_mono[0] is not None and monotonic() < lock_deadline_mono[0]:
+            return state, False
+        if level <= 0 or until <= 0 or now < until:
+            return state, False
+        elapsed_levels = int((now - until) // 86400)
+        if elapsed_levels <= 0:
+            return state, False
+        new_level = max(0, level - elapsed_levels)
+        result = dict(state, lock_level=new_level, failures=0)
+        if new_level == 0:
+            result["locked_until"] = 0
+            lock_deadline_mono[0] = None
+        return result, new_level != level or (new_level == 0 and until != 0)
+
     if os.path.islink(run_dir):
         return 1
     try:
@@ -414,6 +472,18 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
     pending_admin_secret = None
     pending_admin_expiry = 0
     pending_admin_wrong = 0
+    startup_state = load_state(state_dir)
+    startup_time = wall_time()
+    if startup_state and startup_time is not None:
+        sync_lock_deadline(startup_state, startup_time)
+        decayed, changed = decay_state(startup_state, startup_time)
+        if changed:
+            try:
+                commit_state(state_dir, state_for_commit(decayed), fault=getattr(run, "injected_commit_fault", None))
+                if decayed.get("lock_level", 0) == 0:
+                    structured("totp-unlock", source="decay")
+            except (CommitPreRenameError, CommitPostRenameError):
+                log_event("commit-failed")
     notify("ready")
     iteration = 0
     post_rename_fatal = False
@@ -602,8 +672,9 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                                     }
                                     try:
                                         fault = getattr(run, "injected_commit_fault", None)
-                                        commit_state(state_dir, nstate, fault=fault)
+                                        commit_state(state_dir, state_for_commit(nstate), fault=fault)
                                         pending_admin_secret = None
+                                        structured("totp-unlock", source="enrol")
                                         reply = "OK\n"
                                     except CommitPreRenameError:
                                         log_event("commit-failed")
@@ -645,8 +716,9 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                                     nstate["enrolled"] = True
                                     try:
                                         fault = getattr(run, "injected_commit_fault", None)
-                                        commit_state(state_dir, nstate, fault=fault)
+                                        commit_state(state_dir, state_for_commit(nstate), fault=fault)
                                         pending_admin_secret = None
+                                        structured("totp-unlock", source="rotate")
                                         reply = "OK\n"
                                     except CommitPreRenameError:
                                         log_event("commit-failed")
@@ -664,6 +736,25 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                         elif line == "ABORT":
                             pending_admin_secret = None
                             reply = "OK\n"
+                        elif line == "UNLOCK":
+                            if cur_state is None:
+                                reply = "NOT_ENROLLED\n"
+                            elif cur_state is False:
+                                reply = "UNAVAILABLE\n"
+                            else:
+                                reset = dict(cur_state, failures=0, locked_until=0, lock_level=0)
+                                try:
+                                    commit_state(state_dir, state_for_commit(reset), fault=getattr(run, "injected_commit_fault", None))
+                                    lock_deadline_mono[0] = None
+                                    deadline_locked_until[0] = 0
+                                    active_lock_logged[0] = False
+                                    structured("totp-unlock", source="admin")
+                                    reply = "UNLOCKED\n"
+                                except (CommitPreRenameError, CommitPostRenameError):
+                                    log_event("commit-failed")
+                                    reply = "UNAVAILABLE\n"
+                                    if isinstance(sys.exc_info()[1], CommitPostRenameError):
+                                        post_rename_fatal = True
                         else:
                             reply = "UNAVAILABLE\n"
                         if reply is not None:
@@ -737,18 +828,36 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                             failures = cur_state.get("failures", 0)
                             last_counter = cur_state.get("last_counter", 0)
                             sec = cur_state["secret"]
-                            if t_now < locked_until:
-                                remaining = math.ceil(locked_until - t_now)
+                            cur_state, changed = decay_state(cur_state, t_now)
+                            if changed:
+                                try:
+                                    commit_state(state_dir, state_for_commit(cur_state), fault=getattr(run, "injected_commit_fault", None))
+                                    if cur_state.get("lock_level", 0) == 0:
+                                        structured("totp-unlock", source="decay")
+                                except (CommitPreRenameError, CommitPostRenameError):
+                                    reply = "UNAVAILABLE\n"
+                                    log_event("commit-failed")
+                                    csock.sendall(reply.encode("ascii"))
+                                    sel.unregister(csock)
+                                    csock.close()
+                                    admitted_clients.pop(csock, None)
+                                    continue
+                            locked_until = cur_state.get("locked_until", 0)
+                            sync_lock_deadline(cur_state, t_now)
+                            remaining_mono = None if lock_deadline_mono[0] is None else lock_deadline_mono[0] - monotonic()
+                            if locked_until > 0 and remaining_mono is not None and remaining_mono > 0:
+                                remaining = max(1, math.ceil(remaining_mono))
+                                if not active_lock_logged[0]:
+                                    structured("totp-locked-reply", lock_level=cur_state.get("lock_level", 1))
+                                    active_lock_logged[0] = True
                                 reply = f"WAIT {remaining}\n"
                             else:
-                                if locked_until > 0:
+                                if locked_until > 0 and failures >= 5 and monotonic() >= lock_deadline_mono[0]:
                                     cur_state["failures"] = 0
-                                    cur_state["locked_until"] = 0
+                                    cur_state["locked_until"] = locked_until
                                     try:
-                                        fault = getattr(run, "injected_commit_fault", None)
-                                        commit_state(state_dir, cur_state, fault=fault)
+                                        commit_state(state_dir, state_for_commit(cur_state), fault=getattr(run, "injected_commit_fault", None))
                                         failures = 0
-                                        locked_until = 0
                                     except CommitPreRenameError:
                                         reply = "UNAVAILABLE\n"
                                         log_event("commit-failed")
@@ -775,9 +884,14 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                                     nstate["last_counter"] = matched
                                     nstate["failures"] = 0
                                     nstate["locked_until"] = 0
+                                    nstate["lock_level"] = 0
                                     try:
                                         fault = getattr(run, "injected_commit_fault", None)
-                                        commit_state(state_dir, nstate, fault=fault)
+                                        commit_state(state_dir, state_for_commit(nstate), fault=fault)
+                                        lock_deadline_mono[0] = None
+                                        deadline_locked_until[0] = 0
+                                        active_lock_logged[0] = False
+                                        structured("totp-unlock", source="success")
                                         reply = "OK\n"
                                     except CommitPreRenameError:
                                         reply = "UNAVAILABLE\n"
@@ -791,10 +905,17 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                                     nstate = dict(cur_state)
                                     nstate["failures"] = failures
                                     if failures >= 5:
-                                        nstate["locked_until"] = int(t_now + 300)
+                                        nstate["lock_level"] = min(4, nstate.get("lock_level", 0) + 1)
+                                        duration = lock_seconds[nstate["lock_level"] - 1]
+                                        nstate["locked_until"] = int(t_now + duration)
+                                        lock_deadline_mono[0] = monotonic() + duration
+                                        deadline_locked_until[0] = nstate["locked_until"]
+                                        active_lock_logged[0] = False
+                                        structured("totp-lock", lock_level=nstate["lock_level"], seconds=duration)
+                                    structured("totp-failure", failures=failures, lock_level=nstate.get("lock_level", 0))
                                     try:
                                         fault = getattr(run, "injected_commit_fault", None)
-                                        commit_state(state_dir, nstate, fault=fault)
+                                        commit_state(state_dir, state_for_commit(nstate), fault=fault)
                                         reply = "NO\n"
                                     except CommitPreRenameError:
                                         reply = "UNAVAILABLE\n"
