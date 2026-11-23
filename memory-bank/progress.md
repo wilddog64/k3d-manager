@@ -88,3 +88,5 @@
 - 2026-11-23: 2e VERIFIED (independent Acceptance; M13 FAIL was stale spec text vs operator 2026-11-20 fail-loud decision — M13 amended). v1.45.0 ready for release PR.
 
 - 2026-11-23: v1.45.0 CHANGELOG promoted (+promote, CVE pins, console, stall entries); README/releases rows; release PR opening. Owed live before merge: 2d E11, M2 live check (travel E3/E5 event-driven).
+
+- 2026-11-23: PR #164 opened (v1.45.0 release, not draft). Argon review spec docs/plans/release-pr164-v1.45.0-review.md written; dispatching agy role review.
