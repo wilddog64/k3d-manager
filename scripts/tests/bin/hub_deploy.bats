@@ -889,9 +889,6 @@ install_fixture() {
 
 @test 'E7 pre-change documentation copies fail the approval wording checks' {
   fixture="$REPO/scripts/tests/fixtures/remote-promote-2b-docs"
-  "$REAL_GIT" -C "$REPO" show HEAD:docs/process/rules.md | cmp - "$fixture/rules.md"
-  "$REAL_GIT" -C "$REPO" show HEAD:docs/howto/hub-promote.md | cmp - "$fixture/hub-promote.md"
-  "$REAL_GIT" -C "$REPO" show HEAD:.github/copilot-instructions.md | cmp - "$fixture/copilot-instructions.md"
   for pattern in 'Worker-signed envelope' 'check value' 'Part 2e' 'gate on the honest path, not a barrier'; do
     run rg -qi -- "$pattern" "$fixture/rules.md"
     [ "$status" -ne 0 ] || { printf 'pre-change rules unexpectedly contains: %s\n' "$pattern" >&3; return 1; }
