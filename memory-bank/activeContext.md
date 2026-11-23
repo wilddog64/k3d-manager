@@ -1,4 +1,4 @@
-## Handoff — 2026-11-23 06:30 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 PR #164 open — START HERE
+## Handoff — 2026-11-23 07:10 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 PR #164 open — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
 
@@ -41,8 +41,9 @@
   write-up (raw captures in `~/.local/share/k3d-manager/captures/2026-11-22-*`); delete probe branch; hub Istio ≥1.31.4;
   old m2 cluster on EOL Istio; v1.46.0 swaps for 3a/3b drafts.
 
-**Dispatches:** 0 implementation open. `bin/k3dm-codex-dispatch open` still lists two exited review runs
-(`release-pr164-v1.45.0-review`, `review-hoverfocus-pr1-v0.0.1`, role review, not WIP) — both read and recorded; close them.
+**Dispatches:** 0 open (both review runs abandoned 2026-11-23 07:00).
+**New:** `docs/bugs/2026-11-23-hoverfocus-safari-no-focus.md` — Safari never focuses; suspect 8-level AX parent walk in
+`Controller.lookup`; add to P1 probe on m2 (tab bar vs page content; depth; `kAXWindowAttribute`), fix goes to L2.
 agy.log read permission was one-off per run; ask again for a new review run.
 
 **Standing facts:**
