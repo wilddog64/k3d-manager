@@ -8,8 +8,8 @@
 **Waiting on:** operator decision — since 2026-11-23 (intent approval of rev 2)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
-**Intent approved:** pending
-**Approval:** pending. This spec is new in v1.45.1, so the operator has not approved its intents yet. Do not dispatch until the line above names the operator and a date.
+**Intent approved:** operator, 2026-11-23
+**Approval:** operator, 2026-11-23 — intents of spec rev 2 approved ("approved"); dispatch after the Fable round-2 review findings are applied.
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match
 **Detected by:** v1.45.0 red-team gate, 2026-11-22, on `7dfb7238` — see [docs/issues/2026-11-23-v1.45.0-red-team.md](../issues/2026-11-23-v1.45.0-red-team.md)
 **Severity:** a same-uid process becomes root at the operator's next install; defeats the promote authority's goal of surviving a compromised operator uid.

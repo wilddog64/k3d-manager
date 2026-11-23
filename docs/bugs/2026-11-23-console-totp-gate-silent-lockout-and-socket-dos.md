@@ -6,7 +6,7 @@
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-23 (intent approval of the rev 4 items listed under Acceptance, and the `**Approval:**` exception; A1 and A2 wait)
-**Approval:** pending operator — exception to "X.Y.N is bug-fix only": recovery codes (B8) are a feature-shaped addition in a patch release. Justified because the escalating lock this patch adds (24 h at level 4, operator Q3) makes the existing lockout worse for an operator travelling with an iPad only, and recovery codes are the no-root way back in.
+**Approval:** operator, 2026-11-23 (approved) — exception to "X.Y.N is bug-fix only": recovery codes (B8) are a feature-shaped addition in a patch release. Justified because the escalating lock this patch adds (24 h at level 4, operator Q3) makes the existing lockout worse for an operator travelling with an iPad only, and recovery codes are the no-root way back in.
 **Triage:** patch → v1.45.1 (security and DR release); metrics, alerts and socket mode split to follow-ups (see Follow-ups)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match
 **Detected by:** v1.45.0 red-team gate, 2026-11-22, on `7dfb7238` — see [docs/issues/2026-11-23-v1.45.0-red-team.md](../issues/2026-11-23-v1.45.0-red-team.md)
@@ -489,31 +489,31 @@ evidence:
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_generate or recovery_storage or recovery_plaintext or recovery_pending_ends or recovery_tmp_cleanup"
     red_control: pre-fix ENROLL_BEGIN pends no codes and RECOVERY_GET is an unknown verb; plaintext scans of recovery.json, state.json and the log are paired with the hash-count and remaining= positive controls; recovery_pending_ends gets CODE for index 3 while pending, then UNAVAILABLE after commit, ABORT, expiry and the fifth wrong code, and for RECOVERY_GET -1 and 10; recovery_tmp_cleanup seeds recovery.json.tmp (and a dangling symlink of that name) and asserts it is gone after start
-    intent: pending (proposed — Recovery codes are shown once when you enrol, rotate or regenerate, are stored only as hashes, and never appear in the log, the state file or a command line.)
+    intent: Recovery codes are shown once when you enrol, rotate or regenerate, are stored only as hashes, and never appear in the log, the state file or a command line.
   - id: E9
     proves: [M11, N8, N9]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_unlock or recovery_burn or gate_recovery_reaches or recovery_concurrent"
     red_control: pre-fix gate prints Invalid code without connecting (stub verifier records no VERIFY line); pre-fix totpd wire-rejects; burn cases use the keyed fault seam - state.json fault after the burn -> UNAVAILABLE and entry gone; recovery.json pre-rename fault -> UNAVAILABLE and the same code then replies OK; recovery.json post-rename fault -> UNAVAILABLE, state unchanged, daemon exits; recovery_concurrent (twin of test_N1_D40) sends one code on two admitted connections and asserts [NO, OK]
-    intent: pending (proposed — When the console is locked, typing one unused recovery code at the Code prompt lets you in and clears the lock, and that code never works again, even if two logins race or the disk write fails.)
+    intent: When the console is locked, typing one unused recovery code at the Code prompt lets you in and clears the lock, and that code never works again, even if two logins race or the disk write fails.
   - id: E10
     proves: [M12, N10]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_after_wrong"
     red_control: twenty wrong recovery codes back to back with monotonic unchanged, each NO (positive control that they were evaluated), then a valid code replies OK; run once unlocked (failures still 0 after the wrong codes) and once locked; pre-fix wire-rejects the recovery format, so the OK assertion fails; the log holds one totp-recovery-failure line (count=1) after the twenty; after monotonic += 60 one more wrong code writes a second line with count=20
-    intent: pending (proposed — A typo, or an attacker's junk from another console session, never stops the operator's real recovery code from working; wrong codes are logged without filling the log.)
+    intent: A typo, or an attacker's junk from another console session, never stops the operator's real recovery code from working; wrong codes are logged without filling the log.
   - id: E11
     proves: [M13]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "gate_recovery_input"
     red_control: GateProcess against a stub verifier socket; pre-fix gate sends nothing for grouped, ungrouped, lowercase, spaced and backspace-corrected input; 21 bytes of input (a valid code plus trailing bytes) records no VERIFY line; a stub reply WAIT 42 shows "(42 s)"; 6-digit input sent unchanged is the positive control
-    intent: pending (proposed — The console accepts a recovery code typed with or without dashes or spaces, in any case and with backspace corrections, still accepts the 6-digit code as before, and says how many seconds a lock has left.)
+    intent: The console accepts a recovery code typed with or without dashes or spaces, in any case and with backspace corrections, still accepts the 6-digit code as before, and says how many seconds a lock has left.
   - id: E12
     proves: [M14, N12]
     kind: offline
     command: python3 -m pytest scripts/tests/bin/test_web_console_totp.py -k "recovery_status or recovery_regen or recovery_damaged or enrol_failure_warns"
     red_control: pre-fix totpctl has no recovery-status verb (unknown command, rc 1); damaged recovery.json cases (symlink, dangling symlink, mode 0644, v true) trigger a load with RECOVERY_STATUS, assert a totp-recovery-damaged line (absent pre-fix) and then TOTP OK; enrol_failure_warns sends a wrong code and asserts NO, an ABORT recorded by the daemon, the fixed warning line and the scrollback clear sequence; RECOVERY_COMMIT without a RECOVERY pending replies UNAVAILABLE
-    intent: pending (proposed — Root at home can see how many recovery codes are left and replace the whole set, a failed enrol or rotate warns that its codes are void, and a damaged recovery file never blocks normal code login.)
+    intent: Root at home can see how many recovery codes are left and replace the whole set, a failed enrol or rotate warns that its codes are void, and a damaged recovery file never blocks normal code login.
   - id: E7
     proves: [M8, N5, N6, N7]
     kind: offline
@@ -531,7 +531,7 @@ evidence:
     kind: live
     command: operator at home after Upgrade order step 3 runs sudo totpctl recovery-status (reads 10), logs in once at the console with one recovery code, reruns recovery-status (reads 9) and pastes the log's totp-recovery-used line; Claude reads the pasted output only (recovery.json is never printed)
     red_control: recovery login refused, count not 9, or a code visible in the pasted log blocks the release PR
-    intent: pending (proposed — After the upgrade, one real recovery-code login at the console works and leaves nine codes, without any code reaching the log.)
+    intent: After the upgrade, one real recovery-code login at the console works and leaves nine codes, without any code reaching the log.
 interface:
   totpd_reply: "OK | NO | UNAVAILABLE | WAIT <n>"
   verify_request: "VERIFY <6 digits> | VERIFY XXXX-XXXX-XXXX-XXXX ([A-Z2-7])"
@@ -565,12 +565,12 @@ Test fixtures, for every child:
 
 Rev 3 note: that approval covers E1–E7 and L1.
 
-Rev 4 note, items **not** covered by that approval (operator to approve before the child dispatches):
+Rev 4 note: the items below were approved by the operator on 2026-11-23 ("approved"), after rev 4:
 - **A1:** E1 (red_control adds the expiry-trigger case, Fable S-3), E4 (adds the v1.45.0 active-lock migration and the
   `lock_level` type cases, S-4), E6 (the gate message is matched as a prefix). Their intent text is unchanged. E2, E3
   and E5 are unchanged and stay approved.
 - **A2:** all of E8–E12 and L2, including the rewritten E10 (no rate limit) and new N13. A2 carries
-  `**Intent approved:** pending`.
+  `**Intent approved:** operator, 2026-11-23`.
 
 ## Routing
 
