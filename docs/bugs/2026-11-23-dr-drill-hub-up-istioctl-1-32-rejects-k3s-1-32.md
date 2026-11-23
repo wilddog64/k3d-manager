@@ -21,6 +21,9 @@
   installs the latest candidate from `istio/istio` `master` (`downloadIstioCandidate.sh`). Same in
   `scripts/lib/foundation/scripts/lib/core.sh:455` (lib-foundation subtree: upstream first).
 - Last good drill 2026-11-04 predates the 2026-11-12 upgrade.
+- Live hub (m2-air, context `k3d-k3d-cluster`, read-only 2026-11-23 by Claude): server `v1.31.5+k3s1`, istiod image
+  `docker.io/istio/pilot:1.28.3`, local kubectl client 1.37. The hub already differs from the template pin (v1.32.0), so a
+  drill does not rebuild what the hub runs today.
 
 ## Workaround (untested)
 
