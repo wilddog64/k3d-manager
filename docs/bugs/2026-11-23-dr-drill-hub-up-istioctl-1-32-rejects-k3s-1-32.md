@@ -2,12 +2,12 @@
 
 **Status:** OPEN — captured 2026-11-23 by Claude from the operator's m2-air run
 **Priority:** P2 (operator, 2026-11-23; flagged — it blocks the DR drill and a from-scratch hub rebuild on this Mac)
-**Triage:** patch → v1.45.1 (operator, 2026-11-23); pin target: match the live hub (k3s 1.31.5, Istio 1.28.x)
+**Triage:** patch → v1.45.1 (operator, 2026-11-23); pin target: match the live hub — corrected 2026-11-23 to k3s v1.32.0 + Istio 1.31.x (pin 1.31.4, the first CVE-free 1.31; hub's 1.31.1 to be raised to match)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** pre-existing (istioctl never pinned); exposed by Homebrew upgrading istioctl to 1.32.0 on m2-air 2026-11-12
 **Should have been caught by:** live check (the weekly drill; not run 2026-11-04 → 2026-11-23)
 **Introducing change reviewed:** no
-**Waiting on:** investigation — since 2026-11-23 (istio.io support range for 1.28, then spec)
+**Waiting on:** dispatch — since 2026-11-23 (spec to write)
 **Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause; `CHANGELOG.md:2565` — recurrence: k3s was raised to v1.32.0-k3s1 in July "to satisfy the istioctl precheck floor" (same class)
 **Detected by:** operator, `make dr-drill` on m2-air, 2026-11-23 ~03:55 PST; also explains the failing daily `Hub DR drill freshness` workflow in `wilddog64/k3dm-hub-data` (stale since 2026-11-04 result)
 
@@ -23,9 +23,12 @@
   installs the latest candidate from `istio/istio` `master` (`downloadIstioCandidate.sh`). Same in
   `scripts/lib/foundation/scripts/lib/core.sh:455` (lib-foundation subtree: upstream first).
 - Last good drill 2026-11-04 predates the 2026-11-12 upgrade.
-- Live hub (m2-air, context `k3d-k3d-cluster`, read-only 2026-11-23 by Claude): server `v1.31.5+k3s1`, istiod image
-  `docker.io/istio/pilot:1.28.3`, local kubectl client 1.37. The hub already differs from the template pin (v1.32.0), so a
-  drill does not rebuild what the hub runs today.
+- **Live hub** (m5-air, context `k3d-k3d-cluster`, read-only 2026-11-23 by Claude): server `v1.32.0+k3s1`, istiod
+  `docker.io/istio/pilot:1.31.1`. It matches the template's k3s pin. (Correction: an earlier line here recorded the m2-air
+  cluster, `v1.31.5+k3s1` + Istio 1.28.3, as the hub; that is an older cluster, not the hub. Its Istio 1.28 is past
+  end of life, Jul 1 2026.)
+- istio.io supported-releases, read verbatim 2026-11-23 (no last-updated date on the page): 1.31 → k8s 1.32–1.37,
+  EOL ~Mar 2027, no known CVEs from 1.31.4; 1.32 → k8s 1.33–1.37; 1.28 → 1.30–1.34, EOL Jul 1 2026.
 
 ## Workaround (untested)
 
