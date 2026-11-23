@@ -11,7 +11,7 @@
 **Intent approved:** pending
 **Approval:** operator, 2026-11-23 — preview first: "can we allow print out schedule for confirm before it actually scheduled" (D12)
 **Operator decision pending:** O8 (multi-host lists refused by default).
-**Proofs needed first:** P7 (zone), P8 (Task Scheduler constants for `PlanTask`), P11 (exe location, O7), P4 (O2 answer)
+**Proofs needed first:** P7 (zone), P8 (task XML schema names and UTF-16 file encoding), P11 (exe location, O7), P4 (O2 answer)
 
 ## Scope
 
@@ -20,10 +20,12 @@ All logic in `Dirused.Common`, tested in `Dirused.Tests.Portable` with fakes. Ex
 - §3 time resolution (clock and zone seams; Pacific by Windows or IANA id).
 - §4 scheduling: one read, preview (exact layout), `/confirm` / `/yes` decision, re-check, source-program check (through
   `IPlanFolderSecurity.SourceExeIsProtected`), plan creation (through `IPlanFolderSecurity` and an `IPlanStore` file seam over a real
-  temp dir in tests), `PlanTask` built and passed to `ITaskScheduler.Register`.
-- §7 `/schedule /list` (states 1–10) and `/schedule /cancel` (claim, then delete).
+  temp dir in tests), `PlanTask` built, `TaskXml.Build` written as `task.xml` (UTF-16 LE + BOM), then
+  `ITaskScheduler.Register(task, xmlPath)` on a fake.
+- `TaskXml.Build(PlanTask)` / `TaskXml.Parse(bytes)`: pure; the parent §4.7 field list. Used by M10b3's verify compare.
+- §7 `/schedule /list` (states 1–9) and `/schedule /cancel` (claim, then delete).
 - §8 seams: `ITaskScheduler`, `IPlanFolderSecurity`, `ScheduleCommands.Schedule/List/Cancel`. `RunPlan` is M10b3.
-- Not here: `RealTaskScheduler`, real ACL class, `/runplan`, `Program.cs` wiring.
+- Not here: `SchtasksTaskScheduler` and the process runner, real ACL class, `/runplan`, `Program.cs` wiring.
 
 **Preview id choice:** the id is generated before the preview and shown there; if this invocation registers, that id is used. Not
 "assigned at registration".
@@ -35,7 +37,7 @@ stays `/yes needs /purge /confirm` because `/purge` stays required.
 ## Files
 
 `src/Dirused.Common/ArgParser.cs`, `src/Dirused.Common/Options.cs`, `src/Dirused.Common/Schedule.cs` (new),
-`tests/Dirused.Tests.Portable/ScheduleTests.cs` (new), `tests/Dirused.Tests.Portable/ArgParserTests.cs`,
+`src/Dirused.Common/TaskXml.cs` (new), `tests/Dirused.Tests.Portable/ScheduleTests.cs` (new), `tests/Dirused.Tests.Portable/TaskXmlTests.cs` (new), `tests/Dirused.Tests.Portable/ArgParserTests.cs`,
 `tests/Dirused.Tests.Portable/PurgeListTests.cs`.
 
 ## Contract readers
@@ -60,7 +62,9 @@ must:
   - id: B2-M1
     text: "preview: clock Mon 2026-11-23 21:00 PST, zone Pacific, list of 12 rows totalling 176.2G, '/fromlist l.txt /purge /schedule 22:30' prints the parent §4.2 layout line for line (run in PST and UTC, expiry, list path, count, size, first 12 hex of sha256, the fixed Held line, task path \\dirused\\<SID>\\purge-<id>, plan dir, program copy path), every line <= 80 columns, then 'Preview only. Add /confirm to schedule it.', exit 0"
   - id: B2-M2
-    text: "'/confirm' + answer 'y' (and 'YES'): the same preview, then 'Schedule this? [y/N] ' on stderr, then exactly one Register call whose PlanTask has folder \\dirused\\<SID>\\, name purge-<id> with the id shown in the preview, the SDDL D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA), StartBoundary 2026-11-23T22:30:00-08:00, EndBoundary created+24h, DeleteExpiredTaskAfter P30D, interactive token, LUA, no password, AllowDemandStart false, StartWhenAvailable false, IgnoreNew, PT2H, action <plan dir>\\dirused.exe '/runplan \"<plan dir>\\plan.txt\"'; plan dir holds dirused.exe byte-equal to the fake exe, list.txt byte-equal to the list, plan.txt with every §4.6 field; Secure was recorded before the first file write; exit 0"
+    text: "'/confirm' + answer 'y' (and 'YES'): the same preview, then 'Schedule this? [y/N] ' on stderr, then exactly one Register call on the fake scheduler with name \\dirused\\<SID>\\purge-<id> (the id shown in the preview) and the path <plan dir>\\task.xml; plan dir holds dirused.exe byte-equal to the fake exe, list.txt byte-equal to the list, task.xml, and plan.txt with every §4.6 field; Secure was recorded before the first file write; exit 0"
+  - id: B2-M2X
+    text: "TaskXml.Build for run 2026-11-23T22:30-08:00 (and a PDT case 2026-06-01T22:30-07:00, and a UTC case): bytes start with FF FE; the declaration says UTF-16; parsed back, it has the SecurityDescriptor D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA), one TimeTrigger with StartBoundary carrying that exact offset and EndBoundary = expires, UserId = SID, LogonType InteractiveToken, RunLevel LeastPrivilege, AllowStartOnDemand false, StartWhenAvailable false, MultipleInstancesPolicy IgnoreNew, ExecutionTimeLimit PT2H, DeleteExpiredTaskAfter P30D, Hidden false, Exec Command <plan dir>\\dirused.exe, Arguments '/runplan <id>'; a plan dir path containing a space, '&', a double quote and '<' round-trips exactly through Build then Parse; TaskXml.Parse of Build's output equals the input PlanTask"
   - id: B2-M3
     text: "'/confirm /yes': preview, no question written, no input read, one Register call"
   - id: B2-M4
@@ -68,11 +72,11 @@ must:
   - id: B2-M5
     text: "re-check after the prompt: clock advances past run-2min while the fake reader waits → the 'less than 2 minutes' message, exit 1, no Register, no plan dir; the fake file reader records exactly one read of the list in this run"
   - id: B2-M6
-    text: "every row of the parent §2 table gives its exact error (one test per row, including order: '/schedule /list 22:30' gives row 4, '/runplan p /schedule 22:30' gives row 1); '/fromlist l /purge /schedule 22:30 /yes' gives '/yes needs /purge /confirm'; the new whitelist text appears for '/fromlist l /purge /bogus'; all usage lines <= 80 columns"
+    text: "every row of the parent §2 table gives its exact error (one test per row, including order: '/schedule /list 22:30' gives row 4, '/runplan 20261123-2230-a1b2 /schedule 22:30' gives row 1); '/fromlist l /purge /schedule 22:30 /yes' gives '/yes needs /purge /confirm'; the new whitelist text appears for '/fromlist l /purge /bogus'; all usage lines <= 80 columns"
   - id: B2-M7
     text: "plan creation failures: Secure fails → plan dir removed, exit 3 'error: could not secure plan folder: ...'; a reparse 'plans' dir → exit 3 '... is a link' and nothing written under it; Register fails → plan dir removed, exit 3 'error: could not schedule: ...'; source exe folder writable by others (fake) → exit 1 with the §4.5 message, no plan dir"
   - id: B2-M8
-    text: "/schedule /list over fixture plan dirs shows each state 1-10 of parent §7 in that precedence (fixtures where two conditions hold show the earlier one, e.g. claim=cancel with task Running shows cancelled; claim=run, no report, task missing shows interrupted); 'No scheduled purges.' when the root is missing"
+    text: "/schedule /list over fixture plan dirs shows each state 1-9 of parent §7 in that precedence (fixtures where two conditions hold show the earlier one, e.g. claim=cancel and task missing shows cancelled; claim=run, no report, dead pid, task missing shows interrupted; claim=run, no report, live pid whose image is the plan's dirused.exe shows running, and a live pid with another image shows interrupted); 'No scheduled purges.' when the root is missing"
   - id: B2-M9
     text: "/schedule /cancel <id>: no claim → claim file 'cancel <time>' created, then Delete called, 'Cancelled <id>.', exit 0; claim=run → exit 1 '<id> already started; it cannot be cancelled' and no Delete; claim=cancel → '<id> is already cancelled', exit 0; bad id or missing dir → exit 1 'unknown plan id: <id>'; Delete fails → exit 3 with the 'marked cancelled' message and the claim stays"
   - id: B2-M10
@@ -90,9 +94,9 @@ must_not:
     text: "cancel with claim=run calls Delete. Positive control: cancel without claim calls Delete once. baseline: mutant-only; mutant 'delete before claiming' turns it red"
 evidence:
   - id: E-B2
-    proves: [B2-M1, B2-M2, B2-M3, B2-M4, B2-M5, B2-M6, B2-M7, B2-M8, B2-M9, B2-M10, B2-N1, B2-N2, B2-N3, B2-N4, B2-N5]
+    proves: [B2-M1, B2-M2, B2-M2X, B2-M3, B2-M4, B2-M5, B2-M6, B2-M7, B2-M8, B2-M9, B2-M10, B2-N1, B2-N2, B2-N3, B2-N4, B2-N5]
     kind: offline
-    command: "dotnet test tests/Dirused.Tests.Portable on ubuntu. New tests red on a2d0508. Mutants each red: register before the decision; plan dir created before the decision; re-read the list after the answer; skip the re-check after the answer; PST treated as DST-aware; passed time stays today; 23h45m limit off by one (>=); bare time accepted off Pacific; IANA id not recognised; write files then secure; delete before claiming; list state order swaps cancelled and running; missed computed from task LastRunTime instead of claim; id regenerated at registration; multi-host check skipped; host compared case-sensitively"
+    command: "dotnet test tests/Dirused.Tests.Portable on ubuntu. New tests red on a2d0508. Mutants each red: register before the decision; plan dir created before the decision; re-read the list after the answer; skip the re-check after the answer; PST treated as DST-aware; passed time stays today; 23h45m limit off by one (>=); bare time accepted off Pacific; IANA id not recognised; write files then secure; delete before claiming; list state order swaps cancelled and running; missed computed from task existence instead of the claim; running accepted for any live pid; XML not escaped; StartBoundary written in local time without offset; XML written as UTF-8; id regenerated at registration; multi-host check skipped; host compared case-sensitively"
     intent: "Typing /schedule shows you exactly what would run — when, which list, how many files and how much space — and schedules nothing until you add /confirm and say yes; you can list and cancel plans, and a cancel can never race a run that already started. Each plan targets one server, named in the preview and the list, and you can schedule separate plans for different servers."
 interface:
   - "/schedule <time> [PT|PST|PDT|UTC]"
@@ -116,5 +120,6 @@ interface:
   - "/schedule can only be combined with /fromlist, /purge, /confirm and /yes"
   - "/fromlist can only be combined with /purge, /confirm, /html, /output, /json, /csv, /yes and /schedule"
   - "/runplan cannot be combined with other switches"
-  - "/runplan requires a plan path"
+  - "/runplan requires a plan id"
+  - "TaskXml.Build(PlanTask) / TaskXml.Parse(byte[])"
 ```

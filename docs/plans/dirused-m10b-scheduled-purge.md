@@ -13,7 +13,7 @@ This file is the design all four children build to; each child carries its own A
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (from main a2d0508, v0.0.26 pre-release); children commit to it in order
 **Version:** v0.0.27 (one release after M10b4 lands)
 **Risk:** high — an unattended run deletes files with nobody watching (it never stops a service in M10b)
-**Review:** rev 1 Fable + Astra blind (2026-11-23), Claude adjudicated (table at the end). Rev 2: Fable delta review of the four children before the first dispatch.
+**Review:** rev 1 Fable + Astra blind (2026-11-23), Claude adjudicated (table at the end). Design change 2026-11-23: COM adapter replaced by `schtasks.exe /xml` (section "Why schtasks.exe"). Rev 2: Fable delta review of the four children before the first dispatch.
 **Implementer:** Luna (Codex) for M10b1–M10b3; Flash for M10b4
 **Verifier:** Claude (offline, from each child's Acceptance only). Live checks by the operator on the office jump box.
 **Filed:** 2026-11-23
@@ -87,19 +87,39 @@ unless marked "operator's call".
 
 | # | Question | Who | Gates | How |
 |---|---|---|---|---|
-| P1 | A task registered with the **production settings** fires in the user's **disconnected** RDP session: one-time trigger with an offset `StartBoundary`, `EndBoundary`, `DeleteExpiredTaskAfter P30D`, `AllowDemandStart false`, `StartWhenAvailable false`, `IgnoreNew`, interactive token, LUA, no password, folder `\dirused-probe\<SID>\`. | operator, jump box | b3 | Claude supplies a PowerShell script (COM `Schedule.Service`, same calls as `RealTaskScheduler`) that first creates `%LOCALAPPDATA%\dirused-probe\p1-<stamp>\` and writes to a fresh marker there; disconnect (do not sign out) for 6 min; reconnect; record the marker, the task XML (`schtasks /query /xml` is fine for reading), `Get-ScheduledTaskInfo`, `whoami /groups`. Remove the task and folder. |
-| P2 | A missed run (signed out at the trigger, `StartWhenAvailable false`) never runs at the next logon, and a fired control shows the recorder works. | operator, jump box | b2 (`missed` state), b3 | Two probe tasks from the P1 script: one fires while connected (positive control, marker present); one fires while signed out (marker absent after the next logon). Record `LastRunTime`, `LastTaskResult` for both. |
+| P1 | A task created by `schtasks /create /xml` from dirused's **production XML** fires in the user's **disconnected** RDP session (one-time trigger with offset `StartBoundary`, `EndBoundary`, `DeleteExpiredTaskAfter P30D`, `AllowStartOnDemand false`, `StartWhenAvailable false`, `IgnoreNew`, `InteractiveToken`, `LeastPrivilege`, `UserId` = SID, folder `\dirused-probe\<SID>\`). Quick pre-probe already given to the operator: `\dirused-probe\t1` with `/it /sc once`, read back with `/query /xml`. | operator, jump box | b3 | Claude supplies the XML file and a `.cmd` that first creates `%LOCALAPPDATA%\dirused-probe\p1-<stamp>\` and a fresh marker path; `schtasks /create /tn ... /xml <file>`; disconnect (do not sign out) for 6 min; reconnect; record the marker, `schtasks /query /tn ... /xml`, `whoami /groups`. Remove the task and folder. |
+| P2 | A missed run (signed out at the trigger, `StartWhenAvailable false`) never runs at the next logon, and a fired control shows the recorder works. | operator, jump box | b2 (`missed` state), b3 | Two probe tasks from the P1 script: one fires while connected (positive control, marker present); one fires while signed out (marker absent after the next logon). Record `schtasks /query /tn ... /xml` and the markers for both (no reliance on scheduler last-result: dirused derives `missed` from its own files). |
 | P3 | Under the disconnected task token, at night after an afternoon disconnect, the run can list `\\us03p02ffm01\d$\Tomcat\Tomcat\logs` and the user's effective rights there include delete. | operator, jump box | b3 | Probe task (P1 settings) triggered ≥ 4 h after disconnecting, action `cmd.exe /c "(dir \\us03p02ffm01\d$\Tomcat\Tomcat\logs & icacls \\us03p02ffm01\d$\Tomcat\Tomcat\logs) > <marker> 2>&1"`. Read-only. A create+delete of a probe file on the server is the operator's call and is not required. |
 | P4 | Session survival: disconnected-session and idle limits. | operator, jump box | b2 (O2) | `reg query "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v MaxDisconnectionTime` and `/v MaxIdleTime`; `qwinsta`. |
 | P5 | Night logoffs and reboots: does the jump box reboot or patch at night? | operator, jump box | b3 (interrupted state is real) | `wevtutil qe System /q:"*[System[(EventID=1074 or EventID=6006 or EventID=6008)]]" /c:30 /rd:true /f:text`. Read-only. |
 | P6 | `%LOCALAPPDATA%` is local, and a protected one-ACE DACL with the user as owner holds on a folder the user creates; whether the operator's shell is elevated. | operator, jump box | b3 | `echo %LOCALAPPDATA%`; create `%LOCALAPPDATA%\dirused-probe\p6`; `icacls ... /inheritance:r /grant:r "%USERNAME%":(OI)(CI)F`; `icacls ... /setowner "%USERNAME%"`; read back with `icacls` and PowerShell `(Get-Acl ...).Owner`; `whoami /groups`. Remove it. |
 | P7 | The jump box time zone. | operator, jump box | b2 | `tzutil /g`. |
-| P8 | Task Scheduler facts from Microsoft docs: logon type 3 = interactive token, `TASK_CREATE` = 2, time trigger = 1, `TASK_INSTANCES_IGNORE_NEW` = 2, `TASK_RUNLEVEL_LUA` = 0, `AllowDemandStart` default true, `RegisterTaskDefinition`'s `sddl` parameter, an offset `StartBoundary` is an absolute instant, `SCHED_S_TASK_HAS_NOT_RUN` = 0x41303. | Claude | b2, b3 | Microsoft Learn Task Scheduler 2.0 reference; record each URL and date here. |
-| P9 | A `windows-latest` runner can register, read back and delete an interactive-token task through .NET COM from the published single-file exe. | Claude | b3 (E-B3W) | One throwaway workflow on a scratch dirused branch; record the run URL. If not, E-B3W asserts the definition XML only and says so. |
-| P10 | A standard user can create `\dirused\<SID>\`, register with the explicit SDDL, and a second ordinary account cannot read or change the task. | operator (second account if one exists), jump box | b3 | From the P1 script with the SDDL; from a second account `schtasks /query /tn "\dirused-probe\<SID>\p10"` must be denied. If no second account exists, record the task's security descriptor instead. |
+| P8 | (a) `schtasks /create /xml` accepts a UTF-16 LE file with BOM and `<?xml version="1.0" encoding="UTF-16"?>`; (b) the bytes `schtasks /query /tn ... /xml` writes to a redirected stdout (encoding, BOM or not) so dirused can decode them; (c) the Task Scheduler 1.2 XML schema element names and values used here (`TimeTrigger`, `StartBoundary` with offset is an absolute instant, `EndBoundary`, `LogonType InteractiveToken`, `RunLevel LeastPrivilege`, `AllowStartOnDemand`, `StartWhenAvailable`, `MultipleInstancesPolicy IgnoreNew`, `ExecutionTimeLimit`, `DeleteExpiredTaskAfter`, `Hidden`, `RegistrationInfo/SecurityDescriptor`); (d) `schtasks` exit codes 0 on success, non-zero on failure, and `/create` without `/f` fails when the name exists. | Claude (docs) + operator (a, b, d on the jump box) | b2, b3 | Microsoft Learn schtasks and Task Scheduler schema pages (record URL, date); operator runs the P1 `.cmd` variant that also creates twice without `/f` and saves `/query /xml > q.xml`, then `certutil -dump q.xml` head (first bytes) is pasted. |
+| P9 | A `windows-latest` runner can `schtasks /create /xml`, `/query /xml` and `/delete /f` an interactive-token task in `\dirused-ci\` from the published single-file exe. | Claude | b3 (E-B3W) | One throwaway workflow on a scratch dirused branch; record the run URL. If not, E-B3W asserts the generated XML only and says so. |
+| P10 | A standard user can create `\dirused\<SID>\` with `schtasks /create /xml`; the XML's `RegistrationInfo/SecurityDescriptor` (`D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA)`) is honoured; a second ordinary account cannot read or change the task. | operator (second account if one exists), jump box | b3 | From the P1 `.cmd` with the descriptor; from a second account `schtasks /query /tn "\dirused-probe\<SID>\p10"` must fail. If no second account exists, record the task's security via PowerShell `(Get-ScheduledTask ...).SecurityDescriptor`. If the descriptor is not honoured, the spec falls back to the per-user folder name only and says so. |
+| P12 | `AllowStartOnDemand false` blocks `schtasks /run /tn ...` (expect a non-zero exit and the task not started). | operator, jump box | b3 | On the P1 task before it fires: `schtasks /run /tn ...`; record the exit code (`echo %ERRORLEVEL%`) and that the marker stays absent. |
 | P11 | Where `dirused.exe` lives on the jump box and who can write it and its folder. | operator, jump box | b2 (O7) | `where dirused`; `icacls <exe>`; `icacls <exe folder>`. |
 
 ## Behaviour
+
+### Why schtasks.exe with an XML file (design change 2026-11-23)
+
+Operator asked whether `schtasks` can simplify the COM adapter; Claude recommends it, pending P8–P10 and P12. Plain `schtasks`
+switches cannot express this plan; the XML file can, and `schtasks` only carries it:
+
+| Need | `schtasks /create` switches | `/create /xml <file>` |
+|---|---|---|
+| `EndBoundary` for a `/sc once` task | no (`/ed` is date-only and not for once) | yes |
+| `StartBoundary` with an explicit UTC offset | no (local `/st` `/sd`, locale date format) | yes |
+| `AllowStartOnDemand = false` | no | yes |
+| `StartWhenAvailable = false` (no catch-up) explicitly | no | yes |
+| `DeleteExpiredTaskAfter`, `ExecutionTimeLimit`, `MultipleInstancesPolicy` | no (partial: `/z`, `/du` only with repeats) | yes |
+| locale-independent dates | no (`/sd` follows the regional format) | yes (ISO 8601) |
+| task security descriptor | no | yes (`RegistrationInfo/SecurityDescriptor`, P10) |
+
+Rules: run `%SystemRoot%\System32\schtasks.exe` by absolute path (from `Environment.SystemDirectory`) through `ProcessStartInfo`
+with `ArgumentList`, `UseShellExecute = false`, no shell and no command string. Success or failure comes from the exit code only;
+`schtasks` text output is never parsed (it is localized). The only output read is `/query /xml`, which is XML.
 
 ### 1. Command line
 
@@ -110,7 +130,7 @@ unless marked "operator's call".
 | `dirused /fromlist <list> /purge /schedule <time> [<zone>] /confirm /yes` | Preview, then schedule without asking. |
 | `dirused /schedule /list` | Show every plan and its state. |
 | `dirused /schedule /cancel <id>` | Cancel a plan that has not started. |
-| `dirused /runplan <plan>` | Internal: what the task runs. Not in usage or help; documented in `docs/purge.md`. |
+| `dirused /runplan <id>` | Internal: what the task runs. Not in usage or help; documented in `docs/purge.md`. |
 
 Switch order is free. `/purge` stays required (the existing `/fromlist requires /purge`). `/yes` keeps today's rule and text:
 `/yes needs /purge /confirm` (so `/schedule /yes` without `/confirm` gets that error). This mirrors the `/purge` dry run.
@@ -123,8 +143,8 @@ known or not. These checks run as a **pre-check before both parser branches**, i
 
 | # | Condition | Error |
 |---|---|---|
-| 1 | `runplan` appears more than once, or with any other token except its one path | `/runplan cannot be combined with other switches` |
-| 2 | `runplan` with no following token, or the next token is switch-like | `/runplan requires a plan path` |
+| 1 | `runplan` appears more than once, or with any other token except its one id | `/runplan cannot be combined with other switches` |
+| 2 | `runplan` with no following token, or the next token is switch-like | `/runplan requires a plan id` |
 | 3 | `list` or `cancel` present without `schedule` | `/list and /cancel go with /schedule` |
 | 4 | `schedule` and `list` both present: anything else present (including `cancel`, a time, a second `schedule`) | `/schedule /list cannot be combined with other switches` |
 | 5 | `schedule` and `cancel`: no token after `cancel`, or it is switch-like | `/schedule /cancel requires a plan id` |
@@ -205,7 +225,7 @@ Usage text (`ShortUsageText` and `UsageText`, every line ≤ 80 columns per `Arg
    collision draws a new suffix up to 5 times without touching the existing dir). Before writing anything into it, set owner = the
    current user's SID and a protected DACL with one ACE (current user, FullControl, this folder, subfolders and files); the same on
    `dirused` and `plans` when this run created them. Then write, each with `FileMode.CreateNew`: `dirused.exe` (byte copy of the
-   running exe), `list.txt` (the buffer), and `plan.txt`:
+   running exe), `list.txt` (the buffer), `task.xml` (§4.7) and `plan.txt`:
    ```
    # dirused plan v1
    # id: <id>
@@ -222,24 +242,31 @@ Usage text (`ShortUsageText` and `UsageText`, every line ≤ 80 columns per `Arg
    ```
    Any failure → remove the plan dir, exit 3 `error: could not secure plan folder: <error>` (security or link) or
    `error: could not write plan: <error>` (file writes).
-7. **Register** through `ITaskScheduler`: folder `\dirused\<SID>\` (created if missing), name `purge-<id>`, explicit task security
-   `D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA)` passed as the `sddl` argument, one time trigger at the run instant (`StartBoundary`
-   with offset), `EndBoundary` = expires, `DeleteExpiredTaskAfter = P30D`; principal = current user, interactive token, LUA, no user
-   name or password; settings `AllowDemandStart = false`, `StartWhenAvailable = false`, `MultipleInstances = IgnoreNew`,
-   `ExecutionTimeLimit = PT2H`, `DisallowStartIfOnBatteries = false`, `StopIfGoingOnBatteries = false`, `Enabled = true`; one exec
-   action: `<plan dir>\dirused.exe`, arguments `/runplan "<plan dir>\plan.txt"`, working dir the plan dir. `TASK_CREATE` only.
-   Failure → remove the plan dir, exit 3 `error: could not schedule: <error>`.
+7. **Register** through `ITaskScheduler` (real: `SchtasksTaskScheduler`). `TaskXml.Build(PlanTask)` is a pure function producing a
+   Task Scheduler 1.2 document, written as `task.xml` in UTF-16 LE with BOM (P8a) and `encoding="UTF-16"`:
+   `RegistrationInfo/SecurityDescriptor` `D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA)`; one `TimeTrigger` with `StartBoundary` = run
+   instant with explicit offset and `EndBoundary` = expires; `Principal` `UserId` = current user SID, `LogonType InteractiveToken`,
+   `RunLevel LeastPrivilege`; `Settings` `AllowStartOnDemand false`, `StartWhenAvailable false`, `MultipleInstancesPolicy IgnoreNew`,
+   `ExecutionTimeLimit PT2H` (no service is stopped, so a kill only interrupts deletes and shows as `interrupted`),
+   `DeleteExpiredTaskAfter P30D`, `DisallowStartIfOnBatteries false`, `StopIfGoingOnBatteries false`, `Hidden false`, `Enabled true`;
+   one `Exec` action: `Command` `<plan dir>\dirused.exe`, `Arguments` `/runplan <id>`, `WorkingDirectory` the plan dir. All text is
+   XML-escaped (paths with spaces, `&`, quotes, `<`). Then run `schtasks.exe /create /tn \dirused\<SID>\purge-<id> /xml <plan
+   dir>\task.xml` (no `/f`: an existing name fails). Non-zero exit → remove the plan dir, exit 3
+   `error: could not schedule (schtasks exit <code>)`.
+   **Verify:** run `schtasks.exe /query /tn <name> /xml`, decode per P8b, parse as XML and compare every field above to the intended
+   `PlanTask` (instants compared as instants). Any difference or non-zero exit → `schtasks.exe /delete /tn <name> /f`, remove the plan
+   dir, exit 3 `error: scheduled task does not match the plan (<field>); it was removed`.
 8. Print `Scheduled <id> for <full time>. Check it with: dirused /schedule /list`, exit 0. Purge log
    `schedule <id> run <ISO> files <n> bytes <total>`.
 
-### 5. The scheduled run (`/runplan <plan>`)
+### 5. The scheduled run (`/runplan <id>`)
 
 Checked in this order. "stderr" outcomes print to stderr and the purge log only and write nothing in the plan dir. "report" outcomes
 take the claim (step 6) if not already taken and write `report.txt` atomically.
 
 | # | Check | Outcome |
 |---|---|---|
-| 1 | Plan path, after `Path.GetFullPath`, equals `<root>\<id>\plan.txt` exactly (case-insensitive), `<id>` matches the id regex | stderr `refused: plan is not in the plan folder`, exit 1 |
+| 1 | `<id>` matches `^[0-9]{8}-[0-9]{4}-[0-9a-f]{4}$` and `<root>\<id>\plan.txt` exists (root from `GetFolderPath`, never from an argument) | stderr `refused: not a plan id: <id>`, exit 1 |
 | 2 | The running exe path equals `<root>\<id>\dirused.exe` | stderr `refused: not started from the plan's program copy`, exit 1 |
 | 3 | None of `dirused`, `plans`, `<id>`, `plan.txt`, `list.txt`, `dirused.exe` is a reparse point | stderr `refused: plan folder contains a link`, exit 1 |
 | 4 | `plans` and `<id>` and the three files: owner = current user SID; the dirs' DACLs protected; every ACE on all five is the current user | stderr `refused: plan folder permissions changed`, exit 1 |
@@ -284,8 +311,9 @@ is unchanged; `/schedule /list` then shows `interrupted` (below). No pop-up.
 
 ### 7. `/schedule /list` and `/schedule /cancel`
 
-`/schedule /list` reads each dir under the plan root (no dir → `No scheduled purges.`, exit 0) and the task state from
-`ITaskScheduler.Query`, newest run first: `<id>  <run, Pacific>  <host>  <state>  <n> file(s) <size>  <source file name>` (host from
+`/schedule /list` reads each dir under the plan root (no dir → `No scheduled purges.`, exit 0), newest run first. State comes from
+dirused's own files; the scheduler is asked only whether the task exists (`ITaskScheduler.Exists`, the exit code of
+`schtasks /query /tn <name>`). Row: `<id>  <run, Pacific>  <host>  <state>  <n> file(s) <size>  <source file name>` (host from
 `# host:`). States, first match
 wins:
 
@@ -293,12 +321,11 @@ wins:
 2. `plan.txt` unreadable → `unreadable plan`
 3. `claim` says `cancel` → `cancelled`
 4. `claim` says `run` and `report.txt` present → its `outcome`; for `done` also `result` and `exit`
-5. `claim` says `run`, task state Running → `running`
+5. `claim` says `run`, no report, and the claim's pid is a live process whose image path is `<plan dir>\dirused.exe` → `running`
 6. `claim` says `run`, no report → `interrupted (started <time>, no report) — check the list and the report folder`
-7. no claim, task state Running → `starting`
-8. no claim, now > run + 15 min → `missed (did not run)`
-9. task missing → `task missing`
-10. otherwise `scheduled`
+7. no claim, now > run + 15 min → `missed (did not run)`
+8. `Exists` false (non-zero exit) → `task missing`
+9. otherwise `scheduled`
 
 `/schedule /cancel <id>`: id regex fails or plan dir missing → exit 1 `unknown plan id: <id>`. Path checks 3–4 fail → exit 1
 `refused: plan folder permissions changed`. Create `claim` with `CreateNew`, content `cancel <ISO>`; exists with `run` → exit 1
@@ -309,9 +336,12 @@ M10b.
 
 ### 8. Seams (all logic in `Dirused.Common`)
 
-- `ITaskScheduler`: `Register(PlanTask)` → (ok, error); `Query(id)` → `TaskInfo(State, LastRunTime, LastTaskResult)` or null;
-  `Delete(id)` → (ok, error). `RealTaskScheduler(string rootFolder = "\\dirused")` (Windows): COM `Schedule.Service` through
-  `[ComImport]` or `dynamic`; no NuGet package; never `schtasks.exe` or a command string.
+- `ITaskScheduler`: `Register(PlanTask, xmlPath)` → (ok, error); `Exists(name)` → bool; `Delete(name)` → (ok, error).
+  `SchtasksTaskScheduler(IProcessRunner runner, string rootFolder = "\\dirused")` builds argv only (`/create /tn <name> /xml <path>`,
+  `/query /tn <name> /xml`, `/query /tn <name>`, `/delete /tn <name> /f`) and does the verify compare; `IProcessRunner.Run(exe, argv)`
+  → (exit code, stdout bytes); the real runner is `[SupportedOSPlatform("windows")]`. `TaskXml.Build` and `TaskXml.Parse` are pure.
+  No COM, no NuGet package.
+- Process seam `Func<int, string?> processImagePath` (for `running`).
 - `IPlanFolderSecurity`: `Secure(path)`, `Check(path)` → (ok, reason), `IsReparsePoint(path)`, `SourceExeIsProtected(exe)` →
   (ok, folder). Real one on `DirectorySecurity`/`FileSecurity`, `[SupportedOSPlatform("windows")]`.
 - Clock `Func<DateTimeOffset> now`, machine zone `TimeZoneInfo`, plan root `string`, id suffix `Func<int>`, current exe path
@@ -332,8 +362,8 @@ M10b.
 | Child | Files |
 |---|---|
 | M10b1 | `src/Dirused.Common/PurgeList.cs`, `src/Dirused.Common/Purge.cs`, `tests/Dirused.Tests.Portable/ScheduledEngineTests.cs` (new) |
-| M10b2 | `src/Dirused.Common/ArgParser.cs`, `src/Dirused.Common/Options.cs`, `src/Dirused.Common/Schedule.cs` (new: time, preview, plan store, claim, list, cancel, seams, fakes-free interfaces), `tests/Dirused.Tests.Portable/ScheduleTests.cs` (new), `tests/Dirused.Tests.Portable/ArgParserTests.cs`, `tests/Dirused.Tests.Portable/PurgeListTests.cs` |
-| M10b3 | `src/Dirused.Common/Schedule.cs` (`RunPlan`), `src/Dirused.Common/TaskScheduling.cs` (new, `RealTaskScheduler`), `src/Dirused.Common/PlanFolderSecurity.cs` (new, real), `src/Dirused.Cli/Program.cs`, `tests/Dirused.Tests.Portable/RunPlanTests.cs` (new), `tests/Dirused.Tests/TaskSchedulerWindowsTests.cs` (new), `tests/Dirused.Tests/ProgramScheduleTests.cs` (new) |
+| M10b2 | `src/Dirused.Common/ArgParser.cs`, `src/Dirused.Common/Options.cs`, `src/Dirused.Common/Schedule.cs` (new: time, preview, plan store, claim, list, cancel, seams), `src/Dirused.Common/TaskXml.cs` (new: pure `Build`/`Parse`), `tests/Dirused.Tests.Portable/ScheduleTests.cs` (new), `tests/Dirused.Tests.Portable/TaskXmlTests.cs` (new), `tests/Dirused.Tests.Portable/ArgParserTests.cs`, `tests/Dirused.Tests.Portable/PurgeListTests.cs` |
+| M10b3 | `src/Dirused.Common/Schedule.cs` (`RunPlan`), `src/Dirused.Common/TaskScheduling.cs` (new: `SchtasksTaskScheduler`, `IProcessRunner` and its real runner), `src/Dirused.Common/PlanFolderSecurity.cs` (new, real), `src/Dirused.Cli/Program.cs`, `tests/Dirused.Tests.Portable/RunPlanTests.cs` (new), `tests/Dirused.Tests.Portable/SchtasksTests.cs` (new, fake runner), `tests/Dirused.Tests/TaskSchedulerWindowsTests.cs` (new), `tests/Dirused.Tests/ProgramScheduleTests.cs` (new) |
 | M10b4 | `docs/purge.md`, `README.md`, `CHANGELOG.md` |
 
 ## Contract readers
@@ -350,16 +380,17 @@ M10b.
 - `PurgeList.Read(path)`: callers `Program.cs:70` and tests; behaviour preserved (b1).
 - New status `skipped: held by <service> — scheduled runs do not stop services`: writer `Purge.cs` (b1); readers `docs/purge.md`.
 - Purge log `C:\temp\dirused-purge.log`: new `schedule`, `schedule-cancel`, `runplan` lines; human-read only.
-- On-disk contract `%LOCALAPPDATA%\dirused\plans\<id>\{plan.txt,list.txt,dirused.exe,claim,report.tmp,report.txt}`: writers
+- On-disk contract `%LOCALAPPDATA%\dirused\plans\<id>\{plan.txt,list.txt,dirused.exe,task.xml,claim,report.tmp,report.txt}`: writers
   `Schedule.cs`; readers `RunPlan`, `/schedule /list`, `/schedule /cancel`. Task path `\dirused\<SID>\purge-<id>`: writer and reader
-  `RealTaskScheduler`.
+  `SchtasksTaskScheduler`. Task action argument `/runplan <id>`: writer `TaskXml.Build`; reader `ArgParser` (rule 2).
 
 ## What NOT to Do (every child)
 
 - Do not scan, add patterns, or delete anything not in `list.txt`. Do not read the original list at run time or twice at schedule time.
 - Do not call `IServiceControl` from a scheduled run. Do not relax any identity, size or time check.
-- Do not add a repeat or logon trigger, `StartWhenAvailable = true`, `AllowDemandStart = true`, a stored password, S4U, or run level highest.
-- Do not call `schtasks.exe` or build a command string; do not add a NuGet package.
+- Do not add a repeat or logon trigger, `StartWhenAvailable = true`, `AllowStartOnDemand = true`, a stored password, S4U, or run level highest.
+- Do not run `schtasks.exe` by bare name, through a shell, or with a command string; do not parse its text output; do not pass `/f` to
+  `/create`; do not use COM; do not add a NuGet package.
 - Do not show a message box or toast. Do not write into a plan dir that failed the link or permission checks.
 - Do not modify files outside the child's Files row. Do not push, open a PR, or skip hooks. Leave changes uncommitted. If the sandbox
   cannot restore NuGet or run tests, finish code and tests anyway and say so.
@@ -369,7 +400,7 @@ M10b.
 | Child | must | must_not | evidence |
 |---|---|---|---|
 | M10b1 | B1-M1..M3 | B1-N1..N3 | E-B1 (offline, Portable) |
-| M10b2 | B2-M1..M10 | B2-N1..N5 | E-B2 (offline, Portable) |
+| M10b2 | B2-M1..M10, B2-M2X | B2-N1..N5 | E-B2 (offline, Portable) |
 | M10b3 | B3-M1..M8 | B3-N1..N5 | E-B3 (offline, Portable), E-B3W (offline, windows-latest), E-B3L1 and E-B3L2 (live) |
 | M10b4 | B4-M1 | — | E-B4 (offline) |
 
@@ -403,7 +434,7 @@ Fable (F) and Astra (A) blind reviews of rev 1. Both: NEEDS FIXES. Claude's disp
 | F-B4 / A-B7 E1 not runnable in Portable | Fixed: logic in `Dirused.Common` (`ScheduleCommands`); Windows wiring in b3's Windows tests. §8. |
 | F-B4 Pacific id on Linux | Fixed: either id. §3. |
 | A-B2 plan path not trusted | Fixed: exact path shape, reparse refusal on every component, owner + DACL on dirs and files, `GetFolderPath`, unsafe → stderr only, `CreateNew` collision retry. §4.6, §5.1–5.4, §7. |
-| A-B3 / F-S3 early or late start | Fixed: `AllowDemandStart = false`; refuse outside [run − 1 min, run + 15 min] before the claim. §5.5b. |
+| A-B3 / F-S3 early or late start | Fixed: `AllowStartOnDemand = false`; refuse outside [run − 1 min, run + 15 min] before the claim. §5.5b. |
 | A-B3 digest beside the list | Accepted as a corruption check; trust boundary stated. |
 | A-B5 Tomcat stopped for an ineligible row; window on the local clock | Moot in M10b: no stop (D9). Carried to M10d. |
 | A-B6 task kill strands Tomcat | Moot in M10b (D9); `ExecutionTimeLimit` cut to PT2H; a killed run shows `interrupted`. M10d must solve recovery. |
@@ -413,7 +444,7 @@ Fable (F) and Astra (A) blind reviews of rev 1. Both: NEEDS FIXES. Claude's disp
 | F-S5 / A-S5 missed vs expired order | Fixed: `missed` from "no claim and run + 15 min passed"; `expired` only as a report outcome. §7. |
 | F-S6 plan path checks | Fixed (as A-B2). Owner set to the user SID explicitly. |
 | F-S7 sha256 is corruption-only | Stated in the trust boundary. |
-| F-S8 shared task folder | Fixed: `\dirused\<SID>\` + explicit SDDL; P10. |
+| F-S8 shared task folder | Fixed: `\dirused\<SID>\` + XML security descriptor; P10. |
 | F-S9 / A-S4 parser precedence | Fixed: ordered pre-check table §2. |
 | F-S10 contract readers | Fixed: list above. `/yes` text no longer changes. |
 | F-S11 / A-S6 missing mutants, effect evidence | Added in each child's Acceptance. |
@@ -421,5 +452,5 @@ Fable (F) and Astra (A) blind reviews of rev 1. Both: NEEDS FIXES. Claude's disp
 | F-S13 E2 is an unattended Tomcat stop | Moot (no stop); live checks split attended (E-B3L1) and disconnected (E-B3L2). |
 | F-S14 / A-N2 scope | Fixed: four sequential children. |
 | A-S5 report misses purge-log events; bytes freed undercounts growth | Fixed: report includes this run's purge-log lines. Growth undercount moot (exact match). |
-| F nits (exit codes, folder param, old dirs, update check, id regex, count/size in list) | Exit codes per §5 tables; `RealTaskScheduler(rootFolder)`; old dirs out of scope (noted); no update check (§8); id regex kept lowercase hex; list shows count and size. Console window for an interactive-token task: accepted, noted in docs (b4). |
+| F nits (exit codes, folder param, old dirs, update check, id regex, count/size in list) | Exit codes per §5 tables; `SchtasksTaskScheduler(runner, rootFolder)`; old dirs out of scope (noted); no update check (§8); id regex kept lowercase hex; list shows count and size. Console window for an interactive-token task: accepted, noted in docs (b4). |
 | A-N1 refusal exit codes | Consolidated in the §5 tables. |
