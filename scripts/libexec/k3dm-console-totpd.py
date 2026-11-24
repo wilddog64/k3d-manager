@@ -484,7 +484,7 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
     def sync_lock_deadline(state, now):
         level = state.get("lock_level", 0)
         locked_until = state.get("locked_until", 0)
-        if locked_until <= 0:
+        if locked_until <= 0 or state.get("failures", 0) < 5:
             lock_deadline_mono[0] = None
             deadline_locked_until[0] = locked_until
             return
@@ -509,6 +509,8 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
         if new_level == 0:
             result["locked_until"] = 0
             lock_deadline_mono[0] = None
+        else:
+            result["locked_until"] = until + elapsed_levels * 86400
         return result, new_level != level or (new_level == 0 and until != 0)
 
     if os.path.islink(run_dir):
@@ -931,6 +933,7 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                                     nstate["last_counter"] = matched_counter
                                     nstate["failures"] = 0
                                     nstate["locked_until"] = 0
+                                    nstate["lock_level"] = 0
                                     nstate["enrolled"] = True
                                     try:
                                         fault = getattr(run, "injected_commit_fault", None)
@@ -1116,10 +1119,10 @@ def run(conf_path=DEFAULT_TOTP_CONF, state_dir=DEFAULT_STATE_DIR, run_dir=DEFAUL
                             log_event("state-unavailable")
                         else:
                             locked_until = cur_state.get("locked_until", 0)
-                            failures = cur_state.get("failures", 0)
                             last_counter = cur_state.get("last_counter", 0)
                             sec = cur_state["secret"]
                             cur_state, changed = decay_state(cur_state, t_now)
+                            failures = cur_state.get("failures", 0)
                             if changed:
                                 try:
                                     commit_state(state_dir, state_for_commit(cur_state), fault=getattr(run, "injected_commit_fault", None))

@@ -1790,6 +1790,150 @@ def test_decay_after_full_days(verifier):
     assert set(json.loads(verifier.state.read_text())) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
 
 
+def _verify_wrong(verifier):
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    return receive(client).strip().decode()
+
+
+def test_decay_counts_each_day_once(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall - 86400)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    levels = []
+    for _ in range(3):
+        assert _verify_wrong(verifier) == "NO"
+        current = totpd.load_state(verifier.state_dir)
+        levels.append(current["lock_level"])
+    assert levels == [3, 3, 3]
+    assert current["locked_until"] == state["locked_until"] + 86400
+
+
+def test_decay_keeps_part_day_remainder(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall - 43200)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    verifier.wall += 86400
+    assert _verify_wrong(verifier) == "NO"
+    first = totpd.load_state(verifier.state_dir)
+    assert first["lock_level"] == 3
+    assert first["locked_until"] == state["locked_until"] + 86400
+    verifier.wall += 43200
+    assert _verify_wrong(verifier) == "NO"
+    second = totpd.load_state(verifier.state_dir)
+    assert second["lock_level"] == 2
+    assert second["locked_until"] == state["locked_until"] + 2 * 86400
+    verifier.finish()
+    verifier.start()
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 2
+
+
+def test_decay_spans_several_days(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall - 1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.wall += 3 * 86400
+    verifier.start()
+    current = totpd.load_state(verifier.state_dir)
+    assert current["lock_level"] == 1
+    assert current["locked_until"] == state["locked_until"] + 3 * 86400
+
+
+def test_decay_two_restarts_same_day(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=3, locked_until=verifier.wall - 86401)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    first = totpd.load_state(verifier.state_dir)
+    assert first["lock_level"] == 2
+    first_until = first["locked_until"]
+    assert first_until == state["locked_until"] + 86400
+    verifier.finish()
+    verifier.wall += 100
+    verifier.tick += 100
+    verifier.start()
+    second = totpd.load_state(verifier.state_dir)
+    assert second["lock_level"] == 2
+    assert second["locked_until"] == first_until
+
+
+def test_decay_resets_failures_at_startup(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=3, lock_level=2, locked_until=verifier.wall - 86401)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    current = totpd.load_state(verifier.state_dir)
+    assert (current["lock_level"], current["failures"]) == (1, 0)
+    for index in range(5):
+        assert _verify_wrong(verifier) == "NO"
+    assert _verify_wrong(verifier) == "WAIT 1800"
+
+
+def test_decay_resets_failures_on_request(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=3, lock_level=2, locked_until=verifier.wall + 100)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    verifier.wall += 100 + 86400
+    verifier.tick += 100 + 86400
+    assert _verify_wrong(verifier) == "NO"
+    current = totpd.load_state(verifier.state_dir)
+    assert current["failures"] == 1
+    assert current["lock_level"] == 1
+
+
+def test_no_phantom_lock_after_clock_correction(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=2, lock_level=1, locked_until=verifier.wall + 300)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _verify_wrong(verifier) == "NO"
+    verifier.finish()
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=4, lock_level=1, locked_until=verifier.wall + 300)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _verify_wrong(verifier) == "NO"
+    verifier.finish()
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=1, locked_until=verifier.wall + 300)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _verify_wrong(verifier).startswith("WAIT ")
+
+
+def test_rotate_clears_lock_level(verifier):
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=3, locked_until=verifier.wall + 1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    admin = verifier.connect("admin")
+    admin.sendall(b"ROTATE_BEGIN\n")
+    secret_reply = receive(admin).decode().strip()
+    admin.close()
+    assert secret_reply.startswith("SECRET ")
+    secret = base64.b32decode(secret_reply.split()[1])
+    code = totpd.compute_hotp(secret, int(verifier.wall // 30))
+    admin = verifier.connect("admin")
+    admin.sendall(f"ROTATE_COMMIT {code}\n".encode())
+    assert receive(admin) == b"OK\n"
+    current = json.loads(verifier.state.read_text())
+    assert current["failures"] == current["locked_until"] == 0
+    for index in range(5):
+        assert _verify_wrong(verifier) == "NO"
+    assert _verify_wrong(verifier) == "WAIT 300"
+    assert set(current) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
+
+
 def test_level4_reply(verifier):
     state = totpd.load_state(verifier.state_dir)
     state.update(failures=5, lock_level=4, locked_until=verifier.wall + 86400)
