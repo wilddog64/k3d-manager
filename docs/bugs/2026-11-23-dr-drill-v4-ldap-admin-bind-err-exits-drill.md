@@ -1,11 +1,11 @@
 # Bug: dr-drill dies silently at V4 — restored LDAP rejects the admin password and `_err` exits the drill
 
-**Status:** OPEN — defect 2 LANDED `da956fbd` (2026-11-23, Sonnet acceptance verify pass x2; E4 live pending); defect 1 waiting on spec (operator chose option a)
+**Status:** OPEN — defect 2 LANDED `da956fbd` (2026-11-23, Sonnet acceptance verify pass x2; E4 live pending); defect 1 spec written `docs/plans/v1.45.1-dr-drill-v4-ldap-resync.md` (intent approval and pre-dispatch probe pending)
 **Priority:** P2 (proposed) — the DR drill cannot pass, so there is no current restore proof; no workaround
 **Introduced by:** unknown (the `_err` inside `hub_data_verify_ldap`; last full drill pass 2026-11-04)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** investigation — since 2026-11-23 (defect 1 read-only inventory check before its spec)
+**Waiting on:** operator decision — since 2026-11-24 (defect 1 intents and the drill-cluster repoint probe)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -139,3 +139,12 @@ Claude's recommendation: (a). First check, read-only, whether the export already
 ## Operator decisions (2026-11-23)
 
 - Defect 1: option (a), restore the `openldap-admin` Secret from the export (Claude's recommendation, accepted). Spec for defect 1 follows after a read-only inventory check; it dispatches after the defect 2 task lands (same file).
+
+## Defect 1 inventory result (read-only, Claude, 2026-11-24)
+
+The export holds no Kubernetes Secrets (three PVC tarballs plus `inventory.json`), so option (a) cannot restore the
+Secret literally. It does not need to: `openldap-admin` is an ExternalSecret from Vault `ldap/openldap-admin`, and the
+restored Vault holds the backup's password. On the kept cluster, ESO last synced at 13:30:16Z (the drill's fresh Vault)
+and has been `SecretSyncedError` since the 13:47:59Z restore. SecretStore `vault-kv-store` is `InvalidProviderConfig`,
+because the restored Vault's `auth/kubernetes/config` names the real hub. `hub_recover` repoints it (step 6); the drill
+does not. Spec: `docs/plans/v1.45.1-dr-drill-v4-ldap-resync.md` (repoint, force-sync, restart openldap after unseal).
