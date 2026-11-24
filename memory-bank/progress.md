@@ -38,6 +38,7 @@
 - **2026-11-24 dirused:** b3a LANDED `f4c117e` (verifier PASS 17/17 mutants; correction 1 = verifier tests; land used --allow-out-of-scope for the correction-added test file, spec Files updated); windows CI 45502759684 green. Probe script moved to dirused `tools/m10b3-probes.ps1` (`3fab789`). Owner check: the Administrators-owned files came from an elevated window (High Mandatory Level), not a spec change; normal-window re-check pending. Cleanup-race flake recurred (run 45503227379, rerun green).
 - **2026-11-24 dirused P9 PASS** (Actions run 45510934313, scratch branch deleted): create/query-xml/delete OK, second create without /f exit 1, /run exit 1 (AllowStartOnDemand false), descriptor reads back verbatim; readback omits default settings and is single-byte text, TaskXml.Parse accepts it (Claude local). Default-owner check PASS from a normal window (Administrators owner came from an elevated window). b3b dispatched to Luna (`dirused-m10b3b-schtasks`); b3c waits on b3a+b3b only.
 - **2026-11-24 dirused:** b3b LANDED `d539912` (verifier PASS, 10/10 mutants, correction 1 = verifier tests; --allow-out-of-scope for the correction file). b3c dispatched to Luna (`dirused-m10b3c-windows`): gates met (b3a, b3b, P6, P9).
+- **2026-11-24:** two ideas rows added to docs/ideas.md for Sunday groom: independent second plan (Argon writes its own plan for large designs), cap spec review at 2 rounds. b3c correction 1 (trust store refuses junctions, spec rev 2) running with Luna; b3b windows CI green (run 45512746865).
 
 ## v1.45.0 status (compressed 2026-11-22)
 
