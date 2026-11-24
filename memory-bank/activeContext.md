@@ -36,6 +36,8 @@ state-U pytest procs clear on reboot.
 
 - **2026-11-24 dirused:** M10b2a LANDED `cf07ace` on `m10b-scheduled-purge` (verifier round 1 FAIL: DTD mutant green + `$` anchors → correction 1 → PASS); windows CI run 45455761460 pending. M10b1: correction 1 added scheduled tests; mutants d, e red; mutant a HANGS a test → correction 2 (fast-fail fakes) running. Stale v1.45.1 headers fixed `ad8b862f`.
 
+- **2026-11-24 dirused:** M10b1 LANDED `e19783f` (Sonnet verifier PASS, 10 mutants red); M10b2a windows CI green (attempt 2; P3 flake captured `docs/bugs/2026-11-24-dirused-root-shared-open-cleanup-race.md`). Integration branch tip e19783f; CI 45456774994 running. Next: M10b2 rev 3 Fable + Argon reviews → dispatch Luna.
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.

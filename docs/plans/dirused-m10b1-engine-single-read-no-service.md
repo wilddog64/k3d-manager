@@ -1,6 +1,6 @@
 # dirused M10b1: purge engine — one-read list parse and a scheduled mode that stops no service
 
-**Status:** OPEN — SPEC rev 4, 2026-11-24; intents approved; Fable + Argon blind reviews of rev 3 applied (table at end)
+**Status:** LANDED — `e19783f` on `m10b-scheduled-purge` (2026-11-24); 2 corrections (missing scheduled tests; a mutant hung a test); independent Sonnet verifier PASS, 10 mutants red; E-B1W windows CI run 45456774994 pending
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) (design, decisions D9 and D11, review adjudication). First of four sequential children.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (integration branch for M10b1–M10b4, created from `main` `966b32b`, v0.0.27; one PR to main at the end)

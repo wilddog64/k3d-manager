@@ -1,6 +1,6 @@
 # dirused M10b2: `/schedule /confirm` with plan files, trust check, `/schedule /list` and `/cancel` (with fakes)
 
-**Status:** OPEN — SPEC rev 3, 2026-11-24; intents approved; starts after M10b1 and M10b2a land; Fable + Argon blind reviews before dispatch
+**Status:** OPEN — SPEC rev 3, 2026-11-24; intents approved; M10b1 (`e19783f`) and M10b2a (`cf07ace`) landed; Fable + Argon blind reviews running
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) §2 (rows 1–6), §4, §7, §8 and D14. Builds on [M10b0](dirused-m10b0-schedule-preview-only.md)
 (preview, live-verified in v0.0.27), [M10b1](dirused-m10b1-engine-single-read-no-service.md) (`PurgeList.Parse(bytes)`) and
