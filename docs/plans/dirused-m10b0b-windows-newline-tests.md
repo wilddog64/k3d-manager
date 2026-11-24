@@ -1,6 +1,6 @@
 # dirused M10b0b: ScheduleTests use one newline convention (Windows CI)
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24
+**Status:** LANDED — merged in dirused PR #40 (`966b32b`), v0.0.27, 2026-11-24
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b0a](dirused-m10b0a-pr40-fixes.md) (landed `c6283a2` on `m10b0-schedule-preview`, PR #40). Test-only.
 **Repo / branch:** wilddog64/dirused / `m10b0-schedule-preview` (tip `c6283a2`)

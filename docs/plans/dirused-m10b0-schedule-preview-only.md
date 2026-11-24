@@ -1,6 +1,6 @@
 # dirused M10b0: `/schedule` preview only (demo build, nothing is scheduled)
 
-**Status:** OPEN — implemented c8520de, dirused PR #40 (2026-11-24); verify pass, offline_tested; Argon PR review and live E-B0L pending
+**Status:** LANDED — dirused PR #40 merged `966b32b` (c8520de + M10b0a c6283a2 + M10b0b 8a4eb86), tag v0.0.27, 2026-11-24; live E-B0L pending (operator, jump box)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) §1–§3 and §4.1–§4.3 (preview subset). Ships before M10b1–M10b4; M10b2 builds on it.
 **Repo / branch:** wilddog64/dirused / `m10b0-schedule-preview` from `main` (`a2d0508`)
