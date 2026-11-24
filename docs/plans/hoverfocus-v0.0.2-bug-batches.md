@@ -50,8 +50,8 @@ Outputs:
    address/search field on activation, L2 adds a per-app fallback: set `kAXMainAttribute` on the target window via AX
    **without** activating the app, and see whether that gives key focus with no raise. Otherwise apps that raise go to a
    documented default `ignoreApps` list.
-2. README "Tested apps" table (focused / raised per app, macOS version, date), written by Flash in F1's README section,
-   or a follow-up docs batch if F1 has already landed. F1 owns `README.md` for v0.0.2. Claude's interim Safari note
+2. README "Tested apps" table (focused / raised per app, macOS version, date): a docs batch after P1 runs (F1 rev 3
+   defers it, since there is no data yet; F1 carries only the Safari "can raise" Known-limitations line). F1 owns `README.md` for v0.0.2. Claude's interim Safari note
    (`dc68692`) went to `m1-base` by mistake. That branch was already merged as v0.0.1, so the note does not reach
    `v0.0.2`; F1 carries the corrected wording instead ("can raise", not "raises").
 3. The operator E-L checks for L2 repeat the matrix rows. A must_not for L2: TextEdit and iTerm2 still focus with no raise.

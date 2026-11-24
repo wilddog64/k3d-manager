@@ -1,8 +1,8 @@
 # hoverfocus v0.0.2 F1 — install: wait for unload, detect a non-GUI session, safe paths, re-grant hint
 
-**Status:** spec rev 2 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 6 should-fix, 4 nits; all applied, Claude
-reproduced the plutil blocker and the vacuous grep); not dispatched (GUI `managername` capture, operator intent approval
-and go)
+**Status:** spec rev 3 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 6 should-fix, 4 nits; all applied) and rev 2
+(2026-11-24, NEEDS FIXES: 1 blocker (SwiftPM nested sandbox), 4 should-fix, 3 nits; all applied); GUI `managername`
+gate closed; not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.2-bug-batches.md`](hoverfocus-v0.0.2-bug-batches.md) (batch F1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.2` (cut from `main` at `d426f18`, tag `v0.0.1`)
@@ -31,16 +31,18 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
 - `launchctl print gui/<uid>/<label>` → rc **113** when the service is not loaded, rc **0** when loaded
   (`com.apple.Finder`).
 - `launchctl managername` over SSH → `Background`, rc 0 (matches the m2 report in the B3 doc).
-- Not yet captured: the value in a GUI Terminal session (expected `Aqua`, the same word as `LimitLoadToSessionType`).
-  If it differs, every GUI install would skip bootstrap with rc 0. **Dispatch gate:** the operator captures
-  `launchctl managername` in a GUI Terminal on m2 (read-only) before F1 is dispatched, and the value is recorded here
-  (Fable 15).
+- GUI Terminal session: `launchctl managername` → `Aqua` (operator on m2, macOS 26, 2026-11-24, while debugging the
+  B3 error 5: "it show aqua"). Dispatch gate (Fable 15) closed.
 - Whether `bootout` returns before the job is fully gone is not proven; the wait below is defensive and costs one
   `print` call when `bootout` is synchronous.
 
 ## Before You Start
 
-1. `git log --oneline -1` shows `d426f18`; `bash tests/install_test.sh` passes (under the sandbox profile below).
+1. `git log --oneline -1` shows `d426f18`. On `d426f18`, `bash tests/install_test.sh` under the sandbox profile fails at
+   `make bundle` → `swift build -c release` (`sandbox_apply: Operation not permitted`: SwiftPM's own sandbox cannot
+   nest inside `sandbox-exec`; Fable 2026-11-24). Behaviour 8 adds `SWIFT_BUILD_FLAGS`; every test command in this spec
+   runs as `SWIFT_BUILD_FLAGS=--disable-sandbox bash tests/install_test.sh` under the profile. Never run it without the
+   profile; the baseline is CI green on `d426f18` (v0.0.1 PR #1), so start with Behaviour 8 and then run the test.
 2. Read `Makefile`, `tests/install_test.sh`, `packaging/com.wilddog64.hoverfocus.plist.tmpl`, `README.md`.
 3. Do not edit any file outside `## Files`.
 
@@ -71,7 +73,7 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
    (the plist path single-quoted, since `AGENTDIR` may contain spaces)
 
    (the first line may fail harmlessly when nothing is loaded) and exits 0. Uninstall does the same check: in a
-   non-`Aqua` session it removes the files, skips `bootout` and prints the `asuser … bootout` line. Neither target runs
+   non-`Aqua` session it removes the files, skips `bootout` and prints the `asuser … bootout` line to stderr. Neither target runs
    `sudo`.
 3. **Wait for unload (B3 part 1).** In an `Aqua` session, after `bootout` (failure ignored), poll
    `$$LAUNCHCTL print gui/<uid>/com.wilddog64.hoverfocus` until it exits non-zero, sleeping 0.1 s between tries, at
@@ -99,12 +101,15 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
    Add a stub `sudo` in `$root/bin` (first on `PATH`) that appends to `$root/sudo.log` and exits 97; every case asserts
    `sudo.log` is absent or empty (Fable 12: hosted runners have passwordless sudo, and the sandbox profile is local
    only). Replace the fixed-line-number log checks with order checks over the bootout/print/bootstrap lines that
-   ignore `managername` lines. New cases, each with its own scratch state reset:
+   ignore `managername` lines. Each case writes `$root/managername` and `$root/print_loaded` **before** taking its
+   snapshot, and the snapshot comparison excludes `launchctl.log` and `sudo.log` (today it excludes only
+   `launchctl.log`, `install_test.sh:38`). New cases, each with its own scratch state reset:
    - **wait:** `print_loaded=3` → log has `bootout …`, then 4 `print` calls, then `bootstrap gui/<uid> <plist>`;
    - **timeout:** `print_loaded=1000`, `BOOTOUT_WAIT_TRIES=3` → install exits non-zero, stderr has `still loaded`,
      no `bootstrap` in the log;
    - **SSH session:** `managername=Background` → install rc 0, bundle and plist exist, no `bootout`/`bootstrap` in the
-     log, stderr has `sudo launchctl asuser <uid> launchctl bootstrap gui/<uid> <plist>` with the real plist path;
+     log, stderr has `sudo launchctl asuser <uid> launchctl bootstrap gui/<uid> '<plist>'` with the real plist path,
+     single-quoted as Behaviour 2 prints it;
      uninstall in the same state removes both files, logs no `bootout`, prints the `asuser … bootout` line;
    - **odd path:** `APPDIR="$root/home/Apps & Co|x <y> 'z'"`, created **before** the case's snapshot (install
      `mkdir -p`s it and uninstall leaves the directory, as in v0.0.1) → install rc 0; `plutil -lint` passes on the
@@ -112,15 +117,23 @@ Captured read-only by Claude on m4-air, macOS 26.5.2, over SSH, 2026-11-23:
      ProgramArguments.0 raw` equals `$APPDIR/HoverFocus.app/Contents/MacOS/hoverfocus` exactly; `grep -c __PROGRAM__`
      on the installed plist is 0; the bundle exists at that path; uninstall removes it and the snapshot check holds.
      The default-path case asserts the same count and no `__PROGRAM__`;
-   - **hint:** the default (ad-hoc) install output has `tccutil reset Accessibility com.wilddog64.hoverfocus`. The
+   - **hint:** run with `CODESIGN_IDENTITY=-` passed explicitly (`Makefile:4` is `?=` and yields to the environment);
+     the install output has `tccutil reset Accessibility com.wilddog64.hoverfocus`. The
      named-identity branch is not run (CI has no signing identity and `bundle` would fail); it is checked by code
      reading.
 6. **README.** Installation: the SSH case and the printed `asuser` commands; re-installing is safe (waits for the old
    agent). Granting Accessibility: grant in System Settings or via the menu; HoverFocus notices within a few seconds
-   (L1); after a rebuild of an ad-hoc build run the `tccutil reset` line. Known limitations: keep the ad-hoc line.
+   (L1); after a rebuild of an ad-hoc build run the `tccutil reset` line. Known limitations: keep the ad-hoc line, and
+   add: `Some apps can raise their own window when they receive focus (seen with Safari on macOS 26). Add such apps to
+   ignoreApps (bundle IDs), for example "ignoreApps": ["com.apple.Safari"].` The Tested-apps table from the parent
+   plan's P1 matrix is **deferred** to a docs batch after P1 runs (no data yet).
 7. **`docs/config.md:6`** (L1 contract reader): replace "keeps the defaults, reports the error … and continues
    running" with: on an invalid file HoverFocus shows `Error: config <reason>` and stops focusing until a valid file
    is loaded with Reload Config.
+
+8. **`SWIFT_BUILD_FLAGS`.** `SWIFT_BUILD_FLAGS ?=` (empty default) and the `build` recipe becomes
+   `swift build -c release $(SWIFT_BUILD_FLAGS)`. CI and normal installs are unchanged; the sandboxed test run sets
+   `--disable-sandbox`.
 
 **Land order:** L1 and F1 both land on `v0.0.2` before the release PR to `main`; the README and `docs/config.md` text
 describe L1's behaviour, so `v0.0.2` is not merged with F1 alone. Test runtime: each `make install` re-runs `bundle`
@@ -130,7 +143,7 @@ describe L1's behaviour, so `v0.0.2` is not merged with F1 alone. Test runtime: 
 
 | File | Change |
 |---|---|
-| `Makefile` | Behaviour 1-4 |
+| `Makefile` | Behaviour 1-4, 8 |
 | `tests/install_test.sh` | Behaviour 5 |
 | `README.md` | Behaviour 6 |
 | `docs/config.md` | Behaviour 7 (one sentence) |
@@ -140,6 +153,8 @@ describe L1's behaviour, so `v0.0.2` is not merged with F1 alone. Test runtime: 
 - `LAUNCHCTL`, `APPDIR`, `AGENTDIR` (writer: Makefile defaults, operator overrides): readers `tests/install_test.sh`,
   `.github/workflows/ci.yml` (runs the test, no overrides), README. Now exported to the recipe environment.
 - New `BOOTOUT_WAIT_TRIES` (writer: Makefile default 50): reader `tests/install_test.sh` (timeout case).
+- New `SWIFT_BUILD_FLAGS` (writer: Makefile default empty; the operator or worker environment): reader the `build`
+  recipe only. `.github/workflows/ci.yml` does not set it.
 - LaunchAgent label `com.wilddog64.hoverfocus` and plist path: unchanged; readers `make uninstall`, README, the printed
   `asuser` commands.
 - `packaging/com.wilddog64.hoverfocus.plist.tmpl` `__PROGRAM__`: was read by `sed` in `Makefile:37`; after this change
@@ -175,17 +190,17 @@ must_not:
   - id: F1-N4
     text: "regression guard (already green on v0.0.1): install or uninstall touches any path outside APPDIR and AGENTDIR (paired: the expected files appear and disappear under the scratch root)"
   - id: F1-N5
-    text: "the installed plist keeps __PROGRAM__ or has more than one ProgramArguments entry (paired: ProgramArguments.0 equals the installed binary path)"
+    text: "regression guard (already green on v0.0.1, whose sed leaves one element): the installed plist keeps __PROGRAM__ or has more than one ProgramArguments entry (paired: ProgramArguments.0 equals the installed binary path)"
 evidence:
   - id: F1-E1
     proves: [F1-M1, F1-N1, F1-N4]
     kind: offline
-    command: "bash tests/install_test.sh rc 0 under the sandbox profile, showing the wait, timeout and v0.0.1 snapshot checks. Red controls, each restored byte-identical: remove the print poll loop (v0.0.1 behaviour) — the wait case fails; make the loop ignore BOOTOUT_WAIT_TRIES exhaustion and bootstrap anyway — the timeout case fails; hard-code the plist destination to $$HOME/outside in the install recipe — the snapshot or expected-path check fails"
+    command: "SWIFT_BUILD_FLAGS=--disable-sandbox bash tests/install_test.sh rc 0 under the sandbox profile, showing the wait, timeout and v0.0.1 snapshot checks. Red controls, each restored byte-identical: remove the print poll loop (v0.0.1 behaviour) — the wait case fails; make the loop ignore BOOTOUT_WAIT_TRIES exhaustion and bootstrap anyway — the timeout case fails; hard-code the plist destination to $$HOME/outside in the install recipe — the snapshot or expected-path check fails"
     intent: "make install while the app is running waits for the old copy to stop before starting the new one, so error 5 no longer happens."
   - id: F1-E2
     proves: [F1-M2, F1-N2]
     kind: offline
-    command: "same run: SSH-session case passes. Red controls: remove the managername check (v0.0.1 behaviour) — the SSH case fails because bootout/bootstrap are logged; change the printed bootstrap line to drop asuser — the stderr check fails; add a real `sudo true` line to the install recipe — the sudo.log check fails. grep -nw sudo Makefile shows sudo only inside echo/printf strings (not git grep -E '\\b', which matched nothing on macOS; Fable 11)"
+    command: "same run: SSH-session case passes. Red controls: remove the managername check (v0.0.1 behaviour) — the SSH case fails because bootout/bootstrap are logged; change the printed bootstrap line to drop asuser — the stderr check fails; add a `-sudo true` line to the install recipe (the `-` keeps make going past the stub's exit 97, so the test reaches the sudo.log assertion instead of stopping under `set -e`) — the sudo.log check fails. grep -nw sudo Makefile shows sudo only inside echo/printf strings (not git grep -E '\\b', which matched nothing on macOS; Fable 11)"
     intent: "make install over SSH or in an SSH-started tmux copies the app and prints the exact commands to run instead of failing."
   - id: F1-E3
     proves: [F1-M3, F1-N3, F1-N5]

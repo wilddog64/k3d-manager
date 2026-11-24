@@ -1,7 +1,7 @@
 # hoverfocus v0.0.2 L1 — reload fails closed; watch Accessibility trust without a menu click
 
-**Status:** spec rev 2 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 3 should-fix, 4 nits; all applied, Claude
-verified the blocker); not dispatched (operator intent approval and go)
+**Status:** spec rev 3 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 3 should-fix, 4 nits; all applied) and rev 2
+(2026-11-24, NEEDS FIXES: 1 blocker (SwiftPM nested sandbox), 2 should-fix, 1 nit; all applied); not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.2-bug-batches.md`](hoverfocus-v0.0.2-bug-batches.md) (batch L1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.2` (cut from `main` at `d426f18`, tag `v0.0.1`)
@@ -22,7 +22,10 @@ v0.0.2")
 
 ## Before You Start
 
-1. `git log --oneline -1` shows `d426f18`; `swift build` and `swift run hoverfocus-selftest` pass.
+1. `git log --oneline -1` shows `d426f18`; `swift build --disable-sandbox` and
+   `swift run --disable-sandbox hoverfocus-selftest` pass (59 passed on `d426f18` under the sandbox profile, Fable
+   2026-11-24). SwiftPM's own sandbox cannot nest inside `sandbox-exec` (`sandbox_apply: Operation not permitted`), so
+   every `swift build`/`swift run` in this spec carries `--disable-sandbox`.
 2. Read `Sources/HoverFocusCore/Interface.swift` (`FocusControlling`, `Config`, `ConfigError`, `ControllerError`),
    `Sources/hoverfocus/AppDelegate.swift` and `Sources/hoverfocus-selftest/main.swift`.
 3. Do not edit `Interface.swift`, `Package.swift`, `Controller.swift`, `CSkyLight/*`, `MenuModel.swift`, `main.swift`
@@ -50,6 +53,9 @@ AppKit work (menu, icon, timers) and calls the coordinator.
    }
    ```
 
+   - **Initial state** after `init`: `config = Config()`, `configError = nil`, `startError = nil`,
+     `watchingTrust = false`; `init` calls nothing on the controller. `AppDelegate` now builds the controller with
+     `Config()` (today `AppDelegate.swift:31` builds it from the loaded config) and then calls `coordinator.load(...)`.
    - `load(.failure(e))`: `configError = e`; `controller.stop()`; `config` unchanged (the last valid one, so the menu
      checkmarks stay meaningful); **no** `apply`, **no** `start`. Then `watchingTrust = !isTrusted()`.
    - `load(.success(c))`: `config = c`, `configError = nil`, `controller.apply(c)`, then `tryStart()`. Then
@@ -87,6 +93,7 @@ AppKit work (menu, icon, timers) and calls the coordinator.
    throw or no-op; keeps `isRunning` (`start` when running is a no-op, as in `HoverFocusController`), and throws a
    settable `ControllerError?` from `start`. A settable `trusted` flag feeds
    `isTrusted`. Cases, each a named `check`:
+   - Every case below builds a **fresh** `AppCoordinator` and a fresh fake controller; call counts are per case.
    - **A1 fails closed:** load valid `Config(dwellMs: 200)` (trusted) → running; then `load(.failure(.invalid(...)))`
      → `stop` recorded, `isRunning == false`, no `apply` after the failure, `config.dwellMs == 200`, `configError`
      set.
@@ -125,7 +132,8 @@ seen without a relaunch, L1's trust watch is replaced by a documented kickstart 
 
 - No edit outside `## Files`. No new dependency, no distributed-notification observer (polling is the chosen
   mechanism: provable offline and cheap at 2 s).
-- Do not launch the app with a window server session; use `swift run hoverfocus-selftest` and the CLI flags.
+- Do not launch the app with a window server session; use `swift run --disable-sandbox hoverfocus-selftest` and the
+  CLI flags.
 - Run every command under
   `sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/sudo") (literal "/bin/launchctl"))'`.
 
@@ -145,12 +153,12 @@ must_not:
   - id: L1-N2
     text: "trust granted in System Settings goes unnoticed until restart or a menu click (paired: trust already granted at load does not watch)"
   - id: L1-N3
-    text: "trust granted while a config error is showing starts the controller (paired: the same grant with a valid config starts it)"
+    text: "regression guard (already green on v0.0.1, startController returns on configError at AppDelegate.swift:122-124): trust granted while a config error is showing starts the controller (paired: the same grant with a valid config starts it)"
 evidence:
   - id: L1-E1
     proves: [L1-M1, L1-N1]
     kind: offline
-    command: "swift build; swift run hoverfocus-selftest rc 0 with the A1 fails-closed, A1 recovers and positive-control checks named in the output or counted. Red control, restored byte-identical: make load(.failure) set config = Config() and call controller.apply(config) without stop (the v0.0.1 behaviour) — the fails-closed checks fail, the positive control still passes"
+    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with the A1 fails-closed, A1 recovers and positive-control checks named in the output or counted. Red control, restored byte-identical: make load(.failure) set config = Config() and call controller.apply(config) without stop (the v0.0.1 behaviour) — the fails-closed checks fail, the positive control still passes"
     intent: "A broken config file stops focus-follows-mouse instead of quietly running with default settings; fixing the file and reloading starts it again."
   - id: L1-E2
     proves: [L1-M2, L1-N2, L1-N3]
