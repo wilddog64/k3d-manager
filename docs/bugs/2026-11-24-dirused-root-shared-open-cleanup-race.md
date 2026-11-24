@@ -28,3 +28,9 @@ completes, which can be after `finally` starts `Directory.Delete(dir, true)`.
 
 Test-only: in that test's `finally`, retry `Directory.Delete(dir, true)` on `IOException` a few times with a short sleep (for
 example 5 × 100 ms), or use the suite's scratch-cleanup helper if one exists with retry. No product change.
+
+## Recurrence
+
+- 2026-11-24, run 45503227379 (push, `3fab789` on `m10b-scheduled-purge`, adds only `tools/m10b3-probes.ps1`), job `windows`,
+  attempt 1: same test, same `IOException` from the `finally` `Directory.Delete` (`ProgramPurgeTests.cs:131`); assertions passed.
+  Attempt 2 (`gh run rerun --failed`) green. Second occurrence in one day on commits that cannot affect it.

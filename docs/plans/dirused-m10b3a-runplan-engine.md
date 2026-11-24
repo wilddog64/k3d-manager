@@ -1,6 +1,6 @@
 # dirused M10b3a: the `/runplan` engine (`PlanRunner`), portable, with fakes
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon blind reviews
+**Status:** LANDED — `f4c117e` on `m10b-scheduled-purge` (2026-11-24); verifier PASS (all items, 17/17 mutants), correction 1 landed the verifier's tests as `RunPlanAcceptanceTests.cs`; Claude mutants red; windows CI run 45502759684 green (windows + portable)
 (both READY WITH FIXES, both: split); review fixes applied (adjudication in M10b3)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b3](dirused-m10b3-runplan-windows.md); design [M10b](dirused-m10b-scheduled-purge.md) §5, §6, D14; shared contract
