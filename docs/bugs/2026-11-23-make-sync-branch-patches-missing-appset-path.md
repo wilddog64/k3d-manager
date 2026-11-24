@@ -31,6 +31,15 @@ Stop hard-coding the index. Either find the `git` generator whose `directories` 
 `K3D_MANAGER_BRANCH=$(BRANCH)` and apply it through the existing deploy path. Refresh the Applications by label or by the
 appset's owner reference instead of a hard-coded name list. Add a test.
 
+## Files
+
+| File | Change |
+|---|---|
+| `Makefile` | `sync-branch` and `sync-main` only: patch path found by content, refresh by the appset's generated Applications |
+| `scripts/tests/bin/make_sync_branch.bats` | new: E1, with a kubectl stub and the rendered-template fixtures (see Clarification) |
+
+Read only: `scripts/etc/argocd/applicationsets/services-git.yaml`.
+
 ## Acceptance
 
 ```yaml
