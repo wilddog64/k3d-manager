@@ -5,7 +5,7 @@
 **Introduced by:** `f1dca6e8` (v1.45.1 totp-a1, escalating lock; unreleased, on the open release branch)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (intent approval for the fix spec; Fable review running)
+**Waiting on:** fix running — since 2026-11-23
 **Triage:** patch → v1.45.1, before the release PR (operator, 2026-11-23: "go for it")
 **Fix spec:** [`docs/plans/v1.45.1-totp-a1-fix-decay-and-rotate.md`](../plans/v1.45.1-totp-a1-fix-decay-and-rotate.md)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: m4 kube context missing); parent [`2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md`](2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md) is the spec these violate, not a duplicate
