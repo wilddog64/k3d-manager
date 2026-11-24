@@ -109,3 +109,155 @@ interface:
   - "<id> already started; it cannot be cancelled" / "<id> is already cancelled" / "Cancelled <id>."
   - "error: could not cancel <id>: <error>" / "error: could not delete task for <id>: <error>; the plan is marked cancelled and will not run"
 ```
+
+## Shared contract (copied from the parent, rev 5, for the worker; the parent file is not in the dirused repo)
+
+Already in the repo from earlier children: `src/Dirused.Common/ScheduleSeams.cs`, `PlanTrust.cs`, `TrustCommands.cs` (b2c, `e7970ff`)
+and the shared fakes `tests/Dirused.Tests.Portable/ScheduleFakes.cs` (`StockSystemDrive()`, `JumpBoxProfile()`). b2c's T-M3 refusal
+lines are asserted in `tests/Dirused.Tests.Portable/PlanTrustTests.cs`. Read those files; do not redefine their types.
+
+## Shared contract
+
+#### Interfaces (`src/Dirused.Common/ScheduleSeams.cs`, written by b2c; every member below, nothing more)
+
+```csharp
+public sealed record SeamResult(bool Ok, string? Error = null);
+
+[Flags] public enum WriteRights { None = 0, Write = 1, Append = 2, Delete = 4, DeleteChild = 8, WriteDac = 16, WriteOwner = 32, GenericWrite = 64, GenericAll = 128 }
+public sealed record AclEntry(string Sid, string Display, WriteRights Rights, bool InheritOnly, bool Allow);
+public sealed record AclRead(bool Ok, bool Missing, string? OwnerSid, string? OwnerDisplay, IReadOnlyList<AclEntry> Entries, string? Error);
+public sealed record TrustedAccount(string Sid, string Display);
+public enum TokenLevel { Medium, High }
+
+public interface IPlanStore                     // paths: absolute Windows paths built by string joins with "\\"
+{
+    bool Exists(string path);                   // file or directory
+    bool IsReparsePoint(string path);           // false when missing
+    SeamResult CreateDirectory(string path);    // fails when it already exists (CreateNew semantics)
+    SeamResult WriteNew(string path, byte[] bytes); // FileMode.CreateNew
+    byte[]? ReadAll(string path);               // null when missing or unreadable
+    IReadOnlyList<string> ListDirectoryNames(string path); // empty when missing
+    SeamResult DeleteTree(string path);
+    SeamResult AppendLog(string line);          // one purge-log line, without newline
+}
+public interface IPlanFolderSecurity
+{
+    SeamResult Secure(string path, string userSid);  // owner = user; protected DACL, one ACE: user FullControl, OI CI
+    AclRead ReadAcl(string path);                    // Missing = true and Ok = false when the path does not exist
+}
+public interface ITaskScheduler
+{
+    SeamResult Register(string taskName, string xmlPath, PlanTask expected); // real (M10b3): create, read back, verify; on failure Error is the text printed after "error: "
+    bool Exists(string taskName);
+    SeamResult Delete(string taskName);              // already gone counts as Ok
+}
+public interface ITrustStore
+{
+    IReadOnlyList<TrustedAccount> Load();            // empty when no file
+    SeamResult Add(TrustedAccount account);
+    SeamResult Remove(string sid);
+}
+public interface IAccountResolver { TrustedAccount? Resolve(string nameOrSid); }
+
+public sealed record ScheduleSeams(
+    Func<DateTimeOffset> Now, TimeZoneInfo Local, string PlanRoot, string UserSid, string ExePath, string ToolVersion,
+    Func<int> IdSuffix, TokenLevel Token, IPlanStore Store, IPlanFolderSecurity Security, ITaskScheduler Scheduler,
+    ITrustStore Trust, IAccountResolver Accounts, Func<int, string?> ProcessImagePath);
+
+public sealed record ScheduleRequest(Options Options, byte[] ListBytes, string ListPathAsTyped, string ListFullPath);
+```
+
+#### Ids, names and times
+
+- `created` = `Now()` truncated to whole seconds (TaskXml.Build refuses sub-second values). `expires` = `created + 24 h`.
+- `created`, `run` and `expires` are converted to Pacific time (`TimeZoneInfo.ConvertTime` with the Pacific zone, so the offset is
+  `-08:00` or `-07:00`) before they build `PlanTask` or are written to `plan.txt` or the purge log. (`Schedule.TryRunTime` returns
+  `run` with offset `+00:00`.)
+- Id = run instant in Pacific as `yyyyMMdd-HHmm`, `-`, then `(IdSuffix() & 0xFFFF)` as 4 lower-case hex digits; matches
+  `\A[0-9]{8}-[0-9]{4}-[0-9a-f]{4}\z`. The preview draws the suffix once; registration uses that id unless `CreateDirectory` of the plan dir
+  fails because it exists, in which case a new suffix is drawn (at most 5 draws in total); `id`, plan dir, task name and `PlanTask`
+  all take the new id, and the printed `Scheduled <id>` shows it.
+- Task name `\dirused\<UserSid>\purge-<id>`, always built from `ScheduleSeams.UserSid` and the id (b2e builds it the same way). Plan dir `<PlanRoot>\<id>`. Program `<plan dir>\dirused.exe`.
+- `PlanTask` for TaskXml: `Id`, `Run`, `Expires`, `UserSid`, `PlanDir`, `Description` = `dirused scheduled purge <id> (<n> file(s), <size>) from <source file name>`.
+- `<total>` / `<total logical bytes>` = decimal integer sum of the rows' `LogicalBytes`; `<size>` = `Format.Size(<total>)`; `<source
+  file name>` = the last non-empty `\`-separated segment of `ListFullPath`.
+
+#### `plan.txt` (UTF-8 without BOM, lines end with `"\n"` written explicitly)
+
+```
+# dirused plan v1
+# id: <id>
+# created: <created, yyyy-MM-ddTHH:mm:sszzz>
+# run: <run, same format>
+# expires: <expires, same format>
+# tool: <ToolVersion>
+# exe-sha256: <lower-case hex of dirused.exe as written>
+# list-sha256: <lower-case hex of ListBytes>
+# files: <n>
+# bytes: <total logical bytes>
+# host: <host>
+# source: <ListFullPath>
+# trusted: <every SID in the trust store when scheduled, sorted ordinal, joined by ","> | none
+```
+
+#### Trust rules (D14 as revised by the rev 3 reviews)
+
+- **Paths.** The exe path and the plan root must start with a drive letter and `:\` (`^[A-Za-z]:\\`), else exit 1
+  `/schedule: dirused.exe must be on a local drive to schedule (<path>)` or `/schedule: the plan folder must be on a local drive (<path>)`.
+  Paths are split on `\` as strings, never with `System.IO.Path` (tests run on macOS and Linux too). Normalisation: repeated `\`
+  collapse to one; a trailing `\` is removed except on a drive root, which is written `X:\`. M10b3's real seam also refuses network,
+  mapped and subst drives (DriveType check); the pure check sees only the string. SIDs compare ordinal ignore-case.
+- **Leaves** (all write rights count): the exe file, the exe's folder, `<PlanRoot>`'s parent (`...\dirused`) and `<PlanRoot>`.
+  **Ancestors** (only rights that can rename, delete or take over an existing child count: `Delete`, `DeleteChild`, `WriteDac`,
+  `WriteOwner`, `GenericAll`): every other folder from the exe's folder and from `<PlanRoot>`'s parent up to the drive root,
+  de-duplicated case-insensitively. Order: exe, exe folder, its ancestors upward, then `...\dirused`, `<PlanRoot>`, then the remaining
+  ancestors of `...\dirused` upward. A path that is both a leaf and an ancestor is a leaf.
+- **Allowed writers:** the user, `S-1-5-18` SYSTEM, `S-1-5-32-544` Administrators, `S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464`
+  TrustedInstaller, and every SID in the trust store; `S-1-3-0` CREATOR OWNER only on ACL entries (never as an owner).
+- **Per path:** a reparse point (`IsReparsePoint`) → exit 1 `/schedule: <path> is a link; dirused does not schedule through links`.
+  `ReadAcl` with `Missing` → allowed only for `...\dirused` and `<PlanRoot>` (this run creates and secures them); any other missing
+  path or any `Ok = false` → exit 1 `/schedule: cannot read permissions of <path>: <error or "not found">`. Deny entries and
+  **inherit-only entries of any SID** are ignored (the inherited copy appears on the child's own DACL, which is checked). An owner not
+  in the allowed writers counts as an entry with `WriteDac` and the right text `owner`.
+- **Broad groups are never trusted:** `S-1-1-0` Everyone, `S-1-2-0` LOCAL, `S-1-5-2` NETWORK, `S-1-5-4` INTERACTIVE, `S-1-5-7`
+  ANONYMOUS, `S-1-5-11` Authenticated Users, `S-1-5-13` Terminal Server Users, `S-1-5-14` Remote Interactive Logon, `S-1-5-15` This
+  Organization, `S-1-15-2-1` All Application Packages, `S-1-5-32-545` Users, `S-1-5-32-546` Guests, `S-1-5-32-555` Remote Desktop
+  Users, and any SID matching `\AS-1-5-21-[0-9-]+-(513|514|515)\z` (Domain Users, Domain Guests, Domain Computers). `/schedule /trust` refuses them; a refusal caused by
+  one prints the IT line instead of the `/trust` line.
+- **Findings** merge per (path, SID): the union of that SID's counted rights on that path, plus `owner` when it is the untrusted
+  owner. Order: shallowest path first (fewest `\` segments), then `PathsToCheck` order, then SID ordinal. On ancestors only counted
+  rights print. `GenericAll` prints only `full control`. A reparse or read failure stops the check at that path; it is the only line,
+  and `ReadAcl` is not called on a link.
+- **Refusal text** (first finding), exit 1, nothing created:
+  ```
+  /schedule: <path> can be changed by <display> (<rights>).
+    If you trust this account, run once: dirused /schedule /trust "<account>"
+    also: <path> by <display>                      (one line per further untrusted path/account pair)
+  ```
+  where `<rights>` is the matching rights in this order and wording, comma-separated: `full control`, `write`, `append`, `delete`,
+  `delete child`, `change permissions`, `take ownership`, `generic write`, `owner`; `<account>` is the display name, or the SID when
+  the display is `unresolved account <sid>`. For a broad group the second line is
+  `  This group is too wide to trust; ask IT to remove this permission or move dirused.exe.`
+- **Residual accepted:** an account trusted by the user can also write `trust.txt` in the user's profile; trusting is a statement
+  that the account already controls the profile (parent D14 rationale).
+
+#### Exact strings used by more than one child
+
+`Preview only. Add /confirm to schedule it.` · `Schedule this? [y/N] ` (stderr, no newline) · `Not scheduled.` ·
+`Scheduled <id> for <run as on the preview Run line, without the relative part>. Check it with: dirused /schedule /list` (e.g. `Scheduled 20261123-2230-a1b2 for Mon 2026-11-23 22:30 PST (06:30 UTC Tue). Check it with: dirused /schedule /list`) ·
+`/schedule: run from a normal (not elevated) window` · `/schedule: fix the list first; nothing was scheduled` ·
+`error: could not secure plan folder: <error>` · `error: could not write plan: <error>` · `error: <Register error>` ·
+purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `schedule-cancel <id>`.
+
+#### `claim` and `report.txt` (writer M10b3 `/runplan`; reader b2e)
+
+`claim` (UTF-8, one line): `run <yyyy-MM-ddTHH:mm:sszzz> pid <n>` or `cancel <yyyy-MM-ddTHH:mm:sszzz>`, written with `WriteNew`.
+`report.txt` header lines `# outcome: <text>` (parent §6: `done`, `expired`, `refused: <reason>`, shown verbatim) and, for `done`,
+`# result: <text>` and `# exit: <n>`. Readers tolerate `\r\n` and a missing final newline.
+
+#### Notes for M10b3's real seams
+
+- `WriteRights` from a Windows ACE: `FullControl` → `GenericAll`; `Modify` → `Write | Append | Delete`; `Delete`, `DeleteSubdirectoriesAndFiles`,
+  `ChangePermissions`, `TakeOwnership`, `WriteData`/`CreateFiles`, `AppendData`/`CreateDirectories` map to their bits; generic-write
+  ACEs → `GenericWrite` plus the bits they imply.
+
