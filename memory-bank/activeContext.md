@@ -32,6 +32,8 @@ gap → commit in worktree → land → record verify → push. Landed today: to
 Groom folded into Sunday 2026-11-29. Leftover: 6 root-owned `k3s-*/logs/*-browser-*.log` (~880M, need sudo); two
 state-U pytest procs clear on reboot.
 
+- **2026-11-24 dirused M10b1–4:** M10b1 rev 4 and M10b2a rev 2 (TaskXml, split from M10b2) reviewed blind by Fable + Argon (null-control held-skip blocker, UTF-16 declaration case, readback defaults, DTD) and fixed (`e303be3e`). Integration branch `m10b-scheduled-purge` from 966b32b pushed. Dispatched: `dirused-m10b1-engine` (Luna), `dirused-m10b2a-taskxml` (Flash, agy). M10b2 rev 3 written (D14 trust check), reviews after M10b1/M10b2a land. Next: M10b3 jump-box probe script (P2, P3, P8, P10, P12).
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
