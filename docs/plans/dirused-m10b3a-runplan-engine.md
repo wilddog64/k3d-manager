@@ -131,7 +131,8 @@ shows `interrupted`). `stdout` gets nothing.
 
 ## Files
 
-New: `src/Dirused.Common/PlanRunner.cs`, `tests/Dirused.Tests.Portable/RunPlanTests.cs` (with its own in-memory `IPlanStore` and
+New: `src/Dirused.Common/PlanRunner.cs`, `tests/Dirused.Tests.Portable/RunPlanAcceptanceTests.cs` (correction 1: the verifier's
+acceptance tests, verbatim), `tests/Dirused.Tests.Portable/RunPlanTests.cs` (with its own in-memory `IPlanStore` and
 `IPurgeFileSystem` fakes, or reuse `ScheduledEngineTests.cs`'s pattern by copying, not by editing that file).
 Changed: `src/Dirused.Common/ScheduleSeams.cs` (one default member), `src/Dirused.Common/PurgeList.cs` (`ToResults`),
 `src/Dirused.Cli/Program.cs` (line 197 only: call `PurgeList.ToResults`).
