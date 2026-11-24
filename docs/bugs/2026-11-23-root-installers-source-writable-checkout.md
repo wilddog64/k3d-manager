@@ -5,7 +5,7 @@
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-23 (P12 probe: `tty` on both hosts)
+**Waiting on:** fix running — since 2026-11-23 (children A and C dispatched to Luna; B after totp-b tip, D after A-C)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
