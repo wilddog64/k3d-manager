@@ -1,11 +1,11 @@
 # Bug: console TOTP gate: flat silent lockout allows slow brute force and operator lockout; world-writable socket
 
-**Status:** OPEN — spec rev 4 (Fable + Argon review applied; pending operator intent approval for new items)
+**Status:** LANDED — children A1 `f1dca6e8`, A2 `93ecfb83`, B `d6e1e7a6`, C `c507cfd7`, A1 fix `b1c99eb7` on `k3d-manager-v1.45.1` (2026-11-23); rev 4 intents approved by the operator 2026-11-23; header corrected 2026-11-24
 **Priority:** P2
 **Introduced by:** v1.45.0 web-console plan C (`1026dbe2`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (intent approval of the rev 4 items listed under Acceptance, and the `**Approval:**` exception; A1 and A2 wait)
+**Waiting on:** live check — since 2026-11-23 (after promote: `make install-web-console-sshd` / `-totp` on the hub, lockout and recovery-code checks)
 **Approval:** operator, 2026-11-23 (approved) — exception to "X.Y.N is bug-fix only": recovery codes (B8) are a feature-shaped addition in a patch release. Justified because the escalating lock this patch adds (24 h at level 4, operator Q3) makes the existing lockout worse for an operator travelling with an iPad only, and recovery codes are the no-root way back in.
 **Triage:** patch → v1.45.1 (security and DR release); metrics, alerts and socket mode split to follow-ups (see Follow-ups)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match

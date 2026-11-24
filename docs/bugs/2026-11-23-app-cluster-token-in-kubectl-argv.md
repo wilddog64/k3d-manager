@@ -1,11 +1,11 @@
 # Bug: app-cluster bearer token passed in kubectl argv by the CVE scan and verifier
 
-**Status:** OPEN — spec rev 2 (Fable rev 1: NEEDS FIXES, 2 blockers, 6 should-fix, 2 nits; all applied)
+**Status:** LANDED — `4b831c81` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier pass after correction); header corrected 2026-11-24 (was stale "intent approval")
 **Priority:** P2
 **Introduced by:** pre-existing in `cve-remediation-verify.sh:9-11` (not in the v1.45.0 diff); `app-cve-scan.sh:149-160` unknown (file rewritten in plan 2e)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (intent approval)
+**Waiting on:** live check — since 2026-11-23 (E9: Claude reads app-cve-scan and cve-remediation-verify job logs on the hub after a promote)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "distribute tasks across flash and luna")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
