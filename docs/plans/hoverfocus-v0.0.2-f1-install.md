@@ -239,3 +239,6 @@ interface: "adds BOOTOUT_WAIT_TRIES; exports APPDIR, AGENTDIR, LAUNCHCTL to reci
   is not loaded" and the two `sudo launchctl asuser 501 … bootout/bootstrap` lines; the running agent was not touched
   (pid 27445, `state = running`). **F1-EL SSH half: pass for "prints the commands and starts nothing".** Pending: the
   operator runs the two printed sudo commands (sudo password) and the agent reloads from the new bundle.
+- 2026-11-24 04:35 PST, m2: operator ran the two printed `sudo launchctl asuser 501 … bootout` / `… bootstrap` commands
+  from the SSH session; Claude read back: new pid 31857 started 04:35:03 (was 27445) from the bundle installed 04:16,
+  `state = running`, `last exit code = (never exited)`. **F1-EL: PASS (GUI half and SSH half).**
