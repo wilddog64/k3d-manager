@@ -39,6 +39,7 @@
 - **2026-11-24 dirused P9 PASS** (Actions run 45510934313, scratch branch deleted): create/query-xml/delete OK, second create without /f exit 1, /run exit 1 (AllowStartOnDemand false), descriptor reads back verbatim; readback omits default settings and is single-byte text, TaskXml.Parse accepts it (Claude local). Default-owner check PASS from a normal window (Administrators owner came from an elevated window). b3b dispatched to Luna (`dirused-m10b3b-schtasks`); b3c waits on b3a+b3b only.
 - **2026-11-24 dirused:** b3b LANDED `d539912` (verifier PASS, 10/10 mutants, correction 1 = verifier tests; --allow-out-of-scope for the correction file). b3c dispatched to Luna (`dirused-m10b3c-windows`): gates met (b3a, b3b, P6, P9).
 - **2026-11-24:** two ideas rows added to docs/ideas.md for Sunday groom: independent second plan (Argon writes its own plan for large designs), cap spec review at 2 rounds. b3c correction 1 (trust store refuses junctions, spec rev 2) running with Luna; b3b windows CI green (run 45512746865).
+- **2026-11-24:** b3c windows CI run 45514086420 red (elevated runner: trust.txt owned by Administrators, Load rejects); spec rev 3 (Save sets trust.tmp owner to the user), correction 2 running with Luna. Ideas row added: hybrid prior-art search (tsvector + RRF), from a reader comment.
 
 ## v1.45.0 status (compressed 2026-11-22)
 
