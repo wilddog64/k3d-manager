@@ -1,6 +1,6 @@
 # dirused M10b2b: parser rows for /list, /cancel, /runplan, /trust, /untrust; usage lines; size-line wording
 
-**Status:** LANDED — `6542862` on `m10b-scheduled-purge` (2026-11-24); Sonnet verifier PASS, correction 1 strengthened 3 tests; Windows mutant proof run 45461565040; E-PW landed-commit CI run 45462979677 pending
+**Status:** LANDED — `6542862` on `m10b-scheduled-purge` (2026-11-24); Sonnet verifier PASS, correction 1 strengthened 3 tests; Windows mutant proof run 45461565040; E-PW landed-commit CI run 45462979677 green (windows + portable)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4); design [M10b](dirused-m10b-scheduled-purge.md) §2.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (tip `e19783f`)
