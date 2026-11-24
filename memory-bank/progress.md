@@ -144,3 +144,4 @@
 - 2026-11-23: istioctl-b blocker → operator chose (a). Spec docs/plans/v1.45.1-istioctl-a2-lib-foundation-split.md (behaviour-preserving split of _install_istioctl to ≤8 ifs/function, characterization tests, no gate change); lib-foundation release/v0.5.9 cut from main ac67873 and pushed; part B repointed to v0.5.9. Waiting: operator intent approval for A2 (E1–E3); dispatch when a WIP slot frees (3/3).
 - 2026-11-23: A2 approved, intents E1–E3 approved by operator; waits for a WIP slot (no WIP exception given).
 - 2026-11-23: m4-air istioctl upgraded 1.30.0 → 1.31.4 (sha256 verified against spec pin) by operator via Claude script; no longer refused by the istioctl-a 1.31.x gate.
+- 2026-11-24: r2-a correction 3 dispatched (operator approved); Fable bootstrap design review approved as pre-land gate.
