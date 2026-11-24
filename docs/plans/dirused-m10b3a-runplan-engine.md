@@ -98,7 +98,8 @@ localNow: null, sleep: null, input: TextReader.Null, inputRedirected: true, yes:
 - `E`: a `StringWriter { NewLine = "\n" }` whose text is copied line by line to `stderr` and to the captured stderr lines after `Apply`
   returns.
 - Exit: `run.ServiceStartFailed` → 3; `run.Failed > 0` or `run.NotAttempted > 0` → 3; else 0 (as `RunFromList`, with no list errors).
-- An exception thrown by `Apply` or by building the report → report `refused: error during run: <exception message>`, exit 3.
+- An exception that escapes `Apply` (per-file I/O exceptions do not: `Purge` turns them into `failed: <message>` rows) or building the
+  report → report `refused: error during run: <exception message>`, exit 3.
 
 **Never:** call `IServiceControl` (there is none in `RunPlanSeams`); read the `# source:` path; read `list.txt` or `plan.txt` twice;
 call `s.Scheduler`; call `s.Store.DeleteTree` on `<planDir>` or `<PlanRoot>`.
@@ -169,7 +170,7 @@ must:
   - id: B3a-M6
     text: "an AppendLog that fails on the first delete line: that file is not deleted (the fake records UnmarkDelete or no delete), its status is 'failed: log write failed', the report outcome is done with exit 3"
   - id: B3a-M7
-    text: "an IPurgeFileSystem that throws from Open: report '# outcome: refused: error during run: <message>', exit 3"
+    text: "an r.UtcNow that throws (Purge swallows per-file Open/Stat/ResolveRoot exceptions into row statuses, so they are not this case): report '# outcome: refused: error during run: <message>', exit 3"
 must_not:
   - id: B3a-N1
     text: "RunPlan deletes a listed row whose size, last-write or file ID differs from the list. Positive control: the matching row in the same run is deleted. baseline: mutant-only (PlanRunner absent at ab98677); mutant 'PlanRunner copies size, LastWriteUtc and FileId from r.Fs.Stat into the rows before Apply' turns it red"
