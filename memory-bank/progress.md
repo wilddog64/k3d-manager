@@ -125,3 +125,4 @@
 - 2026-11-23: v1.45.0 merged (PR #164, 0c27b830), tagged v1.45.0, GitHub release created, enforce_admins restored, next branch k3d-manager-v1.45.1, retro written.
 - 2026-11-23: v1.45.1 mode-label landed 9f953c0b, totp-a2 landed 93ecfb83, both verify pass; live checks (L1, L2) pending after promote.
 - 2026-11-23: CI-red Linux test fix 7a84f90d landed; awaiting green CI then hub promote.
+- 2026-11-24 00:4xZ: hub-deploy 948e5e7..5162281 ok (reapply, appsets-check, platform-ops, exporter). Mode-label L1 config half PASS (live CM == repo@5162281e); screenshot pending. Preflight-rename and continuation-prompts dispatches exited; Sonnet verifiers running.

@@ -1,11 +1,11 @@
 # Bug: agent dashboard mode labels are unclear and differ per agent ("print" for agy, "exec" for codex)
 
-**Status:** LANDED — `9f953c0b` on k3d-manager-v1.45.1 (2026-11-23), Sonnet acceptance verify pass; L1 live pending after promote; was: OPEN
+**Status:** LANDED — `9f953c0b` on k3d-manager-v1.45.1 (2026-11-23), Sonnet acceptance verify pass; L1 config half PASS on deploy/hub 5162281 (live ConfigMap `monitoring/grafana-dashboard-agent-activity` equals the repo at 5162281e, four renameByRegex transforms present, old titles gone; Claude, kubectl read-only, 2026-11-24); operator screenshot of the legends pending; was: OPEN
 **Priority:** P3 — cosmetic; the operator had to ask what "print" meant
 **Introduced by:** unknown (the agy mode split in `bin/k3dm-dispatch-metrics`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-23
+**Waiting on:** live check — since 2026-11-23 (operator screenshot of the four mode panels)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "change print to headless session", then "or make them look the same", "consistency across vendor model")
 **Intent approved:** operator, 2026-11-23
 **Approval note:** "approve your intents", given after the E1, E2 and L1 intents for the cross-vendor version were shown
