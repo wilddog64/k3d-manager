@@ -3,7 +3,7 @@
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
 
 **1. HoverFocus (repo `~/src/gitrepo/personal/hoverfocus`)**
-- 2026-11-24 status: L1 landed `e4a7d51` + verified; F1 verify running, then land; then operator installs on m2 and runs L1-EL/F1-EL + P1 app matrix.
+- 2026-11-24 status: L1 `e4a7d51` and F1 `42273f0` landed + verified on v0.0.2; then operator installs on m2 and runs L1-EL/F1-EL + P1 app matrix.
 - v0.0.1 SHIPPED: PR #1 merged `d426f18` (14:09Z), enforce_admins back on, tag `v0.0.1` + GitHub release with limitations.
 - v0.0.2 plan: `docs/plans/hoverfocus-v0.0.2-bug-batches.md` — L1 Luna (`AppDelegate.swift`: reload fails open + watch
   trust without menu click), F1 Flash (Makefile/install_test/README: error-37 race, SSH `asuser` hint, sed/XML escaping,
