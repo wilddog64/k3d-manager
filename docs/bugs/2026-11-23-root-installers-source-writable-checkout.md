@@ -1,6 +1,6 @@
 # Bug: root installers source libraries from the operator-writable checkout
 
-**Status:** OPEN — children A `ff3e6cf9` and C `5d9e6410` LANDED; B landing; D (docs) dispatching (2026-11-24)
+**Status:** OPEN — children A `ff3e6cf9`, B `901329af` and C `5d9e6410` LANDED; D (docs) verified, landing (2026-11-24)
 **Priority:** P2 (operator, 2026-11-23: doc + bug, does not block v1.45.0)
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review

@@ -188,6 +188,28 @@ unless marked "operator's call".
     nothing and creates no plan folder; the positive control is a fake medium token that proceeds.
 
 
+**2026-11-24, jump box (operator screenshots, morning PT):**
+
+- **P1: PASS (quick-task form).** `\dirused-probe\t1` (`/it /sc once /st 23:00`) shows Last Run Time `11/23/2026 11:00:00 PM`,
+  Last Result `0`, Logon Mode `Interactive only`. The operator's RDP session was disconnected (not signed out) from leaving
+  the office on 11-23 until the next morning. So an interactive-token task fires in a disconnected session. The production-XML
+  variant (offset `StartBoundary`, `EndBoundary`, folder per SID) is still checked by the P8/P10/P12 script.
+- **P4: no policy limit.** `reg query "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"` `/v MaxDisconnectionTime`
+  and `/v MaxIdleTime` both return "unable to find the specified registry key or value". The session survived overnight
+  disconnected, which agrees. The HKCU policy and the RDP-Tcp listener values were not read; the overnight survival is the
+  practical answer for O2.
+- **P5: patch reboots only, in the afternoon.** The last 30 System events 1074/6006/6008 show restarts on 2026-11-05 at
+  22:45Z and 22:48Z (14:45 PT), both `NT AUTHORITY\SYSTEM` via TrustedInstaller/svchost, "Operating System: Upgrade
+  (Planned)" and "Service pack (Planned)". No unexpected-shutdown (6008) event. A reboot signs the session out, so a run
+  planned across a patch reboot is `missed`; the `interrupted` state stays for a reboot during a run.
+- **P6, first half:** `%LOCALAPPDATA%` is local (operator). The shell is not elevated by default; the operator can elevate
+  with `gsudo`, which dirused must not need (scheduling stays a standard-user action).
+- **P7:** `tzutil /g` → `Pacific Standard Time`.
+- **Profile-root grants stay (operator, 2026-11-24).** The second named domain account is the company sysadmin; the operator
+  will not remove its grant. O7 is reopened (see Open decisions). The unresolved SID is unexplained.
+- **M9b E2 (the y path) is deferred** until the operator has demoed dirused to the team and they want it; M10b's live check
+  waits with it.
+
 ## Behaviour
 
 ### Why schtasks.exe with an XML file (design change 2026-11-23)
@@ -505,7 +527,7 @@ named mutant that turns it red. Listed: B2-N1, B2-N3, B2-N5, B3-N2, B3-N3, B3-N5
 | O3 | Refuse a list older than N hours at schedule time? | No age check; the exact identity, size and time match at run time skips anything that changed. |
 | O6 | The preview shows no held rows because scheduling touches no server. Do a read-only held check (stat + service query on the server) at preview time to list rows that will be skipped? | No: scheduling stays server-free; the report shows the skipped rows. |
 | O8 | A list whose paths span more than one host: refuse, or schedule it as one plan touching several nodes? (Coordinator suggested O6; O6 was already the held-check question.) | Refuse with the §4.1 message, so each plan is one node. |
-| O7 | Refuse to schedule when `dirused.exe` sits in a folder other users can change (P11)? | Refuse (§4.5). |
+| O7 | Refuse to schedule when `dirused.exe`, the plan, or any parent folder up to the volume root can be changed by an account other than the user, SYSTEM or Administrators (P11)? **Reopened 2026-11-24:** the profile root grants full control to the company sysadmin account (kept, operator) and an unresolved SID, so the default refuses on the jump box. | Proposed: refuse unless every such account is named once at `/schedule` (`/trust <account>`, recorded in the plan and re-checked at run time); an unresolved SID can be trusted only by its literal SID. Awaiting operator. |
 
 Resolved in rev 2: O1 (held files are always skipped, D9), O4 (`/confirm` is the schedule switch, D12), O5 (the task runs the program
 copy, so a self-update does not affect a scheduled run).
