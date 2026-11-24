@@ -22,6 +22,17 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "agent dispatch dashboard: no panel has the old human continuation title" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
+assert all(p["title"]!="Human continuation prompts" for p in panels)
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
 @test "agent dispatch dashboard: verification ladder contract" {
   run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "${BATS_TEST_DIRNAME}/../../../docs/guides/grafana-dashboards/k3dm-agent-dispatch.md" "$BASELINE_FIXTURE" <<'PY'
 import json, re, sys
@@ -65,7 +76,7 @@ old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
 assert set(new) == set(old) | {123,124} | set(range(125,134))
 assert new[123]["title"] == "Unreported coordinator share"
-for panel_id in old.keys() - {105, 12, 103, 9}:
+for panel_id in old.keys() - {105, 12, 103, 9, 85}:
     assert old[panel_id] == new[panel_id], panel_id
 print("ok: verification ladder contract; other panels unchanged")
 PY
@@ -274,7 +285,8 @@ per=panels["Per spec"]
 assert any("k3dm_dispatch_task_post_exit_land_seconds" in t["expr"] for t in per["targets"])
 assert any(p["title"]=="Time to land" for p in d["panels"])
 assert "k3dm_dispatch_post_exit_land_minutes_per_landed" in panels["Final worker exit → land"]["targets"][0]["expr"]
-human=panels["Human continuation prompts"]
+human=panels["Coordinator → agent prompts"]
+assert human["id"]==85
 assert any("k3dm_dispatch_intervention_tracking_tasks" in t["expr"] for t in human["targets"])
 assert any("k3dm_dispatch_human_continuation_prompts" in t["expr"] for t in human["targets"])
 assert human["type"]=="bargauge" and human["options"]["namePlacement"]=="top" and all(t.get("instant") for t in human["targets"]),human["type"]
@@ -1127,7 +1139,7 @@ assert options["orientation"]=="horizontal" and options["namePlacement"]=="left"
 later={"Per run evidence":(10,18,6,39), "First-pass live verification":(10,6,0,39),
        "Lines changed total":(4,6,0,49), "Median lines / spec":(4,6,6,49),
        "Acceptance items total":(4,6,12,49), "Measured":(4,6,18,49),
-       "Final worker exit → land":(8,6,0,54), "Human continuation prompts":(8,18,6,54)}
+       "Final worker exit → land":(8,6,0,54), "Coordinator → agent prompts":(8,18,6,54)}
 assert {p["title"] for p in d["panels"] if 42<=p["gridPos"]["y"]<65}==set(later)
 for title,(h,w,x,y) in later.items():
     assert panels[title]["gridPos"]=={"h":h,"w":w,"x":x,"y":y+3},title
