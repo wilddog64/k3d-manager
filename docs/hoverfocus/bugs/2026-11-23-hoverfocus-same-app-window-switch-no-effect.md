@@ -7,7 +7,7 @@
 **Introducing change reviewed:** yes (Fable)
 **Waiting on:** dispatch
 **Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
-**Prior art:** `docs/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (filed same day, no score run) — read, related mechanism (key-window state), different symptom
+**Prior art:** `docs/hoverfocus/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (filed same day, no score run) — read, related mechanism (key-window state), different symptom
 **Filed:** 2026-11-23
 **Detected by:** operator, E-L1 step 3 on m2-air (2026-11-23)
 

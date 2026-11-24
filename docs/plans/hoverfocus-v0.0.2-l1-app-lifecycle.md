@@ -18,7 +18,7 @@ v0.0.2")
 | Input | Defect (v0.0.1) |
 |---|---|
 | Argon #1 (`docs/issues/2026-11-23-argon-hoverfocus-pr1-review-findings.md`) | `AppDelegate.reloadConfig()` (`AppDelegate.swift:229-236`): an invalid `config.json` sets `config = Config()` (defaults, `enabled: true`) and still calls `controller.apply(config)`; a running controller keeps focusing with defaults while the menu shows the config error (fails open) |
-| B3 part 3 (`docs/bugs/2026-11-23-hoverfocus-install-launchagent-and-tcc-grant-gaps.md`) | trust is polled only after the **Grant Accessibility…** menu click (`AppDelegate.swift:208-226`, 2 s × 60). Granting in System Settings directly leaves the app untrusted until restart |
+| B3 part 3 (`docs/hoverfocus/bugs/2026-11-23-hoverfocus-install-launchagent-and-tcc-grant-gaps.md`) | trust is polled only after the **Grant Accessibility…** menu click (`AppDelegate.swift:208-226`, 2 s × 60). Granting in System Settings directly leaves the app untrusted until restart |
 
 ## Before You Start
 

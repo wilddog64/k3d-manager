@@ -45,7 +45,7 @@ its activation path orders the window front and shows Favorites; over plain page
 now: `"ignoreApps": ["com.apple.Safari"]`.
 
 Three Safari behaviours are now in play: no focus at all (first report), focus without raise (11-23), focus with raise
-(11-24). The P1 app matrix in [`hoverfocus-v0.0.2-bug-batches.md`](../plans/hoverfocus-v0.0.2-bug-batches.md) records
+(11-24). The P1 app matrix in [`hoverfocus-v0.0.2-bug-batches.md`](../../plans/hoverfocus-v0.0.2-bug-batches.md) records
 which Safari state gives which.
 
 ## Next

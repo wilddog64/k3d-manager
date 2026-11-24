@@ -1,7 +1,7 @@
 # HoverFocus v0.0.2 — bug batches (Flash / Luna split)
 
 **Filed:** 2026-11-23
-**Status:** plan — L1/F1 child specs rev 1 written ([L1](hoverfocus-v0.0.2-l1-app-lifecycle.md), [F1](hoverfocus-v0.0.2-f1-install.md)); `v0.0.2` cut on origin at `d426f18`; awaiting Fable spec review, operator intents and go. P1 probe also covers the Cmd-W/key-window gap (B2 recurrence) and Safari (`docs/bugs/2026-11-23-hoverfocus-safari-no-focus.md`)
+**Status:** plan — L1/F1 child specs rev 1 written ([L1](hoverfocus-v0.0.2-l1-app-lifecycle.md), [F1](hoverfocus-v0.0.2-f1-install.md)); `v0.0.2` cut on origin at `d426f18`; awaiting Fable spec review, operator intents and go. P1 probe also covers the Cmd-W/key-window gap (B2 recurrence) and Safari (`docs/hoverfocus/bugs/2026-11-23-hoverfocus-safari-no-focus.md`)
 **Repo:** `hoverfocus`, branch `v0.0.2` cut from `main` at `d426f18` (v0.0.1)
 **Approval:** "plan for bugs distributions between flash and luna" (operator, 2026-11-23)
 
@@ -12,9 +12,9 @@ file; a fix that depends on macOS behaviour gets a live probe first ("prove exte
 
 | Bug | Doc | Files |
 |---|---|---|
-| B1 same-app window switch | `docs/bugs/2026-11-23-hoverfocus-same-app-window-switch-no-effect.md` | `Controller.swift`, `CSkyLight.c` |
-| B2 terminal unfocused cursor | `docs/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` | `Controller.swift`, `CSkyLight.c` |
-| B3 install/TCC gaps (4 parts) | `docs/bugs/2026-11-23-hoverfocus-install-launchagent-and-tcc-grant-gaps.md` | `Makefile`, `tests/install_test.sh`, `AppDelegate.swift` |
+| B1 same-app window switch | `docs/hoverfocus/bugs/2026-11-23-hoverfocus-same-app-window-switch-no-effect.md` | `Controller.swift`, `CSkyLight.c` |
+| B2 terminal unfocused cursor | `docs/hoverfocus/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` | `Controller.swift`, `CSkyLight.c` |
+| B3 install/TCC gaps (4 parts) | `docs/hoverfocus/bugs/2026-11-23-hoverfocus-install-launchagent-and-tcc-grant-gaps.md` | `Makefile`, `tests/install_test.sh`, `AppDelegate.swift` |
 | A1 reload fails open | `docs/issues/2026-11-23-argon-hoverfocus-pr1-review-findings.md` #1 | `AppDelegate.swift` |
 | A2 AX element cache leak | same, #2 | `Controller.swift` |
 | A3 Makefile sed escaping | same, #3 | `Makefile` |
