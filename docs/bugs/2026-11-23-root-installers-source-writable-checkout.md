@@ -1,11 +1,11 @@
 # Bug: root installers source libraries from the operator-writable checkout
 
-**Status:** OPEN — children A `ff3e6cf9`, B `901329af` and C `5d9e6410` LANDED; D (docs) verified, landing (2026-11-24)
+**Status:** LANDED — all children on k3d-manager-v1.45.1: A `ff3e6cf9`, B `901329af`, C `5d9e6410`, D `afb79533` (2026-11-24); live check after hub promote and the operator Rollout (E15)
 **Priority:** P2 (operator, 2026-11-23: doc + bug, does not block v1.45.0)
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-24 (B land, D docs; then hub promote and operator Rollout / E15)
+**Waiting on:** live check — since 2026-11-24 (hub promote, then operator Rollout / E15)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
