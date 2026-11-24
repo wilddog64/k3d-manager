@@ -48,6 +48,7 @@ recorded operator events by reason". The ledger `intervention` events behind it 
 | `scripts/tests/plugins/agent_dispatch_dashboard.bats` | lines 277 and 1130 look the panel up by the new title; a test that the old title is gone |
 | `docs/guides/grafana-dashboards/k3dm-agent-cost.md` | line 69 wording |
 | `docs/howto/codex-dispatch.md` | line 168 wording |
+| `docs/plans/human-operator-turns.md` | Fix item 3: drop the rename step, point at this bug (added 2026-11-24 by Claude at land; Fix 3 always required it, the table missed it) |
 
 ## Contract readers
 
