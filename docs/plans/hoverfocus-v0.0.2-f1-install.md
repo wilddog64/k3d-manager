@@ -224,3 +224,10 @@ interface: "adds BOOTOUT_WAIT_TRIES; exports APPDIR, AGENTDIR, LAUNCHCTL to reci
 
 - Change only the files in the table. Report each command, its rc and the proving lines; list every error seen; show
   each red control's failing output and `git diff --stat` after restoring it. Commit nothing; Claude lands.
+
+## Live check log
+
+- 2026-11-24 17:57, m2 (macOS 26.5.1), GUI Terminal, `make install` of `42273f0`: no error; old agent (pid since 17:34)
+  gone, new pid started at the install second; plist `ProgramArguments` = one app-path entry. **F1-EL first install: pass.**
+  Pending: a second `make install` straight after (no error 37, icon back); over SSH from m4, prints the asuser commands
+  and starts nothing.

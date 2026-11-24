@@ -182,3 +182,11 @@ interface: "adds public AppCoordinator in HoverFocusCore; no change to Interface
 
 - Change only the files in the table. Report each command, its rc and the proving lines; list every error seen; show
   each red control's failing output and `git diff --stat` after restoring it. Commit nothing; Claude lands.
+
+## Live check log
+
+- 2026-11-24 18:05, m2 (macOS 26.5.1), build `42273f0` installed 17:57: after `tccutil reset`, grant via System Settings
+  **+** with no menu click. Unified log: 2 s trust-poll wakeups until 17:58:54, then TCC check, SkyLight session
+  connect (controller start), polling stops. Operator typed "testing from hoverfocus" into TextEdit behind iTerm2
+  (screenshot 145). **L1-EL grant half: pass.** Pending: break config.json, Reload Config shows Error: config and hover
+  stops; fix, Reload, Running.
