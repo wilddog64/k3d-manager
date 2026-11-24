@@ -48,6 +48,8 @@ state-U pytest procs clear on reboot.
 
 - **2026-11-24 dirused b2c:** round 1 verifier FAIL — worker could not read the parent contract (k3d-manager file, absent from dirused worktree), guessed ScheduleSeams + empty fixtures. Correction 1 sent with contract sections inlined. **b2d/b2e dispatch must inline the parent contract** (append sections 38-182 to the spec prompt).
 
+- **2026-11-24 dirused:** b2c LANDED `e7970ff` (verifier round 2 PASS; CI 45469466819 pending). b2d (`dirused-m10b2d-confirm`) and b2e (`dirused-m10b2e-list`) dispatched to Luna in parallel, specs carry the contract inline (`cb01683d`). Then M10b3 spec revision, M10b4 docs, one PR to main.
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.

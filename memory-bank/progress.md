@@ -28,6 +28,8 @@
 
 - **2026-11-24 dirused b2c:** round 1 verifier FAIL — worker could not read the parent contract (k3d-manager file, absent from dirused worktree), guessed ScheduleSeams + empty fixtures. Correction 1 sent with contract sections inlined. **b2d/b2e dispatch must inline the parent contract** (append sections 38-182 to the spec prompt).
 
+- **2026-11-24 dirused:** b2c LANDED `e7970ff` (verifier round 2 PASS; CI 45469466819 pending). b2d (`dirused-m10b2d-confirm`) and b2e (`dirused-m10b2e-list`) dispatched to Luna in parallel, specs carry the contract inline (`cb01683d`). Then M10b3 spec revision, M10b4 docs, one PR to main.
+
 ## v1.45.0 status (compressed 2026-11-22)
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);
