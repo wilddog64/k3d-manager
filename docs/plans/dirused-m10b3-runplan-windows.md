@@ -25,7 +25,7 @@ Live checks E-B3L1 and E-B3L2 (below) follow b3d and the jump-box probes P1–P3
 
 ## Jump-box probe script (2026-11-24)
 
-[`assets/dirused-m10b3-probes.ps1`](assets/dirused-m10b3-probes.ps1) covers P1, P2, P3, P8 (a, b, d), P10 (descriptor readback; the
+`tools/m10b3-probes.ps1` in the dirused repo (branch `m10b-scheduled-purge`; moved from this repo 2026-11-24, run it as `m10b3-probes.ps1`) covers P1, P2, P3, P8 (a, b, d), P10 (descriptor readback; the
 second-account check is manual) and P12. It creates tasks only under `\dirused-probe\<SID>\` and files only under
 `%LOCALAPPDATA%\dirused-probe\`; P3 runs `dir` and `icacls` on the share (read-only). Run order: `setup` (afternoon, prints the
 steps and times), `run12`, disconnect / sign-out steps as printed, leave disconnected, next morning `collect`, paste `report.txt`,
