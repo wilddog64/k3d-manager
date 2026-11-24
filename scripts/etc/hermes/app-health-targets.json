@@ -1,5 +1,0 @@
-{
-  "targets": [
-    {"service": "payment-service", "namespace": "shopping-cart-payment", "port": 8084}
-  ]
-}
