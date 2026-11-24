@@ -1,6 +1,6 @@
 # dirused M10b2d: the `/schedule /confirm` flow (preview, prompt, re-check, trust, plan creation, register) with fakes
 
-**Status:** LANDED — `ab98677` on `m10b-scheduled-purge` (2026-11-24); verifier round 1 FAIL (extras before Held; id from created), correction 1 fixed both and ported the verifier's 45 checks; Claude mutants red; windows CI run 45473345605 pending
+**Status:** LANDED — `ab98677` on `m10b-scheduled-purge` (2026-11-24); verifier round 1 FAIL (extras before Held; id from created), correction 1 fixed both and ported the verifier's 45 checks; Claude mutants red; windows CI run 45473345605 green (windows + portable)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4); design [M10b](dirused-m10b-scheduled-purge.md) §4.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (after [b2b](dirused-m10b2b-parser-usage.md) and [b2c](dirused-m10b2c-seams-and-trust.md))
