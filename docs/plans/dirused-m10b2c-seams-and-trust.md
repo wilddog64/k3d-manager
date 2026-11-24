@@ -1,6 +1,6 @@
 # dirused M10b2c: seam interfaces, the D14 trust check, `/schedule /trust` and `/untrust` (pure, with fakes)
 
-**Status:** OPEN — SPEC rev 2, 2026-11-24; intents approved (carries E-B2); round-2 reviews applied (parent table); **not dispatchable until the P-ACL tables below are filled**
+**Status:** OPEN — SPEC rev 3, 2026-11-24; intents approved (carries E-B2); round-2 reviews applied (parent table); P-ACL tables filled from the jump box (2026-11-24); dispatched to Luna
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4: Interfaces, Trust rules); design D14.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (tip `e19783f`); runs beside [b2b](dirused-m10b2b-parser-usage.md) (no shared file)
@@ -73,6 +73,8 @@
 
 ### P-ACL tables (jump box, `icacls` and `dir /q`, operator, 2026-11-24)
 
+`C:\` shows why ancestors count only rename/delete/take-over rights: stock `Users (CI)(AD)` on the root must not refuse (T-M2).
+
 Account names are placeholders with the same shape as the jump box: `PROD\op` (`S-1-5-21-1-2-3-1104`) is the user, `PROD\admin2`
 (`S-1-5-21-1-2-3-2001`) stands for the second domain admin, and `S-1-5-21-9-9-9-8249` stands for the unresolved SID (no display
 name; `Resolve` returns null). Rights: `F` = `GenericAll`; `M` = `Write | Append | Delete`; `RX`, `GR,GE` = `None`. `(IO)` =
@@ -80,7 +82,7 @@ inherit-only; `(I)` = inherited (not inherit-only).
 
 | Path | Owner | Entries (all allow) |
 |---|---|---|
-| `C:\` | TrustedInstaller (assumed; `dir /q` cannot show it) | pending `icacls C:\` |
+| `C:\` | TrustedInstaller (assumed; `dir /q` cannot show it) | SYSTEM `GenericAll`; Administrators `GenericAll`; Users `None` (RX, OI CI); **Users `Append` (CI, `AD`: create folders, applies to this folder)**; Users IO `Write` (CI IO `WD`); CREATOR OWNER IO `GenericAll` |
 | `C:\Program Files` | `S-1-5-80-956008885-...-2271478464` TrustedInstaller | TrustedInstaller `GenericAll`; TrustedInstaller IO `GenericAll`; SYSTEM `Write\|Append\|Delete`; SYSTEM IO `GenericAll`; Administrators `Write\|Append\|Delete`; Administrators IO `GenericAll`; Users `None`; Users IO `None`; CREATOR OWNER IO `GenericAll`; `S-1-15-2-1` ALL APPLICATION PACKAGES `None`; its IO `None`; `S-1-15-2-2` ALL RESTRICTED APPLICATION PACKAGES `None`; its IO `None` |
 | `C:\Program Files\dirused`, `dirused.exe` | TrustedInstaller | inherited (not IO) copies of Program Files' IO entries: TrustedInstaller, SYSTEM, Administrators `GenericAll`; Users and both package groups `None` (CREATOR OWNER's copy is not created) |
 | `C:\Users` | SYSTEM | SYSTEM `GenericAll`; Administrators `GenericAll`; Users `None`; Users IO `None`; Everyone `None`; Everyone IO `None` |
