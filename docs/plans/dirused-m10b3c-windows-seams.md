@@ -1,6 +1,6 @@
 # dirused M10b3c: the real Windows seam classes (`ScheduleWindows.cs`), tested on windows CI
 
-**Status:** OPEN — SPEC rev 2, 2026-11-24 (rev 2: trust store refuses a junction in Add/Remove, found in Claude's review of the first pass); split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
+**Status:** OPEN — SPEC rev 3, 2026-11-24 (rev 2: trust store refuses a junction in Add/Remove, from Claude's review; rev 3: Save sets trust.tmp's owner to the user, from windows CI run 45514086420 where the elevated runner made Administrators the owner and Load rejected the list); split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
 **gates:** after [b3a](dirused-m10b3a-runplan-engine.md) and [b3b](dirused-m10b3b-schtasks-and-rights.md) land; P6 (PASS 2026-11-24),
 P6 default-owner check (PASS 2026-11-24, normal window), P9 PASS (run 45510934313)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
@@ -83,8 +83,10 @@ discard). `WaitForExit(timeoutMs)`; on timeout kill the process tree and return 
   naming itself. Lines without a tab or with an empty SID are skipped.
 - **`Add` / `Remove`**: if `<folder>` or `trust.txt` exists and is a reparse point (`File.GetAttributes`), return
   `SeamResult(false, "<that path> is a link")` and change nothing (so `Secure` never re-permissions a junction's target); else create `<folder>` if missing; always `security.Secure(folder, userSid)` first (failure → that error); entries =
-  `Load()` plus or minus the one; delete a stale `trust.tmp`; write `trust.tmp` with `CreateNew`; `File.Move(trust.tmp, trust.txt,
-  overwrite: true)`.
+  `Load()` plus or minus the one; delete a stale `trust.tmp`; write `trust.tmp` with `CreateNew`; if `security.ReadAcl(trust.tmp).OwnerSid` differs from `userSid` (an elevated token makes
+  Administrators the default owner, seen on windows-latest run 45514086420), set its owner to `userSid` (a `FileSecurity` carrying only
+  the owner, `FileInfo.SetAccessControl`); on any failure delete `trust.tmp` and return the error; `File.Move(trust.tmp, trust.txt,
+  overwrite: true)`. `Load` keeps requiring owner = user.
 - Consequence (intended): a trust list made unreadable by a permission change is ignored, `/schedule` refuses naming the account, and
   `/schedule /trust` rewrites it in a secured folder.
 
