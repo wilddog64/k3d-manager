@@ -44,6 +44,8 @@ state-U pytest procs clear on reboot.
 
 - **2026-11-24 dirused:** b2b LANDED `6542862` (verifier PASS; correction 1 test-only; Windows mutant proof 45461565040; CI 45462979677 pending). Next: b2c on operator Get-Acl output; then b2d ‖ b2e.
 
+- **2026-11-24 dirused:** P-ACL recorded from jump box (icacls + dir /q; C:\ has stock Users (CI)(AD) — ancestor rule needed; profile has 2nd domain admin + unresolved -8249 SID, placeholders PROD\admin2 / S-1-5-21-9-9-9-8249 in fixtures). b2c dispatched to Luna (`dirused-m10b2c-trust`, `374fee87`). Next: verify b2c, then b2d ‖ b2e.
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
