@@ -6,6 +6,7 @@
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-24
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-24 (test-suite/fast-gate timeout under heavy host load, not installer behaviour; a retry on a quieter host passes); matches Claude.
 **Prior art:** slug ls found no match; `docs/bugs/2026-11-23-web-console-bats-lock-busy-test-races-10s-stale-window.md` (read, same suite family under load, different cause: a lock-age race, not run time); `make find-similar-docs` not run (vector store unavailable on m4)
 
 ## Symptom
