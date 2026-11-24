@@ -487,11 +487,14 @@ sync-apps:
 ##        make sync-branch BRANCH=k3d-manager-v1.4.12
 sync-branch:
 	@echo "[make] Patching services-git ApplicationSet → $(BRANCH)"
-	@_b='$(BRANCH)'; \
+	@set -e; _b='$(BRANCH)'; _appset="$$(kubectl get applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) -o json)"; \
+	_path="$$(printf '%s' "$$_appset" | jq -er '[paths(objects) as $$p | select((getpath($$p) | has("git")) and any(getpath($$p).git.directories[]?; .path | startswith("services/"))) | "/" + ([$$p[] | tostring | gsub("~"; "~0") | gsub("/"; "~1")] | join("/")) + "/git/revision"] | if length == 1 then .[0] else error("expected one services git generator") end')"; \
+	[ -n "$$_path" ] || { echo "[make] services git generator not found" >&2; exit 1; }; \
 	kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	  --type=json -p \
-	  "[{\"op\":\"replace\",\"path\":\"/spec/generators/0/git/revision\",\"value\":\"$$_b\"},{\"op\":\"replace\",\"path\":\"/spec/template/spec/source/targetRevision\",\"value\":\"$$_b\"}]"
-	@for app in shopping-cart-basket shopping-cart-frontend shopping-cart-namespace shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
+	  "[{\"op\":\"replace\",\"path\":\"$$_path\",\"value\":\"$$_b\"},{\"op\":\"replace\",\"path\":\"/spec/template/spec/source/targetRevision\",\"value\":\"$$_b\"}]"; \
+	kubectl get applications -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) -l app-type=service,discovered-from=git -o name | while IFS= read -r app; do \
+	  [ -n "$$app" ] || continue; \
 	  kubectl annotate application "$$app" -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
 	done
@@ -500,10 +503,14 @@ sync-branch:
 ## Revert services-git ApplicationSet back to main and force-refresh apps
 sync-main:
 	@echo "[make] Reverting services-git ApplicationSet → main"
-	@kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
+	@set -e; _appset="$$(kubectl get applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) -o json)"; \
+	_path="$$(printf '%s' "$$_appset" | jq -er '[paths(objects) as $$p | select((getpath($$p) | has("git")) and any(getpath($$p).git.directories[]?; .path | startswith("services/"))) | "/" + ([$$p[] | tostring | gsub("~"; "~0") | gsub("/"; "~1")] | join("/")) + "/git/revision"] | if length == 1 then .[0] else error("expected one services git generator") end')"; \
+	[ -n "$$_path" ] || { echo "[make] services git generator not found" >&2; exit 1; }; \
+	kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	  --type=json -p \
-	  '[{"op":"replace","path":"/spec/generators/0/git/revision","value":"main"},{"op":"replace","path":"/spec/template/spec/source/targetRevision","value":"main"}]'
-	@for app in shopping-cart-basket shopping-cart-frontend shopping-cart-namespace shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
+	  "[{\"op\":\"replace\",\"path\":\"$$_path\",\"value\":\"main\"},{\"op\":\"replace\",\"path\":\"/spec/template/spec/source/targetRevision\",\"value\":\"main\"}]"; \
+	kubectl get applications -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) -l app-type=service,discovered-from=git -o name | while IFS= read -r app; do \
+	  [ -n "$$app" ] || continue; \
 	  kubectl annotate application "$$app" -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
 	done
