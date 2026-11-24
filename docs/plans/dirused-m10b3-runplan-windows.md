@@ -37,6 +37,12 @@ second-account check is manual) and P12. It creates tasks only under `\dirused-p
 steps and times), `run12`, disconnect / sign-out steps as printed, leave disconnected, next morning `collect`, paste `report.txt`,
 then `cleanup`. P5, P6 and P9 are not in it (P9 is a CI workflow, Claude's).
 
+**P6 second half, 2026-11-24 14:07 PT, jump box (operator screenshot), normal window:** `icacls ...\dirused-probe\p6 /inheritance:r
+/grant:r "%USERNAME%":(OI)(CI)F` and `/setowner "%USERNAME%"` both `Successfully processed 1 files`; readback one entry
+`PROD\cliang:(OI)(CI)(F)`; `dir /q` owner of `p6` `PROD\cliang`. **PASS.** The parent `dirused-probe` shows owner
+`BUILTIN\Administrators` (creation context unknown); the default owner of a new file and subfolder in a user-only folder is being
+checked (`echo x> ...\p6\f.txt`, `mkdir ...\p6\sub`, `dir /q`).
+
 **Gates.** Dispatch: P6 second half (a standard user can set owner = self and a protected one-ACE DACL; a 4-line `icacls` check the
 operator runs), P9 (Claude: a scratch-branch windows-latest workflow registers, queries and deletes an interactive-token task in
 `\dirused-ci\`), P10 readback (the SDDL that `/query /xml` returns for the descriptor, so the verify compare uses the right form). P8 (b)
