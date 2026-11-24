@@ -68,11 +68,10 @@ stage="$base/staging.<UTC>"
 hashes=()
 if ((!plan)); then
     [[ $ids =~ ^(cli|[A-Z0-9]{2,32})(,(cli|[A-Z0-9]{2,32}))*$ ]] || die 'Invalid OPERATOR_IDS'
-    if [[ -z $ref ]]; then
-        _run_command -- "$gitbin" -C "$repo" fetch origin refs/heads/deploy/hub:refs/remotes/origin/deploy/hub
-        ref=origin/deploy/hub
+    commit=$(_run_command -- "$gitbin" -C "$repo" rev-parse --verify --end-of-options 'HEAD^{commit}')
+    if [[ -n $ref ]]; then
+        [[ $(_run_command -- "$gitbin" -C "$repo" rev-parse --verify --end-of-options "$ref^{commit}") == "$commit" ]] || die 'INSTALL_REF must be the staged commit'
     fi
-    commit=$(_run_command -- "$gitbin" -C "$repo" rev-parse --verify --end-of-options "$ref^{commit}")
     tmp=$(mktemp -d)
     trap '/bin/rm -rf -- "$tmp"' EXIT
     stage="$base/staging.$(/bin/date -u +%Y%m%dT%H%M%SZ)"
@@ -170,6 +169,10 @@ for i in "${!sources[@]}"; do
         [[ $actual == "${hashes[i]}" ]] || die "Staged blob mismatch: $src"
     fi
 done
+if ((!plan)); then
+    actual=$(priv /bin/cat "$stage/values.json")
+    [[ $actual == "$(printf '{"operator_uid":"%s","operator_gid":"%s","operator_ids":"%s"}\n' "$(id -u)" "$(id -g)" "$ids")" ]] || die 'Staged values mismatch'
+fi
 priv "$py" -IS "$stage/k3dm-promote-daemon.py" render-check "$stage"
 for file in "$daemon" "$lib/hub_approval.py" "$lib/promote_mover.py" "$conf/promote.conf" "$plist"; do
     if ((plan)); then
