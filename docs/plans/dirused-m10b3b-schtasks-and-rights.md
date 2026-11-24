@@ -1,7 +1,7 @@
 # dirused M10b3b: `SchtasksTaskScheduler` (argv, verify, delete) and `AclRights.FromMask`, portable
 
 **Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
-**gate: P10** (the SDDL that `schtasks /query /xml` returns for the task's security descriptor) before dispatch
+P10 form taken from P9 (run 45510934313: the descriptor reads back verbatim); the jump-box P10 run confirms it for a standard user
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b3](dirused-m10b3-runplan-windows.md); design [M10b](dirused-m10b-scheduled-purge.md) §4.7, §8; shared contract copied
 at the end of this file.
@@ -48,8 +48,8 @@ treated as exit `-1`. Exit codes only; stdout is read only from the `/xml` query
   3. Else `TaskXml.Parse(stdout)`. `FormatException` → field = its message up to the first `:`.
   4. Else compare in this order; the first difference names the field: `Id` (ordinal), `Run` (as instants), `Expires` (as instants),
      `UserSid` (ordinal ignore-case), `PlanDir` (ordinal ignore-case), `Description` (ordinal), then `SecurityDescriptor`:
-     `TaskXml.SecurityDescriptorOf(stdout)` equals the form recorded by P10 (filled in before dispatch; the XML writes
-     `D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA)`).
+     `TaskXml.SecurityDescriptorOf(stdout)` equals `D:P(A;;FA;;;<expected.UserSid>)(A;;FA;;;SY)(A;;FA;;;BA)` exactly (ordinal; P9
+     showed Windows returns it verbatim).
   5. On any field: `["/delete", "/tn", name, "/f"]`. Exit 0 → `Error = "scheduled task does not match the plan (<field>); it was
      removed"`; exit `d ≠ 0` → `Error = "scheduled task does not match the plan (<field>); removing it failed (schtasks exit <d>)"`.
   6. All equal → `Ok`.
@@ -94,7 +94,7 @@ New: `src/Dirused.Common/TaskScheduling.cs`, `src/Dirused.Common/AclRights.cs`,
 ```yaml
 must:
   - id: B3b-M1
-    text: "Register with a recording IProcessRunner, systemDirectory 'C:\\Windows\\System32\\': exe recorded = 'C:\\Windows\\System32\\schtasks.exe'; argv exactly ['/create','/tn',<name>,'/xml',<path>] then ['/query','/tn',<name>,'/xml']; a query returning TaskXml.Build(expected) (with the P10 descriptor form) → Ok and no third call"
+    text: "Register with a recording IProcessRunner, systemDirectory 'C:\\Windows\\System32\\': exe recorded = 'C:\\Windows\\System32\\schtasks.exe'; argv exactly ['/create','/tn',<name>,'/xml',<path>] then ['/query','/tn',<name>,'/xml']; a query returning TaskXml.Build(expected) → Ok and no third call; also a query returning the P9 readback shape (defaults omitted, URI and IdleSettings added, single-byte text without BOM, built by the test from TaskXml.Build output) → Ok"
   - id: B3b-M2
     text: "one case per row of the field table: a readback with that single difference → third call ['/delete','/tn',<name>,'/f'] and Error 'scheduled task does not match the plan (<Field>); it was removed' with the table's field"
   - id: B3b-M3

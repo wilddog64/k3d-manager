@@ -2,7 +2,7 @@
 
 **Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
 **gates:** after [b3a](dirused-m10b3a-runplan-engine.md) and [b3b](dirused-m10b3b-schtasks-and-rights.md) land; P6 (PASS 2026-11-24),
-P6 default-owner check (PASS 2026-11-24, normal window), P9 (Claude, scratch-branch windows workflow)
+P6 default-owner check (PASS 2026-11-24, normal window), P9 PASS (run 45510934313)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b3](dirused-m10b3-runplan-windows.md); design [M10b](dirused-m10b-scheduled-purge.md) §8, D14; shared contract copied at
 the end of this file.
@@ -135,7 +135,7 @@ must:
   - id: B3c-M5
     text: "windows-latest: RealProcessRunner(timeoutMs: 2000) on 'powershell.exe -NoProfile -Command Start-Sleep 30' returns -1 within 10 s; on a nonexistent exe returns -1 without throwing; on 'cmd.exe /c echo hi' returns 0 and stdout bytes containing 'hi'"
   - id: B3c-M6
-    text: "windows-latest (if P9 shows the runner can register an interactive-token task): SchtasksTaskScheduler(RealProcessRunner, Environment.SystemDirectory) Register of '\\dirused-ci\\<SID>\\purge-<guid>' from a TaskXml.Build file one day ahead → Ok; a second Register of the same name → 'could not schedule (schtasks exit <non-zero>)'; Exists true; Delete Ok; Exists false; delete in finally. If P9 says it cannot, this item asserts the written XML parses with TaskXml.Parse and the spec records that"
+    text: "windows-latest (P9 showed the runner registers an interactive-token task): SchtasksTaskScheduler(RealProcessRunner, Environment.SystemDirectory) Register of '\\dirused-ci\\<SID>\\purge-<guid>' from a TaskXml.Build file one day ahead → Ok; a second Register of the same name → 'could not schedule (schtasks exit <non-zero>)'; Exists true; Delete Ok; Exists false; delete in finally. If P9 says it cannot, this item asserts the written XML parses with TaskXml.Parse and the spec records that"
   - id: B3c-M7
     text: "windows-latest: RealTrustStore in a temp folder: Add then Load returns the entry; Remove empties it; after Add the folder's ReadAcl is user-only; Load returns empty when trust.txt carries an extra Everyone allow ACE (positive control: the same file without it loads)"
   - id: B3c-M8

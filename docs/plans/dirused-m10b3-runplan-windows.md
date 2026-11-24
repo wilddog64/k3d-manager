@@ -17,8 +17,8 @@ rev 5 (copied into each child).
 | Child | Scope | Worker | Starts |
 |---|---|---|---|
 | [b3a](dirused-m10b3a-runplan-engine.md) | `PlanRunner.RunPlan`, run report, `IPlanStore.MoveNew`, `PurgeList.ToResults` (portable) | Luna | now |
-| [b3b](dirused-m10b3b-schtasks-and-rights.md) | `SchtasksTaskScheduler`, `IProcessRunner`, `AclRights.FromMask` (portable) | Luna | after P10; parallel with b3a |
-| [b3c](dirused-m10b3c-windows-seams.md) | `ScheduleWindows.cs`: real store, ACL, trust store, resolver, process runner, `WindowsSchedule` (windows CI) | Luna | after b3a, b3b, P9 |
+| [b3b](dirused-m10b3b-schtasks-and-rights.md) | `SchtasksTaskScheduler`, `IProcessRunner`, `AclRights.FromMask` (portable) | Luna | P10 form taken from P9 (verbatim round-trip); jump-box P10 confirms |
+| [b3c](dirused-m10b3c-windows-seams.md) | `ScheduleWindows.cs`: real store, ACL, trust store, resolver, process runner, `WindowsSchedule` (windows CI) | Luna | after b3a and b3b land (P6 and P9 PASS) |
 | [b3d](dirused-m10b3d-program-wiring.md) | Program wiring, `ProgramTestSeams`, interim refusal removed (windows CI) | Luna | after b3c |
 
 Live checks E-B3L1 and E-B3L2 (below) follow b3d and the jump-box probes P1–P3, P12. Then M10b4 (docs, usage text), then one PR.
@@ -39,6 +39,22 @@ then `cleanup`. P5, P6 and P9 are not in it (P9 is a CI workflow, Claude's).
 owner`) new files were owned by `BUILTIN\Administrators`; from a normal window (Medium, Administrators `Group used for deny only`)
 `f.txt` and `sub` are owned by `PROD\cliang`. **PASS:** `IsIntact`'s owner = user rule holds for plans made from a normal window,
 and `/schedule` already refuses High tokens. No spec change.
+
+**P9, 2026-11-24, wilddog64/dirused Actions run 45510934313 (windows-latest, scratch branch `p9-schtasks-probe`, deleted after):**
+runner account `runneradmin` (High, elevated). Production-shape XML (UTF-16 LE BOM) under `\dirused-ci\<SID>\purge-<id>`:
+`/create` exit 0; `/query /xml` exit 0; second `/create` without `/f` exit 1 (`Cannot create a file when that file already exists`);
+`/run` exit 1 (`The task settings do not allow the task to start on demand`, P12 on CI); `/query` exit 0; `/delete /f` exit 0;
+`/query` after delete exit 1. **PASS.** Findings:
+- The readback omits every setting equal to the Windows default (`RunLevel`, `StartWhenAvailable`, `AllowHardTerminate`,
+  `Settings/Enabled`, `Hidden`, trigger `Enabled`) and adds `URI` and `IdleSettings`. `TaskXml.Parse` on the exact readback bytes
+  (Claude, local, 2026-11-24): **PARSE OK**, every `PlanTask` field equal to the written one.
+- `SecurityDescriptor` reads back verbatim: `D:P(A;;FA;;;<SID>)(A;;FA;;;SY)(A;;FA;;;BA)` (P10 form on CI; the jump-box probe
+  confirms it for a standard user).
+- `/query /xml` redirected by `cmd` is single-byte text without BOM (`3C 3F 78 6D`) although it declares `encoding="UTF-16"`;
+  `TaskXml.Parse` decodes it (UTF-8 fallback). A non-ASCII character in the Description (list file name) could then fail the
+  compare: fail-closed (task removed, `error: scheduled task does not match the plan (Description)`); accepted residual.
+- Probe bug, not a product finding: the probe's id suffix `p9a1` is not hex, so `TaskXml.Parse` refused `Arguments` until the
+  suffix was a valid one.
 
 **Gates.** Dispatch: P6 second half (a standard user can set owner = self and a protected one-ACE DACL; a 4-line `icacls` check the
 operator runs), P9 (Claude: a scratch-branch windows-latest workflow registers, queries and deletes an interactive-token task in
