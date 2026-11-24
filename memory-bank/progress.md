@@ -18,6 +18,8 @@
 
 - **2026-11-24 dirused:** M10b1 LANDED `e19783f` (Sonnet verifier PASS, 10 mutants red); M10b2a windows CI green (attempt 2; P3 flake captured `docs/bugs/2026-11-24-dirused-root-shared-open-cleanup-race.md`). Integration branch tip e19783f; CI 45456774994 running. Next: M10b2 rev 3 Fable + Argon reviews → dispatch Luna.
 
+- **2026-11-24 dirused M10b2:** rev 3 NEEDS REWORK from Fable + Argon (D14 refused every stock install: Append on C:\ + inherit-only; no seam signatures; sub-second created). Rev 4 `d7f8a4d4`: shared contract + children b2b (parser, now), b2c (seams+trust, needs P-ACL icacls from jump box), b2d (confirm flow), b2e (list/cancel). Round-2 Fable + Argon reviews running. Operator ask pending: P-ACL icacls (C:\, Program Files, C:\Users, %LOCALAPPDATA%, its parent).
+
 ## v1.45.0 status (compressed 2026-11-22)
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);
