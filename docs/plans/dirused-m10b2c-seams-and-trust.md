@@ -1,6 +1,6 @@
 # dirused M10b2c: seam interfaces, the D14 trust check, `/schedule /trust` and `/untrust` (pure, with fakes)
 
-**Status:** LANDED — `e7970ff` on `m10b-scheduled-purge` (2026-11-24); round 1 FAIL (parent contract unreadable by worker), correction 1 inlined it; Sonnet verifier round 2 PASS (19 mutants red); windows CI run 45469466819 pending
+**Status:** LANDED — `e7970ff` on `m10b-scheduled-purge` (2026-11-24); round 1 FAIL (parent contract unreadable by worker), correction 1 inlined it; Sonnet verifier round 2 PASS (19 mutants red); windows CI run 45469466819 green (windows + portable)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4: Interfaces, Trust rules); design D14.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (tip `e19783f`); runs beside [b2b](dirused-m10b2b-parser-usage.md) (no shared file)
