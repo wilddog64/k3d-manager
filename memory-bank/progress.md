@@ -33,6 +33,7 @@
 - **2026-11-24 dirused:** b2e LANDED `e825ed8` (round 1 FAIL report.txt header bug → correction 1; CI 45472288659 pending). b2d round 1 FAIL (extras before Held; id from created not run) → correction 1 running with verifier tests as reference.
 
 - **2026-11-24 dirused:** b2d LANDED `ab98677` — **M10b2 complete** (b2a cf07ace, b2b 6542862, b2c e7970ff, b2e e825ed8, b2d ab98677; CI 45473345605 pending). Lesson: Luna's first pass shipped 2-3 test methods per child every time; verifier tests ported as correction each time. Next: revise M10b3 spec to the contract (inline it), operator probe run on jump box, M10b4 docs, one PR to dirused main.
+- **2026-11-24 dirused M10b3:** spec rev 3 written `6dc610cd` (to the M10b2 shared contract rev 5 and landed code ab98677; contract inlined; PlanRunner.RunPlan, SchtasksTaskScheduler without rootFolder, ScheduleWindows real classes, AclRights.FromMask, IPlanStore.MoveNew default member, D14 trust re-check at /runplan, Program wiring replacing the interim refusal). Fable + Argon blind reviews running. Dispatch gates: P6 second half, P9 (Claude CI probe), P10 readback; probe script run by operator.
 
 ## v1.45.0 status (compressed 2026-11-22)
 
