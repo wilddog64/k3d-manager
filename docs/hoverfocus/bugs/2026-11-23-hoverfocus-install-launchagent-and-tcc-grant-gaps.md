@@ -1,11 +1,11 @@
 # Bug: HoverFocus install — LaunchAgent bootstrap fails over SSH, and the Accessibility grant goes stale per build
 
-**Status:** OPEN
+**Status:** OPEN — parts 1-3 fixed in v0.0.2 (`42273f0`, `e4a7d51`, live-checked on m2 2026-11-24); part 4 (stable signing) → v0.0.3 P3/F2
 **Priority:** P2 (proposed) — degraded: every install needs manual launchctl/TCC steps (the workaround)
 **Introduced by:** `87322d6` (hoverfocus M1b app shell: bundle/install)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** dispatch
+**Waiting on:** dispatch — since 2026-11-24 (part 4, v0.0.3)
 **Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
 **Prior art:** none above threshold (no earlier hoverfocus install docs)
 **Filed:** 2026-11-23

@@ -1,7 +1,7 @@
 # HoverFocus v0.0.2 — bug batches (Flash / Luna split)
 
 **Filed:** 2026-11-23
-**Status:** plan — L1/F1 child specs rev 1 written ([L1](hoverfocus-v0.0.2-l1-app-lifecycle.md), [F1](hoverfocus-v0.0.2-f1-install.md)); `v0.0.2` cut on origin at `d426f18`; awaiting Fable spec review, operator intents and go. P1 probe also covers the Cmd-W/key-window gap (B2 recurrence) and Safari (`docs/hoverfocus/bugs/2026-11-23-hoverfocus-safari-no-focus.md`)
+**Status:** RELEASED 2026-11-24 — v0.0.2 = L1 + F1, PR wilddog64/hoverfocus#2 merged `d2cdb00`, tag + release `v0.0.2`; Argon blind review: no findings (Claude re-checked the Enabled-toggle-during-config-error path: `Controller.apply` never starts the controller). L2 moved to v0.0.3 L3 (D1)
 **Repo:** `hoverfocus`, branch `v0.0.2` cut from `main` at `d426f18` (v0.0.1)
 **Approval:** "plan for bugs distributions between flash and luna" (operator, 2026-11-23)
 
