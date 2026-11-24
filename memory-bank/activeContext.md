@@ -1,3 +1,23 @@
+## MORNING REMINDER (operator asked 2026-11-23 evening) — say this first in the next chat
+
+**Remind the operator: HoverFocus live checks on m2 this morning** (L1 gates the v0.0.2 merge). Steps:
+- **L1-EL second half (config reload):** menu bar "Open Config" (edits `~/.config/hoverfocus/config.json`,
+  docs/config.md:3), break it with invalid JSON → "Reload Config" → status reads `Error: config <reason>` and
+  hover-focus stops; fix the file → Reload Config → `Running`, hover-focus works again.
+- **F1-EL second half:** run `make install` twice in a row on m2 from an iTerm window (no error 37, menu bar icon
+  back); then from m4 over SSH run `make install` on m2 and check it prints the `sudo launchctl asuser` commands
+  instead of failing.
+- **Decisions also waiting at m2:** Electron no-focus (P2 proposed) and no visual focus indicator (P2 proposed) —
+  priority and v0.0.2 vs later; signing identity vs keep printing the `tccutil reset` step.
+- Record results in `docs/plans/hoverfocus-v0.0.2-l1-app-lifecycle.md` / `-f1-install.md` live-check logs.
+
+**State at end of 2026-11-23 evening session:** WIP 3/3 — r2-a correction 1 (test gaps), totp-a1-fix (Luna, spec
+rev 2), istioctl-b (Luna, after v0.5.9 subtree `7dc95697`). On each exit: independent verifier → Claude reproduces top
+gap → commit in worktree → land → record verify → push. Landed today: totp-c `c507cfd7`, r2-c `5d9e6410`, lf v0.5.9
+(PR #93 `083c249`, tag + release). Next queued: istioctl-c (after B), V4 defect 1 (m2 drill probe), R2-B (after r2-a).
+Groom folded into Sunday 2026-11-29. Leftover: 6 root-owned `k3s-*/logs/*-browser-*.log` (~880M, need sudo); two
+state-U pytest procs clear on reboot.
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
