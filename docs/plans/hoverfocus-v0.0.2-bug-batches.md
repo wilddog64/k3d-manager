@@ -58,6 +58,9 @@ Outputs:
 
 L1 and F1 share no file and can run in parallel (WIP 2 of 3). L2 waits for P1. Stable local code signing (B3 part 4
 fix) needs an operator decision on creating a local signing identity; until then F1 only prints the reset step.
+**Decision (operator, 2026-11-24):** create a local self-signed code-signing identity on m2 so the Accessibility grant
+survives rebuilds (approved Claude's recommendation); spec it for v0.0.3 together with the Electron and focus-indicator
+bugs and the visible-error idea (`docs/ideas.md`, 2026-11-24).
 
 ## Gates per batch
 

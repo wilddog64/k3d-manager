@@ -195,3 +195,5 @@ interface: "adds public AppCoordinator in HoverFocusCore; no change to Interface
   `Error: config /Users/cliang/.config/hoverfocus/config.json: invalid JSON` (screenshot 5). **L1-EL error half: pass.**
   Pending: restore `}` → Reload Config → `Running`, hover-focus works. Operator UX note: the grey disabled status line
   is hard to read; idea filed in `docs/ideas.md` (red error line + one Notification Center message).
+- 2026-11-24 ~04:20 PST, m2: operator restored `}` and reloaded; Claude confirmed over SSH that the config parses again.
+  Operator confirmation that the status line reads `Running` and hover-focus works is the last L1-EL step.

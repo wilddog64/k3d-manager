@@ -1,11 +1,12 @@
 # Bug: a window focused by hover shows no visual cue
 
 **Status:** OPEN
-**Priority:** P2 (proposed) — degraded: the user cannot tell which window will receive keys
+**Priority:** P2 (operator, 2026-11-24) — degraded: the user cannot tell which window will receive keys
+**Triage:** HoverFocus v0.0.3 (operator, 2026-11-24: approved Claude's recommendation — v0.0.2 merges after L1/F1, this goes to v0.0.3)
 **Introduced by:** pre-existing (inherent to focus-without-raise in M1a `4cbd377`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (both)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-24
 **Prior art:** `docs/hoverfocus/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (exact-slug
 glob, read) — related: the app stays drawn as inactive, cursor shape is one instance; `make find-similar-docs` not run
 **Filed:** 2026-11-24

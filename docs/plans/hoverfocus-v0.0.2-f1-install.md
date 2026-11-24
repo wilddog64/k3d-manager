@@ -234,3 +234,8 @@ interface: "adds BOOTOUT_WAIT_TRIES; exports APPDIR, AGENTDIR, LAUNCHCTL to reci
 - 2026-11-24 ~04:03 PST, m2, GUI iTerm, `make install` of `42273f0` twice in a row: both runs complete, no error 37, no
   "still loaded after bootout"; launchd `state = running`, `last exit code = (never exited)`, process started 04:03:36
   from the new bundle (Claude, read-only over SSH). **F1-EL GUI half: pass (second run).** Pending: over SSH from m4.
+- 2026-11-24 ~04:20 PST, Claude over SSH from m4 → m2 (`launchctl managername` = `Background`), `make install` of
+  `42273f0`: rc 0, prints "not a GUI login session (launchctl managername: Background); files are installed but the agent
+  is not loaded" and the two `sudo launchctl asuser 501 … bootout/bootstrap` lines; the running agent was not touched
+  (pid 27445, `state = running`). **F1-EL SSH half: pass for "prints the commands and starts nothing".** Pending: the
+  operator runs the two printed sudo commands (sudo password) and the agent reloads from the new bundle.

@@ -1,11 +1,12 @@
 # Bug: HoverFocus does not focus Electron apps (Slack, VS Code)
 
 **Status:** OPEN
-**Priority:** P2 (proposed) — degraded: Electron windows must be clicked to focus
+**Priority:** P2 (operator, 2026-11-24) — degraded: Electron windows must be clicked to focus
+**Triage:** HoverFocus v0.0.3 (operator, 2026-11-24: approved Claude's recommendation — v0.0.2 merges after L1/F1, this goes to v0.0.3)
 **Introduced by:** `4cbd377` (M1a focus core, variant B no-raise focus)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (both)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-24
 **Prior art:** `docs/hoverfocus/bugs/2026-11-23-hoverfocus-safari-no-focus.md` (exact-slug glob, read) — same no-focus
 class, different apps; `make find-similar-docs` not run
 **Filed:** 2026-11-24
