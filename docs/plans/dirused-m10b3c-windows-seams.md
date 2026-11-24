@@ -2,7 +2,7 @@
 
 **Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
 **gates:** after [b3a](dirused-m10b3a-runplan-engine.md) and [b3b](dirused-m10b3b-schtasks-and-rights.md) land; P6 (PASS 2026-11-24),
-P6 default-owner check (pending), P9 (Claude, scratch-branch windows workflow)
+P6 default-owner check (PASS 2026-11-24, normal window), P9 (Claude, scratch-branch windows workflow)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b3](dirused-m10b3-runplan-windows.md); design [M10b](dirused-m10b-scheduled-purge.md) §8, D14; shared contract copied at
 the end of this file.

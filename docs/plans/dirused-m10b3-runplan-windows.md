@@ -18,7 +18,7 @@ rev 5 (copied into each child).
 |---|---|---|---|
 | [b3a](dirused-m10b3a-runplan-engine.md) | `PlanRunner.RunPlan`, run report, `IPlanStore.MoveNew`, `PurgeList.ToResults` (portable) | Luna | now |
 | [b3b](dirused-m10b3b-schtasks-and-rights.md) | `SchtasksTaskScheduler`, `IProcessRunner`, `AclRights.FromMask` (portable) | Luna | after P10; parallel with b3a |
-| [b3c](dirused-m10b3c-windows-seams.md) | `ScheduleWindows.cs`: real store, ACL, trust store, resolver, process runner, `WindowsSchedule` (windows CI) | Luna | after b3a, b3b, P9, P6 default-owner check |
+| [b3c](dirused-m10b3c-windows-seams.md) | `ScheduleWindows.cs`: real store, ACL, trust store, resolver, process runner, `WindowsSchedule` (windows CI) | Luna | after b3a, b3b, P9 |
 | [b3d](dirused-m10b3d-program-wiring.md) | Program wiring, `ProgramTestSeams`, interim refusal removed (windows CI) | Luna | after b3c |
 
 Live checks E-B3L1 and E-B3L2 (below) follow b3d and the jump-box probes P1–P3, P12. Then M10b4 (docs, usage text), then one PR.
@@ -34,8 +34,11 @@ then `cleanup`. P5, P6 and P9 are not in it (P9 is a CI workflow, Claude's).
 **P6 second half, 2026-11-24 14:07 PT, jump box (operator screenshot), normal window:** `icacls ...\dirused-probe\p6 /inheritance:r
 /grant:r "%USERNAME%":(OI)(CI)F` and `/setowner "%USERNAME%"` both `Successfully processed 1 files`; readback one entry
 `PROD\cliang:(OI)(CI)(F)`; `dir /q` owner of `p6` `PROD\cliang`. **PASS.** The parent `dirused-probe` shows owner
-`BUILTIN\Administrators` (creation context unknown); the default owner of a new file and subfolder in a user-only folder is being
-checked (`echo x> ...\p6\f.txt`, `mkdir ...\p6\sub`, `dir /q`).
+`BUILTIN\Administrators` (creation context unknown); the default owner of a new file and subfolder was then checked.
+**Default owner, 2026-11-24 14:52 PT:** from an elevated window (`whoami /groups`: High Mandatory Level, Administrators `Group
+owner`) new files were owned by `BUILTIN\Administrators`; from a normal window (Medium, Administrators `Group used for deny only`)
+`f.txt` and `sub` are owned by `PROD\cliang`. **PASS:** `IsIntact`'s owner = user rule holds for plans made from a normal window,
+and `/schedule` already refuses High tokens. No spec change.
 
 **Gates.** Dispatch: P6 second half (a standard user can set owner = self and a protected one-ACE DACL; a 4-line `icacls` check the
 operator runs), P9 (Claude: a scratch-branch windows-latest workflow registers, queries and deletes an interactive-token task in
