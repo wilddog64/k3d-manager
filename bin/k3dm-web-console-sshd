@@ -12,12 +12,12 @@ function _wc_sources() {
     scripts/lib/foundation/scripts/lib/system.sh scripts/lib/agent_rigor.sh
     "$_WC_CONFIG_TEMPLATE" "$_WC_PLIST_TEMPLATE" "$_WC_STUB_SOURCE")
   local file blob
-  { _wc_tool /usr/bin/git ls-files --error-unmatch -- "${paths[@]}" >/dev/null 2>&1 &&
-    _wc_tool /usr/bin/git diff --quiet HEAD -- "${paths[@]}"; } || {
+  { _wc_tool /Library/Developer/CommandLineTools/usr/bin/git ls-files --error-unmatch -- "${paths[@]}" >/dev/null 2>&1 &&
+    _wc_tool /Library/Developer/CommandLineTools/usr/bin/git diff --quiet HEAD -- "${paths[@]}"; } || {
       _wc_message 'sources differ from HEAD; commit or discard first'; return 9
     }
   for file in "${paths[@]}"; do
-    blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$file") || return 9
+    blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$file") || return 9
     printf '%s %s\n' "$blob" "$file"
   done
 }
@@ -154,7 +154,7 @@ function _wc_trust_install() {
 }
 
 function _wc_blob() {
-  _wc_tool /usr/bin/git cat-file blob "HEAD:$1" && printf '.'
+  _wc_tool /Library/Developer/CommandLineTools/usr/bin/git cat-file blob "HEAD:$1" && printf '.'
 }
 
 function _wc_check_config() {
@@ -689,9 +689,9 @@ function _wc_install() {
   config="${config%.}"
   plist=$(_wc_blob "$_WC_PLIST_TEMPLATE") && stub=$(_wc_blob "$_WC_STUB_SOURCE") || return 9
   plist="${plist%.}"; stub="${stub%.}"
-  config_blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$_WC_CONFIG_TEMPLATE") &&
-    stub_blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$_WC_STUB_SOURCE") &&
-    plist_blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$_WC_PLIST_TEMPLATE") || return 9
+  config_blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$_WC_CONFIG_TEMPLATE") &&
+    stub_blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$_WC_STUB_SOURCE") &&
+    plist_blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$_WC_PLIST_TEMPLATE") || return 9
   if (( dry )); then
     _wc_chosen_ca || return 2
     printf '%s' "${config//"AllowUsers $_WC_LOGIN"/AllowUsers <login>}"
