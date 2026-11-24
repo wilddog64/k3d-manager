@@ -1,6 +1,6 @@
 # Bug: "Human continuation prompts" counts Claude's resumes of dispatched agents, not human turns
 
-**Status:** OPEN — reopened on recurrence 2026-11-23 (operator); was: CLOSED at grooming 2026-11-22 ("reopen on recurrence")
+**Status:** LANDED — `8c121c32` on k3d-manager-v1.45.1 (2026-11-24), Sonnet acceptance verify pass; landed with --allow-out-of-scope for docs/plans/human-operator-turns.md (Fix 3; Files table fixed in e900a717); was: OPEN — reopened on recurrence 2026-11-23
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-12 (Cosmetic wording fix renaming a dashboard panel title, description, and related documentation without changing underlying queries or behavior); Claude proposed P3. Agreed.
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "yes, go ahead to file a P3 spec"); was: close — grooming 2026-11-22, operator; before that: passed over, 1st (out of v1.44.0 at the 10-P3 cap) — grooming 2026-11-12, operator.
@@ -11,7 +11,8 @@
 **Approval:** operator, 2026-11-10: "also can you schedule the label fix?"
 **Intent approved:** operator, 2026-11-23
 **Intent approval words:** "yes, go ahead to file a P3 spec" (2026-11-23); first approved 2026-11-10 ("go with your suggestion")
-**Waiting on:** fix running — since 2026-11-23
+**Waiting on:** live check — since 2026-11-24 (needs a promote, then the Agent Dispatch panel title)
+**Fix commit:** 8c121c32
 **Dispatch:** codex gpt-6-luna, started 2026-11-23 (task/v1.45.1/2026-11-10-human-continuation-prompts-panel-counts-coordinator-resumes)
 **Filed:** 2026-11-10
 **Detected by:** operator, 2026-11-07 (v1.43.14 retro); re-raised 2026-11-10

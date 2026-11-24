@@ -1,11 +1,12 @@
 # Bug: `cluster-preflight` no longer renames the services Applications (`sed` pattern matches a retired template line)
 
-**Status:** OPEN
+**Status:** LANDED — `0d7d1e18` on k3d-manager-v1.45.1 (2026-11-24), Sonnet acceptance verify pass (pre-fix red, 3 mutations caught); test file renamed to the spec's `cluster_preflight_render.bats` at land; was: OPEN
 **Priority:** P3 — degraded preflight bookkeeping; production Applications are unaffected
 **Introduced by:** `4c5d3556` (v1.16.0, services-git Application name became `'{{.name}}-{{.path.basename}}'`)
 **Should have been caught by:** offline test (the render function is stubbed out in `cluster_preflight_pin_guard.bats:12`; nothing renders it)
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-23 (R1 landed 5f7ef7be; services-git.yaml:51 still `'{{.name}}-{{.path.basename}}'`)
+**Waiting on:** live check — since 2026-11-24 (next sandbox preflight run renders preflight-named services Applications)
+**Fix commit:** 0d7d1e18
 **Triage:** patch → v1.45.1 (operator, 2026-11-23)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-preflight-services-appset-name-rename-no-longer-matches.md`: none; `make find-similar-docs` not run (vector store unavailable); [`v1.1.1-bugfix-preflight-cluster-name-label.md`](v1.1.1-bugfix-preflight-cluster-name-label.md) (name grep) — read, different defect in the same render family

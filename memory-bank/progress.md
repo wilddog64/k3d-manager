@@ -126,3 +126,4 @@
 - 2026-11-23: v1.45.1 mode-label landed 9f953c0b, totp-a2 landed 93ecfb83, both verify pass; live checks (L1, L2) pending after promote.
 - 2026-11-23: CI-red Linux test fix 7a84f90d landed; awaiting green CI then hub promote.
 - 2026-11-24 00:4xZ: hub-deploy 948e5e7..5162281 ok (reapply, appsets-check, platform-ops, exporter). Mode-label L1 config half PASS (live CM == repo@5162281e); screenshot pending. Preflight-rename and continuation-prompts dispatches exited; Sonnet verifiers running.
+- 2026-11-24: preflight rename LANDED 0d7d1e18 + verify pass (test renamed to spec name; stray partial edit in main checkout restored, captured docs/bugs/2026-11-24-dispatch-worker-partial-edit-left-in-main-checkout.md). Continuation-prompts LANDED 8c121c32 + verify pass (--allow-out-of-scope for human-operator-turns.md; how-to record command restored). Follow-ups: prompts-by-model.md:36,68 still says old title; panel 85 expr only substring-tested. WIP now 0 open.
