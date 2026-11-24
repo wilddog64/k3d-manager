@@ -11,7 +11,7 @@ scratch root with `launchctl` stubbed.
 **Implementer:** Flash (`agy`; Makefile, shell, docs). Runs in parallel with L1 (no shared file). **Verifier:** Claude,
 from `## Acceptance` only.
 **Filed:** 2026-11-23
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-24
 **Approval:** operator 2026-11-23 ("plan for bugs distributions between flash and luna"; "ship v0.0.1 and fix bugs in
 v0.0.2")
 
@@ -181,27 +181,27 @@ evidence:
     proves: [F1-M1, F1-N1, F1-N4]
     kind: offline
     command: "bash tests/install_test.sh rc 0 under the sandbox profile, showing the wait, timeout and v0.0.1 snapshot checks. Red controls, each restored byte-identical: remove the print poll loop (v0.0.1 behaviour) — the wait case fails; make the loop ignore BOOTOUT_WAIT_TRIES exhaustion and bootstrap anyway — the timeout case fails; hard-code the plist destination to $$HOME/outside in the install recipe — the snapshot or expected-path check fails"
-    intent: pending
+    intent: "make install while the app is running waits for the old copy to stop before starting the new one, so error 5 no longer happens."
   - id: F1-E2
     proves: [F1-M2, F1-N2]
     kind: offline
     command: "same run: SSH-session case passes. Red controls: remove the managername check (v0.0.1 behaviour) — the SSH case fails because bootout/bootstrap are logged; change the printed bootstrap line to drop asuser — the stderr check fails; add a real `sudo true` line to the install recipe — the sudo.log check fails. grep -nw sudo Makefile shows sudo only inside echo/printf strings (not git grep -E '\\b', which matched nothing on macOS; Fable 11)"
-    intent: pending
+    intent: "make install over SSH or in an SSH-started tmux copies the app and prints the exact commands to run instead of failing."
   - id: F1-E3
     proves: [F1-M3, F1-N3, F1-N5]
     kind: offline
     command: "same run: odd-path case passes. Red controls: restore the v0.0.1 sed line for the plist — the odd-path case fails (sed 'bad flag' or the extract check), while the default-path checks still pass; use plutil -replace ProgramArguments.0 instead of replace-array + insert — the element-count and __PROGRAM__ checks fail"
-    intent: pending
+    intent: "Installing to a folder whose name has spaces or symbols such as & or | still produces a working startup file."
   - id: F1-E4
     proves: [F1-M4]
     kind: offline
     command: "same run: hint case passes; red control: delete the hint echo — the hint check fails. README sections quoted with line numbers"
-    intent: pending
+    intent: "Install reminds you how to re-grant Accessibility after a reinstall, and the README explains the SSH case."
   - id: F1-EL
     proves: [F1-M1, F1-M2]
     kind: live
     command: "operator on m2 (home): in a GUI Terminal, launchctl managername prints Aqua; make install twice in a row succeeds with no error 37 and the menu bar icon is back; over SSH from m4, make install prints the asuser commands and running them loads the agent"
-    intent: pending
+    intent: "On m2, make install twice in a row from a GUI Terminal shows no error and the menu bar icon returns; over SSH from m4 it prints the commands and starts nothing."
 interface: "adds BOOTOUT_WAIT_TRIES; exports APPDIR, AGENTDIR, LAUNCHCTL to recipes; install output gains the session and re-grant messages"
 ```
 
