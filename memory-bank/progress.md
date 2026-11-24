@@ -14,6 +14,8 @@
 
 - **2026-11-24 dirused M10b1–4:** M10b1 rev 4 and M10b2a rev 2 (TaskXml, split from M10b2) reviewed blind by Fable + Argon (null-control held-skip blocker, UTF-16 declaration case, readback defaults, DTD) and fixed (`e303be3e`). Integration branch `m10b-scheduled-purge` from 966b32b pushed. Dispatched: `dirused-m10b1-engine` (Luna), `dirused-m10b2a-taskxml` (Flash, agy). M10b2 rev 3 written (D14 trust check), reviews after M10b1/M10b2a land. Next: M10b3 jump-box probe script (P2, P3, P8, P10, P12).
 
+- **2026-11-24 dirused:** M10b2a LANDED `cf07ace` on `m10b-scheduled-purge` (verifier round 1 FAIL: DTD mutant green + `$` anchors → correction 1 → PASS); windows CI run 45455761460 pending. M10b1: correction 1 added scheduled tests; mutants d, e red; mutant a HANGS a test → correction 2 (fast-fail fakes) running. Stale v1.45.1 headers fixed `ad8b862f`.
+
 ## v1.45.0 status (compressed 2026-11-22)
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);
