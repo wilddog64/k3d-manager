@@ -5,7 +5,7 @@
 **Introduced by:** `4cbd377` (M1a focus core: `Controller.swift` `lookup(x:y:)`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (both)
-**Waiting on:** investigation
+**Waiting on:** investigation — P1 app matrix on m2
 **Prior art:** not run (find-similar-docs vector store unavailable; exact-slug glob found nothing)
 **Filed:** 2026-11-23
 **Detected by:** operator, 2026-11-23 ("hoverfocus does not work for Safari")
@@ -32,6 +32,21 @@ bar is inactive, so a hover reached Safari without a click and without raising. 
 Still open: which point was hovered (video area vs text or links), and whether the earlier failure depends on where
 the pointer sits (deep tree under text/links) or was a one-off. If it does not come back over text and links, close as
 not reproducible.
+
+## Update 2026-11-24 — second symptom: Safari raised itself
+
+On m2 (macOS 26, fresh `make install` of v0.0.1 plus README, agent running, no log errors), hovering a Safari window
+(YouTube, behind iTerm2) brought Safari **to the front** and opened the address-bar Favorites list. Control in the same
+session: TextEdit behind iTerm2 got hover focus and stayed behind, so variant B (`kCPSNoWindows`) still works and the
+raise comes from Safari. That differs from the 2026-11-23 screenshot (Safari focused under TextEdit, not raised).
+
+Hypothesis (unproven): when Safari's first responder is the address field (new-tab page, or a field focused earlier),
+its activation path orders the window front and shows Favorites; over plain page content it does not. Workaround for
+now: `"ignoreApps": ["com.apple.Safari"]`.
+
+Three Safari behaviours are now in play: no focus at all (first report), focus without raise (11-23), focus with raise
+(11-24). The P1 app matrix in [`hoverfocus-v0.0.2-bug-batches.md`](../plans/hoverfocus-v0.0.2-bug-batches.md) records
+which Safari state gives which.
 
 ## Next
 

@@ -28,6 +28,34 @@ file; a fix that depends on macOS behaviour gets a live probe first ("prove exte
 | **P1** | Claude + operator (live) | probe for B1/B2: on m2, candidate ways to make a non-key window key without raising (AX `kAXMainAttribute`/`kAXFocusedAttribute` on the window, after variant B), record raise and terminal cursor | scratch probe only | operator at the m2 (from ~15:30) |
 | **L2** | Luna | B1 + B2 from P1's winning variant, plus A2 (evict closed windows from `elements`) | `Sources/HoverFocusPlatform/Controller.swift`, `Sources/CSkyLight/*`, selftest | P1 |
 
+### P1 app matrix (operator, 2026-11-24: "go ahead to add it")
+
+Variant B is proven on TextEdit and iTerm2 only; Safari has now shown three behaviours (see the Safari bug, update
+2026-11-24). P1 runs every app below with the pointer resting on an unfocused window behind iTerm2 and records three
+things: **focused** (a typed key reaches it), **raised** (the window comes to the front) and **side effects** (popovers,
+field focus, menu changes).
+
+| App | States to try |
+|---|---|
+| Safari | page content; tab bar; new-tab page; address field focused before switching away |
+| Chrome | page content; tab bar |
+| Mail | message list; message body |
+| Finder | file list; sidebar |
+| Electron app (VS Code or Slack) | editor or message pane |
+| Terminal.app, iTerm2 | prompt (cursor shape, B2) |
+| TextEdit | document (control: proven no-raise 2026-11-24) |
+
+Outputs:
+1. The matrix table goes into the Safari bug doc and decides L2's design. If raises cluster in apps that take an
+   address/search field on activation, L2 adds a per-app fallback: set `kAXMainAttribute` on the target window via AX
+   **without** activating the app, and see whether that gives key focus with no raise. Otherwise apps that raise go to a
+   documented default `ignoreApps` list.
+2. README "Tested apps" table (focused / raised per app, macOS version, date), written by Flash in F1's README section,
+   or a follow-up docs batch if F1 has already landed. F1 owns `README.md` for v0.0.2. Claude's interim Safari note
+   (`dc68692`) went to `m1-base` by mistake. That branch was already merged as v0.0.1, so the note does not reach
+   `v0.0.2`; F1 carries the corrected wording instead ("can raise", not "raises").
+3. The operator E-L checks for L2 repeat the matrix rows. A must_not for L2: TextEdit and iTerm2 still focus with no raise.
+
 L1 and F1 share no file and can run in parallel (WIP 2 of 3). L2 waits for P1. Stable local code signing (B3 part 4
 fix) needs an operator decision on creating a local signing identity; until then F1 only prints the reset step.
 
