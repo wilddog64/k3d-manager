@@ -5,7 +5,7 @@
 **Introduced by:** `0c9b2707` (v1.7.1, the services-git generator became a matrix); the patch path dates from `c5949cf4` (v1.4.12)
 **Should have been caught by:** offline test (no test exercises either target)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — blocked until R1 lands (see Routing)
+**Waiting on:** fix running — since 2026-11-24 (R1 landed `5f7ef7be` 2026-11-23, unblocking it)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-make-sync-branch-patches-missing-appset-path.md`: none; `make find-similar-docs` not run (vector store unavailable); found while writing R1, [`2026-11-23-cve-pins-branch-trusted-without-verification.md`](2026-11-23-cve-pins-branch-trusted-without-verification.md) "Not readers" — read, same finding, this doc is its P3 capture
@@ -51,6 +51,17 @@ evidence:
     red_control: on current Makefile the recorded path is /spec/generators/0/git/revision and applying it to the rendered template fails
     intent: Running make sync-branch actually points the shopping-cart apps at the chosen branch and refreshes them, instead of failing silently.
 ```
+
+## Clarification (Claude, 2026-11-24, before dispatch)
+
+- R1 landed (`5f7ef7be`): `services-git.yaml` is now `matrix` → [`clusters`, `matrix` → [`git`, `git`]]. Line numbers above
+  have moved (`sync-branch` is at `Makefile:488`, `sync-main` at `:501`); find the targets by name.
+- The hub still runs v1.45.0's ApplicationSet until a promote, so a live capture would show the old tree. E1's stub object
+  is therefore the **rendered template from this branch** (`envsubst` over `services-git.yaml` with the variables the
+  deploy path sets; record the commit and date in a comment), not a hub capture. Claude captures the live object after the
+  promote as a live follow-up.
+- Pick the generator by content (the `git` generator whose `directories` include `services/*`), never by index, so the
+  test must also pass against a second fixture with the two `git` generators swapped.
 
 ## Routing
 

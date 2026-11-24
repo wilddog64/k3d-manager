@@ -1,11 +1,11 @@
 # Bug: ArgoCD Degraded / OutOfSync alerts never match the cluster-prefixed shopping-cart Application names
 
-**Status:** OPEN
+**Status:** LANDED — `400041df` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier pass); header corrected 2026-11-24
 **Priority:** P3 — a monitoring gap: `ArgoCDAppProgressingStuck` (no name filter) and the dashboards still cover them
 **Introduced by:** `4c5d3556` (v1.16.0, Applications renamed `<cluster>-<service>`); the name regex dates from the v1.12.0 alert work
 **Should have been caught by:** offline test (promtool rule tests use the old bare names, if any; not checked)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch
+**Waiting on:** live check — since 2026-11-23 (L1: Claude reads argocd_app_info names on the hub Prometheus after a promote)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-argocd-alert-name-regex-misses-cluster-prefixed-apps.md`: none; `make find-similar-docs` not run (vector store unavailable); [`2026-06-30-argocd-alerts-app-specific-outofsync.md`](2026-06-30-argocd-alerts-app-specific-outofsync.md) (name grep) — read, the change that wrote the bare-name regex; this is its rot after the rename
