@@ -12,6 +12,10 @@
 - **Also on m2 (k3d-manager istioctl-b, landed `7d8a40e4`, needs hub/m2 checkout at v1.45.1 head):** E6 — with brew
   istioctl 1.32 still linked, `make dr-drill` stops with one line naming 1.32 before any Istio precheck; E7 — after
   `brew unlink istioctl`, the drill installs pinned 1.31.4 and passes precheck.
+- **Tell the operator (no action unless they object):** R2 stage check narrowed overnight — the root bootstrap now
+  refuses ANY symlink in a verified stage (was "a symlink pointing out of the stage"; the round-2 verifier escaped the
+  lexical check with a two-link pair, Claude reproduced). Repo commits 0 symlinks, so no behaviour loss. Parent bug doc
+  F1 + child spec `## Clarification`, commit `cecc52e1`.
 - Record results in `docs/plans/hoverfocus-v0.0.2-l1-app-lifecycle.md` / `-f1-install.md` live-check logs.
 
 **State at end of 2026-11-23 evening session:** WIP 3/3 — r2-a correction 1 (test gaps), totp-a1-fix (Luna, spec
