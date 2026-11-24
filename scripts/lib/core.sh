@@ -454,44 +454,6 @@ function _install_docker() {
    esac
 }
 
-function _install_istioctl() {
-   install_dir="${1:-/usr/local/bin}"
-
-   if _command_exist istioctl ; then
-      echo "istioctl already exists, skip installation"
-      return 0
-   fi
-
-   echo "install dir: ${install_dir}"
-   if [[ ! -e "$install_dir" && ! -d "$install_dir" ]]; then
-      if mkdir -p "${install_dir}" 2>/dev/null; then
-         :
-      else
-         _run_command --prefer-sudo -- mkdir -p "${install_dir}"
-      fi
-   fi
-
-   if  ! _command_exist istioctl ; then
-      echo installing istioctl
-      tmp_script=$(mktemp -t istioctl-fetch.XXXXXX)
-      trap 'rm -rf /tmp/istio-*' EXIT TERM
-      pushd /tmp || return
-      curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
-      istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
-      if [[ -z "$istio_bin" ]]; then
-         echo "Failed to download istioctl"
-         exit 1
-      fi
-      if [[ -w "${install_dir}" ]]; then
-         _run_command -- cp -v "$istio_bin/istioctl" "${install_dir}/"
-      else
-         _run_command --prefer-sudo -- cp -v "$istio_bin/istioctl" "${install_dir}/"
-      fi
-      popd || return
-   fi
-
-}
-
 function _cleanup_on_success() {
    local file_to_cleanup=$1
    local logger="_info"
