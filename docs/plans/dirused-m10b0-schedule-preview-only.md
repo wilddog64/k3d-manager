@@ -1,6 +1,6 @@
 # dirused M10b0: `/schedule` preview only (demo build, nothing is scheduled)
 
-**Status:** LANDED — dirused PR #40 merged `966b32b` (c8520de + M10b0a c6283a2 + M10b0b 8a4eb86), tag v0.0.27, 2026-11-24; live E-B0L pending (operator, jump box)
+**Status:** LIVE-VERIFIED — dirused PR #40 merged `966b32b`, v0.0.27; E-B0L passed on the jump box 2026-11-24 (operator)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) §1–§3 and §4.1–§4.3 (preview subset). Ships before M10b1–M10b4; M10b2 builds on it.
 **Repo / branch:** wilddog64/dirused / `m10b0-schedule-preview` from `main` (`a2d0508`)
@@ -209,3 +209,17 @@ Fable (`claude-fable-5-2`): NEEDS REWORK. Argon (`gemini-4-argon-medium`): READY
 | `CleanupUpdateFiles` carve-out | Fable 13 | Applied: noted as pre-existing |
 | `schtasks /query /tn \dirused\` unproven; compile-fail baseline | Fable 14 | Applied: before/after `findstr` capture; baseline note |
 | Demo wording "add /confirm" vs not available | Fable 15 | Applied: docs open with the preview-only sentence |
+
+## Live check 2026-11-24 (operator, office jump box, v0.0.27 win-x64)
+
+- `dirused /update` → `updated dirused 0.0.26 -> 0.0.27`; `/version` → `dirused 0.0.27 (win-x64)`.
+- `schtasks /query /fo list | findstr /i dirused` before: no output.
+- `dirused /fromlist m9a.txt /purge /schedule 00:30` → preview: `Run: Wed 2026-11-25 00:30 PST (08:30 UTC Wed), in 15 h 27 min`,
+  `Expires: Wed 2026-11-25 09:02 PST (17:02 UTC Wed)`, `Host: us03p02ffm01`, `List: m9a.txt`, `3 file(s), 156.1 GB`, the Held line,
+  the logged-on line, `Preview only. Add /confirm to schedule it.` Exact spec text; UTC correct (00:30 PST = 08:30 UTC).
+- Same with `/confirm` → the preview without its last line, then `/schedule /confirm is not available in this version; nothing was
+  scheduled`.
+- `schtasks` after: no output — no task created.
+- Observation (by design, O6): the list's 3 rows total 156.1 GB while the dry run on the same list shows one row no longer exists
+  (146.2 GB would be freed). Scheduling touches no server; the run re-checks each row. Candidate for M10b2 wording: make the size
+  line say "in the list".
