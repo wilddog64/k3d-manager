@@ -1,6 +1,6 @@
 # dirused M10b2c: seam interfaces, the D14 trust check, `/schedule /trust` and `/untrust` (pure, with fakes)
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; intents approved (carries E-B2); waits on P-ACL; Fable + Argon blind reviews before dispatch
+**Status:** OPEN — SPEC rev 2, 2026-11-24; intents approved (carries E-B2); round-2 reviews applied (parent table); **not dispatchable until the P-ACL tables below are filled**
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4: Interfaces, Trust rules); design D14.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (tip `e19783f`); runs beside [b2b](dirused-m10b2b-parser-usage.md) (no shared file)
@@ -20,7 +20,7 @@
 2. **`src/Dirused.Common/PlanTrust.cs`**:
    ```csharp
    public enum PathRole { Leaf, Ancestor }
-   public sealed record TrustPath(string Path, PathRole Role, bool MayBeMissing);
+   public sealed record TrustPath(string FullPath, PathRole Role, bool MayBeMissing);
    public sealed record TrustCheck(bool Ok, IReadOnlyList<string> Lines);   // Lines = stderr lines on refusal, empty when Ok
    public static class PlanTrust
    {
@@ -30,11 +30,12 @@
    }
    ```
    Rules exactly as the parent's "Trust rules": drive-rooted paths; leaves (exe, exe folder, `...\dirused`, `<PlanRoot>`; the last two
-   `MayBeMissing = true`) and ancestors in the stated order; allowed writers; reparse check on every existing path; `AclRead` handling;
-   deny and inherit-only ignored; owner pseudo-entry; broad SIDs; refusal lines and rights wording. `Check` calls
-   `store.IsReparsePoint` and `security.ReadAcl` once per path, in `PathsToCheck` order, and stops reading after the first path
-   whose reparse or read check fails (that refusal is the only line). For ACL findings it reads every path and lists all findings:
-   the first as the two-line refusal, the rest as `  also:` lines, in path order, then SID order.
+   `MayBeMissing = true`) and ancestors in the stated order; normalisation; allowed writers; reparse check on every existing path;
+   `AclRead` handling; deny and inherit-only ignored; owner pseudo-entry; broad SIDs; findings merge and order; refusal lines and
+   rights wording — all as the parent states. `Check` calls `store.IsReparsePoint` then (unless it is a link) `security.ReadAcl` once
+   per path, in `PathsToCheck` order; the first reparse or read failure ends the check and its line is the only output (earlier ACL
+   findings are discarded). Otherwise it reads every path and prints the first finding as the two-line refusal and the rest as
+   `  also:` lines.
 3. **`src/Dirused.Common/TrustCommands.cs`**:
    ```csharp
    public static class TrustCommands
@@ -56,7 +57,10 @@
 ## Files
 
 - `src/Dirused.Common/ScheduleSeams.cs`, `src/Dirused.Common/PlanTrust.cs`, `src/Dirused.Common/TrustCommands.cs` (new)
-- `tests/Dirused.Tests.Portable/PlanTrustTests.cs`, `tests/Dirused.Tests.Portable/TrustCommandsTests.cs` (new; in-memory fakes defined there)
+- `tests/Dirused.Tests.Portable/ScheduleFakes.cs` (new): `internal sealed` in-memory fakes `FakePlanStore`, `FakeFolderSecurity`,
+  `FakeTaskScheduler`, `FakeTrustStore`, `FakeAccountResolver`, each recording calls in one shared ordered `List<string>` log, plus
+  `internal static` fixture builders `StockSystemDrive()` and `SysadminProfile()`. b2d and b2e reuse them.
+- `tests/Dirused.Tests.Portable/PlanTrustTests.cs`, `tests/Dirused.Tests.Portable/TrustCommandsTests.cs` (new)
 
 ## What NOT to Do
 
@@ -67,8 +71,13 @@
 
 ## Acceptance
 
-Fixture `StockSystemDrive` (fake `IPlanFolderSecurity`): ACLs copied from P-ACL for `C:\`, `C:\Program Files`, `C:\Users`, the profile
-`C:\Users\op`, `...\AppData`, `...\AppData\Local`; `C:\Program Files\dirused` and its `dirused.exe` inherit Program Files' entries;
+### P-ACL tables (filled by Claude from the jump box before dispatch)
+
+Pending: owner and every ACE (SID, display, rights as `WriteRights`, inherit-only, allow/deny) for `C:\`, `C:\Program Files`, `C:\Users`,
+the profile, `AppData`, `Local`, from `Get-Acl` on the jump box (host, date).
+
+Fixture `StockSystemDrive` (fake `IPlanFolderSecurity`): the P-ACL tables for `C:\`, `C:\Program Files`, `C:\Users`, the profile
+`C:\Users\op` without the sysadmin entry, `...\AppData`, `...\AppData\Local`; `C:\Program Files\dirused` and its `dirused.exe` inherit Program Files' entries;
 `...\Local\dirused` and `plans` missing. User SID `S-1-5-21-1-2-3-1104`. Fixture `SysadminProfile` = the same plus an explicit
 `PROD\sysadmin` (`S-1-5-21-1-2-3-2001`) allow `GenericAll`, not inherit-only, on `C:\Users\op` and inherited copies below it.
 
@@ -79,7 +88,7 @@ must:
   - id: T-M2
     text: "Check on StockSystemDrive with no trusted accounts is Ok with no lines (no /trust needed for an IT install plus a normal profile)"
   - id: T-M3
-    text: "Check on SysadminProfile refuses with exactly two lines first: '/schedule: C:\\\\Users\\\\op can be changed by PROD\\\\sysadmin (full control).' and '  If you trust this account, run once: dirused /schedule /trust \"PROD\\\\sysadmin\"', then '  also:' lines for the inherited copies in path order; with PROD\\\\sysadmin in trusted it is Ok"
+    text: "Check on SysadminProfile refuses with exactly two lines first: '/schedule: C:\\\\Users\\\\op can be changed by PROD\\\\sysadmin (full control).' and '  If you trust this account, run once: dirused /schedule /trust \"PROD\\\\sysadmin\"' (C:\\\\Users\\\\op is the shallowest path with a finding), then '  also:' lines for '...\\\\AppData' and '...\\\\AppData\\\\Local' in that order (inherited copies; ancestors print only counted rights, here 'full control'); with PROD\\\\sysadmin in trusted it is Ok"
   - id: T-M4
     text: "single-entry cases on the exe folder (Leaf): Users with Append → refused with the IT line ('  This group is too wide to trust; ask IT to remove this permission or move dirused.exe.'); a domain user with Write → refused with the /trust line; the same entry InheritOnly → Ok; the same entry Deny → Ok; a read-only entry → Ok. On 'C:\\\\Program Files' (Ancestor): a domain user with Append or Write or GenericWrite → Ok; with Delete, DeleteChild, WriteDac, WriteOwner or GenericAll → refused, rights text 'delete', 'delete child', 'change permissions', 'take ownership', 'full control' respectively"
   - id: T-M5
@@ -98,7 +107,7 @@ must_not:
   - id: T-N3
     text: "a broad group can be trusted (stored by Trust, or accepted by Check because it is in the trusted list). Positive control: PROD\\\\sysadmin trusted. Mutant 'IsBroad ignored in Check' turns T-M4 red"
   - id: T-N4
-    text: "PlanTrust.cs or TrustCommands.cs (comments stripped) match \\\\b(File|Directory|Path|Registry|NTAccount|SecurityIdentifier|Process)\\\\s*[.(] — positive control: mutant adding 'System.IO.Path.GetDirectoryName' turns the scan red"
+    text: "PlanTrust.cs or TrustCommands.cs (comments stripped) match (?<![\\\\w.])(File|Directory|Path|Registry|NTAccount|SecurityIdentifier|Process)\\\\s*[.(] — positive control: mutant adding 'System.IO.Path.GetDirectoryName' turns the scan red"
 evidence:
   - id: E-T
     proves: [T-M1, T-M2, T-M3, T-M4, T-M5, T-M6, T-M7, T-M8, T-N1, T-N2, T-N3, T-N4]

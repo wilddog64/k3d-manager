@@ -1,6 +1,6 @@
 # dirused M10b2d: the `/schedule /confirm` flow (preview, prompt, re-check, trust, plan creation, register) with fakes
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; intents approved (carries E-B2); starts after b2b and b2c land; Fable + Argon blind reviews before dispatch
+**Status:** OPEN — SPEC rev 2, 2026-11-24; intents approved (carries E-B2); starts after b2b and b2c land; round-2 reviews applied (parent table)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4); design [M10b](dirused-m10b-scheduled-purge.md) §4.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (after [b2b](dirused-m10b2b-parser-usage.md) and [b2c](dirused-m10b2c-seams-and-trust.md))
@@ -18,15 +18,19 @@
    `internal static int Schedule.Preview(ParsedPurgeList list, string listPathAsTyped, DateTimeOffset created, TimeZoneInfo local,
    Options options, TextWriter stdout, TextWriter stderr, PreviewExtras? extras, out DateTimeOffset run, out string host)` so that
    `Schedule.Run` and the new flow share one formatter. `PreviewExtras(string Sha12, string TaskName, string PlanDir, string ExePath)`.
-   With `extras == null` the output is byte-identical to today's (all existing `ScheduleTests` pass unchanged). With extras, after
+   With `extras == null` the output is byte-identical to today's after b2b (all existing `ScheduleTests` pass unchanged; keep b2b's
+   `NotAvailableForm` and the ` in the list` size line). Inside `ScheduleCommands` call it as `Dirused.Common.Schedule.Preview(...)`
+   (a bare `Schedule.` binds to the method `ScheduleCommands.Schedule`). With extras, after
    the size line comes `            sha256 <Sha12>`, and after the `Held:` line come `  Task:     <TaskName>`, `  Plan dir: <PlanDir>`,
    `  Program:  <PlanDir>\dirused.exe` and `            (copy of <ExePath>)`, each value written with the existing `WriteWrappedPath`
-   rule (≤ 80 columns, 68-character chunks, 12-space continuation).
+   rule (≤ 80 columns, 68-character chunks, 12-space continuation); `(copy of <ExePath>)` is one value wrapped the same way after a
+   12-space prefix.
 2. **`src/Dirused.Common/ScheduleCommands.cs`** (new):
    `public static int ScheduleCommands.Schedule(ScheduleRequest req, ScheduleSeams s, TextWriter stdout, TextWriter stderr, TextReader input, bool inputRedirected)`.
    Steps, in order:
    1. `PurgeList.Parse(req.ListBytes, out list)` — the only parse; false → stderr `not a dirused delete list: <ListPathAsTyped>`, exit 1.
-   2. `created` = `s.Now()` truncated to whole seconds; id per the parent (one `IdSuffix()` draw); `Preview(... extras)` with
+   2. `created` = `s.Now()` truncated to whole seconds; `created`, `run` and `expires` in Pacific per the parent; id per the parent (one
+      `IdSuffix()` draw); `Preview(... extras)` with
       `Sha12` = first 12 lower-case hex of SHA-256 of `ListBytes`. Preview errors (no files, host, time rules) keep M10b0's messages and
       exit codes.
    3. No `/confirm`: print `Preview only. Add /confirm to schedule it.`; bad lines → the M10b0 `Bad list lines:` block, exit 3; else
@@ -34,15 +38,18 @@
    4. `/confirm` and bad lines → `Bad list lines:` block, `/schedule: fix the list first; nothing was scheduled`, exit 3, no prompt.
    5. `/confirm` and `s.Token == High` → `/schedule: run from a normal (not elevated) window`, exit 1.
    6. Without `/yes`: `Schedule this? [y/N] ` on stderr (no newline); `inputRedirected` → no read, No; else one `ReadLine`; `y` or
-      `yes` (trimmed, case-insensitive) is Yes. No → `Not scheduled.`, exit 0.
+      `yes` (trimmed, case-insensitive) is Yes. No → `Not scheduled.` on stdout, exit 0.
    7. Re-check: `run - s.Now() < 2 min` → `/schedule: <time as typed> is less than 2 minutes away; pick a later time`, exit 1. The time
       rules are not re-run (no silent roll to another day).
    8. Trust: `PlanTrust.Check(s.ExePath, s.PlanRoot, s.UserSid, s.Trust.Load(), s.Store, s.Security)`; not Ok → its lines on stderr,
       exit 1.
-   9. Folders: for `<PlanRoot>`'s parent then `<PlanRoot>`: `IsReparsePoint` → exit 3 `error: could not secure plan folder: <path> is a
-      link`; when not `Exists`: `CreateDirectory` then `Secure`; failure → exit 3 `error: could not secure plan folder: <error>`.
+   9. Folders: for `<PlanRoot>`'s parent then `<PlanRoot>`: when not `Exists`, `CreateDirectory` (failure → exit 3
+      `error: could not secure plan folder: <error>`); then `Secure(path, UserSid)` **always**, whether it existed or was just created
+      (so an existing `plans` folder ends up user-only, as b2e's `IsIntact` requires). `Secure` failure → `DeleteTree` the folder if
+      this run created it, exit 3 `error: could not secure plan folder: <error>`. (Links were already refused by step 8.)
    10. Plan dir `<PlanRoot>\<id>`: `CreateDirectory`; failure and `Exists` → draw a new suffix and retry (at most 5 draws in total; then
-       exit 3 `error: could not write plan: no free plan id`); other failure → exit 3 `error: could not write plan: <error>`.
+       exit 3 `error: could not write plan: no free plan id`); other failure → exit 3 `error: could not write plan: <error>`. After a
+       new draw, `id`, plan dir, task name and `PlanTask` all use the new id.
        `IsReparsePoint` on it → `DeleteTree`, exit 3 link message. `Secure(planDir, UserSid)`; failure → `DeleteTree`, exit 3 secure
        message.
    11. `Store.ReadAll(ExePath)` null → `DeleteTree`, exit 3 `error: could not write plan: cannot read <ExePath>`. Then `WriteNew` in this
@@ -57,7 +64,7 @@
 ## Files
 
 - `src/Dirused.Common/Schedule.cs` (refactor only), `src/Dirused.Common/ScheduleCommands.cs` (new)
-- `tests/Dirused.Tests.Portable/ScheduleCommandsTests.cs` (new; fakes for every seam, recording call order)
+- `tests/Dirused.Tests.Portable/ScheduleCommandsTests.cs` (new; uses b2c's `ScheduleFakes.cs`, defines no fake types)
 
 ## What NOT to Do
 
@@ -74,10 +81,30 @@ as `C:\Users\op\m10b.txt` (full path the same), `/fromlist ... /purge /schedule 
 `ExePath` `C:\Program Files\dirused\dirused.exe`, `UserSid` `S-1-5-21-1-2-3-1104`, `IdSuffix` → 0xa1b2, `ToolVersion` `0.0.28`, trust
 fakes = b2c's `StockSystemDrive` (no trust needed).
 
+D-M1 expected stdout (lines joined by "\n", final "\n"):
+
+```text
+Scheduled purge preview (nothing is scheduled yet)
+  Run:      Mon 2026-11-23 22:30 PST (06:30 UTC Tue), in 1 h 30 min
+  Expires:  Tue 2026-11-24 21:00 PST (05:00 UTC Wed)
+  Host:     us03p02ffm01
+  List:     C:\Users\op\m10b.txt
+            12 file(s), 176.2 GB in the list
+            sha256 <sha12>
+  Held:     not checked now; files held open at run time are skipped
+  Task:     \dirused\S-1-5-21-1-2-3-1104\purge-20261123-2230-a1b2
+  Plan dir: C:\Users\op\AppData\Local\dirused\plans\20261123-2230-a1b2
+  Program:  C:\Users\op\AppData\Local\dirused\plans\20261123-2230-a1b2\dirused.e
+            xe
+            (copy of C:\Program Files\dirused\dirused.exe)
+It runs only while you are logged on to this machine (disconnected is fine).
+Preview only. Add /confirm to schedule it.
+```
+
 ```yaml
 must:
   - id: D-M1
-    text: "no /confirm: stdout is exactly the M10b0 preview lines with '            12 file(s), 176.2 GB in the list', then '            sha256 <first 12 hex of SHA-256(ListBytes)>', 'Held:' line, '  Task:     \\\\dirused\\\\S-1-5-21-1-2-3-1104\\\\purge-20261123-2230-a1b2', '  Plan dir: C:\\\\Users\\\\op\\\\AppData\\\\Local\\\\dirused\\\\plans\\\\20261123-2230-a1b2', the Program line wrapped at 68 characters, '            (copy of C:\\\\Program Files\\\\dirused\\\\dirused.exe)', the logged-on line, 'Preview only. Add /confirm to schedule it.'; every line <= 80; exit 0; every seam fake records zero calls"
+    text: "no /confirm: stdout is exactly the block below (ListBytes' SHA-256 first 12 hex in place of <sha12>), every line <= 80, exit 0, and every seam fake records zero calls"
   - id: D-M2
     text: "/confirm + 'y' (also 'YES', ' yes '): 'Schedule this? [y/N] ' on stderr; recorded order: Trust.Load, ReadAcl/IsReparsePoint per path, CreateDirectory+Secure for '...\\\\dirused' and 'plans', CreateDirectory+Secure plan dir, ReadAll(exe), WriteNew dirused.exe, list.txt, task.xml, plan.txt, Register, AppendLog; dirused.exe bytes = the fake exe bytes; list.txt = ListBytes; task.xml = TaskXml.Build(planTask) with Run 2026-11-23T22:30:00-08:00, Expires 2026-11-24T21:00:00-08:00 (created truncated: no exception); plan.txt equals the parent format line for line with 'created: 2026-11-23T21:00:00-08:00' and '# trusted: none', ending with '\\n' and no '\\r'; Register(taskName '\\\\dirused\\\\S-1-5-21-1-2-3-1104\\\\purge-20261123-2230-a1b2', '<plan dir>\\\\task.xml'); AppendLog 'schedule 20261123-2230-a1b2 run 2026-11-23T22:30:00-08:00 files 12 bytes <total>'; stdout ends 'Scheduled 20261123-2230-a1b2 for Mon 2026-11-23 22:30 PST (06:30 UTC Tue). Check it with: dirused /schedule /list'; exit 0"
   - id: D-M3
@@ -91,7 +118,7 @@ must:
   - id: D-M7
     text: "trust: with b2c's SysadminProfile fake and empty store → the two refusal lines then also-lines on stderr, exit 1, no CreateDirectory/WriteNew/Register; with PROD\\\\sysadmin stored → registers and plan.txt says '# trusted: S-1-5-21-1-2-3-2001'"
   - id: D-M8
-    text: "failures: plan-dir CreateDirectory fails with Exists true twice → ids with the 2nd and 3rd suffix draws, success on the 3rd, printed id is the 3rd; five collisions → exit 3 'error: could not write plan: no free plan id'; Secure(plan dir) fails → DeleteTree(plan dir), exit 3 'error: could not secure plan folder: <error>', no WriteNew; WriteNew(task.xml) fails → DeleteTree, exit 3 'error: could not write plan: <error>', no Register; ReadAll(exe) null → exit 3 'error: could not write plan: cannot read C:\\\\Program Files\\\\dirused\\\\dirused.exe'; Register fails with 'could not schedule (schtasks exit 1)' → DeleteTree, exit 3 'error: could not schedule (schtasks exit 1)'; '...\\\\dirused' IsReparsePoint → exit 3 'error: could not secure plan folder: C:\\\\Users\\\\op\\\\AppData\\\\Local\\\\dirused is a link'; AppendLog fails → warning line, exit 0"
+    text: "failures: plan-dir CreateDirectory fails with Exists true twice → ids with the 2nd and 3rd suffix draws, success on the 3rd, printed id is the 3rd; five collisions → exit 3 'error: could not write plan: no free plan id'; Secure(plan dir) fails → DeleteTree(plan dir), exit 3 'error: could not secure plan folder: <error>', no WriteNew; WriteNew(task.xml) fails → DeleteTree, exit 3 'error: could not write plan: <error>', no Register; ReadAll(exe) null → exit 3 'error: could not write plan: cannot read C:\\\\Program Files\\\\dirused\\\\dirused.exe'; Register fails with 'could not schedule (schtasks exit 1)' → DeleteTree, exit 3 'error: could not schedule (schtasks exit 1)'; the plan dir reported as a reparse point after CreateDirectory → DeleteTree, exit 3 'error: could not secure plan folder: C:\\\\Users\\\\op\\\\AppData\\\\Local\\\\dirused\\\\plans\\\\20261123-2230-a1b2 is a link'; an existing 'plans' folder with inherited Administrators entries is passed to Secure (recorded) before the plan dir is created; Secure fails on a 'plans' folder this run created → DeleteTree('plans'), exit 3; AppendLog fails → warning line, exit 0"
   - id: D-M9
     text: "Schedule.Run (M10b0 entry) output and exit codes are unchanged: every existing ScheduleTests assertion passes without edits"
 must_not:

@@ -1,6 +1,6 @@
 # dirused M10b2e: `/schedule /list` and `/schedule /cancel` (pure, with fakes)
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; intents approved (carries E-B2); starts after b2c lands (parallel with b2d); Fable + Argon blind reviews before dispatch
+**Status:** OPEN — SPEC rev 2, 2026-11-24; intents approved (carries E-B2); starts after b2c lands (parallel with b2d); round-2 reviews applied (parent table)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4); design [M10b](dirused-m10b-scheduled-purge.md) §5 path checks 3–4, §7.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (after [b2c](dirused-m10b2c-seams-and-trust.md))
@@ -12,12 +12,10 @@
 **Intent note:** carries the approved E-B2 intent unchanged (parent); this child is its list-and-cancel part.
 **Approval:** operator, 2026-11-24 — "intents approved"
 
-## File formats this child reads (writers: b2d for `plan.txt`; M10b3 `/runplan` for `claim` and `report.txt`)
+## File formats this child reads
 
-- `claim` (UTF-8, one line, `"\n"`): `run <yyyy-MM-ddTHH:mm:sszzz> pid <n>` or `cancel <yyyy-MM-ddTHH:mm:sszzz>`. Written with
-  `WriteNew` (CreateNew), so whichever of run and cancel writes first wins.
-- `report.txt` (UTF-8, `"\n"`): header lines `# outcome: <done|refused|interrupted>`, and for `done` also `# result: <text>` and
-  `# exit: <n>`; other lines ignored here.
+As the parent's "`claim` and `report.txt`" section (writer M10b3) and `plan.txt` (writer b2d). Lines are read tolerant of `\r\n` and
+a missing final newline. The report outcome is shown verbatim (`done`, `expired`, `refused: <reason>`, or anything else written).
 
 ## Scope
 
@@ -35,12 +33,16 @@ public static class SchedulePlans
 1. **`IsIntact`**: none of `<PlanRoot>`'s parent, `<PlanRoot>`, the plan dir, `plan.txt`, `list.txt`, `dirused.exe` is a reparse point;
    `ReadAcl` of `<PlanRoot>`, the plan dir and the three files is Ok, owner = `UserSid`, and every allow entry (inherit-only included)
    has SID `UserSid`. Any miss → false.
-2. **`List`**: `ListDirectoryNames(PlanRoot)`; keep names matching `^[0-9]{8}-[0-9]{4}-[0-9a-f]{4}$`, ignore others. None → `No scheduled
+2. **`List`**: `ListDirectoryNames(PlanRoot)`; keep names matching `\A[0-9]{8}-[0-9]{4}-[0-9a-f]{4}\z`, ignore others. Task name =
+   `\dirused\<s.UserSid>\purge-<id>`. A readable plan needs: first line `# dirused plan v1`, `# id:` equal to the folder name, `# run:`
+   parsing as `DateTimeOffset`, `# files:` and `# bytes:` non-negative integers, `# host:` and `# source:` non-empty; else state 2.
+   A missing `plan.txt` fails `IsIntact` (its ACL cannot be read), so it shows state 1. Times print in Pacific (a private Pacific
+   lookup in this file, as `Schedule.cs` does; `Schedule.cs` is not changed here). None → `No scheduled
    purges.`, exit 0. Per plan, the state is the first match:
    1. `!IsIntact` → `permissions changed — not run`
    2. `plan.txt` unreadable (`ReadAll` null) or missing a field the row needs → `unreadable plan`
    3. claim `cancel` → `cancelled`
-   4. claim `run` and `report.txt` readable → its outcome; `done` → `done (<result>, exit <n>)`
+   4. claim `run` and `report.txt` readable → its outcome verbatim; `done` → `done (<result>, exit <n>)`
    5. claim `run`, no report, `ProcessImagePath(pid)` equals `<plan dir>\dirused.exe` (ordinal, ignore case) → `running`
    6. claim `run`, no report → `interrupted (started <claim time as ddd HH:mm PST|PDT>, no report) — check the list and the report folder`
    7. no claim and `Now() > run + 15 min` → `missed (did not run)`
@@ -49,7 +51,7 @@ public static class SchedulePlans
 
    Row (two spaces between fields, no padding): `<id>  <run as ddd yyyy-MM-dd HH:mm PST|PDT>  <host>  <state>  <n> file(s) <size>  <source file name>`
    where `<size>` is `Format.Size(bytes)` and `<source file name>` is the last `\`-separated part of `# source:`. States 1–2 print
-   `<id>  -  -  <state>`. Order: plans with a readable run, newest run first; then the others by id descending. Exit 0.
+   `<id>  -  -  <state>`. Order: plans with a readable run, newest run first (ties: id descending); then the others by id descending. Exit 0.
 3. **`Cancel(id)`**: id not matching the pattern, or plan dir missing → exit 1 `unknown plan id: <id>`. `!IsIntact` → exit 1
    `refused: plan folder permissions changed`. `WriteNew(<plan dir>\claim, "cancel <Now ISO>\n")`; it fails and the existing claim
    reads `run ...` → exit 1 `<id> already started; it cannot be cancelled`; reads `cancel ...` → `<id> is already cancelled`, exit 0;
@@ -59,7 +61,7 @@ public static class SchedulePlans
 
 ## Files
 
-- `src/Dirused.Common/SchedulePlans.cs` (new), `tests/Dirused.Tests.Portable/SchedulePlansTests.cs` (new; in-memory fakes)
+- `src/Dirused.Common/SchedulePlans.cs` (new), `tests/Dirused.Tests.Portable/SchedulePlansTests.cs` (new; uses b2c's `ScheduleFakes.cs`, defines no fake types)
 
 ## What NOT to Do
 
@@ -74,7 +76,7 @@ must:
   - id: L-M1
     text: "List over nine fixture plans, one per state 1-9, prints each with its exact state text; two-condition fixtures (claim cancel + not intact; claim run + report + live pid; no claim + past run+15 + task missing) show the earlier state; rows match the literal format, e.g. '20261123-2230-a1b2  Mon 2026-11-23 22:30 PST  us03p02ffm01  scheduled  12 file(s) 176.2 GB  m10b.txt'; states 1-2 rows are '<id>  -  -  <state>'; order newest run first, unreadable last; a dir named 'notes' is ignored; missing plan root → 'No scheduled purges.'"
   - id: L-M2
-    text: "running vs interrupted: claim 'run ... pid 42' with ProcessImagePath(42) = '<plan dir>\\\\dirused.exe' → running; = 'C:\\\\Windows\\\\notepad.exe' or null → interrupted (started Mon 22:30 PST, no report) — ...; done report → 'done (deleted 12, exit 0)' for '# result: deleted 12' '# exit: 0'"
+    text: "running vs interrupted: claim 'run ... pid 42' with ProcessImagePath(42) = '<plan dir>\\\\dirused.exe' → running; = 'C:\\\\Windows\\\\notepad.exe' or null → interrupted (started Mon 22:30 PST, no report) — ...; done report → 'done (deleted 3 file(s), 52.1 GB freed; 1 skipped; 0 failed, exit 0)' for '# result: deleted 3 file(s), 52.1 GB freed; 1 skipped; 0 failed' '# exit: 0'; '# outcome: expired' → 'expired'; '# outcome: refused: plan folder contains a link' → that text; the state-2 fixture is an intact plan whose plan.txt lacks '# host:'"
   - id: L-M3
     text: "Cancel without claim: WriteNew(claim) with content 'cancel 2026-11-23T21:10:00-08:00\\n', then Delete(taskName) once, AppendLog 'schedule-cancel <id>', 'Cancelled <id>.', exit 0, in that order"
   - id: L-M4

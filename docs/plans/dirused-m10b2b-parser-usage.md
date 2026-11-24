@@ -1,6 +1,6 @@
 # dirused M10b2b: parser rows for /list, /cancel, /runplan, /trust, /untrust; usage lines; size-line wording
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; intents approved (carries E-B2); Fable + Argon blind reviews before dispatch
+**Status:** OPEN — SPEC rev 2, 2026-11-24; intents approved (carries E-B2); Fable + Argon round-2 reviews applied (parent table)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4); design [M10b](dirused-m10b-scheduled-purge.md) §2.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (tip `e19783f`)
@@ -20,7 +20,7 @@
 
    | # | Condition | Error |
    |---|---|---|
-   | 1 | `runplan` appears more than once, or with any other token except its one id | `/runplan cannot be combined with other switches` |
+   | 1 | `runplan` appears more than once, or any token is present other than `runplan` and the one token directly after it (whatever it is) | `/runplan cannot be combined with other switches` |
    | 2 | `runplan` with no following token, or the next token is switch-like | `/runplan requires a plan id` |
    | 3 | `list` or `cancel` present without `schedule` | `/list and /cancel go with /schedule` |
    | 3a | `trust` or `untrust` present without `schedule` | `/trust and /untrust go with /schedule` |
@@ -31,7 +31,9 @@
    | 6c | `schedule` and `untrust`: no token after `untrust`, or it is switch-like | `/schedule /untrust requires an account` |
    | 6d | `schedule` and `untrust`: anything else present | `/schedule /untrust cannot be combined with other switches` |
 
-   Then the existing rows 7–11 run unchanged.
+   Each of `schedule`, `list`, `cancel`, `trust`, `untrust` may appear at most once inside rows 4–6d; a duplicate counts as "anything
+   else present" for that row. Then the existing rows 7–11 run unchanged. The old `/fromlist`-branch checks at `ArgParser.cs:155-157`
+   become unreachable for these switches; leave them.
 3. **Accepted forms** return `Options(Array.Empty<string>())` with exactly one new field set and every other field at its default:
    `/runplan <id>` → `RunPlan = <id>`; `/schedule /list` → `ScheduleList = true`; `/schedule /cancel <id>` → `ScheduleCancelId = <id>`;
    `/schedule /trust` → `ScheduleTrust = true`; `/schedule /trust <acct>` → `ScheduleTrust = true, ScheduleTrustAccount = <acct>`;
@@ -67,8 +69,8 @@
 
 - `ArgParserTests.cs:328-329` (`/schedule /list` and `/schedule /cancel x` expect `/schedule requires /fromlist`) and
   `ScheduleTests.cs:53-54` (`/schedule /list` → `/schedule requires /fromlist`; `... 22:30 /list` → `Unknown switch: /list`): these four
-  assertions change to rows 4/5 behaviour (`/schedule /list` accepted; `/schedule /cancel x` accepted; `... 22:30 /list` → row 4). No
-  other existing assertion changes.
+  assertions change to rows 4/5 behaviour (`/schedule /list` accepted; `/schedule /cancel x` accepted; `... 22:30 /list` → row 4), and
+  `ScheduleTests.cs:29` (the size line) gains ` in the list`. No other existing assertion changes (five in total).
 - Size line: `ScheduleTests.cs` exact-preview expectations and `docs/purge.md:17`.
 - `ArgParser.cs:155` (the `/fromlist` branch's own `schedule` handling) is unchanged; rows 1–6d run before it.
 
@@ -87,7 +89,7 @@ must:
   - id: P-M2
     text: "accepted forms give Options with exactly the one field set and every other field equal to a default Options(Array.Empty<string>()): ['/runplan','20261123-2230-a1b2'], ['/schedule','/list'], ['/list','/schedule'], ['/schedule','/cancel','20261123-2230-a1b2'], ['/schedule','/trust'], ['/schedule','/trust','PROD\\\\Domain Admins'] (one token with a space), ['/schedule','/untrust','S-1-5-21-1-2-3-1104']"
   - id: P-M3
-    text: "M10b0 rows 7-11 unchanged: every existing ArgParserTests and ScheduleTests assertion passes except the four listed under Contract readers, which assert the new behaviour"
+    text: "M10b0 rows 7-11 unchanged: every existing ArgParserTests and ScheduleTests assertion passes except the five listed under Contract readers, which assert the new behaviour"
   - id: P-M4
     text: "UsageText contains the four new lines exactly, directly after the existing /schedule <time> lines; no usage line exceeds 80 columns; '/runplan' does not appear in UsageText or ShortUsageText"
   - id: P-M5
@@ -103,12 +105,12 @@ evidence:
   - id: E-P
     proves: [P-M1, P-M2, P-M3, P-M4, P-M5, P-M6, P-N1, P-N2]
     kind: offline
-    command: "dotnet test tests/Dirused.Tests.Portable on m4; new tests red on e19783f; mutants each red: row 4 checked after row 6b; row 3a removed; ScheduleTrustAccount not set; Program refusal removed; size line without 'in the list'"
+    command: "dotnet test tests/Dirused.Tests.Portable on m4; new tests red on e19783f; mutants each red: row 4 checked after row 6b; row 3a removed; ScheduleTrustAccount not set; NotAvailableForm returns null for ScheduleList; size line without 'in the list'"
     intent: "Typing /schedule shows you exactly what would run — when, which list, how many files and how much space — and schedules nothing until you add /confirm and say yes; you can list and cancel plans, and a cancel can never race a run that already started. Before scheduling, dirused checks who else could change the program or plan folders and tells you exactly which account to trust, once."
   - id: E-PW
     proves: [P-M3, P-M5, P-N2]
     kind: offline
-    command: "after landing: the windows CI job on the m10b-scheduled-purge push run is green on the landed commit, including ProgramScheduleRefusalTests"
+    command: "after landing: the windows CI job on the m10b-scheduled-purge push run is green on the landed commit, including ProgramScheduleRefusalTests; before landing, Claude pushes a scratch branch with the Program refusal line removed and records that the windows job fails ProgramScheduleRefusalTests (run URL), then deletes the branch"
     intent: "The same tests pass on Windows, where dirused actually runs."
 interface:
   - "/runplan cannot be combined with other switches"
