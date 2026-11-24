@@ -5,7 +5,7 @@
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** investigation — since 2026-11-23 (P12 `sudo -V` timestamp probe at home; rev 3 intents re-approved, see [Re-approval](#re-approval-done-2026-11-23))
+**Waiting on:** dispatch — since 2026-11-23 (P12 probe: `tty` on both hosts)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -299,7 +299,7 @@ P16 and P17 are Fable's round-2 probes (m4-air, 2026-11-23, session scratchpad, 
 | P9 | `sudo -n -l` | `timestamp_timeout=60`; ticket type not shown | a ticket stays valid 60 minutes; `stage` and `run` run `sudo -k` |
 | P10 | (earlier in this session) zsh 5.9.2 and bash 5.3.20: an alias and a function named `/usr/bin/sudo` | both replace the absolute path | residual 1 |
 | P11 | `csrutil status`; ownership | m4-air: SIP **disabled**; m5-air: SIP enabled. `/usr/local` `root:wheel 0755` on both; `/usr/local/libexec` absent on both; `/`, `/private`, `/private/var`, `/private/var/db`, CLT `git` and each of its ancestors are uid 0 mode 755; `/opt/homebrew` belongs to the operator; `/private/tmp` is 0777 (Fable round 2) | residual 3; the walk in F1.3 passes on a stock system; tests need `_VS_TRUST_TOP` |
-| P12 | `/etc/sudoers` | `root 0440`, unreadable: `env_reset`, `env_keep`, `secure_path` and `timestamp_type` are unproven. `/var/db/sudo/ts` is `root 0700` (Fable round 2) | **pre-dispatch gate for A (operator, at home):** `sudo /usr/bin/sudo -V \| grep -i timestamp` on m5-air and m4-air; record the result here. `tty` keeps residual 5 as written; `global` or `ppid` means any same-uid process can use the ticket during a run, and residual 5 and the howto must say so |
+| P12 | `/etc/sudoers` | `root 0440`, unreadable: `env_reset`, `env_keep`, `secure_path` and `timestamp_type` are unproven. `/var/db/sudo/ts` is `root 0700` (Fable round 2) | **pre-dispatch gate for A (operator, at home):** `sudo /usr/bin/sudo -V \| grep -i timestamp` on m5-air and m4-air; record the result here. `tty` keeps residual 5 as written; `global` or `ppid` means any same-uid process can use the ticket during a run, and residual 5 and the howto must say so **Result (operator, 2026-11-23, screenshot 146):** m4-air and the hub pane both print `Type of authentication timestamp record: tty`, `timeout: 60.0 minutes`, dir `/var/db/sudo/ts`. Residual 5 stands as written; gate for A cleared. |
 | P13 | `gh api repos/wilddog64/k3d-manager/rulesets` and `branches/main/protection` | one ruleset `main`: `deletion` and `non_fast_forward`, bypass `RepositoryRole`; 1 approving review, `enforce_admins: true`; public repo, 34 MB | `deploy/hub` and release branches are unprotected (Q1, residual 2) |
 | P14 | `SCRIPT_DIR=<evil> /bin/bash -p -c 'source <repo>/scripts/lib/system.sh'` with `<evil>/lib/agent_rigor.sh` printing `SCRIPT_DIR-PWNED` | `SCRIPT_DIR-PWNED` printed | `run` drops `SCRIPT_DIR`; the direct-run fix is deferred (P3) |
 | P15 | `/usr/bin/env -i /bin/bash -p -c 'compgen -e'`; a scratch file given `chmod +a "everyone allow write"`, then `/bin/ls -le`, `/bin/ls -lReA \| grep -cE '^ [0-9]+: '`, `chmod -RN`, count again | `PWD SHLVL`. ACL: mode shows `+`, one ` 0: group:everyone allow write` line; count 1, then 0 after `chmod -RN` | no self re-exec; the ACL check and `chmod -RN` work as specified |
