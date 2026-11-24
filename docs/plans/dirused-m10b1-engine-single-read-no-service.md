@@ -1,16 +1,22 @@
 # dirused M10b1: purge engine — one-read list parse and a scheduled mode that stops no service
 
-**Status:** OPEN — SPEC rev 2, 2026-11-23; awaiting intent approval
+**Status:** OPEN — SPEC rev 3, 2026-11-24; intents approved; Fable + Argon blind reviews before dispatch
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) (design, decisions D9 and D11, review adjudication). First of four sequential children.
-**Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (from main a2d0508)
+**Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (integration branch for M10b1–M10b4, created from `main` `966b32b`, v0.0.27; one PR to main at the end)
 **Risk:** medium — touches `Purge.Apply` (85 test call sites) and `PurgeList.Read`; behaviour with the new flag off must not change
 **Implementer:** Luna (Codex)
 **Verifier:** Claude, offline, from Acceptance only
 **Filed:** 2026-11-23
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-24
 **Approval:** operator, 2026-11-23 — "Skip held files for now"; "Held Tomcat logs only" (no growth relaxation in M10b)
 **Proofs needed first:** none (no external behaviour)
+
+## Rev 3 (2026-11-24)
+
+Rebased on `main` `966b32b`: M10b0 changed neither `Purge.cs` nor `PurgeList.cs`, so the change is as rev 2; only Program.cs
+line numbers moved. Output asserts in new tests use writers with `NewLine = "\n"` and literal `"\n"` expectations (no
+`Environment.NewLine` in the file), so the windows CI job passes.
 
 ## Why
 
@@ -38,8 +44,8 @@ Do not change any other file; existing tests must pass unchanged.
 
 ## Contract readers
 
-- `Purge.Apply`: callers `src/Dirused.Cli/Program.cs:119`, `:204`, 85 test call sites — parameter optional and last; no edits needed.
-- `PurgeList.Read`: caller `Program.cs:70`, `PurgeListTests` — behaviour preserved.
+- `Purge.Apply`: callers `src/Dirused.Cli/Program.cs:120`, `:205` (at `966b32b`), 85 test call sites — parameter optional and last; no edits needed.
+- `PurgeList.Read`: caller `Program.cs:71`, `PurgeListTests` — behaviour preserved.
 - New status text: writer `Purge.cs`; readers M10b3 report, `docs/purge.md` (M10b4).
 
 ## What NOT to Do
@@ -60,7 +66,7 @@ must:
     text: "Purge.Apply with scheduled true and yes true at a localNow of 14:00 (outside 19:00-06:00): held rows get the scheduled-skip status, not 'skipped: in use, outside 19:00-06:00 for /yes'"
 must_not:
   - id: B1-N1
-    text: "with scheduled true, any IServiceControl call is recorded (Stop, Start, Query on the control) — positive control: the same fixture with scheduled false, yes true, localNow 22:30 records Stop then Start for Tomcat85. Baseline red: on a2d0508 the test does not compile without the parameter; the named mutant 'ignore scheduled in the held loop' makes it red at run time"
+    text: "with scheduled true, any IServiceControl call is recorded (Stop, Start, Query on the control) — positive control: the same fixture with scheduled false, yes true, localNow 22:30 records Stop then Start for Tomcat85. Baseline red: on 966b32b the test does not compile without the parameter; the named mutant 'ignore scheduled in the held loop' makes it red at run time"
   - id: B1-N2
     text: "with scheduled true, a not-held row whose size grew, whose last-write is newer, or whose file ID differs is deleted — each stays with 'skipped: file changed since list (...)'; positive control: the matching row deletes"
   - id: B1-N3
@@ -69,7 +75,7 @@ evidence:
   - id: E-B1
     proves: [B1-M1, B1-M2, B1-M3, B1-N1, B1-N2, B1-N3]
     kind: offline
-    command: "dotnet test tests/Dirused.Tests.Portable. ScheduledEngineTests red on a2d0508 (compile). Mutants each red: (a) held loop ignores scheduled; (b) scheduled check placed after the /yes window check; (c) control called for Query when scheduled; (d) Parse drops the BOM handling; (e) Parse splits only on \\n leaving \\r; (f) ordinary-row check relaxed to size >= when scheduled"
+    command: "dotnet test tests/Dirused.Tests.Portable. ScheduledEngineTests red on 966b32b (compile). Mutants each red: (a) held loop ignores scheduled; (b) scheduled check placed after the /yes window check; (c) control called for Query when scheduled; (d) Parse drops the BOM handling; (e) Parse splits only on \\n leaving \\r; (f) ordinary-row check relaxed to size >= when scheduled. The PR windows CI job is green on the head commit."
     intent: "A scheduled run never stops or starts Tomcat: files Tomcat holds open are listed as skipped, and every other file is deleted only if it is exactly the file you reviewed."
 interface:
   - "PurgeList.Parse(byte[] bytes, out ParsedPurgeList? list)"
