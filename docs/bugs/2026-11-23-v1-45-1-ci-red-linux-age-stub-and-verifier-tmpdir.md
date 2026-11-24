@@ -1,6 +1,6 @@
 # Bug: v1.45.1 CI red on Linux: dr_drill secret-tool stub lacks the age identity; verifier test needs TMPDIR
 
-**Status:** LANDED — test-only fix `7a84f90d` on `k3d-manager-v1.45.1`, 2026-11-23 (Claude); CI on the pushed head pending
+**Status:** LANDED — test-only fixes `7a84f90d` and `037a7ab8` on `k3d-manager-v1.45.1`, 2026-11-23 (Claude); CI on the pushed head pending
 **Priority:** P1 (proposed: CI red on the release branch blocks `make hub-deploy`, which requires green checks; also blocks the release PR)
 **Introduced by:** `77d5a836` (age-identity fix, dr_drill.bats) and `4b831c81` (cve-scan private kubeconfig, cve_remediation_verify.bats)
 **Should have been caught by:** review (both lands were verified on macOS only, where `uname -s` is Darwin and `TMPDIR` is always set)
@@ -8,7 +8,7 @@
 **Waiting on:** live check — since 2026-11-23 (green CI on the pushed head)
 **Prior art:** `docs/bugs/2026-11-12-dev-hub-bats-tmpdir-unset-on-linux-ci.md` (name grep, read) — same escape class and same TMPDIR fix; `make find-similar-docs` not run
 **Detected by:** operator, 2026-11-23: `make hub-deploy REF=7b690cd3` refused, "GitHub check runs are pending or failed"; CI run 45288874536 had test (2) and test (3) red
-**Fix commit:** 7a84f90d
+**Fix commit:** 7a84f90d, 037a7ab8
 
 ## What is wrong
 
@@ -34,6 +34,15 @@ Evidence on m4, 2026-11-23, Linux simulation (a `uname` shim printing `Linux` fo
 | dr_drill.bats (Linux sim) | 25/35 red (matches CI) | 0/35 |
 | cve_remediation_verify.bats (Linux sim) | 5/9 red (test 8 skipped: BSD sed) | 0/9 |
 | dr_drill.bats (macOS) | — | 0/35 |
+
+## Recurrence — 2026-11-23 (CI run 45291816630 on 53b23fab)
+
+test (3) went green; test (2) still had test 8 red: `grep: .../k3dm-kc.XXXX/config: No such file or directory`. A
+third defect from `4b831c81`, hidden by the TMPDIR abort: test 8 greps the loader's live kubeconfig after the loader
+has exited and removed its directory (test 4 asserts that removal). It skips under BSD sed, so it had never run
+anywhere before. Fix `037a7ab8`: assert the live file is gone and read the kubectl stub's capture (`$probe/config`),
+as test 9 does. Alpine 3.20 container with GNU sed, m4, 2026-11-23: pre-fix test 8 red with CI's exact error, fixed
+cve_remediation_verify.bats 9/9. (dr_drill does not run on Alpine; ubuntu CI test (3) is green for it.)
 
 ## Acceptance
 
