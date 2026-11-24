@@ -8,8 +8,16 @@
 **Implementer:** Luna (Codex)
 **Verifier:** Claude offline; live checks E-B3L1 and E-B3L2 by the operator on the jump box
 **Filed:** 2026-11-23
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-24
 **Approval:** operator, 2026-11-23 — D9 (no service stop), D3 (logged-on only, no password)
+
+## Jump-box probe script (2026-11-24)
+
+[`assets/dirused-m10b3-probes.ps1`](assets/dirused-m10b3-probes.ps1) covers P1, P2, P3, P8 (a, b, d), P10 (descriptor readback; the
+second-account check is manual) and P12. It creates tasks only under `\dirused-probe\<SID>\` and files only under
+`%LOCALAPPDATA%\dirused-probe\`; P3 runs `dir` and `icacls` on the share (read-only). Run order: `setup` (afternoon, prints the
+steps and times), `run12`, disconnect / sign-out steps as printed, leave disconnected, next morning `collect`, paste `report.txt`,
+then `cleanup`. P5, P6 and P9 are not in it (P9 is a CI workflow, Claude's).
 
 ## Scope
 
