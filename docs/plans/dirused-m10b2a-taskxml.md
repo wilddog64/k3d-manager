@@ -1,6 +1,6 @@
 # dirused M10b2a: `TaskXml` — build and parse the scheduled task's XML (pure, no scheduler)
 
-**Status:** LANDED — `cf07ace` on `m10b-scheduled-purge` (2026-11-24); independent Sonnet verifier (round 1 FAIL → correction 1) and Claude mutant re-run PASS; E-XW windows CI on push run 45455761460 pending
+**Status:** LANDED — `cf07ace` on `m10b-scheduled-purge` (2026-11-24); independent Sonnet verifier (round 1 FAIL → correction 1) and Claude mutant re-run PASS; E-XW windows CI on push run 45455761460 green on attempt 2 (attempt 1: unrelated cleanup flake, docs/bugs/2026-11-24-dirused-root-shared-open-cleanup-race.md)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) §4.7 (split out of [M10b2](dirused-m10b2-schedule-preview-list-cancel.md) on 2026-11-24 so it can run
 beside M10b1; no shared file with M10b1).
