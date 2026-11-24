@@ -1,11 +1,11 @@
 # Bug: `make sync-branch` / `make sync-main` JSON-patch a path that no longer exists in `services-git`
 
-**Status:** OPEN
+**Status:** LANDED — `22b61f8d` 2026-11-24 (Luna, correction 1 by Claude: failed get or patch now stops make); verify pass, offline_tested
 **Priority:** P3 — hygiene: a dev convenience target fails; the ApplicationSet can still be re-pointed by redeploying it
 **Introduced by:** `0c9b2707` (v1.7.1, the services-git generator became a matrix); the patch path dates from `c5949cf4` (v1.4.12)
 **Should have been caught by:** offline test (no test exercises either target)
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-24 (R1 landed `5f7ef7be` 2026-11-23, unblocking it)
+**Waiting on:** live check — since 2026-11-24 (hub reads deploy/hub: needs `make hub-deploy` promote, then a `make sync-branch` / `make sync-main` round trip)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-make-sync-branch-patches-missing-appset-path.md`: none; `make find-similar-docs` not run (vector store unavailable); found while writing R1, [`2026-11-23-cve-pins-branch-trusted-without-verification.md`](2026-11-23-cve-pins-branch-trusted-without-verification.md) "Not readers" — read, same finding, this doc is its P3 capture
