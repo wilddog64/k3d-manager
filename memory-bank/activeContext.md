@@ -16,6 +16,17 @@
   refuses ANY symlink in a verified stage (was "a symlink pointing out of the stage"; the round-2 verifier escaped the
   lexical check with a two-link pair, Claude reproduced). Repo commits 0 symlinks, so no behaviour loss. Parent bug doc
   F1 + child spec `## Clarification`, commit `cecc52e1`.
+- **DECISION NEEDED — R2 child A (root bootstrap `bin/k3dm-verified-stage`), not landed, stopped after 3 verify rounds:**
+  each round found new real defects. R1: 36/49 mutants green. R2: lexical symlink escape + fail-open find/git status
+  (fixed in corr 2, Claude re-probed). R3: (a) wrapper → `sudo self stage <c>` re-enters `_vs_wrapper` as root and exits
+  3 "run as the operator", so the installed staging flow can never work (entry line `[ "$1" = stage ] && _vs_wrapper`;
+  test asserts the wrong argv); (b) `_vs_git` forwards caller GIT_CONFIG_COUNT/KEY_0/VALUE_0 into root git (N3);
+  (c) ~101 of 163 surviving mutants are real gaps (root-form dispatch, exit-code table 2/4/5/6, `.git` symlink check,
+  `set` stdout dump). Options to put to the operator: (1) correction 3 whose core is ONE end-to-end test layer that
+  runs the real script file as fake root via the EUID seam for every form (wrapper → sudo stand-in → real entry →
+  stage/run/install-self) and asserts exact exit codes, plus fixes (a)(b); (2) split A into A1 stage+install-self and
+  A2 run mode+wrapper, each with its own verifier; (3) Fable design review of the bootstrap before more Luna rounds.
+  Claude's recommendation: (1) now, then (3) as the gate before landing. Round-3 report: scratchpad r2a-verify3/.
 - Record results in `docs/plans/hoverfocus-v0.0.2-l1-app-lifecycle.md` / `-f1-install.md` live-check logs.
 
 **State at end of 2026-11-23 evening session:** WIP 3/3 — r2-a correction 1 (test gaps), totp-a1-fix (Luna, spec
@@ -228,3 +239,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-23 late: totp-a1-fix LANDED b1c99eb7 (retry after P3 bats race), verify pass + offline_tested. istioctl-c LANDED 3e74f38b (Claude fixed stale m4 1.30.0 fact), verify + mark. Bug docs totp-A1 and dr-drill istioctl → LANDED, Waiting on live check. WIP 1/3: r2-a (round-2 verifier). Free slots: next candidates V4 defect 1 (needs m2 probe first), R2-B (after r2-a lands).
 - 2026-11-23 late: r2-a round-2 verifier FAIL: REAL defects — (1) lexical symlink containment escaped by a two-link pair (Claude reproduced: _vs_stage_ok rc 0, bin/x → base/), (2) find/git-status failures pass (fail-open), plus install-self follows a staged symlink; 303/586 mutants green incl. env-exactness, real root check, exit codes, run mode only sshd; test 29 flakes under backgrounded bats (SIGINT ignored). Claude narrowed parent F1 + child spec: no symlink in stage at all (repo commits 0), find/git failure refuses. Correction 2 resumed (D1-D4 code, G1-G7 tests).
 - 2026-11-23 late: r2-a correction 2 exited: suite 44 tests; Claude reran probes — two-link escape refused, any symlink refused, mode-000 dir refused (find error fails closed); suite 44/44 fg and 44/44 backgrounded (test 29 flake fixed); lint ok; dead helpers gone. Round-3 independent verifier running (regenerated 586-mutant set + security probes).
+- 2026-11-23 night: r2-a round-3 verifier FAIL: wrapper/sudo re-dispatch bug (Claude confirmed in code: entry routes 'stage' to _vs_wrapper, wrapper sudo-runs 'self stage <c>' → root re-enters wrapper → exit 3), GIT_CONFIG_* forwarding in _vs_git (N3, confirmed :30), ~101 real-gap survivors of 531. Correction loop stopped after 3 rounds; options recorded in the morning reminder for the operator. WIP 1/3 (r2-a exited, not landed).
