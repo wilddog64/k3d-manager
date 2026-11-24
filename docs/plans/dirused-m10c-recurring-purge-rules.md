@@ -15,6 +15,25 @@ scheduled runs stop no service; M10b's live check is now M10b3 E-B3L2).
 **Intent approved:** pending
 **Approval:** operator, 2026-11-23 — reverses Amendment 3's "one-time only" for rules (below)
 
+
+## Team-lead target (2026-11-24)
+
+The operator showed dirused to their lead. The lead's goal: **a nightly run at 00:30 that deletes the large Tomcat logs, stopping and
+starting Tomcat**. Operator: "let's keep our agenda, preview first then move to actual scheduling". So the order stays:
+
+1. M10b0 — `/schedule` preview (demo build).
+2. M10b1–M10b4 — one-time scheduling from a reviewed list; held files skipped, no service stop (D9).
+3. M9b E2 — the attended stop/delete/start ("y path") live check, which every unattended stop builds on.
+4. M10d — unattended stop/start with recovery that survives a killed run (proven on a disposable service first).
+5. M10c — recurring rules ("nightly 00:30, Tomcat redirect logs"), the lead's target, using M10d for the stop.
+
+M10c and M10d together are the lead's request. Two choices for them, to settle at their specs:
+- **Where the nightly task runs.** On the jump box it depends on the operator's RDP session (signed out or rebooted → `missed`). On
+  the server (M10d "register on the target node", S4U, no stored password) it does not, but it is a production change that needs
+  the server owner's approval. A team tool that runs nightly probably wants the server option.
+- **Stop/start or truncate.** If P-T1 (M10c) shows Tomcat's log handle shares write, truncating the log in place frees the space
+  with no Tomcat restart at all, which is lower risk for a nightly job.
+
 ## Why, and what it reverses
 
 Operator, 2026-11-23: "if we find a pattern of log file growing can we schedule to delete it at the desired time". Amendment 3

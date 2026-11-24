@@ -23,6 +23,9 @@ sequential parts ("Split into sequential parts"); the growth relaxation goes onl
 ("Held Tomcat logs only"); preview before scheduling ("can we allow print out schedule for confirm before it actually scheduled").
 Baseline-red exceptions requested for the absence-of-effect tests listed in "Acceptance map" (not yet approved).
 
+
+**Team-lead target (2026-11-24):** nightly 00:30 delete of the large Tomcat logs with stop/start. Agenda unchanged (operator): M10b0 preview, then M10b one-time scheduling, then M9b E2, M10d, M10c. See [M10c](dirused-m10c-recurring-purge-rules.md#team-lead-target-2026-11-24).
+
 ## Before You Start
 
 - Read `docs/plans/dirused-m10a-purge-delete-list.md` (list format, `/fromlist` checks) and
