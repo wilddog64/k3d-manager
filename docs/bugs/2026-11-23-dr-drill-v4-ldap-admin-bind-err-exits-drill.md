@@ -5,7 +5,7 @@
 **Introduced by:** unknown (the `_err` inside `hub_data_verify_ldap`; last full drill pass 2026-11-04)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-24 (defect 1 intents and the drill-cluster repoint probe)
+**Waiting on:** operator decision — since 2026-11-23 (defect 1 intents and the drill-cluster repoint probe)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -140,7 +140,7 @@ Claude's recommendation: (a). First check, read-only, whether the export already
 
 - Defect 1: option (a), restore the `openldap-admin` Secret from the export (Claude's recommendation, accepted). Spec for defect 1 follows after a read-only inventory check; it dispatches after the defect 2 task lands (same file).
 
-## Defect 1 inventory result (read-only, Claude, 2026-11-24)
+## Defect 1 inventory result (read-only, Claude, 2026-11-23)
 
 The export holds no Kubernetes Secrets (three PVC tarballs plus `inventory.json`), so option (a) cannot restore the
 Secret literally. It does not need to: `openldap-admin` is an ExternalSecret from Vault `ldap/openldap-admin`, and the
