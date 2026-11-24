@@ -20,6 +20,8 @@
 
 - **2026-11-24 dirused M10b2:** rev 3 NEEDS REWORK from Fable + Argon (D14 refused every stock install: Append on C:\ + inherit-only; no seam signatures; sub-second created). Rev 4 `d7f8a4d4`: shared contract + children b2b (parser, now), b2c (seams+trust, needs P-ACL icacls from jump box), b2d (confirm flow), b2e (list/cancel). Round-2 Fable + Argon reviews running. Operator ask pending: P-ACL icacls (C:\, Program Files, C:\Users, %LOCALAPPDATA%, its parent).
 
+- **2026-11-24 dirused M10b2 round 2:** Fable + Argon round-2 applied `0a44b05a` (contract rev 5, children rev 2: run offset to Pacific, findings shallowest-first, always Secure plans, shared ScheduleFakes.cs, broad-SID list, Get-Acl P-ACL). b2b dispatched to Luna (`dirused-m10b2b-parser`). b2c blocked on operator P-ACL Get-Acl output (owner+SDDL for C:\, Program Files, C:\Users, %USERPROFILE%, AppData, Local). b2d after b2b+b2c; b2e after b2c. M10b3 must be revised to the contract before dispatch.
+
 ## v1.45.0 status (compressed 2026-11-22)
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);
