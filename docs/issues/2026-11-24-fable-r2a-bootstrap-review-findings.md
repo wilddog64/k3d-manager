@@ -33,3 +33,10 @@ substitution) was caused by Claude's correction-2 instruction to delete dead hel
 | env_reset/env_keep unproven for root's other tools | low | covered by `cd /` (F4); probe with the sudo one above |
 | test gaps: diff-guard content, entry-point failing child/presence vars, real constants in some copies, misleading title, timing-margin signal tests | low | correction 4 T2-T6 |
 | redundant checks mask some mutants; slow per-entry forks | low | accepted (defence in depth; performance not measured) |
+
+## Result
+
+Correction 4 (all rows marked "correction 4") applied; independent verifier round 4 PASS (own probes for F1-F8, round-3
+defects re-checked, 59 mutants: 47 killed, 7 equivalent, 5 low test gaps — `.git` symlink fixture to an external gitdir,
+invalid `TERM`, 39-hex commit (fails closed in git), `core.hooksPath`, `chmod -RN` failure). LANDED `ff3e6cf9`
+2026-11-24. The 5 test gaps are accepted as low and go to the P3 `installer-direct-run-hardening-deferred` batch.
