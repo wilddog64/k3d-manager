@@ -52,6 +52,8 @@ state-U pytest procs clear on reboot.
 
 - **2026-11-24 dirused:** b2e LANDED `e825ed8` (round 1 FAIL report.txt header bug → correction 1; CI 45472288659 pending). b2d round 1 FAIL (extras before Held; id from created not run) → correction 1 running with verifier tests as reference.
 
+- **2026-11-24 dirused:** b2d LANDED `ab98677` — **M10b2 complete** (b2a cf07ace, b2b 6542862, b2c e7970ff, b2e e825ed8, b2d ab98677; CI 45473345605 pending). Lesson: Luna's first pass shipped 2-3 test methods per child every time; verifier tests ported as correction each time. Next: revise M10b3 spec to the contract (inline it), operator probe run on jump box, M10b4 docs, one PR to dirused main.
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
