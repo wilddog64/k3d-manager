@@ -1,6 +1,6 @@
 # dirused M10b3b: `SchtasksTaskScheduler` (argv, verify, delete) and `AclRights.FromMask`, portable
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
+**Status:** LANDED — `d539912` on `m10b-scheduled-purge` (2026-11-24); verifier PASS (all items, 10/10 mutants), correction 1 landed the verifier's tests as `SchtasksAcceptanceTests.cs`; Claude mutant red; windows CI pending
 P10 form taken from P9 (run 45510934313: the descriptor reads back verbatim); the jump-box P10 run confirms it for a standard user
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b3](dirused-m10b3-runplan-windows.md); design [M10b](dirused-m10b-scheduled-purge.md) §4.7, §8; shared contract copied
