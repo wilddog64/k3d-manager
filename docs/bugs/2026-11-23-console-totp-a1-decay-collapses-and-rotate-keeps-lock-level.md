@@ -1,11 +1,13 @@
 # Bug: console TOTP (v1.45.1 A1): decay drops one level per request after the first day; rotate keeps `lock_level`
 
 **Status:** OPEN — captured 2026-11-23; both defects reproduced or confirmed by Claude on `k3d-manager-v1.45.1`
-**Priority:** P2 (proposed)
+**Priority:** P2 (operator, 2026-11-23)
 **Introduced by:** `f1dca6e8` (v1.45.1 totp-a1, escalating lock; unreleased, on the open release branch)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23 (confirm priority; fix in v1.45.1 before the release PR is proposed, since A1 is part of this release)
+**Waiting on:** operator decision — since 2026-11-23 (intent approval for the fix spec; Fable review running)
+**Triage:** patch → v1.45.1, before the release PR (operator, 2026-11-23: "go for it")
+**Fix spec:** [`docs/plans/v1.45.1-totp-a1-fix-decay-and-rotate.md`](../plans/v1.45.1-totp-a1-fix-decay-and-rotate.md)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: m4 kube context missing); parent [`2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md`](2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md) is the spec these violate, not a duplicate
 **Detected by:** independent verifier of totp-c-guides (2026-11-23), reading the landed code to check the guide; Claude reproduced defect 1 and confirmed defect 2 against the code and the A1 spec
 **Parent:** [`2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md`](2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md); spec [`docs/plans/v1.45.1-totp-a-lock-and-recovery.md`](../plans/v1.45.1-totp-a-lock-and-recovery.md)
