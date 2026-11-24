@@ -200,8 +200,9 @@ _run_verify_access_probe() {
   _make_verify_access_probe "$probe"
   _run_verify_access_probe "$probe" ok https://192.0.2.30:6443 '{"bearerToken":"verify-argv-token","insecure":true}'
   [ "$status" -eq 0 ]
-  grep -q '^    insecure-skip-tls-verify: true$' "$(cat "$probe/file")"
-  grep -q '^current-context: app-cluster-context$' "$(cat "$probe/file")"
+  [ ! -e "$(cat "$probe/file")" ]
+  grep -q '^    insecure-skip-tls-verify: true$' "$probe/config"
+  grep -q '^current-context: app-cluster-context$' "$probe/config"
 }
 
 @test "verifier plain secret leaves cluster TLS fields unset" {
