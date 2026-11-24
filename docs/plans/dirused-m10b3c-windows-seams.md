@@ -1,6 +1,6 @@
 # dirused M10b3c: the real Windows seam classes (`ScheduleWindows.cs`), tested on windows CI
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
+**Status:** OPEN — SPEC rev 2, 2026-11-24 (rev 2: trust store refuses a junction in Add/Remove, found in Claude's review of the first pass); split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
 **gates:** after [b3a](dirused-m10b3a-runplan-engine.md) and [b3b](dirused-m10b3b-schtasks-and-rights.md) land; P6 (PASS 2026-11-24),
 P6 default-owner check (PASS 2026-11-24, normal window), P9 PASS (run 45510934313)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
@@ -81,7 +81,8 @@ discard). `WaitForExit(timeoutMs)`; on timeout kill the process tree and return 
 - **`Load`**: returns empty unless `<folder>` and `trust.txt` are not reparse points, are owned by `userSid`, and every allow entry on
   both is `userSid` (read with `security.ReadAcl`). This keeps an account that can write the profile from pre-creating a trust list
   naming itself. Lines without a tab or with an empty SID are skipped.
-- **`Add` / `Remove`**: create `<folder>` if missing; always `security.Secure(folder, userSid)` first (failure → that error); entries =
+- **`Add` / `Remove`**: if `<folder>` or `trust.txt` exists and is a reparse point (`File.GetAttributes`), return
+  `SeamResult(false, "<that path> is a link")` and change nothing (so `Secure` never re-permissions a junction's target); else create `<folder>` if missing; always `security.Secure(folder, userSid)` first (failure → that error); entries =
   `Load()` plus or minus the one; delete a stale `trust.tmp`; write `trust.tmp` with `CreateNew`; `File.Move(trust.tmp, trust.txt,
   overwrite: true)`.
 - Consequence (intended): a trust list made unreadable by a permission change is ignored, `/schedule` refuses naming the account, and
@@ -137,7 +138,7 @@ must:
   - id: B3c-M6
     text: "windows-latest (P9 showed the runner registers an interactive-token task): SchtasksTaskScheduler(RealProcessRunner, Environment.SystemDirectory) Register of '\\dirused-ci\\<SID>\\purge-<guid>' from a TaskXml.Build file one day ahead → Ok; a second Register of the same name → 'could not schedule (schtasks exit <non-zero>)'; Exists true; Delete Ok; Exists false; delete in finally. If P9 says it cannot, this item asserts the written XML parses with TaskXml.Parse and the spec records that"
   - id: B3c-M7
-    text: "windows-latest: RealTrustStore in a temp folder: Add then Load returns the entry; Remove empties it; after Add the folder's ReadAcl is user-only; Load returns empty when trust.txt carries an extra Everyone allow ACE (positive control: the same file without it loads)"
+    text: "windows-latest: RealTrustStore in a temp folder: Add then Load returns the entry; Remove empties it; after Add the folder's ReadAcl is user-only; Load returns empty when trust.txt carries an extra Everyone allow ACE (positive control: the same file without it loads); with <folder> replaced by a junction (mklink /J) to another temp dir holding a valid trust.txt: Load returns empty, Add returns '<folder> is a link', and the junction target's ACL is unchanged"
   - id: B3c-M8
     text: "windows-latest: RealAccountResolver resolves the current user's 'DOMAIN\\name' to the current SID and the current SID to that name; 'S-1-5-21-1-2-3-999999' → null; 'no such account x' → null"
   - id: B3c-M9
@@ -146,7 +147,7 @@ must_not:
   - id: B3c-N1
     text: "ReadAcl reports Ok for a path on a subst drive. Positive control: B3c-M2's C: path is Ok. baseline: mutant-only (class absent at the b3b head); mutant 'skip the QueryDosDevice check' turns it red"
   - id: B3c-N2
-    text: "RealTrustStore.Load returns entries from a trust.txt with a non-user allow ACE. Positive control in B3c-M7. baseline: mutant-only; mutant 'skip the ACL check in Load' turns it red"
+    text: "RealTrustStore.Load returns entries from a trust.txt with a non-user allow ACE. Positive control in B3c-M7. baseline: mutant-only; mutants 'skip the ACL check in Load' and 'skip the reparse check in Load/Add' turn it red"
 evidence:
   - id: E-B3c
     proves: [B3c-M1, B3c-M2, B3c-M3, B3c-M4, B3c-M5, B3c-M6, B3c-M7, B3c-M8, B3c-M9, B3c-N1, B3c-N2]
