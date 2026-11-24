@@ -30,6 +30,8 @@
 
 - **2026-11-24 dirused:** b2c LANDED `e7970ff` (verifier round 2 PASS; CI 45469466819 pending). b2d (`dirused-m10b2d-confirm`) and b2e (`dirused-m10b2e-list`) dispatched to Luna in parallel, specs carry the contract inline (`cb01683d`). Then M10b3 spec revision, M10b4 docs, one PR to main.
 
+- **2026-11-24 dirused:** b2e LANDED `e825ed8` (round 1 FAIL report.txt header bug → correction 1; CI 45472288659 pending). b2d round 1 FAIL (extras before Held; id from created not run) → correction 1 running with verifier tests as reference.
+
 ## v1.45.0 status (compressed 2026-11-22)
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);

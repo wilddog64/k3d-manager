@@ -1,6 +1,6 @@
 # dirused M10b2e: `/schedule /list` and `/schedule /cancel` (pure, with fakes)
 
-**Status:** OPEN — SPEC rev 2, 2026-11-24; intents approved (carries E-B2); starts after b2c lands (parallel with b2d); round-2 reviews applied (parent table)
+**Status:** LANDED — `e825ed8` on `m10b-scheduled-purge` (2026-11-24); verifier round 1 FAIL (report.txt parsed with the plan header; Pacific offsets), correction 1 fixed and ported the verifier's tests; Claude mutants red; windows CI run 45472288659 pending
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b2 shared contract](dirused-m10b2-schedule-preview-list-cancel.md) (rev 4); design [M10b](dirused-m10b-scheduled-purge.md) §5 path checks 3–4, §7.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (after [b2c](dirused-m10b2c-seams-and-trust.md))

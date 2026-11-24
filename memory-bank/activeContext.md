@@ -50,6 +50,8 @@ state-U pytest procs clear on reboot.
 
 - **2026-11-24 dirused:** b2c LANDED `e7970ff` (verifier round 2 PASS; CI 45469466819 pending). b2d (`dirused-m10b2d-confirm`) and b2e (`dirused-m10b2e-list`) dispatched to Luna in parallel, specs carry the contract inline (`cb01683d`). Then M10b3 spec revision, M10b4 docs, one PR to main.
 
+- **2026-11-24 dirused:** b2e LANDED `e825ed8` (round 1 FAIL report.txt header bug → correction 1; CI 45472288659 pending). b2d round 1 FAIL (extras before Held; id from created not run) → correction 1 running with verifier tests as reference.
+
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
 **Operator:** at work today, home ~15:30 PT (only then: m2 live tests, hub promote). Batch every ask for that time.
