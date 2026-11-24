@@ -1,14 +1,14 @@
 # Bug: v1.45.1 CI red on Linux: dr_drill secret-tool stub lacks the age identity; verifier test needs TMPDIR
 
-**Status:** LANDED — test-only fixes `7a84f90d` and `037a7ab8` on `k3d-manager-v1.45.1`, 2026-11-23 (Claude); CI on the pushed head pending
+**Status:** LIVE-VERIFIED — CI run 45294470789 on 5162281e green on all 7 checks (test 1-4, test-python, lint, alertmanager-behaviour), checked 2026-11-23 by Claude; LANDED — test-only fixes `7a84f90d` and `037a7ab8` on `k3d-manager-v1.45.1` (Claude)
 **Priority:** P1 (proposed: CI red on the release branch blocks `make hub-deploy`, which requires green checks; also blocks the release PR)
 **Introduced by:** `77d5a836` (age-identity fix, dr_drill.bats) and `4b831c81` (cve-scan private kubeconfig, cve_remediation_verify.bats)
 **Should have been caught by:** review (both lands were verified on macOS only, where `uname -s` is Darwin and `TMPDIR` is always set)
 **Introducing change reviewed:** yes (Claude land review plus a Sonnet acceptance verifier, both macOS)
-**Waiting on:** live check — since 2026-11-23 (green CI on the pushed head)
 **Prior art:** `docs/bugs/2026-11-12-dev-hub-bats-tmpdir-unset-on-linux-ci.md` (name grep, read) — same escape class and same TMPDIR fix; `make find-similar-docs` not run
 **Detected by:** operator, 2026-11-23: `make hub-deploy REF=7b690cd3` refused, "GitHub check runs are pending or failed"; CI run 45288874536 had test (2) and test (3) red
 **Fix commit:** 7a84f90d, 037a7ab8
+**Live evidence:** 2026-11-23 · run 45294470789 · env github-actions/ubuntu · scenario ci-green · commit 5162281e · proves fix
 
 ## What is wrong
 
