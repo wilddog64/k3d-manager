@@ -82,7 +82,8 @@ other bit contributes nothing. So `Modify` `0x301BF` → `Write | Append | Delet
 ## Files
 
 New: `src/Dirused.Common/TaskScheduling.cs`, `src/Dirused.Common/AclRights.cs`,
-`tests/Dirused.Tests.Portable/SchtasksTests.cs`, `tests/Dirused.Tests.Portable/AclRightsTests.cs`.
+`tests/Dirused.Tests.Portable/SchtasksTests.cs`, `tests/Dirused.Tests.Portable/AclRightsTests.cs`,
+`tests/Dirused.Tests.Portable/SchtasksAcceptanceTests.cs` (correction 1: the verifier's acceptance tests).
 
 ## What NOT to Do
 
