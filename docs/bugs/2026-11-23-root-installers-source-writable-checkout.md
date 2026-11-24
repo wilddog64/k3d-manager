@@ -207,7 +207,9 @@ The operator installs it once at `/usr/local/libexec/k3dm/k3dm-verified-stage`, 
          `$_VS_TRUST_TOP` by uid `$_VS_OWNER`, all with no group or other write bit and no ACL (S10);
        - every entry under the stage is owned by `$_VS_OWNER`, has no group or other write bit, and has no ACL entry
          (`/usr/bin/find <stage> ! -user …`, `-perm +022`, `/bin/ls -lReA`), and none is a symlink that points out of the
-         stage;
+         stage — **narrowed 2026-11-23 (Claude, after the r2-a round-2 verifier escaped a lexical containment check):
+         no entry outside `.git` may be a symlink at all** (the repo commits none: `git ls-files -s` has 0 mode-120000
+         entries), and a `find` or `git status` failure is a refusal, never a pass;
        - `.git/k3dm-verified` holds `<c>`, and `rev-parse HEAD` equals `<c>`;
        - `status --porcelain --untracked-files=all --ignored` prints nothing.
 
