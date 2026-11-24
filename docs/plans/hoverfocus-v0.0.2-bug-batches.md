@@ -26,7 +26,7 @@ file; a fix that depends on macOS behaviour gets a live probe first ("prove exte
 | **L1** | Luna | A1 (reload: on config error stop focusing, show error) + B3 part 3 (watch trust without a menu click: poll while untrusted, start the controller when granted) | `Sources/hoverfocus/AppDelegate.swift`, selftest | intent |
 | **F1** | Flash | B3 parts 1-2 (bootout then wait before bootstrap; detect non-Aqua `launchctl managername` and print the `asuser` command instead of failing) + A3 (escape `APPDIR` for sed/XML) + B3 part 4 doc (print the `tccutil reset` step after install) + README | `Makefile`, `tests/install_test.sh`, `README.md` | intent |
 | **P1** | Claude + operator (live) | probe for B1/B2: on m2, candidate ways to make a non-key window key without raising (AX `kAXMainAttribute`/`kAXFocusedAttribute` on the window, after variant B), record raise and terminal cursor | scratch probe only | operator at the m2 (from ~15:30) |
-| **L2** | Luna | B1 + B2 from P1's winning variant, plus A2 (evict closed windows from `elements`) | `Sources/HoverFocusPlatform/Controller.swift`, `Sources/CSkyLight/*`, selftest | P1 |
+| ~~**L2**~~ moved to v0.0.3 L3 (operator, 2026-11-24, D1) | Luna | B1 + B2 from P1's winning variant, plus A2 (evict closed windows from `elements`) | `Sources/HoverFocusPlatform/Controller.swift`, `Sources/CSkyLight/*`, selftest | P1 |
 
 ### P1 app matrix (operator, 2026-11-24: "go ahead to add it")
 

@@ -1,7 +1,7 @@
 # HoverFocus v0.0.3 — plan
 
 **Filed:** 2026-11-24
-**Status:** plan — awaiting operator decisions D1-D3; child specs are written after them, then Fable spec review
+**Status:** plan — D1-D3 decided (operator, 2026-11-24); next: P2/P3 probes on m2, then child specs and Fable spec review
 **Repo:** `hoverfocus`, branch `v0.0.3` cut from `main` after v0.0.2 merges
 **Approval:** "let's plan to work on hoverfocus v0.0.3" (operator, 2026-11-24); Electron + indicator → v0.0.3 and local
 signing identity approved the same day
@@ -37,13 +37,15 @@ PR review.
 Order: P2 and P3 together (one m2 session) → L3, F2, U1 in parallel (no shared file, WIP 3) → U2 after L3 lands.
 Five dispatches plus two probes. A fix that depends on macOS behaviour carries the probe result before dispatch.
 
-## Decisions for the operator
+## Decisions (operator, 2026-11-24: "go with your recommendation"; D3 "yes, and other command hotkeys")
 
-- **D1 — v0.0.2 scope.** L2 (B1, B2, A2) was in the v0.0.2 batch plan but is blocked on probes. Proposed: v0.0.2 =
+- **D1 — v0.0.2 scope (decided: as proposed).** L2 (B1, B2, A2) was in the v0.0.2 batch plan but is blocked on probes. Proposed: v0.0.2 =
   L1 + F1 and merges now; L2 becomes L3 here. (Claude recommends.)
-- **D2 — focus indicator.** (1) thin click-through border overlay around the focused window, config opt-out
+- **D2 — focus indicator (decided: option 1, border overlay).** (1) thin click-through border overlay around the focused window, config opt-out
   `focusIndicator: false` (Claude recommends); (2) menu-bar text with the focused app's name; (3) document only.
-- **D3 — Safari Cmd+W and B2 priority.** P2 proposed for both (shortcuts silently go nowhere until a click).
+- **D3 — Safari Cmd+W and B2 priority.** P2 proposed for both (shortcuts silently go nowhere until a click). **Decided: P2, and the scope widens to every command hotkey** — P2 and
+  the L3 selftest/live matrix check that Cmd-key shortcuts (Cmd+W, Cmd+T, Cmd+L, Cmd+N, Cmd+Q, Cmd+F, menu shortcuts)
+  reach the hover-focused app in each app class, not only typed text.
 
 ## Gates
 

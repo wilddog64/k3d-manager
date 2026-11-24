@@ -1,12 +1,12 @@
 # Bug: HoverFocus — terminals (iTerm2 and Terminal.app) show an unfocused cursor after hover focus returns to them
 
 **Status:** OPEN
-**Priority:** P3 — cosmetic; keystrokes reach iTerm, one click restores the solid cursor
+**Priority:** P2 (operator, 2026-11-24, D3: "yes, and other command hotkeys") — Cmd-key shortcuts do not reach the hover-focused app until a click
 **Introduced by:** `4cbd377` (hoverfocus M1a, no-raise focus via `_SLPSSetFrontProcessWithOptions`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)
 **Waiting on:** investigation — since 2026-11-23 (P1 probe)
-**Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
+**Triage:** carry → hoverfocus v0.0.3 (operator, 2026-11-24, D1: v0.0.2 = L1 + F1; deferred focus work moves to v0.0.3 batch L3)
 **Prior art:** none above threshold (no earlier hoverfocus bug docs)
 **Filed:** 2026-11-23
 **Detected by:** operator, E-L1 on m2-air (2026-11-23), build at pid 578

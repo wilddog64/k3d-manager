@@ -197,3 +197,5 @@ interface: "adds public AppCoordinator in HoverFocusCore; no change to Interface
   is hard to read; idea filed in `docs/ideas.md` (red error line + one Notification Center message).
 - 2026-11-24 ~04:20 PST, m2: operator restored `}` and reloaded; Claude confirmed over SSH that the config parses again.
   Operator confirmation that the status line reads `Running` and hover-focus works is the last L1-EL step.
+- 2026-11-24 ~04:35 PST, m2: after restoring `}` and Reload Config, the menu status line reads `Running` (screenshot 10);
+  operator confirms. **L1-EL: PASS (grant half, error half, recovery half).** v0.0.2 merge gate cleared for L1.
