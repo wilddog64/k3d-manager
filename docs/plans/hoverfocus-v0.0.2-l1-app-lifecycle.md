@@ -190,3 +190,8 @@ interface: "adds public AppCoordinator in HoverFocusCore; no change to Interface
   connect (controller start), polling stops. Operator typed "testing from hoverfocus" into TextEdit behind iTerm2
   (screenshot 145). **L1-EL grant half: pass.** Pending: break config.json, Reload Config shows Error: config and hover
   stops; fix, Reload, Running.
+- 2026-11-24 ~04:10 PST, m2, build `42273f0` (agent started 04:03:36 by `make install`): operator removed the closing
+  `}` from `~/.config/hoverfocus/config.json` → Reload Config → menu status line reads
+  `Error: config /Users/cliang/.config/hoverfocus/config.json: invalid JSON` (screenshot 5). **L1-EL error half: pass.**
+  Pending: restore `}` → Reload Config → `Running`, hover-focus works. Operator UX note: the grey disabled status line
+  is hard to read; idea filed in `docs/ideas.md` (red error line + one Notification Center message).

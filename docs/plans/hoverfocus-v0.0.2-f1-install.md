@@ -231,3 +231,6 @@ interface: "adds BOOTOUT_WAIT_TRIES; exports APPDIR, AGENTDIR, LAUNCHCTL to reci
   gone, new pid started at the install second; plist `ProgramArguments` = one app-path entry. **F1-EL first install: pass.**
   Pending: a second `make install` straight after (no error 37, icon back); over SSH from m4, prints the asuser commands
   and starts nothing.
+- 2026-11-24 ~04:03 PST, m2, GUI iTerm, `make install` of `42273f0` twice in a row: both runs complete, no error 37, no
+  "still loaded after bootout"; launchd `state = running`, `last exit code = (never exited)`, process started 04:03:36
+  from the new bundle (Claude, read-only over SSH). **F1-EL GUI half: pass (second run).** Pending: over SSH from m4.
