@@ -519,6 +519,45 @@ the command does not exist, so the only red there is a parse error, which does n
 `baseline: mutant-only` in the children: each has a positive control (the recorder sees the effect in a run that should have it) and a
 named mutant that turns it red. Listed: B2-N1, B2-N3, B2-N5, B3-N2, B3-N3, B3-N5. Every other must_not has a behavioural baseline red.
 
+## D14. Team use: shared install and a remembered trust list (operator, 2026-11-24)
+
+Operator: "this tool will be used by my team ... if I am the only one who can schedule or run it then what if I depart from team?
+no one can use it"; "do (a) and (b). It need to be secure but not over restricted". (a) is [M10b0](dirused-m10b0-schedule-preview-only.md).
+
+**Nothing is tied to one person.** Each teammate runs dirused as themselves; their task runs as their own account, in their own
+`\dirused\<SID>\` folder, with their own rights on the server. When someone leaves, only their pending plans stop.
+
+**Recommended install: one shared copy.** IT installs `dirused.exe` in `C:\Program Files\dirused\` (Administrators-only by default).
+That folder passes the program check with no extra step, everyone runs one version, and nothing lives in a personal profile. A per-user
+copy still works when its folder chain passes (or its writers are trusted, below). Consequence for M4 self-update: a standard user
+cannot replace a Program Files copy, so the update notice there says `ask IT to update C:\Program Files\dirused` instead of
+offering `/update` (M10b4 docs; code change in M10b3 or a follow-up, decided at its spec).
+
+**Program and plan check (replaces §4.5 and the P11 "every ancestor" rule).** At `/schedule` and again at `/runplan`, dirused reads
+the DACL of the running exe, its folder, the plan root, the plan dir and every ancestor up to the volume root. Allowed to hold write,
+append, delete, delete-child, write-DAC, write-owner or generic write/all: the current user, SYSTEM, Administrators,
+TrustedInstaller, CREATOR OWNER on inherit-only entries, **and the accounts in the user's trust list**. Anything else refuses, naming
+the folder, the account (name, or `unresolved account S-1-5-...`) and the right, and printing the exact command that would accept it:
+
+```
+/schedule: C:\Users\op can be changed by PROD\sysadmin (full control).
+  If you trust this account, run once: dirused /schedule /trust PROD\sysadmin
+```
+
+**Trust list.** `dirused /schedule /trust <DOMAIN\account | SID>` adds one entry to `%LOCALAPPDATA%\dirused\trust.txt` (created with
+the plan-root protected DACL); `dirused /schedule /trust` with no argument lists it; `/schedule /untrust <entry>` removes one. It is
+per user and remembered, so a teammate does it once, not on every schedule. Entries are stored as SIDs (a name is resolved when added);
+an unresolved SID can be trusted only by typing that SID. Each plan copies the list into `plan.txt` (`# trusted: <sid>,...`) and
+`/runplan` re-checks with that copy: a writer that was not trusted when the plan was made reports `blocked` and deletes nothing.
+
+**Why this is enough and not more.** An account that can already change the user's profile can already change every script the user
+runs from it, so trusting it adds no new exposure; the check exists so dirused never quietly depends on a folder whose writers the
+user has not named. The jump-box sysadmin account is expected to be trusted once (operator keeps the grant); the unresolved SID is the
+operator's call (ask IT first, or trust it by SID).
+
+**Placement:** the check and trust store are M10b3 (real ACL class) with the logic and fakes in M10b2 (`IPlanFolderSecurity`
+gains `TrustedSids`); `/trust` parser rows join §2 in M10b2. Children's specs and intents are updated before their dispatch.
+
 ## Open decisions for the operator
 
 | # | Question | Spec default |
@@ -527,7 +566,7 @@ named mutant that turns it red. Listed: B2-N1, B2-N3, B2-N5, B3-N2, B3-N3, B3-N5
 | O3 | Refuse a list older than N hours at schedule time? | No age check; the exact identity, size and time match at run time skips anything that changed. |
 | O6 | The preview shows no held rows because scheduling touches no server. Do a read-only held check (stat + service query on the server) at preview time to list rows that will be skipped? | No: scheduling stays server-free; the report shows the skipped rows. |
 | O8 | A list whose paths span more than one host: refuse, or schedule it as one plan touching several nodes? (Coordinator suggested O6; O6 was already the held-check question.) | Refuse with the §4.1 message, so each plan is one node. |
-| O7 | Refuse to schedule when `dirused.exe`, the plan, or any parent folder up to the volume root can be changed by an account other than the user, SYSTEM or Administrators (P11)? **Reopened 2026-11-24:** the profile root grants full control to the company sysadmin account (kept, operator) and an unresolved SID, so the default refuses on the jump box. | Proposed: refuse unless every such account is named once at `/schedule` (`/trust <account>`, recorded in the plan and re-checked at run time); an unresolved SID can be trusted only by its literal SID. Awaiting operator. |
+| O7 | Who may be able to change the program and plan folders? | **Resolved 2026-11-24 by D14** (operator: "secure but not over restricted"). |
 
 Resolved in rev 2: O1 (held files are always skipped, D9), O4 (`/confirm` is the schedule switch, D12), O5 (the task runs the program
 copy, so a self-update does not affect a scheduled run).
