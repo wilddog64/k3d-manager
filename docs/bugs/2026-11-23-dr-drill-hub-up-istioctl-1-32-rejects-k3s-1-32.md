@@ -1,13 +1,13 @@
 # Bug: `make dr-drill` (and any fresh `hub-up`) fails: unpinned Homebrew istioctl 1.32 rejects the pinned k3s v1.32 image
 
-**Status:** OPEN — spec rev 2 (Fable rev 1 review: NEEDS FIXES, 1 blocker, 5 should-fix, 5 nits; all applied); captured 2026-11-23 by Claude from the operator's m2-air run
+**Status:** LANDED — parts A/A2 (lib-foundation v0.5.8/v0.5.9), B `7d8a40e4`, C `3e74f38b` on `k3d-manager-v1.45.1` (2026-11-23); live E6/E7 on m2 pending
 **Priority:** P2 (operator, 2026-11-23; flagged — it blocks the DR drill and a from-scratch hub rebuild on this Mac)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23); pin target: match the live hub — corrected 2026-11-23 to k3s v1.32.0 + Istio 1.31.x (pin 1.31.4, the first CVE-free 1.31; hub's 1.31.1 to be raised to match)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** pre-existing (istioctl never pinned); exposed by Homebrew upgrading istioctl to 1.32.0 on m2-air 2026-11-12
 **Should have been caught by:** live check (the weekly drill; not run 2026-11-04 → 2026-11-23)
 **Introducing change reviewed:** no
-**Waiting on:** dispatch — since 2026-11-23 (operator intent approval; m4-air istioctl 1.30.0 must be replaced before its next deploy, see Rollout survey)
+**Waiting on:** live check — since 2026-11-23
 **Approval:** pending (operator decision 2026-11-23: pin 1.31.4, no k3s bump, archive + SHA-256, refuse other minors)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause; `CHANGELOG.md:2565` — recurrence: k3s was raised to v1.32.0-k3s1 in July "to satisfy the istioctl precheck floor" (same class)

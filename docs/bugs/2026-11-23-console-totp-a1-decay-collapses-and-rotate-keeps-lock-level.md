@@ -1,11 +1,11 @@
 # Bug: console TOTP (v1.45.1 A1): decay drops one level per request after the first day; rotate keeps `lock_level`
 
-**Status:** OPEN — captured 2026-11-23; both defects reproduced or confirmed by Claude on `k3d-manager-v1.45.1`
+**Status:** LANDED `b1c99eb7` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier + correction 1; offline_tested recorded). Live check after release on the hub console.
 **Priority:** P2 (operator, 2026-11-23)
 **Introduced by:** `f1dca6e8` (v1.45.1 totp-a1, escalating lock; unreleased, on the open release branch)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-23
+**Waiting on:** live check — since 2026-11-23
 **Triage:** patch → v1.45.1, before the release PR (operator, 2026-11-23: "go for it")
 **Fix spec:** [`docs/plans/v1.45.1-totp-a1-fix-decay-and-rotate.md`](../plans/v1.45.1-totp-a1-fix-decay-and-rotate.md)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: m4 kube context missing); parent [`2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md`](2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md) is the spec these violate, not a duplicate
