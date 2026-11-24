@@ -22,6 +22,8 @@
 
 - **2026-11-24 dirused M10b2 round 2:** Fable + Argon round-2 applied `0a44b05a` (contract rev 5, children rev 2: run offset to Pacific, findings shallowest-first, always Secure plans, shared ScheduleFakes.cs, broad-SID list, Get-Acl P-ACL). b2b dispatched to Luna (`dirused-m10b2b-parser`). b2c blocked on operator P-ACL Get-Acl output (owner+SDDL for C:\, Program Files, C:\Users, %USERPROFILE%, AppData, Local). b2d after b2b+b2c; b2e after b2c. M10b3 must be revised to the contract before dispatch.
 
+- **2026-11-24 dirused:** b2b LANDED `6542862` (verifier PASS; correction 1 test-only; Windows mutant proof 45461565040; CI 45462979677 pending). Next: b2c on operator Get-Acl output; then b2d ‖ b2e.
+
 ## v1.45.0 status (compressed 2026-11-22)
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);
