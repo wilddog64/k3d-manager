@@ -48,6 +48,29 @@ Three Safari behaviours are now in play: no focus at all (first report), focus w
 (11-24). The P1 app matrix in [`hoverfocus-v0.0.2-bug-batches.md`](../../plans/hoverfocus-v0.0.2-bug-batches.md) records
 which Safari state gives which.
 
+## P1 app matrix — 2026-11-24 (operator, m2, macOS 26.5.1)
+
+Build: m1-base `dc68692` installed 17:34 (L1/F1 not yet installed; neither touches `Controller.swift`, so the focus
+results stand). Each window behind iTerm2, pointer resting on it; operator report, verbatim where quoted.
+
+| App | Focused | Notes |
+|---|---|---|
+| Safari | yes | Cmd+L and Cmd+T reach Safari; typed text reached the page ("testdsasfdasdf"); **Cmd+W did not close the tab** |
+| Finder | yes | Cmd+G works |
+| TextEdit | yes | control |
+| MacVim | yes | |
+| Slack | **no** | "does not receive focus when under iTerm" |
+| VS Code | **no** | "not working" |
+| Chrome, Mail, Terminal.app | not run | |
+
+Raise was not reported for any app this run (the 11-24 Safari raise did not recur). Findings:
+- Safari focus works over page content on this build, so the original "no focus" symptom did not reproduce; Cmd+W is the
+  open Safari gap (a window-level command; hypothesis: routed to the key window of the frontmost app, not Safari).
+- Both Electron apps fail: filed separately as
+  [`2026-11-24-hoverfocus-electron-apps-no-focus.md`](2026-11-24-hoverfocus-electron-apps-no-focus.md).
+- No visual cue on the focused window: filed as
+  [`2026-11-24-hoverfocus-no-visual-focus-indicator.md`](2026-11-24-hoverfocus-no-visual-focus-indicator.md).
+
 ## Next
 
 1. Operator quick check: hover over an unfocused Safari window's tab bar, then over its page.
