@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.5.9] — 2026-11-23
+
+### Changed
+- `_install_istioctl` is split into five `_istioctl_*` helpers so no function exceeds the agent audit's 8-`if` limit (`AGENT_AUDIT_MAX_IF`, unchanged); it had 17, which made k3d-manager's subtree pull of v0.5.8 fail its pre-commit audit. Behaviour is unchanged: the same messages, exit paths, temp-dir cleanup and `--prefer-sudo` copy. A 17-test characterization suite passes on v0.5.8 and on this release; the nine v0.5.8 istioctl tests are unchanged. `_install_istioctl [install_dir]` and `_istioctl_pinned_sha256` keep their interfaces. Reference: k3d-manager `docs/plans/v1.45.1-istioctl-a2-lib-foundation-split.md`.
+
+## [v0.5.8] — 2026-11-23
+
+### Fixed
+- `_install_istioctl` pins istioctl `${ISTIOCTL_VERSION:-1.31.4}` and installs it from the GitHub release archive verified against a pinned SHA-256 (`_istioctl_pinned_sha256`, osx/linux × amd64/arm64), instead of running `downloadIstioCandidate.sh` from Istio's `master` branch, which fetched the latest release (1.32 rejects k3s 1.32 clusters). An existing `istioctl` (in `install_dir`, then `PATH`) of the same minor is accepted with no download; another minor, or a version line that does not parse, is refused with one line naming the found version, its path, the pin and the fix. A checksum mismatch installs nothing. The installed binary is re-checked by full path. No global EXIT trap (the caller's is preserved), no `cd`. Reference: k3d-manager `docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md`, spec `docs/plans/v1.45.1-istioctl-a-lib-foundation.md`.
+
 ## [v0.5.7] — 2026-11-18
 
 ### Fixed

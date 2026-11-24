@@ -79,6 +79,13 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | `_install_virtualbox` | Install VirtualBox with its Homebrew cask on macOS when `VBoxManage` is missing. |
 | `_install_vagrant` | Install Vagrant with its Homebrew cask on macOS when `vagrant` is missing. |
 | `_install_promtool` | Install the pinned Prometheus `promtool` release after verifying its platform-specific SHA-256 checksum. |
+| `_install_istioctl` | Install Istio `istioctl` 1.31.4 from its release archive after verifying the platform-specific SHA-256 checksum; accepts an existing build with the pinned minor. Set `ISTIOCTL_VERSION` to select a version with a recorded checksum. |
+| `_istioctl_pinned_sha256 <version> <os> <arch>` | Print the pinned Istio `istioctl` SHA-256 checksum for a supported version and platform. |
+| `_istioctl_find_existing <install_dir>` | Find an existing `istioctl` in the install directory or PATH; stores the result in the private `_ISTIOCTL_FOUND_PATH` variable. |
+| `_istioctl_client_version <path>` | Read the client version from an `istioctl` binary; stores the parsed version (or `unknown`) in `_ISTIOCTL_FOUND_VERSION`. |
+| `_istioctl_platform` | Detect supported istioctl OS and architecture; stores them in `_ISTIOCTL_OS` and `_ISTIOCTL_ARCH`, and exits on unsupported platforms. |
+| `_istioctl_fetch_verified <version> <os> <arch> <checksum> <base_url> <tmp_dir>` | Download, verify, and extract the pinned istioctl archive into the temporary directory; removes it on failure. |
+| `_istioctl_copy_into <tmp_dir> <install_dir>` | Create the install directory if needed and copy the extracted istioctl, using the configured privilege wrapper when required. |
 | `_install_kubernetes_cli` | Install `kubectl` (Debian/RedHat/mac). |
 | `_install_orbstack` | Install OrbStack on macOS. |
 | `_install_bats_from_source` | Build and install BATS from source tarball. |
