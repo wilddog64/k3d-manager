@@ -161,3 +161,5 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-24: OOB interim convention written into v1.45.0-multi-project-records.md (operator ask). hoverfocus bugs moved docs/bugs -> docs/hoverfocus/bugs (mirrors docs/dirused/bugs), links fixed.
 - 2026-11-24: hoverfocus L1/F1 evidence intents approved by operator; written into specs (spec_intent OK). Fable rev-2 re-review running; then dispatch L1 -> Luna (gpt-6-luna), F1 -> Flash (gemini-3.8-flash-medium) with --project hoverfocus --branch v0.0.2.
 - 2026-11-24: Fable rev-2 review of hoverfocus L1/F1: both NEEDS FIXES (blocker: SwiftPM nested sandbox -> --disable-sandbox / SWIFT_BUILD_FLAGS); all applied as rev 3; F1 GUI managername gate closed (operator: Aqua). Dispatching L1 Luna, F1 Flash.
+- 2026-11-24: hoverfocus L1 (Luna) exited 0; worker could not run swift (codex sandbox); Claude ran build + selftest under profile with --disable-sandbox: 65 passed. Sonnet acceptance verifier running. F1 (Flash) running. CI a06ad924 in progress (promote target).
+- 2026-11-24: agy mode-label bug LIVE-VERIFIED (operator screenshot of agy untracked by repo: headless legends).

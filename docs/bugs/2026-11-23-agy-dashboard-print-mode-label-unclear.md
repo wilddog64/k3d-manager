@@ -1,11 +1,12 @@
 # Bug: agent dashboard mode labels are unclear and differ per agent ("print" for agy, "exec" for codex)
 
-**Status:** LANDED — `9f953c0b` on k3d-manager-v1.45.1 (2026-11-23), Sonnet acceptance verify pass; L1 config half PASS on deploy/hub 5162281 (live ConfigMap `monitoring/grafana-dashboard-agent-activity` equals the repo at 5162281e, four renameByRegex transforms present, old titles gone; Claude, kubectl read-only, 2026-11-24); operator screenshot of the legends pending; was: OPEN
+**Status:** LIVE-VERIFIED — operator screenshot 2026-11-24 (hub deploy/hub 5162281): "agy untracked by repo" legends read `<repo> headless` (dirused, k3d-manager, lib-foundation, other, shopping-cart-order, hoverfocus), no "print"; the other three panels carry the identical transform (live ConfigMap check, Claude, 2026-11-24). was: LANDED — `9f953c0b` on k3d-manager-v1.45.1 (2026-11-23), Sonnet acceptance verify pass; L1 config half PASS on deploy/hub 5162281 (live ConfigMap `monitoring/grafana-dashboard-agent-activity` equals the repo at 5162281e, four renameByRegex transforms present, old titles gone; Claude, kubectl read-only, 2026-11-24); was: OPEN
+**Fix commit:** 9f953c0b
+**Live evidence:** 2026-11-24 · run operator-screenshot-138 · env hub-deploy-hub · scenario agy-untracked-legend · commit 5162281e · proves fix
 **Priority:** P3 — cosmetic; the operator had to ask what "print" meant
 **Introduced by:** unknown (the agy mode split in `bin/k3dm-dispatch-metrics`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-23 (operator screenshot of the four mode panels)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "change print to headless session", then "or make them look the same", "consistency across vendor model")
 **Intent approved:** operator, 2026-11-23
 **Approval note:** "approve your intents", given after the E1, E2 and L1 intents for the cross-vendor version were shown
