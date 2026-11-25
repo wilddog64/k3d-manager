@@ -1,11 +1,11 @@
 # Bug: dr-drill dies silently at V4 — restored LDAP rejects the admin password and `_err` exits the drill
 
-**Status:** LANDED — defect 2 `da956fbd` (2026-11-23; E4 live pending); defect 1 `cf743007` (2026-11-25; spec rev 3, probe PASS on m2, independent verifier + correction 1, all mutants red); E5 live drill pending
+**Status:** LANDED — defect 1 `cf743007` LIVE-VERIFIED 2026-11-25 (E5: drill report 20261125T173312Z on m2-air, success, V4 true); defect 2 `da956fbd` (2026-11-23): its live E4 needs a drill where V4 fails, which a passing drill cannot show — operator decision
 **Priority:** P2 (proposed) — the DR drill cannot pass, so there is no current restore proof; no workaround
 **Introduced by:** unknown (the `_err` inside `hub_data_verify_ldap`; last full drill pass 2026-11-04)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-25 (E5: full `make dr-drill` on m2-air at `cf743007` or later prints V4 true; defect 2 E4 rides on the same run)
+**Waiting on:** operator decision — since 2026-11-25 (defect 2 E4: accept the offline E1-E3 proof, or run one drill with V4 forced false)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -148,3 +148,12 @@ restored Vault holds the backup's password. On the kept cluster, ESO last synced
 and has been `SecretSyncedError` since the 13:47:59Z restore. SecretStore `vault-kv-store` is `InvalidProviderConfig`,
 because the restored Vault's `auth/kubernetes/config` names the real hub. `hub_recover` repoints it (step 6); the drill
 does not. Spec: `docs/plans/v1.45.1-dr-drill-v4-ldap-resync.md` (repoint, force-sync, restart openldap after unseal).
+
+## Live result — defect 1 (E5, 2026-11-25)
+
+`make dr-drill` on m2-air, HEAD `c5bcf645` (contains `cf743007`), started about 09:07, exited 09:34 (Claude watched the
+child processes read-only over SSH). Report `~/.k3dm/dr-drill/20261125T173312Z.json`: `success: true`, `failed: ""`,
+V0-V7 and V9 all true, `rto_seconds: 644`, `rpo_seconds: 20921`. Drill cluster deleted at teardown (only `e2e-runner` and
+`k3d-cluster` remain). Phases: preflight clone 09:07-09:22 (P3 filed:
+`docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md`), hub-up 09:22, restore 09:27, checks
+and report 09:32, teardown 09:33.
