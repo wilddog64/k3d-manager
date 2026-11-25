@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-17 from Argon's blind review of PR #162 (v1.44.1), verified by Claude
 **Priority:** P3 — needs an author to write an empty collection; the gate then lets an evidence item through with no intent
+**Triage:** backlog — pull into a release that already touches `scripts/lib/spec_intent.py` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** d09d98f2 (spec-intent flow-style fix, k3d-manager-v1.44.1)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown

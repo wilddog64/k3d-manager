@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-dispatch-stall-watch` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** 6972d10a (multi-project M1: `project` ledger key added via `_dispatch_ledger_event` only)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no

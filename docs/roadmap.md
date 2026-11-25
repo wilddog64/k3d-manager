@@ -643,6 +643,24 @@ iPad SSH and tailscale (plans 6 and 7 below). Remote-promote 3a/3b went to the o
 
 **v1.46.0 plan 7 (cap exception, operator 2026-11-22: "put tailscale in v1.46.0 side by side with iPad SSH plan"):** [`v1.46.0-tailscale-break-glass-access.md`](plans/v1.46.0-tailscale-break-glass-access.md) (moved from v1.48.0 plan 5; spec only, scope revision owed before intent approval). An operator-only tailnet gives the iPad Air a second way into the Macs that does not depend on cloudflared, plus macOS Screen Sharing so a TCC or Keychain dialog on a clamshelled Mac can be answered while travelling (2026-11-22 password-bundle hang). Enrollment, system-extension approvals and live rollout need the operator at home and a separate go. Source: `docs/ideas.md` row 2026-11-22 (iPad-only travel GUI path).
 
+### Candidate milestone — v1.46.1 (patch)
+
+**Bug-fix release from the 2026-11-25 triage** (operator, 2026-11-25: "go with patch release v1.46.1"). Branch
+`k3d-manager-v1.46.1`, cut from `main` after v1.46.0 merges. Bug fixes only; batched by file, one dispatch per batch
+(Luna implements, Flash takes docs-only parts). Argon classified each doc blind; Claude verified.
+
+| Batch | Bugs | Priority |
+|---|---|---|
+| A1 `bin/k3dm-codex-dispatch` | `docs/bugs/2026-11-17-open-count-ignores-linked-review-role.md`, `docs/bugs/2026-11-18-codex-dispatch-status-project-task-state-unknown.md`, `docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md`, `docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md` | P2 |
+| A2 rule violations | `docs/bugs/2026-11-25-ci-copilot-cli-installed-unpinned-latest.md` (A08), `docs/bugs/2026-11-18-hub-recovery-root-token-in-jq-argv.md` (A02) | P3 |
+| A3 ops tooling | `docs/bugs/2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md`, `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`, `docs/bugs/2026-11-19-prometheus-auth-proxy-has-no-standalone-installer.md` | P2 |
+| A4 Hermes | `docs/bugs/2026-11-18-hermes-approve-repropose-voids-digest-and-expiry-checks.md` (fix before v1.46.0 plan 1's approval gate depends on the Hermes approval path) | P3 |
+| B small | `docs/bugs/2026-11-21-host-disk-free-panel-always-red.md`, `docs/bugs/2026-11-21-hub-deploy-bats-catch-up-test-races-git-index-lock.md` | P3 |
+
+The same triage sent 6 bugs to the next `/release-groom` as v1.47.0 candidates, 42 to the backlog (each pulled into a release that
+already touches its file) and `docs/bugs/2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md` (P2) upstream to
+lib-foundation.
+
 ### Candidate milestone — v1.47.0
 
 **Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.47.0`, cut from

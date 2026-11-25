@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from Argon's blind review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — metrics only
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing (cross-repo dispatch; the same line is on `main` at `bin/k3dm-codex-dispatch:1380`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

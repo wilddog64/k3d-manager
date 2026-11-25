@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-21 during the priv_open E4 live check
 **Priority:** P3 (cosmetic: the install succeeds, but the two lines look like a failure to the operator)
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-web-console-sshd` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** unknown (web-console part A, v1.45.0)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown

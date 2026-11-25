@@ -2,10 +2,12 @@
 
 **Status:** OPEN — captured 2026-11-25, not triaged
 **Priority:** P3 (operator, 2026-11-25: "yes" to filing) — hygiene / supply chain: CI red with no code cause; a rerun works.
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** `0dfa5361` (2026-03-23, "Copilot CLI install + _copilot_auth_check integration test", #47)
 **Should have been caught by:** review (the A08 rule pins every external tool; `VERSION=latest` breaks it)
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-25
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** docs/bugs/ exact-slug glob (no match; the copilot-named docs are PR-review finding records); `make
 find-similar-docs` not run — vector store unavailable (context `k3d-k3d-cluster` does not exist)
 

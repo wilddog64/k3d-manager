@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-24, not triaged
 **Priority:** P3 (test/gate only; the installer behaves correctly; a land retry on a quieter host passes)
+**Triage:** backlog — pull into a release that already touches `scripts/ci/fast_gate.sh` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** unknown (the suite grew with v1.45.0 and R3 `totp-b` `d6e1e7a6`; the limit is `scripts/ci/fast_gate.sh:29`)
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown

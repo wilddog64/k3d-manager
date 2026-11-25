@@ -1,12 +1,14 @@
 # machine-setup: antigravity-cli cask refuses to install over an agy brew does not own
 
 **Status:** OPEN
-**Priority:** P3
+**Priority:** P2 (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** 20c9bc74 (cask:antigravity-cli added to brew.hub.list / brew.worker.list)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (`make machine-setup` fails when an existing working `/opt/homebrew/bin/agy` binary is not tracked by Homebrew, with a workaround of running `brew install --cask --force antigravity-cli`.)
-**Waiting on:** operator decision — since 2026-11-20
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** docs/bugs/2026-10-31-machine-setup-installs-wrong-gemini-and-no-agy.md (exact topic, read) — read, different root cause; find-similar-docs not run
 
 ## Symptom

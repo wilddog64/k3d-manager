@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-22
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-test-metrics` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown

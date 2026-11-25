@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-22
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `scripts/tests/bin/hub_promote.bats` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** `aa1196ed` (v1.43.15, `_run_promoter_tty` with `deadline = time.time() + 10`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

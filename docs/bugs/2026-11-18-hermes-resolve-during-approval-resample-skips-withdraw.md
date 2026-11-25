@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from Argon's blind review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — rare timing window
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-hermes` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing in shape; `withdraw_on_resolve` (v1.44.x R7) kept the default on re-samples by design
 **Should have been caught by:** spec
 **Introducing change reviewed:** no

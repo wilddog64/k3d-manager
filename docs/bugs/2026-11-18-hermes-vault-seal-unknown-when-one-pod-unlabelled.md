@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from Argon's blind review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — matches the H1 spec; the hub runs one Vault pod
+**Triage:** backlog — pull into a release that already touches `scripts/lib/hermes/sensors.py` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.44.2 Hermes vault_seal sensor (`scripts/lib/hermes/sensors.py:905`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no

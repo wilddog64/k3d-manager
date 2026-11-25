@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-23, not triaged
 **Priority:** P3 (test-only; intermittent; the installer behaves correctly)
+**Triage:** backlog — pull into a release that already touches `scripts/tests/bin/web_console_totp.bats` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.45.0 (`0c27b830`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

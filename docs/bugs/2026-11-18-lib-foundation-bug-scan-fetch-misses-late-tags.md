@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from the M2 spec review (Argon)
 **Priority:** P3 — a lib-foundation bug's release label can lag or stay `unassigned` until some later fetch brings the tag
+**Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing (`_publish_lib_foundation_bugs`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-25, not triaged
 **Priority:** P3 (operator, 2026-11-25: "go ahead to file P3") — slow, not broken: the drill completes; the clone adds about
+**Triage:** backlog — pull into a release that already touches `bin/dr-drill` (operator, 2026-11-25); Argon blind classification, Claude verified
 15 minutes to every run before any cluster work starts.
 **Introduced by:** v1.43.0 (`edfc9a5c`, preflight export-age check added with the drill)
 **Should have been caught by:** live check (the first drill runs would have shown the duration; nobody timed the phase)

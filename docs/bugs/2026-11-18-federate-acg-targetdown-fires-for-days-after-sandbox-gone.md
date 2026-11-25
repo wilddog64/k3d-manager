@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 (operator reported the alert email)
 **Priority:** P3 — one warning email a day while no sandbox runs; no workaround needed, but it trains the operator to ignore TargetDown
+**Triage:** backlog — pull into a release that already touches `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown

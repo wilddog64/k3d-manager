@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-web-console-sshd` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** `6b34bd55` (v1.45.0 plan 4, web-console part A)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no

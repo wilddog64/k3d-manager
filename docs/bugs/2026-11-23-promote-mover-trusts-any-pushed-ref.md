@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-23
 **Priority:** P3
+**Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.45.0 plan 2d (deploy-ref mover)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

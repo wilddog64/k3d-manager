@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from the PR #89 blind reviews (Argon, Astra 6.2, Fable)
 **Priority:** P3 — no current caller hits these (the one caller, `Makefile:1773`, passes `scripts/tests/...` paths to a fresh stage dir)
+**Triage:** backlog — pull into a release that already touches `scripts/lib/system.sh` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing (present at lib-foundation `f8025a2`, before v0.5.7)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

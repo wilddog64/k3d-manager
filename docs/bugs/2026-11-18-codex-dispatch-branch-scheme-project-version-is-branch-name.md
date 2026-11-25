@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from Argon's blind review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — latent; no registered project uses `scheme=branch` today
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
