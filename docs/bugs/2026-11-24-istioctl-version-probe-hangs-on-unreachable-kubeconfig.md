@@ -8,7 +8,8 @@
 **Should have been caught by:** offline test (the `_write_existing` stub in `scripts/tests/lib/install_istioctl.bats:114-123` prints the version whatever its arguments, so a remote probe could never fail or hang)
 **Introducing change reviewed:** yes (Fable)
 **Waiting on:** fix running — since 2026-11-24
-**Intent approved:** operator, 2026-11-24 ("go ahead to file a P1 bug and have Fable review then dispatch to Luna")
+**Intent approved:** operator, 2026-11-24
+**Intent note:** "go ahead to file a P1 bug and have Fable review then dispatch to Luna"
 **Prior art:** `docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md` (exact topic; this is a defect in its fix) — appended as a follow-up of that bug, not a recurrence; `make find-similar-docs` not run (vector store not reachable from m4)
 **Detected by:** operator + Claude, E6 run of `~/k3dm-e6e7.sh` on m2-air, 2026-11-24: the drill sat 1 h 47 min on `/opt/homebrew/bin/istioctl version --short` (process tree read by Claude over SSH)
 
