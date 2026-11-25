@@ -1,6 +1,6 @@
 # Bug: console TOTP enrolment shows no QR code, and the recovery codes are wiped from the screen the instant they appear
 
-**Status:** OPEN — spec rev 2, 2026-11-24 (rev 2: Fable review NEEDS FIXES applied — Python 3.9 syntax, pty harness, UNAVAILABLE pause, QR constants, SGR form, window height, type-ahead, Ctrl-C, how-to lines, CodeQL note)
+**Status:** OPEN — spec rev 3, 2026-11-24 (rev 3: reference vectors from python-qrcode, decode-verified; rev 2: Fable review NEEDS FIXES applied — Python 3.9 syntax, pty harness, UNAVAILABLE pause, QR constants, SGR form, window height, type-ahead, Ctrl-C, how-to lines, CodeQL note)
 **Priority:** P2 (enrolment works only by hand-typing a 32-character secret, and the ten recovery codes cannot be saved; workaround: phone app "Enter a setup key", and `totpctl recovery-regen` later, which has the same instant clear)
 **Triage:** patch → v1.45.1 (blocks the operator's first enrolment and the TOTP live checks of the open release)
 **Branch:** k3d-manager-v1.45.1
@@ -21,8 +21,8 @@
 - totpctl runs as root under `python3 -IS` from `/Library/PrivilegedHelperTools/k3dm-web-console/totpctl` (single file, no site
   packages, `bin/k3dm-web-console-totp:505`). `qrencode` is not installed on m5-air (checked 2026-11-24), and a root helper must not
   run a Homebrew binary the operator's account can replace.
-- Reference QR matrices: segno 1.6.6 (scratch venv on m4-air, 2026-11-24), `segno.make(uri, version=6, error='L', mode='byte',
-  mask=0, boost_error=False)`; the URI form is `otpauth://totp/k3dm-console-<host>?secret=<32>&issuer=k3dm-console` (88 bytes + host).
+- Reference QR matrices: python-qrcode 8.0, decoded back with zxing-cpp 2.3.0 (scratch venv on m4-air, 2026-11-24; rev 3 —
+  segno 1.6.6 pads non-canonically); the URI form is `otpauth://totp/k3dm-console-<host>?secret=<32>&issuer=k3dm-console` (88 bytes + host).
   Version 6-L byte mode holds 134 bytes, so hosts up to 46 characters fit; segno accepted a 41-character host.
 
 ## Fix
@@ -117,95 +117,96 @@ interface:
 
 ## Reference vectors
 
-segno 1.6.6, version 6, error L, byte mode, mask 0, m4-air 2026-11-24. Secret `JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP` is the
-RFC-example test value, not a real secret. Each row is 41 bits as 11 hex digits, most significant bit = leftmost module.
-Put them in the test with this provenance comment.
+python-qrcode 8.0 (`version=6, ERROR_CORRECT_L, mask_pattern=0`, byte mode), each decoded back to the exact URI with zxing-cpp
+2.3.0; m4-air, 2026-11-24. Rev 3: replaces the rev 1-2 segno 1.6.6 vectors, which insert a non-canonical `0x00` before the
+`EC 11` padding (still decodable, but not the canonical stream). Secret `JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP` is the RFC-example
+test value. Each row is 41 bits as 11 hex digits, most significant bit = leftmost module.
 
 ```text
 # len=94 otpauth://totp/k3dm-console-m5-air?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=k3dm-console
-1fcaccaee7f
-104e6777e41
-175cdffc05d
-1743fffc25d
-1746d55de5d
-104a3f3ee41
+1fca4426e7f
+1046abbbe41
+1758133005d
+1746aaa825d
+17468008e5d
+10490c0ce41
 1fd5555557f
-001eaaaef00
-1df8009ddc4
-0916bc9c149
-0e445444065
-13aceeffc51
-13fd77559e0
-1c2bfffe149
-124bf7300eb
-1e0d99dfca2
-0af322bd8cf
-1d3b73518ea
-075d9889cef
-0cba2103c12
-02d80003ae9
-193eaaa18c9
-017cc001cb7
-090eeeafc71
-1c6c00cbbce
-0e93fbd9160
-194544448cf
-0397ccddd32
-07fd5577bc8
-0e17f77d14f
-1347b7348c7
-0d85d9ddf83
-15ff222bbfe
-001b4701312
-1fd48998b57
-10540000b10
-175020019f3
-174a2a21618
-175044c4997
-1052eaac9aa
-1fd4d108903
+001f999df00
+1dfa22bfdc4
+08163414149
+16c89888065
+0a2c2233c51
+09ec22019e0
+120eaaaa149
+1278c4000eb
+182eaaefca2
+0ef1009d8cf
+0c33fbd98ea
+0e595445cef
+14beedcfc12
+03d15557ae9
+133ffff58c9
+014ff331cb7
+0b0ddd9fc71
+1c4e22ebbce
+1f9b7351160
+094188888cf
+13970011d32
+04640023bc8
+0ea2a22914f
+154484048c7
+0f86eaedf83
+11fd000bbfe
+0013cf89312
+1fdc4554b57
+1054ccccb10
+175175559f3
+174f7f75618
+175377f4997
+1051d99c9aa
+1fd6f328903
 # len=128 otpauth://totp/k3dm-console-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=k3dm-console
 1fcbee66e7f
-104a6ea7a41
-175d115045d
-174045dde5d
-1748ef8885d
+10426ea7a41
+1751115045d
+174c45dde5d
+174bef8885d
 1048babbf41
 1fd5555557f
 001d8888f00
 1dff9999dc4
-0f39111094b
-167f1d54467
-113faeaf8d1
-17c3ae2c1d1
-05af1547301
-1ac754451cf
-0f959b88eb2
-084bb9b98c3
-170999990e9
-0fed1d5dc6f
-1fa2eeafc51
-16ea7bf3eda
-12921133f09
-15484455dbb
-15969ba8f51
-17f1b99b9ca
-1a159999961
-0d695190ccd
-1326aaa9d72
-1c7f7aa33e8
-092b113772b
-16d744558d3
-0f1988aac82
-15d799b99f1
-00111119b13
-1fd99154757
-105e2ee8b12
-17523eb01f0
-174e1173612
-1758444599c
-1052b8ba9e2
-1fddb99a9cb
+1e31111094b
+07771d54467
+08b3aeaf8d1
+1d42ae2c1d1
+0b8a1547301
+1ec454451cf
+0b869b88eb2
+0c49b9b98c3
+060999990e9
+0f611d5dc6f
+06aaeeafc51
+046f7bf3eda
+1e971133f09
+176b4455dbb
+13a59ba8f51
+17d3b99b9ca
+0b151999961
+0c659190ccd
+022a2aa9d72
+06723aa33e8
+071e113772b
+14d444558d3
+0d2a88aac82
+11f599b99f1
+00199119b13
+1fd15154757
+105aeee8b12
+17577eb01f0
+174f5173612
+175b444599c
+1051b8ba9e2
+1fdfb99a9cb
 ```
 
 ## Worker definition of done
