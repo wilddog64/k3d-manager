@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 15:30 PST — v1.45.1 released; v1.46.0 open — START HERE
+## Handoff — 2026-11-25 16:40 PST — v1.45.1 released; v1.46.0 open — START HERE
 
 - **Session 2026-11-25 afternoon (operator home, said go):**
   - dirused M10b4 rev 3 `52bbe180`: split into M10b4a docs (Flash) + M10b4b DocsDriftTests (Luna). Fable blind review READY WITH
@@ -10,7 +10,15 @@
     older unrelated bullet. Remaining dirused: probe collect 11-26 (operator), E-B3L1, PR.
   - **v1.46.0 plan 1 rev 2 `677cb16e`**: parent + children a store (Luna), b bridge (Luna, after a), c relay prefix (Luna),
     d helper wait (Luna), e docs (Flash, after b). Ruleset dropped: all cloud-requests commits authored as operator (git log -200).
-    Fable + Astra blind reviews running (prompt in scratchpad plan1-review-prompt.md).
+    Fable + Astra both NOT READY on rev 2; all findings verified. **Rev 3 `c89589f5`**: single-instance flock, per-decision save +
+    expiry recheck before token read, pending notice outside outbox, StoreError reason, relay records c Deny + first decision wins,
+    5-min minimum, 30 s drain throttle, requested_by validation, lazy path/config, named mutants. New child **b1** (watch fixes) carries
+    two pre-existing P2s Astra found: `docs/bugs/2026-11-25-cloud-bridge-watch-entry-crashes-on-sandbox-lifecycle.md` (TypeError, sandbox
+    responses lost) and `...-trusts-public-watch-ledger-entries.md` (one bad line freezes the bridge). Next: operator intent approval,
+    then dispatch a + b1 + c (3 WIP), then d, b, e.
+  - **Docs review (operator ask 16:30):** mechanical pass done (119 standing docs): only real miss `make install-webhook`
+    (launchd-daemons.md:13,153). 33 docs older than their code; Flash read-only audit of 31 running (scratchpad flash-doc-audit.md);
+    cloud-bridge/cloud-session-requests excluded (plan 1e rewrites them).
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
     cloud-runner requests (sandbox-up/down aws, make-e2e[-remote]) wait for operator approval (reuse Hermes/Slack approve);
     GitHub ruleset limits pushes to `cloud-requests`. Spec rewrite next (Fable + Astra review: shared contract).
