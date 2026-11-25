@@ -54,6 +54,7 @@ expires 2026-11-26 (operator may delete).
 - Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
   agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first).
 
+- 2026-11-25 09:50 P3 captured: docs/bugs/2026-11-25-ci-copilot-cli-installed-unpinned-latest.md (CI run 45660622977 red at Copilot CLI checksum). Hub promote of 65fd63f2 waits on its CI (operator rerun when green).
 - 2026-11-25 09:40 V4 defect 1 LIVE-VERIFIED: m2 drill 20261125T173312Z success, V0-V9 true, RTO 644 s (HEAD c5bcf645). Defect 2 E4 (V4-false path) not exercisable by a passing drill → operator decision. Next: v1.45.1 release PR.
 - 2026-11-25 09:35 P3 captured: docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md (preflight clone 09:07→09:22 on m2). E5 drill running on m2 (watching).
 - 2026-11-25 09:05 dirused b3d LANDED `009fb14` (10/10 mutants, CI green; N2 state-isolation fix `009fb14`). Next dirused: jump-box probe collect 11-26 → E-B3L1 → M10b4 docs → PR.
