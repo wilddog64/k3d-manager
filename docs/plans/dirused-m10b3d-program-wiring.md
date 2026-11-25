@@ -89,7 +89,7 @@ must:
   - id: B3d-M1
     text: "RunWithSchedule with fakes (ScheduleFakes.StockSystemDrive security, an in-memory store, recording FakeTaskScheduler, Version '1.2.3', recording IReleaseSource): '/fromlist <temp list> /purge /schedule 22:30 /confirm /yes' → FakeTaskScheduler records Register and output has 'Scheduled <id> for '; '/runplan <id>' on that plan at its run time → a claim is written; '/schedule /list' → its row; '/schedule /cancel <id>' on a second plan → 'Cancelled <id>.'; '/schedule /trust' → 'No trusted accounts.'; '/schedule /untrust x' → 'x is not trusted.'; in every run the release source records no call and neither output contains 'is not available in this version'"
   - id: B3d-M2
-    text: "with IsWindows false and no seams: '/runplan x', '/schedule /list', '/schedule /cancel x', '/schedule /trust', '/schedule /untrust x' and '/fromlist <list> /purge /schedule 22:30 /confirm' each → stderr '/schedule needs Windows', stdout empty, exit 1; '/fromlist <list> /purge /schedule 22:30' (no /confirm) → the preview on stdout, exit 0 (positive control)"
+    text: "with IsWindows false and no seams: '/runplan x', '/schedule /list', '/schedule /cancel x', '/schedule /trust', '/schedule /untrust x' and '/fromlist <list> /purge /schedule 22:30 /confirm' each → stderr '/schedule needs Windows', stdout empty, exit 1; '/fromlist <list> /purge /schedule 22:30 PT' (no /confirm; zone explicit because D7 refuses a bare time on a non-Pacific machine and CI runs in UTC — rev 2, 2026-11-25) → the preview on stdout, exit 0 (positive control)"
   - id: B3d-M3
     text: "'/fromlist <list> /purge /schedule 22:30 /confirm /yes' with the list path equal to PurgeLogPath → '/fromlist cannot be the purge log', exit 1, no Register (path checks still run first)"
   - id: B3d-M4
@@ -266,3 +266,7 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
 - Mutants: E-B3d's "scratch-branch mutants" follow the b3c operator decision (option 2, 2026-11-25): they run in the CI runner via
   the mutant harness (per-mutant test filter). Watch item: N1's `/runplan` half asserts no Control actions but not that the plan
   reached the held row — the "Control forwarded to PlanRunner" mutant decides whether it is vacuous.
+- Correction 2 (CI run 45656593794: M1, M2, M3 red): M1 test fake kept files visible after MarkDelete (test fixed); M3 test mixed
+  the purge-log and output cases (split; both messages verified). M2: Luna forced the Pacific zone in production for the
+  non-Windows preview — Claude reverted it (breaks D7: a bare time only on a Pacific machine); the defect was the spec's bare
+  `22:30` on a UTC runner, so M2 now uses `22:30 PT` (spec rev 2).
