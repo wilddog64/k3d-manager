@@ -16,9 +16,12 @@
     two pre-existing P2s Astra found: `docs/bugs/2026-11-25-cloud-bridge-watch-entry-crashes-on-sandbox-lifecycle.md` (TypeError, sandbox
     responses lost) and `...-trusts-public-watch-ledger-entries.md` (one bad line freezes the bridge). Next: operator intent approval,
     then dispatch a + b1 + c (3 WIP), then d, b, e.
-  - **Docs review (operator ask 16:30):** mechanical pass done (119 standing docs): only real miss `make install-webhook`
-    (launchd-daemons.md:13,153). 33 docs older than their code; Flash read-only audit of 31 running (scratchpad flash-doc-audit.md);
-    cloud-bridge/cloud-session-requests excluded (plan 1e rewrites them).
+  - **Docs review (operator ask 16:30) DONE `af3b96c2`:** 119 docs mechanical pass + Flash audit of 31 drifted docs;
+    13 stale statements verified and fixed in 11 docs (webhook :7443 / `make setup-worker`, copilot auth, cve-pins/hub, Trivy
+    metric, confirm targets, log path, Pushgateway wording, Hermes R5/R6/R10 note, dr-drill ldap_resync, doctor Slack checks).
+  - Plan 1 intents approved (`91d88a47`); dispatch a + b1 + c waits on push (pre-push fast gate slow). Split work tip `2022216d`,
+    `2720e262`. CI red on `88d86c23` = machine-secrets 1-in-256 CBC flake, captured P3
+    `docs/bugs/2026-11-25-machine-secrets-wrong-passphrase-decrypts-1-in-256.md`. K3dmPromoteWaiting alert = operator promote.
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
     cloud-runner requests (sandbox-up/down aws, make-e2e[-remote]) wait for operator approval (reuse Hermes/Slack approve);
     GitHub ruleset limits pushes to `cloud-requests`. Spec rewrite next (Fable + Astra review: shared contract).

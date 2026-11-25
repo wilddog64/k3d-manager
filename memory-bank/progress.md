@@ -211,3 +211,4 @@
 - 2026-11-25: M10b4a/b dispatched (Flash/Luna); triage applied `b19970dd` (v1.46.1 patch: 12 bugs).
 - [x] dirused M10b4 LANDED a `24dffb5` + b `eaa51be` 2026-11-25 (mutants 5/5). Plan 1 rev 2 specs `677cb16e`, in Fable+Astra review.
 - 2026-11-25: plan 1 rev 3 `c89589f5` (both reviews NOT READY on rev 2; 2 pre-existing P2 bridge bugs filed, fixed in new child b1). Docs audit started.
+- 2026-11-25: plan 1 intents approved; docs audit done (13 fixes `af3b96c2`); machine-secrets CBC flake captured P3.
