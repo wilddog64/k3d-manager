@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -18,6 +19,7 @@ from webhook.cloud_actions import ACTION_ALLOWLIST
 
 RESPONSE_REF = "refs/remotes/origin/cloud-requests"
 FETCH_REFSPEC = f"+refs/heads/cloud-requests:{RESPONSE_REF}"
+APPROVAL_ID_RE = re.compile(r"^c[0-9]+-[0-9a-f]{8}$")
 
 
 def _git(args, cwd=ROOT, env=None, timeout=60):
@@ -94,6 +96,24 @@ def _commit_request(request_id, payload):
                 pass
 
 
+def _pending_approval(request_id, action):
+    """Return a validated approval notice, or None for untrusted/missing data."""
+    try:
+        pending = json.loads(_git(["show", f"{RESPONSE_REF}:responses/{request_id}.pending.json"]))
+        if not isinstance(pending, dict) or pending.get("id") != request_id or pending.get("action") != action:
+            return None
+        body = pending.get("body")
+        if (not isinstance(body, dict) or body.get("status") != "approval-pending"
+                or not isinstance(body.get("approval_id"), str)
+                or not APPROVAL_ID_RE.fullmatch(body["approval_id"])
+                or not isinstance(body.get("expires_at"), str)):
+            return None
+        expires_at = datetime.fromisoformat(body["expires_at"].replace("Z", "+00:00"))
+        return body["approval_id"], body["expires_at"], expires_at
+    except (RuntimeError, json.JSONDecodeError, TypeError, ValueError, OverflowError):
+        return None
+
+
 def main(argv=None):
     parsed, args = _parse_args(argv)
     now = datetime.now(timezone.utc)
@@ -109,7 +129,10 @@ def main(argv=None):
     print(request_id)
     if not parsed.wait and not parsed.wait_final:
         return 0
-    deadline = time.monotonic() + parsed.timeout
+    wait_started = time.monotonic()
+    deadline = wait_started + parsed.timeout
+    approval_started = None
+    approval_notice = None
     while True:
         try:
             _git(["fetch", "origin", FETCH_REFSPEC], timeout=120)
@@ -121,6 +144,8 @@ def main(argv=None):
         except (RuntimeError, json.JSONDecodeError):
             response = None
         if response is not None:
+            if approval_started is not None:
+                deadline += time.monotonic() - approval_started
             print(json.dumps(response, sort_keys=True))
             if not parsed.wait_final:
                 return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
@@ -147,6 +172,14 @@ def main(argv=None):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return 5
+        if approval_notice is None and parsed.action != "cluster-status":
+            approval_notice = _pending_approval(request_id, parsed.action)
+            if approval_notice is not None:
+                approval_id, expires_text, expires_at = approval_notice
+                approval_started = time.monotonic()
+                print(f"awaiting operator approval ({approval_id}) until {expires_text}", file=sys.stderr)
+                expiry_deadline = time.monotonic() + (expires_at.timestamp() - time.time()) + 120
+                deadline = max(deadline, min(expiry_deadline, wait_started + 2100))
         time.sleep(min(parsed.poll_interval, remaining))
 
 
