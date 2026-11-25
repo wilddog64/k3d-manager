@@ -1,13 +1,13 @@
 # Bug: `make install-web-console-sshd` always fails on macOS: it calls `/usr/bin/chmod`, which does not exist
 
-**Status:** OPEN — spec rev 1, 2026-11-24
+**Status:** LANDED — `ee2416eb` on `k3d-manager-v1.45.1` (2026-11-24); E1 offline PASS (red on 3a23e839); E2 live pending (operator install on m5-air after promote)
 **Priority:** P1 (blocks the v1.45.1 first install of part A, so the TOTP and RevokedKeys live checks cannot run; no workaround without editing the installer)
 **Triage:** patch → v1.45.1 (blocks the open release)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** `d6e1e7a6` (totp-b, "enforce RevokedKeys KRL for console certificates")
 **Should have been caught by:** offline test (the fixture resolves every tool by basename, `scripts/lib/web_console_common.sh:26`, so an absolute path that does not exist on macOS can never fail a test)
 **Introducing change reviewed:** unknown
-**Waiting on:** fix running — since 2026-11-24
+**Waiting on:** live check — since 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Prior art:** `ls docs/bugs/*chmod*` none; `make find-similar-docs` returned no rows (vector store not reachable from m4) — none above threshold
 **Detected by:** operator, first `make install-web-console-sshd CA_FILE=…` on m5-air (the hub), 2026-11-24; exit 8 after `web-console-sshd: rolled back an interrupted install`
