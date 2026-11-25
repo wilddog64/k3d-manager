@@ -54,6 +54,7 @@ expires 2026-11-26 (operator may delete).
 - Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
   agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first).
 
+- 2026-11-25 post-merge: v1.45.1 merged 19d396ed, tagged and released; enforce_admins restored; now on k3d-manager-v1.46.0 (groomed 5/5). Open carry-overs: 5 LANDED P2/P3 live checks (totp a1 decay, totp gate lockout, cve-pins, make sync-branch, preflight rename); dirused jump-box probe collect 2026-11-26; HoverFocus probe rewrite; #158 deferred.
 - 2026-11-25 11:55 Argon PR #165: 2 low (V1 _err via pipeline: refuted; totpctl fin/fout isatty: real, unreachable) → no change, docs/issues/2026-11-25-argon-pr165-review-findings.md. Waiting CI on final head, then enforce_admins off.
 - 2026-11-25 11:40 PR #165 (v1.45.1) opened, not draft. Argon blind review dispatched (release-pr165-v1.45.1-review, agy gemini-4-argon-medium, pid 86935); CI on head running. Alerts L1 LIVE-VERIFIED; 5 P2/P3 still LANDED (listed in PR notes). #158 deferred (operator).
 - 2026-11-25 11:10 root-installers E15 LIVE-VERIFIED (m5 console; bootstrap installed at 65fd63f2, stage --ref deploy/hub, sudo dropped both times). All v1.45.1 bugs LIVE-VERIFIED → release PR next.

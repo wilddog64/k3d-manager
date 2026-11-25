@@ -204,3 +204,4 @@
 - **2026-11-25:** V4 defect 1 LANDED cf743007; E5 drill owed. Jump-box probe running (collect 2026-11-26).
 - [x] dirused b3d (M10b3d) LANDED `009fb14` 2026-11-25 (10/10 mutants).
 - 2026-11-25: v1.45.1 release prep — all 8 Branch-v1.45.1 bugs + alerts L1 LIVE-VERIFIED; 5 P2/P3 fixes still LANDED awaiting live checks (totp a1 decay, totp gate lockout, cve-pins, make sync-branch, preflight rename). CHANGELOG [1.45.1] - 2026-11-25, releases tables, verified-stage how-to. Hub smoke PASS (30/30 apps Synced+Healthy, vault unsealed, deploy/hub 65fd63f2 = release code). Opening release PR; Argon blind review (Copilot capped).
+- 2026-11-25: v1.45.1 MERGED (PR #165, 19d396ed); tag v1.45.1 + GitHub release created; next branch k3d-manager-v1.46.0; enforce_admins restored.
