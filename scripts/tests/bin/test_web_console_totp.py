@@ -1522,11 +1522,9 @@ def test_pause_keeps_codes_until_read_and_clear_after(verifier, monkeypatch, ver
     assert Path(verifier.run_dir).is_relative_to(verifier.root)
     assert Path(verifier.state_dir).is_relative_to(verifier.root)
     if verb == "recovery-regen":
-        prefix = "RECOVERY"
         incoming = "yes\n287082\n\n"
     else:
         secret = base64.b32encode(b"only-in-test-secret!").decode()
-        prefix = "ENROLL" if verb == "enroll" else "ROTATE"
         incoming = "287082\n\n"
     assert Path(verifier.root).is_dir()
     commands = []
