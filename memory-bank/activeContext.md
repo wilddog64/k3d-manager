@@ -54,6 +54,7 @@ expires 2026-11-26 (operator may delete).
 - Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
   agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first).
 
+- 2026-11-25 09:35 P3 captured: docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md (preflight clone 09:07→09:22 on m2). E5 drill running on m2 (watching).
 - 2026-11-25 09:05 dirused b3d LANDED `009fb14` (10/10 mutants, CI green; N2 state-isolation fix `009fb14`). Next dirused: jump-box probe collect 11-26 → E-B3L1 → M10b4 docs → PR.
 - (prior) 2026-11-25 08:55 dirused b3d: windows CI green on task branch `e34100a` (114/114 + 391); 3 CI rounds fixed test defects (Claude reverted Luna's Pacific-zone production change; spec rev 2 M2 uses `22:30 PT`). Next: harness per-mutant filter (operator scope exception) → 4 mutants → land.
 
