@@ -7,8 +7,8 @@
 **Introduced by:** `d6e1e7a6` (totp-b, "enforce RevokedKeys KRL for console certificates")
 **Should have been caught by:** offline test (the fixture resolves every tool by basename, `scripts/lib/web_console_common.sh:26`, so an absolute path that does not exist on macOS can never fail a test)
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-24 (intent approval, then dispatch)
-**Intent approved:** pending
+**Waiting on:** fix running — since 2026-11-24
+**Intent approved:** operator, 2026-11-24
 **Prior art:** `ls docs/bugs/*chmod*` none; `make find-similar-docs` returned no rows (vector store not reachable from m4) — none above threshold
 **Detected by:** operator, first `make install-web-console-sshd CA_FILE=…` on m5-air (the hub), 2026-11-24; exit 8 after `web-console-sshd: rolled back an interrupted install`
 
