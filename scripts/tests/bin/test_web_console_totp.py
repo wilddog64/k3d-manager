@@ -1439,6 +1439,149 @@ def test_N5_E3_secret_never_creates_temp_files(verifier, monkeypatch, verb):
             path.unlink(missing_ok=True)
 
 
+def _matrix_from_hex_rows(rows):
+    return [[bool((int(value, 16) >> (40 - col)) & 1) for col in range(41)] for value in rows]
+
+
+def test_qr_reference_matrices_and_limits():
+    # python-qrcode 8.0 (version 6, ERROR_CORRECT_L, byte mode, mask_pattern 0), each decoded back with zxing-cpp 2.3.0;
+    # m4-air, 2026-11-24. Replaces segno 1.6.6 vectors (segno inserts a non-canonical 0x00 before the EC/11 padding).
+    first = """1fca4426e7f 1046abbbe41 1758133005d 1746aaa825d 17468008e5d 10490c0ce41 1fd5555557f 001f999df00 1dfa22bfdc4 08163414149 16c89888065 0a2c2233c51 09ec22019e0 120eaaaa149 1278c4000eb 182eaaefca2 0ef1009d8cf 0c33fbd98ea 0e595445cef 14beedcfc12 03d15557ae9 133ffff58c9 014ff331cb7 0b0ddd9fc71 1c4e22ebbce 1f9b7351160 094188888cf 13970011d32 04640023bc8 0ea2a22914f 154484048c7 0f86eaedf83 11fd000bbfe 0013cf89312 1fdc4554b57 1054ccccb10 175175559f3 174f7f75618 175377f4997 1051d99c9aa 1fd6f328903""".split()
+    second = """1fcbee66e7f 10426ea7a41 1751115045d 174c45dde5d 174bef8885d 1048babbf41 1fd5555557f 001d8888f00 1dff9999dc4 1e31111094b 07771d54467 08b3aeaf8d1 1d42ae2c1d1 0b8a1547301 1ec454451cf 0b869b88eb2 0c49b9b98c3 060999990e9 0f611d5dc6f 06aaeeafc51 046f7bf3eda 1e971133f09 176b4455dbb 13a59ba8f51 17d3b99b9ca 0b151999961 0c659190ccd 022a2aa9d72 06723aa33e8 071e113772b 14d444558d3 0d2a88aac82 11f599b99f1 00199119b13 1fd15154757 105aeee8b12 17577eb01f0 174f5173612 175b444599c 1051b8ba9e2 1fdfb99a9cb""".split()
+    uris = [b"otpauth://totp/k3dm-console-m5-air?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=k3dm-console",
+            b"otpauth://totp/k3dm-console-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=k3dm-console"]
+    assert len(uris[0]) == 94 and len(uris[1]) == 128
+    assert totpctl._qr_matrix(uris[0]) == _matrix_from_hex_rows(first)
+    assert totpctl._qr_matrix(uris[1]) == _matrix_from_hex_rows(second)
+    assert totpctl._qr_matrix(b"x" * 135) is None
+    matrix = totpctl._qr_matrix(b"x" * 134)
+    assert len(matrix) == 41 and all(len(row) == 41 for row in matrix)
+
+
+def test_qr_render_has_exact_quiet_zone_and_sgr_cells():
+    matrix = [[(r + c) % 3 == 0 for c in range(41)] for r in range(41)]
+    rendered = totpctl._qr_render(matrix)
+    lines = rendered.splitlines(keepends=True)
+    assert len(lines) == 25
+    padded = [[False] * 49 for _ in range(4)]
+    padded.extend([[False] * 4 + row + [False] * 4 for row in matrix])
+    padded.extend([[False] * 49 for _ in range(4)])
+    for index, line in enumerate(lines):
+        assert line.endswith("\x1b[0m\n")
+        cells = re.findall(r"\x1b\[(30|97);(40|107)m\u2580", line[:-5])
+        assert len(cells) == 49
+        for col, (fg, bg) in enumerate(cells):
+            assert (fg == "30") == padded[index * 2][col]
+            assert (bg == "40") == (padded[index * 2 + 1][col] if index * 2 + 1 < 49 else False)
+
+
+def test_totpctl_is_stdlib_only_and_python39_safe(verifier):
+    source = Path(TOTPCTL_PATH).read_text()
+    assert not re.search(r"\b(subprocess|popen|system|execv?e?|spawn\w*)\s*\(", source)
+    tree = __import__("ast").parse(source)
+    imported = {alias.name.split(".", 1)[0] for node in __import__("ast").walk(tree)
+                if isinstance(node, (__import__("ast").Import, __import__("ast").ImportFrom))
+                for alias in node.names}
+    assert imported <= set(sys.stdlib_module_names)
+    hub_python = "/Library/Developer/CommandLineTools/usr/bin/python3"
+    if not Path(hub_python).exists():
+        pytest.skip("hub CommandLineTools Python 3 not installed on this host")
+    assert Path(verifier.root).is_dir()
+    path, server, worker, _commands = _admin_stub(verifier.root, [("STATUS", "ENROLLED")])
+    program = ("import importlib.util, sys; "
+               "spec=importlib.util.spec_from_file_location('ctl', sys.argv[1]); "
+               "ctl=importlib.util.module_from_spec(spec); spec.loader.exec_module(ctl); "
+               "raise SystemExit(ctl.run(['status', '--wire'], admin_sock=sys.argv[2], check_root=False))")
+    env = os.environ.copy()
+    env["HOME"] = str(verifier.root)
+    try:
+        result = subprocess.run([hub_python, "-IS", "-c", program, TOTPCTL_PATH, str(path)],
+                                cwd=verifier.root, env=env, capture_output=True, text=True, timeout=10)
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+    finally:
+        server.close()
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "ENROLLED\n"
+
+
+class _ReadRecorder(io.StringIO):
+    def __init__(self, value, output):
+        super().__init__(value)
+        self.output = output
+        self.read_lengths = []
+    def readline(self, size=-1):
+        self.read_lengths.append(len(self.output.getvalue()))
+        return super().readline(size)
+    def isatty(self):
+        return False
+
+
+@pytest.mark.parametrize("verb", ["enroll", "rotate", "recovery-regen"])
+def test_pause_keeps_codes_until_read_and_clear_after(verifier, monkeypatch, verb):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    if verb == "recovery-regen":
+        prefix = "RECOVERY"
+        incoming = "yes\n287082\n\n"
+    else:
+        secret = base64.b32encode(b"only-in-test-secret!").decode()
+        prefix = "ENROLL" if verb == "enroll" else "ROTATE"
+        incoming = "287082\n\n"
+    assert Path(verifier.root).is_dir()
+    commands = []
+    alphabet = "234567ABCD"
+    def fake_admin(_path, command):
+        commands.append(command)
+        if command in ("ENROLL_BEGIN", "ROTATE_BEGIN"):
+            return f"SECRET {secret}"
+        if command == "RECOVERY_BEGIN":
+            return "RECOVERY_PENDING"
+        if command.startswith("RECOVERY_GET "):
+            index = int(command.rsplit(" ", 1)[1])
+            return f"CODE AAAA-BBBB-CCCC-AAA{alphabet[index]}"
+        if command.endswith(" 287082"):
+            return "OK"
+        return "OK"
+    monkeypatch.setattr(totpctl, "send_admin_cmd", fake_admin)
+    path = str(verifier.root / "stub-admin.sock")
+    try:
+        output = io.StringIO()
+        reader = _ReadRecorder(incoming, output)
+        assert totpctl.run([verb], admin_sock=str(path), tty_in=reader, tty_out=output, check_root=False) == 0
+        assert len(reader.read_lengths) == (3 if verb == "recovery-regen" else 2)
+        before_pause_read = reader.read_lengths[-1]
+        assert "\x1b[3J\x1b[H\x1b[2J" not in output.getvalue()[:before_pause_read]
+        assert "Save the recovery codes now" in output.getvalue()[:before_pause_read]
+        assert "\x1b[3J\x1b[H\x1b[2J" in output.getvalue()[before_pause_read:]
+        assert commands[-1].endswith("COMMIT 287082")
+    finally:
+        pass
+
+
+def test_pause_unavailable_keeps_potentially_live_codes(verifier, monkeypatch):
+    assert Path(verifier.root).is_dir()
+    secret = base64.b32encode(b"only-in-test-secret!").decode()
+    def fake_admin(_path, command):
+        if command == "ENROLL_BEGIN":
+            return f"SECRET {secret}"
+        if command.startswith("RECOVERY_GET "):
+            index = int(command.rsplit(" ", 1)[1])
+            return f"CODE AAAA-BBBB-CCCC-AAA{'234567ABCD'[index]}"
+        if command.startswith("ENROLL_COMMIT "):
+            return "UNAVAILABLE"
+        return "OK"
+    monkeypatch.setattr(totpctl, "send_admin_cmd", fake_admin)
+    output = io.StringIO()
+    reader = _ReadRecorder("287082\n\n", output)
+    assert totpctl.run(["enroll"], admin_sock=str(verifier.root / "stub.sock"), tty_in=reader,
+                       tty_out=output, check_root=False) == 1
+    before_clear = output.getvalue().index("\x1b[3J\x1b[H\x1b[2J")
+    assert output.getvalue().index("commit not confirmed; run web-console-totp-status") < output.getvalue().index(
+        "Save the recovery codes now") < before_clear
+    assert len(reader.read_lengths) == 2
+
+
 def admin_commit_at_pty(verifier, monkeypatch, verb, fault, tmpdir=None):
     raw = b"only-in-test-secret!"
     assert len(raw) == 20
@@ -1486,6 +1629,8 @@ raise SystemExit(ctl.run([sys.argv[3]], admin_sock=sys.argv[2], check_root=False
         while b"Code: " not in transcript:
             assert select.select([master], [], [], 3)[0]
             transcript.extend(os.read(master, 4096))
+        assert b"Scan this with your phone's camera or authenticator app:" in transcript
+        assert transcript.index(b"Scan this with your phone's camera or authenticator app:") < transcript.index(b"Secret:")
         assert b"otpauth://totp/" in transcript and secret in transcript
         assert not verifier.state.exists() if verb == "enroll" else verifier.state.read_bytes() == old_state
         assert not verifier.state.with_suffix(".json.tmp").exists()
@@ -1493,6 +1638,13 @@ raise SystemExit(ctl.run([sys.argv[3]], admin_sock=sys.argv[2], check_root=False
             if file.is_file():
                 assert secret not in file.read_bytes() and raw not in file.read_bytes()
         os.write(master, (wrong_code if fault == "wrong-code" else code) + b"\n")
+        if fault != "wrong-code":
+            prompt = b"Save the recovery codes now (not on your travel device), then press Enter to clear the screen: "
+            while prompt not in transcript:
+                assert select.select([master], [], [], 3)[0]
+                transcript.extend(os.read(master, 4096))
+            assert b"\x1b[3J\x1b[H\x1b[2J" not in transcript
+            os.write(master, b"\n")
         deadline = time.monotonic() + 4
         while proc.poll() is None or select.select([master], [], [], 0)[0]:
             assert time.monotonic() < deadline
@@ -1512,6 +1664,7 @@ raise SystemExit(ctl.run([sys.argv[3]], admin_sock=sys.argv[2], check_root=False
         assert proc.returncode == (1 if fault else 0)
         assert code not in transcript and wrong_code not in transcript
         if fault == "wrong-code":
+            assert b"Save the recovery codes now" not in transcript
             assert b"Invalid code" in transcript
             assert b"The recovery codes shown are void." in transcript
             assert transcript.count(b"The recovery codes shown are void.") == 1

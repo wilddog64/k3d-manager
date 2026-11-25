@@ -25,6 +25,7 @@ bin/k3dm-web-console-totp enroll
 Enrolment refused under tmux: for accident prevention, enrolment and rotation refuse to run when `$TMUX`, `$TMUX_PANE` or `$STY` is set, over SSH (`$SSH_CONNECTION` or `$SSH_TTY`), without an interactive terminal, or as root.
 
 During enrolment, the root helper prints the base32 secret and `otpauth://totp/` URI to `/dev/tty` only. It never writes the secret to disk, logs, environment, or command arguments until the first valid 6-digit code is confirmed via `ENROLL_COMMIT`.
+The QR code appears above the secret. Enlarge the Terminal window if needed, scan it with the phone camera or an authenticator app, then type the 6-digit code. Save the recovery codes when they appear and press Enter to clear the screen. Do not click the URI.
 
 To check enrolment status:
 ```bash
@@ -90,7 +91,7 @@ Every unlock path shipped by parts A1 and A2 (see parent [`docs/bugs/2026-11-23-
   - Session and attempt limits: While the daemon imposes no attempt limit on recovery codes (wrong recovery codes return `NO` and never increment `failures` or alter `lock_level` or `locked_until`), the console gate counts each wrong entry against its ten-prompt session limit (closing the SSH session after ten failed attempts) and pauses about 2 s after each attempt.
   - Reset effect: A valid recovery code immediately resets `failures`, `locked_until`, and `lock_level` to 0.
 - **Managing recovery codes (root, at home):**
-  - Ten single-use recovery codes are displayed once on `/dev/tty` during enrolment (`make web-console-totp-enroll`) and rotation (`make web-console-totp-rotate`). Enrolment and rotation provide a 300 s window; regeneration provides 600 s. Have a safe storage location ready before starting.
+  - Ten single-use recovery codes are displayed once on `/dev/tty` during enrolment (`make web-console-totp-enroll`) and rotation (`make web-console-totp-rotate`). After a successful commit, they stay visible until you press Enter to clear the screen. Enrolment and rotation provide a 300 s window; regeneration provides 600 s. Have a safe storage location ready before starting.
   - Codes printed during enrol, rotate, or recovery-regen are void if the confirming TOTP code fails (the command output notes when codes are void); store them only after the command reports success.
   - Keep the ten recovery codes safely off the travel device.
   - Inspect remaining recovery codes:
@@ -102,7 +103,7 @@ Every unlock path shipped by parts A1 and A2 (see parent [`docs/bugs/2026-11-23-
     ```bash
     sudo /Library/PrivilegedHelperTools/k3dm-web-console/totpctl recovery-regen
     ```
-    Prompts `Replace all recovery codes? Type yes: ` (600 s timeout). Type `yes`, then enter a valid 6-digit TOTP code. The ten new codes are displayed on `/dev/tty` before the scrollback is cleared. Regenerate when two or fewer codes remain (`totp-recovery-low` is logged when remaining <= 2).
+    Prompts `Replace all recovery codes? Type yes: ` (600 s timeout). Type `yes`, then enter a valid 6-digit TOTP code. The ten new codes are displayed on `/dev/tty`; press Enter after saving them to clear the screen. Regenerate when two or fewer codes remain (`totp-recovery-low` is logged when remaining <= 2).
   - Also, entering a correct TOTP code, enrol, or rotate resets any active lockout.
 - **Code exhaustion under sustained attack (parent B8):**
   An attacker holding a console certificate cannot use a recovery code they do not know, but could repeatedly trigger TOTP lockouts, costing the operator one recovery code per login. The remedy is to revoke that certificate using `ssh-keygen -k -u` (see [`docs/howto/web-console-sshd.md`](web-console-sshd.md) and parent section B7) and regenerate recovery codes with `totpctl recovery-regen` at home.
