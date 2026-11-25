@@ -33,6 +33,7 @@ The docs, once updated, will satisfy:
 4. Each of these appears in the section, backticks included: `` `scheduled` ``, `` `running` ``, `` `done ( ``,
    `` `cancelled` ``, `` `expired` ``, `` `missed (did not run)` ``, `` `task missing` ``, `` `interrupted ( ``,
    `` `permissions changed — not run` `` (em dash, U+2014), `` `unreadable plan` ``, `` `refused: ``.
+   (In this list the spaces just inside each double-backtick span are Markdown padding, not part of the string: the two open-ended entries are backtick + `done (` and backtick + `interrupted (`, with nothing after the parenthesis; `` `refused: `` keeps its space after the colon.)
 
 ## Change
 

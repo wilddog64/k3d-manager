@@ -36,6 +36,7 @@ You write only `docs/purge.md`, `README.md` and `CHANGELOG.md`. A sibling task a
    `` `done (deleted, exit 0)` ``): `` `scheduled` ``, `` `running` ``, `` `done ( ``, `` `cancelled` ``, `` `expired` ``,
    `` `missed (did not run)` ``, `` `task missing` ``, `` `interrupted ( ``, `` `permissions changed — not run` ``,
    `` `unreadable plan` ``, `` `refused: ``. The dash in `permissions changed — not run` is an em dash (U+2014).
+   (In this list the spaces just inside each double-backtick span are Markdown padding, not part of the string: the two open-ended entries are backtick + `done (` and backtick + `interrupted (`, with nothing after the parenthesis; `` `refused: `` keeps its space after the colon.)
 
 ## Change
 

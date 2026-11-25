@@ -37,6 +37,7 @@ Facts both children rely on, each from `009fb14`:
    `` `scheduled` ``, `` `running` ``, `` `done ( `` , `` `cancelled` ``, `` `expired` ``, `` `missed (did not run)` ``,
    `` `task missing` ``, `` `interrupted ( ``, `` `permissions changed — not run` ``, `` `unreadable plan` ``, `` `refused: ``.
    (`expired` and `refused: …` reach `/schedule /list` through the report outcome, `SchedulePlans.cs:52`.)
+   (In this list the spaces just inside each double-backtick span are Markdown padding, not part of the string: the two open-ended entries are backtick + `done (` and backtick + `interrupted (`, with nothing after the parenthesis; `` `refused: `` keeps its space after the colon.)
 
 ## Order
 
