@@ -71,12 +71,12 @@ are the interesting engineering:
   it's "deploy something proven clean."
 - **Pin by digest, not tag** — the promoted image is `<repo>:<sha-tag>@<digest>`.
   A tag can be repointed; a digest is the immutable bytes. This is also why it's
-  called *git-persisted*: the digest is written to the app's frozen target branch,
-  so ArgoCD deploys exactly those bytes and the choice survives a resync.
-  Once that commit lands, the promoter removes its live `spec.source.kustomize.images`
-  override from the Application, so git is the only pin and a later manual re-pin takes
-  effect. If git persistence fails, the override stays and shadows git until removed
-  (`docs/bugs/2026-10-02-cve-promoter-live-override-shadows-git-pin.md`).
+  called *git-persisted*: the digest is written to `pins.json` on the `cve-pins/hub`
+  branch (`CVE_PIN_BRANCH` in `scripts/etc/argocd/platform-ops/app-cve-scan.sh`), which the
+  services ApplicationSet reads (`scripts/etc/argocd/applicationsets/services-git.yaml`), so
+  ArgoCD deploys exactly those bytes and the choice survives a resync. The promoter no longer
+  writes live `spec.source.kustomize.images` overrides; it only reads an existing one to
+  report it.
 - **Fail loud, not green** — missing `VulnerabilityReport`s cause a *non-zero* scan
   result, never a fake success. A remediation loop that false-greens is worse than
   no loop.

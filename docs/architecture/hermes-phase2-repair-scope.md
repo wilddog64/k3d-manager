@@ -1,5 +1,12 @@
 # Architecture: Hermes Phase 2 — Allowlisted, Approval-Gated Repairs (scope)
 
+> **Current state (2026-11-25):** this is the original scope record. The implemented catalog in
+> `scripts/lib/hermes/repairs.py` has grown beyond the table below: R5 (scale the ArgoCD application
+> controller to 0 under Kine pressure — an ArgoCD write this scope originally excluded), R6 (restart the hub
+> k3s server container when compaction stalls) and R10 (delete superseded Jobs in `identity`, `monitoring`,
+> `cicd`). Approval Mechanism C (Slack interactive buttons) is implemented (`bin/k3dm-hermes`
+> `_apply_slack_approvals`). See `docs/guides/hermes.md` for operation.
+
 Scope document for **Phase 2** of the **Hermes** event-driven operations automation
 theme. The roadmap requires a scope document before Hermes may be assigned to a
 release, and the Phase 1 scope (`hermes-phase1-monitoring-scope.md`) explicitly

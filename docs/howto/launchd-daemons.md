@@ -10,7 +10,7 @@ Install via `make <target>` or via the plugin function noted below.
 
 | Label | Port / Action | KeepAlive | Install Method | Log |
 |-------|--------------|-----------|----------------|-----|
-| `com.k3d-manager.webhook` | HTTP server :9000 | ✅ | `make install-webhook` | `~/Library/Logs/k3dm-webhook.log` |
+| `com.k3d-manager.webhook` | HTTP server 127.0.0.1:7443 | ✅ | `make setup-worker` (runs `bin/k3dm-webhook-setup`) | `~/Library/Logs/k3dm-webhook.log` |
 | `com.k3d-manager.webhook-token-rotate` | Updates Cloudflare relay and Keychain token | ❌ (timer: 6h) | Not installed by machine setup | `~/Library/Logs/k3dm-webhook-token-rotate.log` |
 | `com.k3d-manager.ssh-tunnel` | Hostinger SSH forward → `:6443` | ✅ | `tunnel_start` | `/tmp/k3d-manager-tunnel.out`, `.err` |
 | `com.k3d-manager.ssh-tunnel-vault` | Hostinger Vault reverse tunnel | ✅ | `tunnel_start` | `/tmp/k3d-manager-tunnel-vault.out`, `.err` |
@@ -148,9 +148,9 @@ Restart the tunnel separately if needed using the launchd hint printed by the ta
 
 ### `com.k3d-manager.webhook`
 - **Trigger:** `KeepAlive=true` (persistent HTTP server)
-- **Port:** 9000 (listens for Slack slash commands)
+- **Port:** 7443 on 127.0.0.1 (`K3DM_WEBHOOK_PORT`); Slack slash commands reach it through the relay Worker
 - **Binary:** `bin/k3dm-webhook` (Python)
-- **Install:** `make install-webhook`
+- **Install:** `make setup-worker` (runs `bin/k3dm-webhook-setup`, then `bin/k3dm-worker-setup`); safe to re-run
 - **Restart after code changes:** `make restart-webhook`
 
 ### `com.k3d-manager.webhook-token-rotate`
