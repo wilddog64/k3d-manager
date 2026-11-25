@@ -257,3 +257,12 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
   `ChangePermissions`, `TakeOwnership`, `WriteData`/`CreateFiles`, `AppendData`/`CreateDirectories` map to their bits; generic-write
   ACEs → `GenericWrite` plus the bits they imply.
 
+## Verification log (Claude)
+
+- 2026-11-25 Luna run 1: files in scope; could not restore (NuGet audit stall; `-p:NuGetAudit=false` works). Tests 3 for 6 items:
+  M1 vacuous (asserted only "not 'not available'" and exit 0..1), M3/N1/N2 missing, M2/M4 partial. Correction 1 (tests only).
+- Correction 1: 7 tests mapped to M1-M4, N1, N2; M3 exposed a production message mismatch (now `/fromlist cannot be the purge
+  log`). Build 0 errors; portable 391 passed. Committed on the task branch `6570688`, pushed for the first windows CI run.
+- Mutants: E-B3d's "scratch-branch mutants" follow the b3c operator decision (option 2, 2026-11-25): they run in the CI runner via
+  the mutant harness (per-mutant test filter). Watch item: N1's `/runplan` half asserts no Control actions but not that the plan
+  reached the held row — the "Control forwarded to PlanRunner" mutant decides whether it is vacuous.
