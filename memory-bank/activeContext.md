@@ -218,3 +218,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-25: promote SHA for gate fix = c7c8f8d1 (7/7 check runs success). Operator: hub-deploy, hub-promote-status, install-web-console-totp, E4.
 - 2026-11-25: V4 Luna exited 0 (4 files, order store-Ready→ES per N5); verifier (Acceptance, sandbox-exec, Linux sim TMPDIR unset) running.
 - 2026-11-25: gate recovery paste bug LIVE-VERIFIED (E4 m5: pasted code via m4→m5, log +113 B, remaining 9→8; promoted c7c8f8d1).
+- 2026-11-25: dirused b3d dispatched to Luna (`dirused-m10b3d-wiring`, base a224279). Operator owed: jump-box overnight probe (m10b3-probes.ps1 setup/run12 → collect/cleanup) gating E-B3L1/E-B3L2. m2 dr-drill leftovers cleared (operator).
