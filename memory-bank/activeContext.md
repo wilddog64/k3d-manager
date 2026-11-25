@@ -32,10 +32,11 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
   U1 (visible errors, Luna); U2 after L3. Fable review before dispatch. Branch `v0.0.3` not cut yet.
 
 **4. dirused (OOB, office jump box)**
-- Dispatch `dirused-m10b3c-windows` exited 0, not landed: waiting on operator mutant-test option (1/2/3, Claude recommends
-  3). Then land b3c, b3d, M10b4 docs, open the dirused PR.
+- Operator chose option 2 (2026-11-25): mutants applied inside the windows CI runner. Harness drafted in scratch
+  (`scratchpad/b3c-mutants/`: mutants.yml, run-mutant.ps1, mutants.json; 6 mutants + control). After correction 1: review, commit
+  code + harness on the task branch, push, read windows + mutants runs, land b3c. Then b3d, M10b4 docs, dirused PR.
 
-**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), `dirused-m10b3c-windows` (exited 0; operator said "recommendation2" — option text lost, re-asked 2026-11-25).
+**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), `dirused-m10b3c-windows` (correction 1 running, resume 4: missing tests M1/M2+N1/M3/M6/M7+N2; `status` shows `unknown` for this resume — watch pid instead).
 
 **Owed / carried:** MEMORY.md over 9 KB (compress at a break); release groom Sun 2026-11-29; triage of captured bugs;
 argon classification backlog; PR #158 (dependabot wrangler-action) open; m5-air test cert `~/.ssh/k3dm-console-test*`
@@ -212,3 +213,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-25: V4 pre-dispatch probe PASS on m2 (store Valid after auth repoint, bind rc 0); found ES-before-store-Ready ordering race; plan rev 3 (N5, E1 intent) — needs operator E1 re-approval, then dispatch Luna.
 - 2026-11-25: V4 rev 3 E1 intent approved (operator); dispatched Luna `v4-ldap-resync`; branch pushed (1ed88a1f).
 - 2026-11-25: gate-recovery-paste LANDED `16199b9c` (verifier PASS-with-gaps e/j, closed by Claude test section 1b). Bug Waiting on live check E4 (promote + install-web-console-totp + paste a recovery code). HoverFocus P2 probe run 05:58: probe UX broken (variants skipped); data: B frontmost w/o raise but typing lands only in TextEdit.
+- 2026-11-25: dirused b3c option 2 recorded in plan `27a51ff5`; Luna correction 1 (tests only) running. CI on c7c8f8d1 being watched for the promote SHA (gate fix 16199b9c).

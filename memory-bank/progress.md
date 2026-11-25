@@ -197,3 +197,4 @@
 - **2026-11-25:** V4 probe PASS (m2, ~/k3dm-v4-probe-20261125T055123.txt); spec rev 3 adds N5 ordering; awaiting E1 intent re-approval.
 - **2026-11-25:** V4 defect 1 dispatched to Luna (`v4-ldap-resync`), WIP 3/3.
 - **2026-11-25:** gate recovery paste/lookalike fix LANDED `16199b9c`; E4 live owed after promote.
+- **2026-11-25:** dirused b3c: operator option 2 (in-runner mutants); test-gap correction 1 to Luna.
