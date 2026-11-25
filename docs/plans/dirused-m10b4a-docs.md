@@ -1,6 +1,6 @@
 # dirused M10b4a: scheduled purge docs
 
-**Status:** OPEN — SPEC rev 2, 2026-11-25; rev 1 reviewed blind by Fable and Argon, fixes applied (see parent's Review log)
+**Status:** LANDED — `24dffb5` 2026-11-25 (Flash; verified by Claude: evidence checks, claims read against code, CI green)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b4](dirused-m10b4-docs.md). The parent's contract is repeated below because the worker cannot read the parent.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (base `009fb14`)
