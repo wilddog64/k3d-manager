@@ -1,6 +1,6 @@
 # dirused M10b3c: the real Windows seam classes (`ScheduleWindows.cs`), tested on windows CI
 
-**Status:** OPEN — SPEC rev 3, 2026-11-24 (rev 2: trust store refuses a junction in Add/Remove, from Claude's review; rev 3: Save sets trust.tmp's owner to the user, from windows CI run 45514086420 where the elevated runner made Administrators the owner and Load rejected the list); split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
+**Status:** OPEN — SPEC rev 4, 2026-11-25 (rev 4: M3 adds fail-closed on GetAttributes error, from the mutant run; rev 2: trust store refuses a junction in Add/Remove, from Claude's review; rev 3: Save sets trust.tmp's owner to the user, from windows CI run 45514086420 where the elevated runner made Administrators the owner and Load rejected the list); split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
 **gates:** after [b3a](dirused-m10b3a-runplan-engine.md) and [b3b](dirused-m10b3b-schtasks-and-rights.md) land; P6 (PASS 2026-11-24),
 P6 default-owner check (PASS 2026-11-24, normal window), P9 PASS (run 45510934313)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
@@ -133,7 +133,7 @@ must:
   - id: B3c-M2
     text: "windows-latest: ReadAcl on a path under a subst letter mapped to the temp dir (existing and missing paths) → Ok false, Missing false, Error 'not on a local fixed drive'; positive control: the same paths through C: → Ok true, and Missing true for the missing one"
   - id: B3c-M3
-    text: "windows-latest: a junction made with 'cmd /c mklink /J' → IsReparsePoint true; a plain dir → false; a missing path → false"
+    text: "windows-latest: a junction made with 'cmd /c mklink /J' → IsReparsePoint true; a plain dir → false; a missing path → false; a path that makes GetAttributes throw anything other than not-found (e.g. a name containing NUL) → true (fail closed; rev 4, from the 2026-11-25 mutant run)"
   - id: B3c-M4
     text: "windows-latest: RealPlanStore WriteNew on an existing file fails and leaves it byte-identical; MoveNew onto an existing file fails and leaves it byte-identical; MoveNew to a new name succeeds; CreateDirectory on an existing dir returns 'already exists'; DeleteTree on a missing path is Ok; ReadAll on a missing file is null; AppendLog appends two lines in order to a temp log"
   - id: B3c-M5
@@ -317,3 +317,12 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
   (extra Everyone ACE on trust.txt). Correction 1 (tests only) sent to Luna, resume 4.
 - Mutant harness drafted by Claude (workflow + `run-mutant.ps1` + `mutants.json`, 6 mutants + control); each find text matches
   exactly once in the reviewed code. Added to the branch after correction 1 lands.
+- 2026-11-25 correction 1 reviewed: 5 tests map to M1, M2+N1, M3, M6, M7+N2. Claude fixed the subst test (paths were under the
+  real temp path, so both were missing; now `<L>:\existing` with a `Directory.Exists` self-check). Pushed task branch `072bc86`:
+  CI run 45637198171 success (windows + portable; first green of the nine windows tests). Mutants run 45637195685: 5 killed, each
+  by the intended ScheduleWindowsTests test (subst → ReadAcl_RejectsSubstDrive…, movenew → Store_EnforcesNewAndAppendSemantics,
+  load-skip-acl → TrustStore_LoadRejectsEveryoneAllowAce…, secure-unprotected → 4 ACL tests, runner-sync → ProcessRunner 32 s);
+  `reparse-error-false` SURVIVED (spec gap: M3 never required fail-closed on error; rev 4 adds it); `control` FAILED on unrelated
+  `ProgramPurgeTests.RootSharedOpenDoesNotBlockConfirmDelete` (IOException, temp dir in use; passed in CI and the 6 mutant jobs —
+  intermittent, pre-existing). Harness now filters `dotnet test` to ScheduleWindowsTests so unrelated flakes cannot fail control or
+  fake a kill.
