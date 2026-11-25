@@ -14,6 +14,7 @@ is the test gate.
 **Mutant method:** operator, 2026-11-25 — option 2 ("go with your recommendation 2"): mutate inside the CI runner. The scratch-branch push of mutated security code was blocked (public repo, 2026-11-24). Intent text unchanged.
 **Filed:** 2026-11-24
 **Intent approved:** operator, 2026-11-24
+**Approval:** operator, 2026-11-25 — scope exception: the option-2 mutant harness `.github/workflows/mutants.yml`, `tests/mutants/mutants.json`, `tests/mutants/run-mutant.ps1` land with b3c ("Approve, land all")
 **Intent note:** E-B3c carries the approved E-B3W intent unchanged.
 **Approval:** operator, 2026-11-23 — D3; operator, 2026-11-24 — D14
 
