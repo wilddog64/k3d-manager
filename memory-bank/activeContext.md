@@ -1,4 +1,13 @@
-## MORNING REMINDER (operator asked 2026-11-23 evening) — DELIVERED 2026-11-24 morning; HoverFocus/istioctl m2 checks still pending
+## MORNING REMINDER (operator asked 2026-11-24 evening) — deliver at the first chat on 2026-11-25
+
+**Remind the operator: dirused overnight probe on the jump box** (normal, NOT elevated window). Download
+`tools/m10b3-probes.ps1` from dirused branch `m10b-scheduled-purge` (raw URL) into `%USERPROFILE%`; then
+`cd /d %USERPROFILE%` and `powershell -ExecutionPolicy Bypass -File m10b3-probes.ps1 setup`, then `... run12`; disconnect;
+next morning `... collect`, then `... cleanup`; send Claude the output. Confirms P10 (task descriptor for a standard user)
+and gates live checks E-B3L1/E-B3L2. Note: operator said "tomorrow morning", so setup/run12 may happen in the morning and
+collect the following morning — ask which.
+
+## (old) MORNING REMINDER 2026-11-23 — DELIVERED 2026-11-24; HoverFocus/istioctl m2 checks still pending
 
 **Remind the operator: HoverFocus live checks on m2 this morning** (L1 gates the v0.0.2 merge). Steps:
 - **L1-EL second half (config reload):** menu bar "Open Config" (edits `~/.config/hoverfocus/config.json`,
