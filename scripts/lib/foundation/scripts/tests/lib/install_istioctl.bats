@@ -16,6 +16,7 @@ setup() {
   export ISTIOCTL_URL_LOG="${BATS_TEST_TMPDIR}/curl.log"
   export TEST_TMP_ROOT="$BATS_TEST_TMPDIR"
   export ISTIOCTL_TMP_LOG="${BATS_TEST_TMPDIR}/mktemp.log"
+  export ISTIOCTL_ARGS_LOG="${BATS_TEST_TMPDIR}/istioctl.args"
   export ISTIOCTL_CHECKSUM_MODE="valid"
   : > "$ISTIOCTL_URL_LOG"
   cat > "$STUB_BIN/uname" <<'EOF'
@@ -103,7 +104,9 @@ _make_fixture() {
   mkdir -p "$fixture_dir"
   cat > "$fixture_dir/istioctl" <<'EOF'
 #!/bin/sh
-# Captured client version format from m4-air, m2-air, and m5-air (2026-11-23).
+# Captured client version format from m4-air, m2-air, and m5-air (2026-11-23/24).
+printf '%s\n' "$*" >> "$ISTIOCTL_ARGS_LOG"
+[ "$#" -eq 2 ] && [ "$1" = version ] && [ "$2" = --remote=false ] || exit 1
 printf '%s\n' 'client version: 1.31.4'
 EOF
   chmod +x "$fixture_dir/istioctl"
@@ -115,11 +118,68 @@ _write_existing() {
   local path="$1" line="$2" mode="${3:-stdout}"
   mkdir -p "${path%/*}"
   if [ "$mode" = stderr ]; then
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s" >&2\n' "$line" > "$path"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "$ISTIOCTL_ARGS_LOG"\n[ "$#" -eq 2 ] && [ "$1" = version ] && [ "$2" = --remote=false ] || exit 1\nprintf "%%s\\n" "%s" >&2\n' "$line" > "$path"
   else
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$line" > "$path"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "$ISTIOCTL_ARGS_LOG"\n[ "$#" -eq 2 ] && [ "$1" = version ] && [ "$2" = --remote=false ] || exit 1\nprintf "%%s\\n" "%s"\n' "$line" > "$path"
   fi
   chmod +x "$path"
+}
+
+@test "client version probe makes one client-only call and preserves parsing" {
+  source "$CORE_LIB"
+  for line in 'client version: 1.31.4' 'client version: 1.32.0' '1.32.0'; do
+    : > "$ISTIOCTL_ARGS_LOG"
+    _write_existing "$STUB_BIN/istioctl" "$line"
+    _istioctl_client_version "$STUB_BIN/istioctl"
+    [ "$(cat "$ISTIOCTL_ARGS_LOG")" = 'version --remote=false' ]
+    [ "$(wc -l < "$ISTIOCTL_ARGS_LOG" | tr -d ' ')" = 1 ]
+    case "$line" in
+      'client version: 1.31.4') [ "$_ISTIOCTL_FOUND_VERSION" = 1.31.4 ] ;;
+      'client version: 1.32.0') [ "$_ISTIOCTL_FOUND_VERSION" = 1.32.0 ] ;;
+      *) [ "$_ISTIOCTL_FOUND_VERSION" = unknown ] ;;
+    esac
+  done
+  : > "$ISTIOCTL_ARGS_LOG"
+  _write_existing "$STUB_BIN/istioctl" 'client version: 1.32.0' stderr
+  _istioctl_client_version "$STUB_BIN/istioctl"
+  [ "$(cat "$ISTIOCTL_ARGS_LOG")" = 'version --remote=false' ]
+  [ "$_ISTIOCTL_FOUND_VERSION" = unknown ]
+}
+
+@test "failed client version probe refuses an existing binary without aborting" {
+  source "$CORE_LIB"
+  cat > "$STUB_BIN/istioctl" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$ISTIOCTL_ARGS_LOG"
+[ "$#" -eq 2 ] && [ "$1" = version ] && [ "$2" = --remote=false ] || exit 1
+exit 1
+EOF
+  chmod +x "$STUB_BIN/istioctl"
+  run bash -e -c 'source "$CORE_LIB"; _err() { printf "ERROR: %s\\n" "$*" >&2; exit 1; }; _install_istioctl "$INSTALL_DIR"'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"does not match pin"* && "$output" == *"unknown"* ]]
+  [ "$(cat "$ISTIOCTL_ARGS_LOG")" = 'version --remote=false' ]
+}
+
+@test "client version probe avoids a slow unreachable-cluster path" {
+  source "$CORE_LIB"
+  cat > "$STUB_BIN/istioctl" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$ISTIOCTL_ARGS_LOG"
+if [ "$#" -eq 2 ] && [ "$1" = version ] && [ "$2" = --remote=false ]; then
+  printf '%s\n' 'client version: 1.32.0'
+  exit 0
+fi
+sleep 8
+EOF
+  chmod +x "$STUB_BIN/istioctl"
+  # Positive control: the exact client-only argv returns the captured m2-air output (2026-11-24).
+  [ "$("$STUB_BIN/istioctl" version --remote=false)" = 'client version: 1.32.0' ]
+  : > "$ISTIOCTL_ARGS_LOG"
+  run timeout 5 bash -c 'source "$CORE_LIB"; _istioctl_client_version "$1"; printf "%s\n" "$_ISTIOCTL_FOUND_VERSION"' _ "$STUB_BIN/istioctl" 3>&-
+  [ "$status" -eq 0 ]
+  [ "$output" = 1.32.0 ]
+  [ "$(cat "$ISTIOCTL_ARGS_LOG")" = 'version --remote=false' ]
 }
 
 @test "pin table returns the four published checksums and rejects unknown platforms" {
@@ -140,7 +200,7 @@ _write_existing() {
   _install_istioctl "$INSTALL_DIR"
   [ -x "$INSTALL_DIR/istioctl" ]
   [ "$(cat "$ISTIOCTL_URL_LOG")" = "https://github.com/istio/istio/releases/download/1.31.4/istioctl-1.31.4-osx-arm64.tar.gz" ]
-  [[ "$($INSTALL_DIR/istioctl)" == "client version: 1.31.4" ]]
+  [[ "$($INSTALL_DIR/istioctl version --remote=false)" == "client version: 1.31.4" ]]
 }
 
 @test "downloads the pinned archive for macOS amd64" {
@@ -295,6 +355,8 @@ _write_existing() {
   [ "$INSTALL_DIR" = "${BATS_TEST_TMPDIR}/install" ]; [[ "$TEST_TMP_ROOT" == "$BATS_TEST_TMPDIR" ]]
   cat > "$BATS_TEST_TMPDIR/wrong-version" <<'EOF'
 #!/bin/sh
+printf '%s\n' "$*" >> "$ISTIOCTL_ARGS_LOG"
+[ "$#" -eq 2 ] && [ "$1" = version ] && [ "$2" = --remote=false ] || exit 1
 printf '%s\n' 'client version: 1.32.0'
 EOF
   chmod +x "$BATS_TEST_TMPDIR/wrong-version"

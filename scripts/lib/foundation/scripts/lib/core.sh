@@ -479,11 +479,12 @@ function _istioctl_find_existing() {
    fi
 }
 
+# Read only istioctl's client version; this probe never contacts the cluster.
 function _istioctl_client_version() {
    local path="$1"
    local version_output=""
    local version_line=""
-   version_output="$("$path" version --short 2>/dev/null || "$path" version 2>/dev/null || true)"
+   version_output="$("$path" version --remote=false 2>/dev/null || true)"
    version_line="${version_output%%$'\n'*}"
    _ISTIOCTL_FOUND_VERSION="unknown"
    if [[ "$version_line" =~ ^client\ version:\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then

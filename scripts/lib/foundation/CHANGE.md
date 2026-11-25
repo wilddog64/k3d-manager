@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v0.5.10] — 2026-11-24
+
+### Fixed
+- `_istioctl_client_version` requests `version --remote=false` once, so checking an existing istioctl pin cannot hang while contacting a missing or unreachable cluster. A failed probe still resolves to `unknown` and follows the existing pin refusal path. Reference: k3d-manager `docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md`.
+
 ## [v0.5.9] — 2026-11-23
 
 ### Changed
