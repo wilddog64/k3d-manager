@@ -36,7 +36,7 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
   (`scratchpad/b3c-mutants/`: mutants.yml, run-mutant.ps1, mutants.json; 6 mutants + control). After correction 1: review, commit
   code + harness on the task branch, push, read windows + mutants runs, land b3c. Then b3d, M10b4 docs, dirused PR.
 
-**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), dirused b3c LANDED (dirused `a224279`, pushed). `v4-ldap-resync` exited 0; independent verifier running.
+**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), dirused b3c LANDED (dirused `a224279`, pushed). `v4-ldap-resync` LANDED `cf743007` (E5 live drill on m2 pending).
 
 **Owed / carried:** MEMORY.md over 9 KB (compress at a break); release groom Sun 2026-11-29; triage of captured bugs;
 argon classification backlog; PR #158 (dependabot wrangler-action) open; m5-air test cert `~/.ssh/k3dm-console-test*`
@@ -219,3 +219,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-25: V4 Luna exited 0 (4 files, order store-Ready→ES per N5); verifier (Acceptance, sandbox-exec, Linux sim TMPDIR unset) running.
 - 2026-11-25: gate recovery paste bug LIVE-VERIFIED (E4 m5: pasted code via m4→m5, log +113 B, remaining 9→8; promoted c7c8f8d1).
 - 2026-11-25: dirused b3d dispatched to Luna (`dirused-m10b3d-wiring`, base a224279). Operator owed: jump-box overnight probe (m10b3-probes.ps1 setup/run12 → collect/cleanup) gating E-B3L1/E-B3L2. m2 dr-drill leftovers cleared (operator).
+- 2026-11-25: V4 defect 1 LANDED cf743007 (all mutants red after correction 1). Next: operator pulls on m2 + `make dr-drill` (E5; defect 2 E4 too). Jump-box probe setup done 08:20 (reminders 08:52 sign-out, 09:04 sign-in; collect tomorrow). E-B3L2 waits on log growth (team cleaned Tomcat logs).

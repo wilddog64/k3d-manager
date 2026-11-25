@@ -122,3 +122,7 @@ Fable: READY WITH FIXES (blocking 9, 14, 15, 25, 26, 28, 29, 30, 36). Argon: REA
 | B3-M1 fixture facts; B3-N4 control | Fable 34, 35 | Applied in b3a |
 | Step 9 stderr summary; `trust.tmp`; lazy seams; contract-reader rows | Fable 37-40 | Applied in b3a, b3c, b3d |
 | `RunWithSchedule` and `ConfirmUnavailable` wording | Fable 27 | Applied in b3d ("neither output contains") |
+
+**E-B3L2 timing (operator, 2026-11-25):** the team cleaned the Tomcat logs; `dirused /fromlist m9a.txt /purge` dry run on the jump box
+showed all 3 rows `[skipped: no longer exists]`, 0 B (stale-list skip confirmed live). E-B3L2 waits for new rotated logs to
+accumulate; E-B3L1 (small test files) is not affected.

@@ -201,3 +201,4 @@
 - **2026-11-25:** dirused b3c LANDED a224279 (mutants 6/6). Gate promote SHA c7c8f8d1. V4 in verification.
 - **2026-11-25:** gate recovery paste/lookalike bug LIVE-VERIFIED (E4 on m5-air).
 - **2026-11-25:** dirused b3d dispatched (Luna).
+- **2026-11-25:** V4 defect 1 LANDED cf743007; E5 drill owed. Jump-box probe running (collect 2026-11-26).
