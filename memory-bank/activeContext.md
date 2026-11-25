@@ -60,6 +60,7 @@ state-U pytest procs clear on reboot.
 - **2026-11-24 dirused:** b3b LANDED `d539912` (verifier PASS, 10/10 mutants, correction 1 = verifier tests; --allow-out-of-scope for the correction file). b3c dispatched to Luna (`dirused-m10b3c-windows`): gates met (b3a, b3b, P6, P9).
 - **2026-11-24:** two ideas rows added to docs/ideas.md for Sunday groom: independent second plan (Argon writes its own plan for large designs), cap spec review at 2 rounds. b3c correction 1 (trust store refuses junctions, spec rev 2) running with Luna; b3b windows CI green (run 45512746865).
 - **2026-11-24:** b3c windows CI run 45514086420 red (elevated runner: trust.txt owned by Administrators, Load rejects); spec rev 3 (Save sets trust.tmp owner to the user), correction 2 running with Luna. Ideas row added: hybrid prior-art search (tsvector + RRF), from a reader comment.
+- **2026-11-24 v1.45.1 operator steps:** hub istiod 1.31.1→1.31.4 done by operator on m5-air (istioctl SHA matched pin; 5 sidecars 1.31.1 until restart). m4-air istioctl already 1.31.4. R1 ruleset `cve-pins-hub` id 28034766 created by Claude via gh api at operator request (deletion, non_fast_forward, update; bypass repo admin). Pending: GIT_WRITE_TOKEN fine-grained PAT + Keychain + argocd_sync_git_writer_secret, then R1 probes; hub promote after CI green.
 
 ## Handoff — 2026-11-23 08:55 PST — hoverfocus v0.0.1 shipped; v0.0.2 planned; v1.45.0 merged — START HERE
 
