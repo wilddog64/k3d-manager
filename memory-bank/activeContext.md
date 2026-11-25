@@ -19,7 +19,12 @@
   - **Docs review (operator ask 16:30) DONE `af3b96c2`:** 119 docs mechanical pass + Flash audit of 31 drifted docs;
     13 stale statements verified and fixed in 11 docs (webhook :7443 / `make setup-worker`, copilot auth, cve-pins/hub, Trivy
     metric, confirm targets, log path, Pushgateway wording, Hermes R5/R6/R10 note, dr-drill ldap_resync, doctor Slack checks).
-  - Plan 1 intents approved (`91d88a47`); **dispatched a, b1, c on Luna 2026-11-25** (slugs v1460-p1a, v1460-p1b1, v1460-p1c; 3/3 WIP). Next: verify + land each, then d, b, e. Split work tip `2022216d`,
+  - Plan 1 intents approved (`91d88a47`); **dispatched a, b1, c on Luna 2026-11-25**; all exited. **b1 verified** (108 tests, 4 red on base) committed `d3ed8d6a`;
+    **c verified** (59 tests, 3 red on base, 3 mutants) committed `324e812a`; both await land (push first). **a**: 7/7 mutants bite,
+    but drop decisions lacked approval_id -> correction resume running. Next: land b1, c, a; then d + GNU-df fix, b, e.
+  - **e2e M2 skip (P2)** `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md`: M2 ~/.zshenv puts gnubin first,
+    `df -g` fails, probe reports 0 GiB (real 307). Spec rev 2 `80a59ad6` after Fable NOT READY (12 findings applied). Waits on
+    operator intent approval + a free slot. Ideas added: iPad password-show via console; rotation advance notice. Split work tip `2022216d`,
     `2720e262`. CI red on `88d86c23` = machine-secrets 1-in-256 CBC flake, captured P3
     `docs/bugs/2026-11-25-machine-secrets-wrong-passphrase-decrypts-1-in-256.md`. K3dmPromoteWaiting alert = operator promote.
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
