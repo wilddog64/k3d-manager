@@ -32,25 +32,45 @@ nothing. On M2 (2026-11-25, read-only SSH capture):
 The stderr is discarded (`2>/dev/null`), both `df` calls print nothing, `disk_gb=0`, and the 40 GiB floor gate rejects the runner.
 Hermes retries 6 times per slot and then posts the skip, without the preflight reason (`bin/k3dm-hermes:438` discards the output).
 
-## Spec
+## Spec (rev 2 — Fable blind review applied, see Review log)
 
 **Files:** `scripts/plugins/e2e_remote.sh`, `scripts/tests/plugins/e2e_remote.bats`, `bin/k3dm-hermes`,
-`scripts/tests/bin/test_hermes_e2e_text.py`. Nothing else. Do not change M2 or any dotfile.
+`scripts/tests/bin/test_hermes_e2e_text.py`, `docs/guides/vcluster-e2e-harness.md` (the status list at `:451-454` only). Nothing else.
+Do not change M2 or any dotfile.
 
-1. **Probe** (`_e2e_remote_probe`, `:189-191`): measure with `df -Pk` (POSIX output; GNU and BSD `df` both accept `-P -k`), take
-   column 4 of line 2 (available KiB) and print `disk_gb=<KiB / 1048576, integer, rounded down>`. Keep the report-dir-then-`$HOME`
+1. **Probe** (`_e2e_remote_probe`, `scripts/plugins/e2e_remote.sh:189-191`; the body is a heredoc sent over SSH, so keep `\$`
+   escaping): measure with `df -Pk <dir>` and take the **third-from-last field of line 2** (`$(NF-2)`, available KiB; robust to a
+   filesystem name with spaces such as `map auto_home`); print `disk_gb=<int(KiB / 1048576)>`. Keep the report-dir-then-`$HOME`
    fallback. If neither call yields a non-negative integer, print `disk_gb=` (empty) — never `0`.
-2. **Gate** (`_e2e_remote_eval_gates`): before the disk floor check, if `disk` is empty or not a non-negative integer, print
-   `reason=cannot read free disk on runner ${E2E_M2_SSH_HOST}` / `status=probe_failed` and return 1. A real value below the floor
-   still gives `status=capacity_disk`. `probe_failed` is not a `capacity_*` status, so `_e2e_remote_preflight_with_retry` does not
-   retry it (unchanged code).
-   The existing test "eval_gates treats missing metrics as a capacity stop, not available" must keep passing (its blob has a
-   numeric `disk_gb`; only the CPU samples are missing).
-3. **Hermes** (`_run_e2e`, `bin/k3dm-hermes:438-445`): keep the preflight output; on the final skip, take the value after the first
-   `reason=` line, remove control characters, cut it to 200 characters, and post
-   `Hermes e2e <slot>: skipped — M2 runner unavailable after 6 attempts (<reason>)`; with no `reason=` line, post the current text
-   exactly. Write the same reason into the slot record as `"reason"`. The manual-slot path (`slot == "now"`, one attempt) uses the same
-   wording rule. Nothing else in `_run_e2e` changes.
+2. **Gate** (`_e2e_remote_eval_gates`): insert immediately before the disk floor check at `:227`, after the docker, lock, CPU and
+   memory gates (their precedence and tests are unchanged): if `disk` is empty or not `^[0-9]+$`, print
+   `reason=cannot read free disk on runner ${E2E_M2_SSH_HOST}` then `status=probe_failed`, return 1. A numeric value below the floor
+   still gives `status=capacity_disk`. `_e2e_remote_preflight_with_retry` (`:256`) is unchanged; because `probe_failed` is not
+   `capacity_*` it is not retried there.
+3. **Hermes** (`_run_e2e`, `bin/k3dm-hermes:438-445`): keep the preflight output (`_e2e_run` returns stdout + stderr, `:378`). The
+   reason is the text after `reason=` on the first line that **starts** with `reason=`. Sanitise it: replace every character outside
+   `[A-Za-z0-9 .,:%/()_-]` with `?` (this removes Slack mrkdwn such as `<!channel>`, `<https://x|y>`, `@`, `&`, backticks, and all
+   control characters), then cut to 200 characters. Post `Hermes e2e <slot>: skipped — M2 runner unavailable after 6 attempts
+   (<reason>)`; with no `reason=` line, post the current text exactly. Add `"reason": <sanitised>` to the slot record
+   (`{"outcome": "runner-unavailable", "reason": ...}`); omit the key when there is no reason. The manual slot uses the same rule.
+   **Hermes's own retry is unchanged (accepted):** any non-zero preflight, including `probe_failed`, is retried up to 6 times 30
+   minutes apart (`:439-442`); this fix only makes the final message name the cause.
+4. **Guide** (`docs/guides/vcluster-e2e-harness.md:451-454`): add `probe_failed` (free disk could not be read; not retried) to the
+   status list.
+
+## Contract readers
+
+Found by grep on `k3d-manager-v1.46.0`, 2026-11-25 (Fable review):
+
+| Reader | File:line | Effect of `probe_failed` / `"reason"` |
+|---|---|---|
+| Capacity retry | `scripts/plugins/e2e_remote.sh:256` | not retried (not `capacity_*`) |
+| Dispatch refusal text | `scripts/plugins/e2e_remote.sh:460-461` | prints the reason as today |
+| `e2e_runner_health` | `scripts/plugins/e2e_remote.sh:1062-1079` | non-`available` → warning, critical when a run is requested (same as other refusals) |
+| Bootstrap / status pass-through | `scripts/plugins/e2e_remote.sh:332,342`, `Makefile:2311` | passes the status through |
+| Hermes | `bin/k3dm-hermes:438-445` | uses return code; message gains the reason (item 3) |
+| Slot record | `scripts/lib/hermes/e2e_schedule.py:46` (existence), `bin/k3dm-hermes:405` (reads `groups`) | new `reason` key ignored |
+| Guide | `docs/guides/vcluster-e2e-harness.md:451-454` | lists the new status (item 4) |
 
 **Proof of `df -Pk` (read-only, 2026-11-25):** on M2 with the runner's PATH (`/opt/homebrew/bin:/usr/local/bin:$PATH`, resolving
 `gnubin/df`, GNU coreutils 9.12): header `Filesystem 1024-blocks Used Available Capacity Mounted on`, line 2 column 4 = 322088920 KiB
@@ -58,17 +78,24 @@ Hermes retries 6 times per slot and then posts the skip, without the preflight r
 
 **Tests:**
 
-- `e2e_remote.bats`: run the probe's script body locally (not over SSH) with a stub directory first on PATH holding a `df` that
-  prints `df: invalid option -- 'g'` and exits 1 for any `-g` argument and otherwise prints POSIX `-Pk` output with 314572800
-  available KiB (GNU behaviour from the 2026-11-25 M2 capture: GNU coreutils 9.12, `df -g` invalid, 308 GiB free); assert
-  `disk_gb=300`. Second stub: `df` that fails for every call → `disk_gb=` empty. Assert first that the stub `df` is the one
-  resolved (`command -v df`). Gate tests: `disk_gb=` and `disk_gb=abc` → `status=probe_failed`, not `capacity_disk`; `disk_gb=10`
-  → `capacity_disk` (positive control); `disk_gb=900` with good CPU/mem → `available`. The retry test: a `probe_failed` verdict is
-  called once, not retried.
-- `test_hermes_e2e_text.py`: a runner whose preflight returns `(1, "reason=disk free 0GiB below floor 40GiB\nstatus=capacity_disk\n")`
-  with the retry claim at 6 attempts → one post containing `(disk free 0GiB below floor 40GiB)` and a record with that `reason`;
-  a preflight with no `reason=` line → the post is exactly the current text; a reason with a newline and 500 characters → one line,
-  at most 200 characters of reason. Reuse the existing test's scratch-HOME fixture and its assertions.
+- **Probe** (`e2e_remote.bats`): run the real `_e2e_remote_probe` with `_e2e_remote_ssh() { PATH="$STUB:$PATH" bash -s; }` (stdin
+  carries the script). Set `E2E_M2_LOCK` and `E2E_M2_REMOTE_REPORT_DIR` to `$BATS_TEST_TMPDIR` paths first. `$STUB` holds `docker`
+  (exit 0), `top` (prints six `CPU usage: ... 90.0% idle` lines at once), `memory_pressure` (prints `free percentage: 80%`), and `df`.
+  GNU-style `df` (from the M2 capture above): any `-g` argument → prints `df: invalid option -- 'g'` to stderr, exit 1; `-Pk` → the
+  captured header and a line 2 with 322088920 available KiB. Assert the output has the exact line `disk_gb=307` (`grep -qx`). First,
+  as a fixture check, run `PATH="$STUB:$PATH" bash -c 'command -v df'` and assert it prints `$STUB/df`. Second `df` stub fails for every call → exact line `disk_gb=` (`grep -qx 'disk_gb='`).
+- **Gate:** blobs with good docker/lock/CPU/memory and `disk_gb=` or `disk_gb=abc` → `status=probe_failed` and the reason; positive
+  controls: `disk_gb=10` → `capacity_disk` (existing test), `disk_gb=900` → `available`.
+- **End-to-end no-retry:** stub only `_e2e_remote_probe` (healthy blob, `disk_gb=`), stub `sleep`, count probe calls through the
+  real `e2e_runner_preflight` and `_e2e_remote_preflight_with_retry` with `E2E_M2_CAPACITY_RETRY_INTERVAL=0`: exactly 1 call and
+  `status=probe_failed`. (Pre-fix: `capacity_disk` and 3 calls.)
+- **Hermes** (`test_hermes_e2e_text.py`, reuse the scratch-HOME fixture of `test_run_e2e_records_null_counts_and_posts_once`):
+  pre-write `<K3DM_HERMES_E2E_DIR>/slot.claim` with `{"attempts": 5}`; preflight returns
+  `(1, "noise\nreason=disk free 0GiB below floor 40GiB\nstatus=capacity_disk\n")` → one post ending
+  `(disk free 0GiB below floor 40GiB)`, record `{"outcome": "runner-unavailable", "reason": "disk free 0GiB below floor 40GiB"}`,
+  claim file removed. No `reason=` line → post exactly the current text, no `reason` key. Hostile reason
+  `reason=<!channel> <https://x|y> @here` plus `\r`, `\x1b[31m`, a tab and 500 characters → the post contains none of `<`, `>`,
+  `|`, `@`, `\r`, `\x1b`, tab, and at most 200 reason characters.
 
 ## Acceptance
 
@@ -77,29 +104,35 @@ must:
   - id: G-M1
     text: "With GNU df first on the runner PATH, the probe reports the real free disk in GiB"
   - id: G-M2
-    text: "When free disk cannot be read, preflight reports status=probe_failed with a reason, not capacity_disk"
+    text: "When free disk cannot be read, preflight reports status=probe_failed with a reason, not capacity_disk, after one probe"
   - id: G-M3
-    text: "The Hermes skip message and slot record carry the preflight reason, capped at 200 characters, one line"
+    text: "The Hermes skip message and slot record carry the preflight reason, sanitised to [A-Za-z0-9 .,:%/()_-] and at most 200 characters"
 must_not:
   - id: G-N1
-    text: "A failed disk measurement is reported as 0 GiB or passes the gate as available"
+    text: "A failed disk measurement is reported as disk_gb=0 or gives capacity_disk"
   - id: G-N2
-    text: "A real low-disk reading stops being capacity_disk, or probe_failed is retried as a capacity refusal"
+    text: "Runner-supplied text reaches Slack with mrkdwn or control characters"
 evidence:
   - id: E-G-offline
     proves: [G-M1, G-M2, G-M3, G-N1, G-N2]
     kind: offline
-    command: "bats scripts/tests/plugins/e2e_remote.bats and python3 -m pytest scripts/tests/bin/test_hermes_e2e_text.py -q pass; on the base commit plus only the new tests, the GNU-df probe test fails (disk_gb=0) and the probe_failed and Hermes-reason tests fail; mutants, each reverted: (1) restore df -g -> GNU-df test fails; (2) fall back to disk_gb=0 -> empty-value tests fail; (3) treat probe_failed as capacity_probe -> the no-retry test fails"
+    command: "bats scripts/tests/plugins/e2e_remote.bats and python3 -m pytest scripts/tests/bin/test_hermes_e2e_text.py -q pass; on the base commit plus only the new tests, the GNU-df probe test (disk_gb=0), the empty-disk tests, the end-to-end no-retry test (3 calls, capacity_disk) and the Hermes reason and hostile-reason tests fail; existing capacity_disk and available tests are positive controls; mutants, each reverted: (1) restore df -g -> GNU-df test fails; (2) fall back to disk_gb=0 -> exact-line empty test fails; (3) gate emits capacity_probe instead of probe_failed -> end-to-end no-retry test fails (3 calls); (4) strip only control characters in Hermes -> hostile-reason test fails"
     intent: "The daily e2e on M2 runs again when M2 has disk space, and if the check ever cannot measure something, Slack says exactly what instead of a misleading skip."
   - id: E-G-live
     proves: [G-M1]
     kind: live
-    command: "Claude, read-only from M4 after landing: ./scripts/k3d-manager e2e_runner_preflight m2 prints disk_gb near 308 and no capacity_disk; then the next Hermes e2e slot posts a PASS/FAIL result, not a skip (requires hub promote)"
+    command: "Claude, read-only from M4 after landing: ./scripts/k3d-manager e2e_runner_preflight m2 status is neither capacity_disk nor probe_failed (if available, disk_gb is about 307); then the next Hermes e2e slot posts a PASS/FAIL result, not a skip (requires hub promote)"
     intent: "You see tomorrow's e2e result in Slack instead of 'skipped'."
 interface:
   - "scripts/plugins/e2e_remote.sh: e2e_runner_preflight status=probe_failed"
-  - "Hermes e2e skip message"
+  - "Hermes e2e skip message and slot record reason"
 ```
+
+## Review log
+
+| Rev | Reviewer | Verdict | Applied |
+|---|---|---|---|
+| 1 (`6134933a`) | Fable (blind, 2026-11-25) | NOT READY — 12 findings, all verified by Claude | rev 2: end-to-end no-retry test (mutant 3 did not bite), Slack allowlist sanitising, exact-line asserts, concrete probe harness (stub docker/top/memory_pressure, tmp lock and report dir), no newline-in-reason test, Hermes retry stated as accepted, contract readers + guide, gate placement, claim pre-write, live wording, `$(NF-2)` and non-multiple stub value |
 
 ## Original fix notes (capture)
 
