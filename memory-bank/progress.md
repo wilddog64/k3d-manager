@@ -209,3 +209,4 @@
 - 2026-11-25: dirused M10b4 rev 3 split a/b (`52bbe180`), Fable review in; v1.46.0 plan 1 threat model = approval gate (operator); triage of 63 started via Argon.
 - 2026-11-25: M10b4 rev 4 `2dd4cb70` (Fable+Argon fixes applied); triage proposal ready (61 docs); plan 1 approval-mechanism map done.
 - 2026-11-25: M10b4a/b dispatched (Flash/Luna); triage applied `b19970dd` (v1.46.1 patch: 12 bugs).
+- [x] dirused M10b4 LANDED a `24dffb5` + b `eaa51be` 2026-11-25 (mutants 5/5). Plan 1 rev 2 specs `677cb16e`, in Fable+Astra review.

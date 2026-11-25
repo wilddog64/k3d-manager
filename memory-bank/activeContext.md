@@ -1,12 +1,16 @@
-## Handoff — 2026-11-25 14:30 PST — v1.45.1 released; v1.46.0 open — START HERE
+## Handoff — 2026-11-25 15:30 PST — v1.45.1 released; v1.46.0 open — START HERE
 
 - **Session 2026-11-25 afternoon (operator home, said go):**
   - dirused M10b4 rev 3 `52bbe180`: split into M10b4a docs (Flash) + M10b4b DocsDriftTests (Luna). Fable blind review READY WITH
     FIXES; Argon READY WITH FIXES (overlapping). All findings verified, rev 4 `2dd4cb70`. Next: operator intent approval, then
     dispatch a (Flash) + b (Luna) in parallel; land a first, b with the full portable suite.
-  - **M10b4 DISPATCHED** (intents approved): `dirused-m10b4a-docs` (Flash, running) and `dirused-m10b4b-docs-drift` (Luna, exited 0,
-    uncommitted; round 2 correction for a spec defect — Markdown padding put a trailing space in two state strings; verified 3 red
-    / 4 green). Land a first, then b with `dotnet test tests/Dirused.Tests.Portable`, then mutants (a)-(e).
+  - **M10b4 LANDED + pushed:** a `24dffb5` (Flash docs), b `eaa51be` (Luna DocsDriftTests; round 2 fixed my spec's Markdown-padding
+    defect). Verified: drift test 3 red on old docs / 7 green on new; mutants (a)-(e) each kill the named fact ((e) respecced: deleting
+    PlanRunner.cs does not compile). CI 24dffb5 green; eaa51be CI watching. E-B4a evidence flaw: 'not available yet' also matches an
+    older unrelated bullet. Remaining dirused: probe collect 11-26 (operator), E-B3L1, PR.
+  - **v1.46.0 plan 1 rev 2 `677cb16e`**: parent + children a store (Luna), b bridge (Luna, after a), c relay prefix (Luna),
+    d helper wait (Luna), e docs (Flash, after b). Ruleset dropped: all cloud-requests commits authored as operator (git log -200).
+    Fable + Astra blind reviews running (prompt in scratchpad plan1-review-prompt.md).
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
     cloud-runner requests (sandbox-up/down aws, make-e2e[-remote]) wait for operator approval (reuse Hermes/Slack approve);
     GitHub ruleset limits pushes to `cloud-requests`. Spec rewrite next (Fable + Astra review: shared contract).
