@@ -1,13 +1,14 @@
 # Bug: the istioctl pin check hangs forever when KUBECONFIG names a missing or unreachable cluster (`make dr-drill` never ends)
 
-**Status:** LANDED — lib-foundation `af33f98` (verify pass; 11/20 red on 083c249), merged as PR #94 `01a5723`, tagged v0.5.10; k3d-manager subtree pull on `k3d-manager-v1.45.1` (2026-11-24). E4 live pending (operator `~/k3dm-e6e7.sh` on m2-air).
+**Status:** LIVE-VERIFIED — lib-foundation `af33f98` (verify pass; 11/20 red on 083c249), merged as PR #94 `01a5723`, tagged v0.5.10; k3d-manager subtree pull `a9862332` on `k3d-manager-v1.45.1` (2026-11-24); E4 live PASS on m2-air 2026-11-24
+**Live evidence:** 2026-11-24 · run k3dm-e6e7-20261124T193757 · env m2-air · scenario dr-drill-missing-kubeconfig-refuses-brew-1.32-no-hang · commit a9862332 · proves E4
+**Fix commit:** a9862332 (lib-foundation af33f98)
 **Priority:** P1 (the v1.45.1 istioctl fix makes the DR drill hang instead of failing; E6/E7 of the istioctl bug cannot pass; blocks the v1.45.1 release PR)
 **Triage:** patch → lib-foundation v0.5.10 + k3d-manager v1.45.1 subtree pull
 **Branch:** lib-foundation `release/v0.5.10` (from main `083c249`); k3d-manager `k3d-manager-v1.45.1`
 **Introduced by:** lib-foundation v0.5.8 (istioctl-a, `_istioctl_client_version` at `scripts/lib/core.sh:486`), carried by v0.5.9 and k3d-manager `7dc95697`
 **Should have been caught by:** offline test (the `_write_existing` stub in `scripts/tests/lib/install_istioctl.bats:114-123` prints the version whatever its arguments, so a remote probe could never fail or hang)
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** live check — since 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Intent note:** "go ahead to file a P1 bug and have Fable review then dispatch to Luna"
 **Prior art:** `docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md` (exact topic; this is a defect in its fix) — appended as a follow-up of that bug, not a recurrence; `make find-similar-docs` not run (vector store not reachable from m4)
@@ -100,3 +101,10 @@ interface:
 - Show E1 and E2 red against `main@083c249` first, then green; the whole `install_istioctl.bats` stays green.
 - Leave changes uncommitted; do not push. This narrows lib-foundation `AGENTS.md` (commit, push, memory-bank): Claude commits,
   lands and owns the memory-bank update.
+
+## Live result (E4, 2026-11-24, m2-air, read by Claude from the logs 2026-11-25)
+
+Run `~/k3dm-e6e7-20261124T193757/` (checkout at `a9862332` or later). E6 of the parent bug finished (run started 19:37:57, `e6.log`
+closed 19:54; the ~15 min preflight clone on m2 is most of that, and the log carries no per-step times) with rc 2 at `hub-up` Step 1/5: `ERROR: istioctl 1.32.0 at /opt/homebrew/bin/istioctl does not match pin 1.31.4; …`, with no precheck or
+IST0142 line after it. The earlier run (`~/k3dm-e6e7-20261124T165546/`) hung 1 h 47 min at the same step: that is the red control.
+E4 PASS.

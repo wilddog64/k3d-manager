@@ -1,13 +1,14 @@
 # Bug: `make dr-drill` (and any fresh `hub-up`) fails: unpinned Homebrew istioctl 1.32 rejects the pinned k3s v1.32 image
 
-**Status:** LANDED — parts A/A2 (lib-foundation v0.5.8/v0.5.9), B `7d8a40e4`, C `3e74f38b` on `k3d-manager-v1.45.1` (2026-11-23); live E6/E7 on m2 pending
+**Status:** LIVE-VERIFIED — parts A/A2 (lib-foundation v0.5.8/v0.5.9), B `7d8a40e4`, C `3e74f38b` on `k3d-manager-v1.45.1` (2026-11-23), hang follow-up `a9862332` (lib-foundation v0.5.10); E6 + E7 live PASS on m2-air 2026-11-24
+**Live evidence:** 2026-11-24 · run k3dm-e6e7-20261124T193757 · env m2-air · scenario brew-1.32-refused-then-pinned-1.31.4-downloaded-precheck-clean · commit a9862332 · proves E6,E7
+**Fix commit:** 7d8a40e4, 3e74f38b, a9862332
 **Priority:** P2 (operator, 2026-11-23; flagged — it blocks the DR drill and a from-scratch hub rebuild on this Mac)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23); pin target: match the live hub — corrected 2026-11-23 to k3s v1.32.0 + Istio 1.31.x (pin 1.31.4, the first CVE-free 1.31; hub's 1.31.1 to be raised to match)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** pre-existing (istioctl never pinned); exposed by Homebrew upgrading istioctl to 1.32.0 on m2-air 2026-11-12
 **Should have been caught by:** live check (the weekly drill; not run 2026-11-04 → 2026-11-23)
 **Introducing change reviewed:** no
-**Waiting on:** live check — since 2026-11-23
 **Approval:** pending (operator decision 2026-11-23: pin 1.31.4, no k3s bump, archive + SHA-256, refuse other minors)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** `docs/bugs/2026-11-22-istio-ambient-appset-targets-retired-ubuntu-k3s.md` (exact-slug glob + grep; vector store unavailable) — read, different root cause; `CHANGELOG.md:2565` — recurrence: k3s was raised to v1.32.0-k3s1 in July "to satisfy the istioctl precheck floor" (same class)
@@ -353,3 +354,16 @@ are never reached (`feedback_mutation_harness_sudo_guard`, `feedback_never_run_i
 The first live E6 run on m2-air hung 1 h 47 min in `_istioctl_client_version` (`istioctl version --short` contacts the cluster;
 the drill's KUBECONFIG names a cluster that does not exist yet). Fix and evidence:
 `docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md` (lib-foundation v0.5.10). E6/E7 rerun after that lands.
+
+## Live result (E6, E7 — 2026-11-24, m2-air, read by Claude from the logs 2026-11-25)
+
+Run `~/k3dm-e6e7-20261124T193757/` by the operator, after the hang fix (`a9862332`).
+
+- **E6 PASS** (`e6.log`, rc 2): `ERROR: istioctl 1.32.0 at /opt/homebrew/bin/istioctl does not match pin 1.31.4; install a
+  compatible release from https://github.com/istio/istio/releases, run 'brew unlink istioctl', or set ISTIOCTL_VERSION.`, then
+  `[hub-up] Step 1/5 failed`. No precheck or IST0142 line after it.
+- **E7 PASS, proves M1** (`e7.log`): the script ran `brew unlink istioctl`, moved any `~/.local/bin/istioctl` aside and confirmed no
+  istioctl on PATH before the drill. `hub-up` installed `~/.local/bin/istioctl` (mtime 19:58, inside the E7 window), logged
+  `istioctl 1.31.4 at /Users/cliang/.local/bin/istioctl matches pin 1.31.4 (minor 1.31)`, and the precheck printed `✔ No issues
+  found when checking the cluster. Istio is safe to install or upgrade!`. The drill went on to restore and verify; its rc 2 comes
+  from `V4 false` (LDAP resync, tracked in `docs/plans/v1.45.1-dr-drill-v4-ldap-resync.md`), which by the E7 definition does not fail E7.
