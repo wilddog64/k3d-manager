@@ -7,6 +7,7 @@
 ### Fixed
 
 - **istioctl pinned to 1.31.4 with SHA-256 verification.** `_install_istioctl` now pins istioctl to 1.31.4 (via lib-foundation v0.5.8, split into helpers in v0.5.9), downloaded from the official Istio release archive and checked against its published SHA-256; the master `downloadIstioCandidate.sh` path is gone. An existing istioctl of another minor is refused with an ERROR naming its version and path. Fix: `brew unlink istioctl` (or remove it from PATH) and rerun, or set `ISTIOCTL_VERSION` deliberately. Operator action before the next deploy on m2-air (Homebrew 1.32.0; m4-air already runs the pinned 1.31.4 in `~/.local/bin`, installed 2026-11-23): see the Rollout survey in [`docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md`](docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md).
+- **The istioctl pin check no longer hangs.** It asks istioctl only for its client version (`version --remote=false`, lib-foundation v0.5.10). Before, with KUBECONFIG naming a cluster that does not exist yet (`make dr-drill`), the check waited forever. See [`docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md`](docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md).
 
 ## [1.45.0] - 2026-11-23
 

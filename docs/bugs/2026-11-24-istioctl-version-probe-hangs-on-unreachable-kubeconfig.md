@@ -1,13 +1,13 @@
 # Bug: the istioctl pin check hangs forever when KUBECONFIG names a missing or unreachable cluster (`make dr-drill` never ends)
 
-**Status:** OPEN — spec rev 2, 2026-11-24 (rev 2: Fable review NEEDS FIXES applied — `|| true`, N2 timeout mechanics, asserted controls, argument-aware stubs, CHANGE.md format, header comment, DoD)
+**Status:** LANDED — lib-foundation `af33f98` (verify pass; 11/20 red on 083c249), merged as PR #94 `01a5723`, tagged v0.5.10; k3d-manager subtree pull on `k3d-manager-v1.45.1` (2026-11-24). E4 live pending (operator `~/k3dm-e6e7.sh` on m2-air).
 **Priority:** P1 (the v1.45.1 istioctl fix makes the DR drill hang instead of failing; E6/E7 of the istioctl bug cannot pass; blocks the v1.45.1 release PR)
 **Triage:** patch → lib-foundation v0.5.10 + k3d-manager v1.45.1 subtree pull
 **Branch:** lib-foundation `release/v0.5.10` (from main `083c249`); k3d-manager `k3d-manager-v1.45.1`
 **Introduced by:** lib-foundation v0.5.8 (istioctl-a, `_istioctl_client_version` at `scripts/lib/core.sh:486`), carried by v0.5.9 and k3d-manager `7dc95697`
 **Should have been caught by:** offline test (the `_write_existing` stub in `scripts/tests/lib/install_istioctl.bats:114-123` prints the version whatever its arguments, so a remote probe could never fail or hang)
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** fix running — since 2026-11-24
+**Waiting on:** live check — since 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Intent note:** "go ahead to file a P1 bug and have Fable review then dispatch to Luna"
 **Prior art:** `docs/bugs/2026-11-23-dr-drill-hub-up-istioctl-1-32-rejects-k3s-1-32.md` (exact topic; this is a defect in its fix) — appended as a follow-up of that bug, not a recurrence; `make find-similar-docs` not run (vector store not reachable from m4)
