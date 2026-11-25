@@ -1,6 +1,6 @@
 # dirused M10b3d: Program wiring for `/schedule` and `/runplan`, test seam, interim refusal removed
 
-**Status:** OPEN — SPEC rev 1, 2026-11-24; split from [M10b3](dirused-m10b3-runplan-windows.md) rev 3 after Fable + Argon reviews;
+**Status:** LANDED `009fb14` on m10b-scheduled-purge (2026-11-25); live check is E-B3L1/E-B3L2 on the jump box
 **gate:** after [b3c](dirused-m10b3c-windows-seams.md) lands
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b3](dirused-m10b3-runplan-windows.md); design [M10b](dirused-m10b-scheduled-purge.md) §8; shared contract copied at the
@@ -277,3 +277,7 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
   PurgeList.Read. Remaining E-B3d mutants (refusal kept, update check before dispatch, cleanup not skipped, isWindows dropped)
   need a per-mutant test filter in the harness: operator scope exception pending.
 - Mutants pushed with the harness change (`386339b`): b3d-refusal-kept (M1), b3d-update-check-first (N2), b3d-cleanup-not-skipped (M4), b3d-iswindows-dropped (M2); each builds locally with 0 errors.
+- Mutant run 1 (`386339b`): 9/10 killed; b3d-update-check-first SURVIVED — N2 forms shared the runner's real LocalAppData update
+  state (stamped by an earlier test), so a non-forced check returned before calling the source. Claude gave each form a fresh,
+  asserted-absent state file (`009fb14`). Mutant run 2: control green (24 tests), 10/10 killed; CI windows 114/114, portable 391.
+- Landed `009fb14` with `--allow-out-of-scope` (harness, approved) and `--test` portable suite (391 passed).
