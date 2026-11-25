@@ -592,6 +592,104 @@ def test_queued_make_response_adds_one_watch_entry(monkeypatch):
     assert watched[0]["job_id"] == "a" * 8
 
 
+@pytest.mark.parametrize("action, expected_timeout", [
+    ("sandbox-up", 3600), ("sandbox-down", 1800),
+    ("make-e2e", bridge.MAKE_TARGETS["e2e"]["timeout"]),
+])
+def test_queued_lifecycle_and_make_responses_commit_watch_entries(monkeypatch, action, expected_timeout):
+    request_id = f"20260925T201403Z-{action}"
+    writes = []
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: [request_id])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, rid: (request(action), None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", action, "ok", 202, body={"status": "queued", "job_id": "a" * 8}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append((args, kwargs)) or "b" * 40)
+
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert writes
+    assert writes[0][1]["watch_add"]["timeout"] == expected_timeout
+    assert writes[0][0][3]["body"]["status"] == "queued"
+
+
+def test_malformed_watch_lines_do_not_stop_tick_or_new_request(monkeypatch, caplog):
+    watched_id = "20260925T201403Z-make-test-pytest"
+    reader_id = "20260925T201404Z-cluster-status"
+    valid = {"request_id": watched_id, "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 600}
+    malformed = [
+        {**valid, "created_at": "x"},
+        {**valid, "timeout": True},
+        {**valid, "timeout": 1e9},
+        {**valid, "job_id": "../x"},
+        {**valid, "request_id": "bad"},
+    ]
+    raw = "\n".join(json.dumps(entry) for entry in [*malformed, valid])
+    calls = []
+    writes = []
+    monkeypatch.setattr(bridge, "_git", lambda repo, args, **kwargs: raw)
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_claimed_ids", lambda: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: [reader_id])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, rid: (request(), None))
+
+    def webhook(value):
+        calls.append(value)
+        return bridge._response("", value["action"], "ok", 200,
+                                body={"status": "success", "output": "done"} if value["action"] == "job-status" else {})
+
+    monkeypatch.setattr(bridge, "_call_webhook", webhook)
+    monkeypatch.setattr(bridge, "job_artifacts", lambda *args: ({}, []))
+
+    def write(*args, **kwargs):
+        writes.append(args[2])
+        bridge._read_watching(args[0], args[1])
+        return "b" * 40
+
+    monkeypatch.setattr(bridge, "_write_commit", write)
+
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert [call["action"] for call in calls] == ["job-status", "cluster-status"]
+    assert calls[0]["args"]["job_id"] == "a" * 8
+    assert reader_id in writes
+    assert caplog.text.count("skipped 5 malformed watch lines") == 1
+
+
+def test_terminal_watch_scrubs_output_before_artifacts_and_commit(monkeypatch):
+    credential = "Bearer ghp_sensitiveExample123"
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 600}
+    observed = {}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "success", "output": f"Authorization: {credential}"}))
+
+    def artifacts(repo, ref, rid, req, response):
+        observed["artifact_output"] = response["body"]["output"]
+        return {}, []
+
+    def write(*args, **kwargs):
+        observed["committed"] = json.dumps(args[3])
+        return "a" * 40
+
+    monkeypatch.setattr(bridge, "job_artifacts", artifacts)
+    monkeypatch.setattr(bridge, "_write_commit", write)
+
+    bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+
+    assert credential not in observed["artifact_output"]
+    assert credential not in observed["committed"]
+
+
 def test_terminal_watch_writes_one_final_response_and_clears_entry(monkeypatch):
     writes = []
     entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,

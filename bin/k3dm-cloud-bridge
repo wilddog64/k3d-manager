@@ -3,6 +3,7 @@
 
 import base64
 import json
+import math
 import os
 import queue
 import re
@@ -44,6 +45,7 @@ TERMINAL_JOB_STATES = ("success", "failed", "killed")
 MAX_JUNIT_BYTES = 512 * 1024
 SLOW_ACTIONS = frozenset({"health"})
 LIFECYCLE_TIMEOUTS = {"sandbox-up": 3600, "sandbox-down": 1800}
+_watch_warning_logged = False
 
 
 def _positive_env(name, default):
@@ -475,18 +477,41 @@ def _stale_artifact_paths(repo, parent, request_id):
 
 
 def _read_watching(repo, ref):
+    global _watch_warning_logged
     try:
         raw = _git(repo, ["show", f"{ref}:ledger/watching.txt"])
     except RuntimeError:
         return []
     entries = []
+    skipped = 0
     for line in raw.splitlines():
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
+            skipped += 1
             continue
-        if isinstance(entry, dict) and {"request_id", "job_id", "created_at", "timeout"} <= set(entry):
-            entries.append(entry)
+        if (not isinstance(entry, dict)
+                or not ID_RE.fullmatch(str(entry.get("request_id", "")))
+                or not JOB_ID_RE.fullmatch(str(entry.get("job_id", "")))):
+            skipped += 1
+            continue
+        created_at = entry.get("created_at")
+        timeout = entry.get("timeout")
+        try:
+            finite_created_at = math.isfinite(created_at) if isinstance(created_at, (int, float)) else False
+            finite_timeout = math.isfinite(timeout) if isinstance(timeout, (int, float)) else False
+        except OverflowError:
+            finite_created_at = finite_timeout = False
+        if (isinstance(created_at, bool) or not isinstance(created_at, (int, float))
+                or not finite_created_at or created_at <= 0
+                or isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+                or not finite_timeout or not 0 < timeout <= 86400):
+            skipped += 1
+            continue
+        entries.append(entry)
+    if skipped and not _watch_warning_logged:
+        _LOG.warning("skipped %d malformed watch lines", skipped)
+        _watch_warning_logged = True
     return entries
 
 
@@ -497,7 +522,8 @@ def _watch_entry(request_id, request, response):
     if body.get("status") != "queued" or not JOB_ID_RE.fullmatch(str(body.get("job_id", ""))):
         return None
     target = ACTION_ALLOWLIST[request["action"]][3]
-    timeout = LIFECYCLE_TIMEOUTS.get(request["action"], MAKE_TARGETS.get(target, {}).get("timeout", 300))
+    timeout = (LIFECYCLE_TIMEOUTS[request["action"]] if request["action"] in LIFECYCLE_TIMEOUTS
+               else MAKE_TARGETS.get(target, {}).get("timeout", 300))
     return {"request_id": request_id, "job_id": body["job_id"], "created_at": time.time(),
             "timeout": timeout}
 
@@ -583,6 +609,8 @@ def _write_commit(repo, parent, request_id, response, artifacts=None, watch_add=
 
 
 def process_tick(repo, root, last_tip=None):
+    global _watch_warning_logged
+    _watch_warning_logged = False
     remote_tip = _remote_tip(repo)
     changed = last_tip is None or remote_tip != last_tip
     ref = _fetch(repo) if changed else last_tip
@@ -616,6 +644,8 @@ def process_tick(repo, root, last_tip=None):
         if response.get("status") != "ok" or not isinstance(body, dict) or body.get("status") not in TERMINAL_JOB_STATES:
             continue
         response["id"] = entry["request_id"]
+        if isinstance(body.get("output"), str):
+            body["output"] = scrub_credentials(body["output"])
         artifacts, paths = job_artifacts(repo, ref, entry["request_id"], watch_request, response)
         if paths:
             response["artifacts"] = paths
