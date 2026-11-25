@@ -22,6 +22,8 @@
 **Do not dispatch until Open question Q1 is answered** (where the early policy check runs); the Behaviour 3 seam is written so the answer
   changes one function, not the contract.
 
+**Contract note (2026-11-25):** v1.46.0 plan 1 (`v1.46.0-cloud-request-submitter-authentication.md`) defines the pending contract as `responses/<id>.pending.json`; this draft's `approval-pending` body inside `responses/<id>.json` must adopt that file before it is placed.
+
 ## Problem
 
 Part 2 gives the hub a root promote authority with an approval record, a TOTP check and a Worker-signed approval envelope. Nothing yet lets a
