@@ -8,7 +8,7 @@
 **Children:** [M10b4a](dirused-m10b4a-docs.md) (Flash), [M10b4b](dirused-m10b4b-docs-drift-test.md) (Luna)
 **Verifier:** Claude, offline
 **Filed:** 2026-11-23
-**Intent approved:** operator, 2026-11-25 ("approved dirused M10b4")
+**Intent approved:** operator, 2026-11-25
 **Approval:** operator, 2026-11-23 — split, docs as the last child; operator, 2026-11-25 — "dispatch across Flash and Luna", blind review by Fable and Argon
 
 ## Contract between the children

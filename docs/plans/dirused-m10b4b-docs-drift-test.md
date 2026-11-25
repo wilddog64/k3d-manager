@@ -8,7 +8,7 @@
 **Implementer:** Luna (`--model gpt-6-luna`)
 **Verifier:** Claude, offline
 **Filed:** 2026-11-25
-**Intent approved:** operator, 2026-11-25 ("approved dirused M10b4")
+**Intent approved:** operator, 2026-11-25
 **Approval:** operator, 2026-11-25 — split across Flash and Luna
 
 ## Contract (from the parent)

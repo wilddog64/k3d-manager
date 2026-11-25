@@ -8,7 +8,7 @@
 **Implementer:** Flash (`--agent agy --model gemini-3.8-flash-medium`)
 **Verifier:** Claude, offline
 **Filed:** 2026-11-25
-**Intent approved:** operator, 2026-11-25 ("approved dirused M10b4")
+**Intent approved:** operator, 2026-11-25
 **Approval:** operator, 2026-11-25 — split across Flash and Luna
 
 ## Contract (from the parent)
