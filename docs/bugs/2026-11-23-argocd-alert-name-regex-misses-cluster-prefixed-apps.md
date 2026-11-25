@@ -1,11 +1,12 @@
 # Bug: ArgoCD Degraded / OutOfSync alerts never match the cluster-prefixed shopping-cart Application names
 
-**Status:** LANDED — `400041df` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier pass); header corrected 2026-11-24
+**Status:** LIVE-VERIFIED — `400041df` on `k3d-manager-v1.45.1`; L1 live PASS on the hub Prometheus 2026-11-25 after promote `65fd63f2`
+**Live evidence:** 2026-11-25 · run claude-hub-prom-argocd-app-info · env m5-air · scenario all-shopping-cart-apps-match-promoted-regex · commit 65fd63f2 · proves fix
+**Fix commit:** 400041df
 **Priority:** P3 — a monitoring gap: `ArgoCDAppProgressingStuck` (no name filter) and the dashboards still cover them
 **Introduced by:** `4c5d3556` (v1.16.0, Applications renamed `<cluster>-<service>`); the name regex dates from the v1.12.0 alert work
 **Should have been caught by:** offline test (promtool rule tests use the old bare names, if any; not checked)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-23 (L1: Claude reads argocd_app_info names on the hub Prometheus after a promote)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23)
 **Intent approved:** operator, 2026-11-23
 **Prior art:** Pass 1 `ls docs/bugs/*-argocd-alert-name-regex-misses-cluster-prefixed-apps.md`: none; `make find-similar-docs` not run (vector store unavailable); [`2026-06-30-argocd-alerts-app-specific-outofsync.md`](2026-06-30-argocd-alerts-app-specific-outofsync.md) (name grep) — read, the change that wrote the bare-name regex; this is its rot after the rename
@@ -69,3 +70,11 @@ evidence:
 
 Luna (rule regex + a promtool test file). Does **not** touch R1's files (`services-git.yaml` is read only), so it can
 dispatch now, subject to the WIP limit.
+
+## Live result (L1, 2026-11-25)
+
+Claude, read-only on m5-air after promote `65fd63f2`: the in-cluster PrometheusRule objects carry the promoted regex
+(`(.+-)?shopping-cart-(…)`, 3 matches). `count by (name) (argocd_app_info)` on `monitoring/kube-prometheus-stack-prometheus`
+lists 9 shopping-cart Applications: `shopping-cart-apps`, `-identity`, `-networking` and the six cluster-prefixed
+`ubuntu-hostinger-shopping-cart-{basket,frontend,namespace,order,payment,product-catalog}`. Full-match test of the rule's
+regex: all 9 MATCH (red control: none unmatched); the unprefixed form misses the 6 prefixed names.
