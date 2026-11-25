@@ -196,3 +196,4 @@
 - **2026-11-25:** istioctl pin bug (2026-11-23) + version-probe hang bug (2026-11-24) LIVE-VERIFIED `12489efd`: E6 refusal, E7 pinned 1.31.4 downloaded + precheck clean (drill rc 2 from V4 only), E4 no hang.
 - **2026-11-25:** V4 probe PASS (m2, ~/k3dm-v4-probe-20261125T055123.txt); spec rev 3 adds N5 ordering; awaiting E1 intent re-approval.
 - **2026-11-25:** V4 defect 1 dispatched to Luna (`v4-ldap-resync`), WIP 3/3.
+- **2026-11-25:** gate recovery paste/lookalike fix LANDED `16199b9c`; E4 live owed after promote.

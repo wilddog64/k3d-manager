@@ -1,6 +1,6 @@
 # Bug: the console gate rejects a pasted recovery code (and 0/1/8 lookalikes) as "Invalid code" without saying why
 
-**Status:** OPEN
+**Status:** LANDED — `16199b9c` on `k3d-manager-v1.45.1` (2026-11-25); E1-E3 offline PASS (independent verifier: new test red on 9cca0789, 11 of 12 mutants red; gaps e/j closed by Claude, both mutants then red); E4 live pending
 **Priority:** P2 (operator, 2026-11-25) — degraded: a recovery code works only when typed by hand, blind, with the right
 letters; the person using one is already locked out. Workaround: type it by hand with the letters O and I.
 **Triage:** patch → v1.45.1 (operator, 2026-11-25: "go ahead to file P2, have Fable review it then dispatch to Flash")
@@ -8,7 +8,7 @@ letters; the person using one is already locked out. Workaround: type it by hand
 **Introduced by:** totp-a2 (`93ecfb83`, recovery codes accepted at the gate prompt)
 **Should have been caught by:** spec (no case for pasted input or lookalike characters at the echo-off prompt)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-25 (after landing: live check E4; this bug cannot go VERIFIED or LIVE-VERIFIED on offline evidence alone)
+**Waiting on:** live check — since 2026-11-25 (E4; this bug cannot go VERIFIED or LIVE-VERIFIED on offline evidence alone)
 **Intent approved:** operator, 2026-11-25
 **Intent note:** "go ahead to file P2, have Fable review it then dispatch to Flash"
 **Review:** Fable 2026-11-25 rev 1 → "ready after should-fix" (1 blocker, 6 should-fix, 4 nits), all taken in rev 2
@@ -150,3 +150,17 @@ interface:
   `scripts/tests/bin/test_web_console_totp.py` and `make check-doc-links`; `python3 -m py_compile` the gate with the
   hub interpreter if present (`/Library/Developer/CommandLineTools/usr/bin/python3`).
 - Leave changes uncommitted; do not push. Claude commits, lands and owns the memory-bank update.
+
+## Verification (Claude, 2026-11-25)
+
+- Worker (Flash) diff reviewed against Fix items 1-4: in scope (3 files), Python 3.9 parse OK (`/usr/bin/python3` 3.9.6, `-IS`).
+- Independent verifier (Acceptance only, scratch copies): new test `1 passed` fixed / `1 failed` on the 9cca0789 gate (positive
+  controls plain code and `108080` captured on both); `-k gate` 27 passed; whole file 194 passed; E3 greps hit line 89 fixed, rc 1
+  on 9cca0789. Mutants red: CSI filter off, ESC-[ to NORMAL, no 0/1/8 map, map on 6 digits, ESC counted to cap, hint on NO,
+  ESC[?2004l dropped from either prompt, bytes >= 0x80 kept, space/tab counted. Green (test gaps): (e) lone Esc eats the next byte,
+  (j) Ctrl-C keeps CSI state.
+- Claude added test section 1b (`b'\x1bGEZD-GNBV-GY3T-QOJQ\n'`; `b'\x1b[\x03'` then the code): mutants e and j both fail at the
+  1b assert; fixed gate passes. ruff 0.15.8 clean; `git diff --check` clean.
+- Land `16199b9c`: test_web_console_totp.py 194 passed, web_console_totp.bats PASS (341 s), doc-links PASS.
+- E4 (live, operator): after promote and `make install-web-console-totp` on m5-air, paste one recovery code at `Code:`; login works;
+  `sudo totpctl recovery-status` drops by one.

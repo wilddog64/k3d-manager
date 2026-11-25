@@ -35,7 +35,7 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
 - Dispatch `dirused-m10b3c-windows` exited 0, not landed: waiting on operator mutant-test option (1/2/3, Claude recommends
   3). Then land b3c, b3d, M10b4 docs, open the dirused PR.
 
-**Dispatches:** 3 open of WIP 3 — `gate-recovery-paste` (running), `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), `dirused-m10b3c-windows` (exited 0; operator said "recommendation2" — option text lost, re-asked 2026-11-25).
+**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), `dirused-m10b3c-windows` (exited 0; operator said "recommendation2" — option text lost, re-asked 2026-11-25).
 
 **Owed / carried:** MEMORY.md over 9 KB (compress at a break); release groom Sun 2026-11-29; triage of captured bugs;
 argon classification backlog; PR #158 (dependabot wrangler-action) open; m5-air test cert `~/.ssh/k3dm-console-test*`
@@ -211,3 +211,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-25: istioctl pin bug + hang bug LIVE-VERIFIED `12489efd` (local, push batched with gate-recovery-paste land). m2 hf-p2 log header-only; V4 probe file is the dead first run.
 - 2026-11-25: V4 pre-dispatch probe PASS on m2 (store Valid after auth repoint, bind rc 0); found ES-before-store-Ready ordering race; plan rev 3 (N5, E1 intent) — needs operator E1 re-approval, then dispatch Luna.
 - 2026-11-25: V4 rev 3 E1 intent approved (operator); dispatched Luna `v4-ldap-resync`; branch pushed (1ed88a1f).
+- 2026-11-25: gate-recovery-paste LANDED `16199b9c` (verifier PASS-with-gaps e/j, closed by Claude test section 1b). Bug Waiting on live check E4 (promote + install-web-console-totp + paste a recovery code). HoverFocus P2 probe run 05:58: probe UX broken (variants skipped); data: B frontmost w/o raise but typing lands only in TextEdit.
