@@ -1,13 +1,13 @@
 # Bug: console TOTP enrolment shows no QR code, and the recovery codes are wiped from the screen the instant they appear
 
-**Status:** OPEN — spec rev 3, 2026-11-24 (rev 3: reference vectors from python-qrcode, decode-verified; rev 2: Fable review NEEDS FIXES applied — Python 3.9 syntax, pty harness, UNAVAILABLE pause, QR constants, SGR form, window height, type-ahead, Ctrl-C, how-to lines, CodeQL note)
+**Status:** LANDED — `6eccd121` on `k3d-manager-v1.45.1` (2026-11-24); verify pass (independent Sonnet verifier, 11/15 red on 0420904b); E4 live pending (operator enrol on m5-air after promote). Spec rev 3.
 **Priority:** P2 (enrolment works only by hand-typing a 32-character secret, and the ten recovery codes cannot be saved; workaround: phone app "Enter a setup key", and `totpctl recovery-regen` later, which has the same instant clear)
 **Triage:** patch → v1.45.1 (blocks the operator's first enrolment and the TOTP live checks of the open release)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** totp-a (enrol design: codes printed then cleared in `finally`); no QR since the start
 **Should have been caught by:** spec (no step said the operator must be able to copy the codes before the clear; no scannable form was asked for)
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-24
+**Waiting on:** live check — since 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Intent note:** "go ahead to make the change: option 1" (option 1 = enrolment shows the QR code itself and pauses on the recovery codes until Enter)
 **Prior art:** `ls docs/bugs/*totp*` → three TOTP bugs (tests connect-before-listen, A1 decay, silent lockout/socket DoS), all different root causes; `make find-similar-docs` not run (vector store not reachable from m4) — read, different root cause
