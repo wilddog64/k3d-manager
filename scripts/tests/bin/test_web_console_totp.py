@@ -3320,6 +3320,199 @@ def test_gate_recovery_input_normalization_and_cap():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_gate_recovery_paste_and_lookalikes():
+    tmp = Path(make_short_tmpdir())
+    assert tmp.is_dir() and tmp.name.startswith("wct.")
+    try:
+        conf = tmp / "totp.conf"
+        conf.write_text(f"uid={os.getuid()}\ntmux=/usr/bin/tmux\nidle_seconds=120\nconsole_port=42722\n")
+        sock_path = tmp / "totp.sock"
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(sock_path))
+        server.listen(16)
+        server.settimeout(5)
+        captured = []
+        running = [True]
+
+        def serve():
+            while running[0]:
+                try:
+                    conn, _ = server.accept()
+                except OSError:
+                    break
+                with conn:
+                    conn.settimeout(2)
+                    try:
+                        data = conn.recv(64)
+                    except OSError:
+                        continue
+                    if data:
+                        captured.append(data)
+                        conn.sendall(b"NO\n")
+
+        worker = threading.Thread(target=serve, daemon=True)
+        worker.start()
+
+        def make_gate():
+            return GateProcess(
+                tmp,
+                dict(
+                    conf_path=str(conf),
+                    sock_path=str(sock_path),
+                    expected_conf_owner=os.getuid(),
+                    expected_server_uid=os.getuid(),
+                    prompt_timeout=5,
+                    short_retry=True,
+                ),
+            )
+
+        # Section 1: Positive controls and input normalization / filter (M1, M2, N2, N3)
+        instance1 = make_gate()
+        try:
+            instance1.until(b"Code: ")
+            # Positive controls: plain recovery code and 6-digit code pass on pre-fix and post-fix
+            instance1.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            instance1.send(b"108080\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M1: Bracketed-paste recovery code
+            instance1.send(b"\x1b[200~GEZD-GNBV-GY3T-QOJQ\x1b[201~\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M1: Spaces and tab
+            instance1.send(b"  GEZD-GNBV-GY3T-QOJQ\t\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M1: En-dash replacement
+            instance1.send(b"GEZD\xe2\x80\x93GNBV\xe2\x80\x93GY3T\xe2\x80\x93QOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M2, N2: Lookalike 0/1/8 mapped to O/I/B
+            instance1.send(b"18EZ-GNBV-GY3T-Q0JQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # N3: Escape sequence inside code (CSI arrow key)
+            instance1.send(b"GEZDGNBV\x1b[DGY3TQOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # N3: Escape sequence inside code (SS3)
+            instance1.send(b"GEZDGNBV\x1bOAGY3TQOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            assert captured == [
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY 108080\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY IBEZ-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+            ]
+        finally:
+            instance1.close()
+
+        # Section 1b: filter-state edges from the Fix item 2 state machine
+        base = len(captured)
+        instance1b = make_gate()
+        try:
+            instance1b.until(b"Code: ")
+            # A lone Esc drops only the ESC; the next byte is kept
+            instance1b.send(b"\x1bGEZD-GNBV-GY3T-QOJQ\n")
+            instance1b.until(b"Invalid code")
+            instance1b.until(b"Code: ")
+
+            # Ctrl-C inside an open CSI sequence resets the filter to NORMAL
+            instance1b.send(b"\x1b[\x03")
+            instance1b.until(b"\x1b[?2004l\r\nCode: ")
+            instance1b.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance1b.until(b"Invalid code")
+            instance1b.until(b"Code: ")
+
+            assert captured[base:] == [
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+            ]
+        finally:
+            instance1b.close()
+        del captured[base:]
+
+        # Section 2: Prompt markers (M3), hint markers (M4), whole-line paste (N1), overflow (M5)
+        instance2 = make_gate()
+        try:
+            # M3: First prompt reads until \x1b[?2004l\x1b[H\x1b[2J\x1b[3JCode:
+            instance2.until(b"\x1b[?2004l\x1b[H\x1b[2J\x1b[3JCode: ")
+
+            # M3: Ctrl-C re-prompt reads until \x1b[?2004l\r\nCode:
+            instance2.send(b"\x03")
+            instance2.until(b"\x1b[?2004l\r\nCode: ")
+
+            # M4: Local rejection hint on short input
+            instance2.send(b"GEZD\n")
+            instance2.until(b"Invalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\r\n")
+            instance2.until(b"Code: ")
+
+            # M2: 16-character input containing 9 is local rejection with hint
+            instance2.send(b"GEZD-GNBV-GY3T-9OJQ\n")
+            instance2.until(b"Invalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\r\n")
+            instance2.until(b"Code: ")
+
+            # M5: 21 real characters with escape inside overflows and gives local rejection hint
+            instance2.send(b"GEZDGNBVGY3TQOJQXXXXX\x1b[D\n")
+            instance2.until(b"Invalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\r\n")
+            instance2.until(b"Code: ")
+
+            # M4: Verifier NO marker has no hint
+            instance2.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance2.until(b"\r\nInvalid code\r\n\x1b[?2004l\x1b[H")
+            instance2.until(b"Code: ")
+
+            # N1: Whole-line copy where newline is inside brackets
+            instance2.send(b"\x1b[200~GEZD-GNBV-GY3T-QOJQ\n\x1b[201~")
+            instance2.until(b"Invalid code")
+            instance2.until(b"Code: ")
+            instance2.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance2.until(b"Invalid code")
+            instance2.until(b"Code: ")
+
+            # 3 more VERIFY lines were captured
+            assert captured == [
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY 108080\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY IBEZ-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+            ]
+
+            # M5: Every captured line matches expected wire format, no ESC byte reached verifier
+            for line in captured:
+                assert re.fullmatch(rb"VERIFY ([0-9]{6}|[A-Z2-7]{4}(-[A-Z2-7]{4}){3})\n", line)
+            assert b"\x1b" not in b"".join(captured)
+        finally:
+            instance2.close()
+            running[0] = False
+            server.close()
+            worker.join(timeout=2)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_N2_G9b_ctrl_c_is_forwarded_after_attach(verifier, start_gate, scratch_tmux):
     argv, control = scratch_tmux
     recorder = verifier.root / "signals.py"
