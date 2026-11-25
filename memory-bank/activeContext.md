@@ -35,7 +35,7 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
 - Dispatch `dirused-m10b3c-windows` exited 0, not landed: waiting on operator mutant-test option (1/2/3, Claude recommends
   3). Then land b3c, b3d, M10b4 docs, open the dirused PR.
 
-**Dispatches:** 2 open of WIP 3 — `gate-recovery-paste` (running, k3d-manager), `dirused-m10b3c-windows` (exited 0, dirused).
+**Dispatches:** 3 open of WIP 3 — `gate-recovery-paste` (running), `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), `dirused-m10b3c-windows` (exited 0; operator said "recommendation2" — option text lost, re-asked 2026-11-25).
 
 **Owed / carried:** MEMORY.md over 9 KB (compress at a break); release groom Sun 2026-11-29; triage of captured bugs;
 argon classification backlog; PR #158 (dependabot wrangler-action) open; m5-air test cert `~/.ssh/k3dm-console-test*`
@@ -210,3 +210,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-24: M10b0 LIVE-VERIFIED on the jump box (v0.0.27): preview exact, UTC right, /confirm not-available line, schtasks before/after empty. Note for M10b2: list size vs current size (one row gone) — say "in the list". Next: M10b1–M10b4 intents (update for D14) + probe script P2/P3/P8/P10/P12.
 - 2026-11-25: istioctl pin bug + hang bug LIVE-VERIFIED `12489efd` (local, push batched with gate-recovery-paste land). m2 hf-p2 log header-only; V4 probe file is the dead first run.
 - 2026-11-25: V4 pre-dispatch probe PASS on m2 (store Valid after auth repoint, bind rc 0); found ES-before-store-Ready ordering race; plan rev 3 (N5, E1 intent) — needs operator E1 re-approval, then dispatch Luna.
+- 2026-11-25: V4 rev 3 E1 intent approved (operator); dispatched Luna `v4-ldap-resync`; branch pushed (1ed88a1f).
