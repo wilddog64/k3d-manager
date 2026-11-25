@@ -1,4 +1,5 @@
 # Progress — v1.45.0 (older entries: `memory-bank/archive/progress-2026-11-22.md`, then `-2026-11-21.md`, `-2026-11-20.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
+- 2026-11-25: session handoff written (START HERE in activeContext: gate-recovery-paste dispatched to Flash, v1.45.1 live checks done, V4 probe + HoverFocus P2 on m2 pending); prior top sections archived to `memory-bank/archive/activeContext-2026-11-25.md`.
 - 2026-11-23: session handoff rewritten (START HERE in activeContext; previous sections archived to `memory-bank/archive/activeContext-2026-11-23.md`).
 - 2026-11-24: hoverfocus live on m2 (42273f0): L1-EL grant half pass (trust watcher started controller, no click), F1-EL first install pass; pending L1 config-reload, F1 second install + SSH path.
 - 2026-11-24: hoverfocus P1 matrix (m1-base build): Safari/Finder/TextEdit/MacVim focus, Safari Cmd+W fails; Slack + VS Code no focus (bug filed); no visual focus cue (bug filed, operator decision on overlay). Chrome/Mail/Terminal not run. m2 still on m1-base: L1/F1 not installed yet.
