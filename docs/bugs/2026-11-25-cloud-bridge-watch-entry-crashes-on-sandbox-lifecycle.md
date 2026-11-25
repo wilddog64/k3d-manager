@@ -1,13 +1,13 @@
 # Cloud bridge loses the response of a queued `sandbox-up` / `sandbox-down`
 
-**Status:** OPEN — captured 2026-11-25
+**Status:** LANDED — `ee277703` (v1.46.0 plan 1b1), 2026-11-25; offline verified (4 new tests red on base); live check with plan 1
 **Priority:** P2 (a cloud lifecycle request runs but its response is lost; workaround: check sandbox state with `cluster-status`)
 **Triage:** carry → v1.46.0, fixed inside plan 1b (`docs/plans/v1.46.0-cloud-approval-b-bridge.md`), which rewrites the same path
 **Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** ef6f48a1 (v1.41.0, `LIFECYCLE_TIMEOUTS` watch timeout)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-25
+**Waiting on:** live check — since 2026-11-25
 **Prior art:** none above threshold (exact-slug glob found none; vector store unreachable)
 **Detected by:** Astra (codex `gpt-6.2-astra`) blind review of v1.46.0 plan 1, 2026-11-25; confirmed by Claude against the code.
 

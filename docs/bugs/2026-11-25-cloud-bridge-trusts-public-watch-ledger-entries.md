@@ -1,13 +1,13 @@
 # Cloud bridge trusts `ledger/watching.txt` entries any pusher can write
 
-**Status:** OPEN — captured 2026-11-25
+**Status:** LANDED — `ee277703` (v1.46.0 plan 1b1), 2026-11-25; offline verified (4 new tests red on base); live check with plan 1
 **Priority:** P2 (one malformed line stops every cloud request, reader requests included, until the file is fixed by hand)
 **Triage:** carry → v1.46.0, fixed inside plan 1b (`docs/plans/v1.46.0-cloud-approval-b-bridge.md`), which already rewrites the watch path
 **Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** pre-existing (watch ledger, `bin/k3dm-cloud-bridge:477-490`, `:603-624`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-25
+**Waiting on:** live check — since 2026-11-25
 **Prior art:** none above threshold (exact-slug glob found none; vector store unreachable)
 **Detected by:** Astra (codex `gpt-6.2-astra`) blind review of v1.46.0 plan 1, 2026-11-25; confirmed by Claude against the code.
 
