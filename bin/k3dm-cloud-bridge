@@ -2,6 +2,7 @@
 """Poll the cloud-requests branch and execute its read-only requests."""
 
 import base64
+import fcntl
 import json
 import math
 import os
@@ -26,6 +27,12 @@ from webhook.make_targets import MAKE_TARGETS
 from webhook.proc import _spawn_capture_text
 from webhook.redact import scrub_credentials
 from webhook.log import get_logger
+from webhook.auth import _keychain_secret
+from hermes.approvals import fetch_approvals, delete_approval
+from hermes.slack import post_interactive
+from webhook.cloud_approval import (CLOUD_ACTION_ID_RE, StoreError, load as load_approvals,
+                                    save as save_approvals, admit, remove, card,
+                                    due_for_drain, decide)
 
 
 _LOG = get_logger("cloud-bridge")
@@ -46,6 +53,21 @@ MAX_JUNIT_BYTES = 512 * 1024
 SLOW_ACTIONS = frozenset({"health"})
 LIFECYCLE_TIMEOUTS = {"sandbox-up": 3600, "sandbox-down": 1800}
 _watch_warning_logged = False
+
+
+def gated(action):
+    target = ACTION_ALLOWLIST.get(action, (None, None, None, None))[3]
+    return target in ("e2e", "e2e-remote") or action in LIFECYCLE_TIMEOUTS
+
+
+def _approvals_path():
+    return STATE_DIR / "approvals.json"
+
+
+def _approval_config():
+    return (os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", ""),
+            _keychain_secret("k3dm-hermes-approval-drain-token"),
+            _keychain_secret("k3dm-slack-webhook"))
 
 
 def _positive_env(name, default):
@@ -235,10 +257,10 @@ def _publish_outbox(repo, ref, processed):
     return ref, count
 
 
-def _recover_orphaned_claims(repo, ref, processed, claims):
+def _recover_orphaned_claims(repo, ref, processed, claims, pending_ids=None):
     count = 0
     for request_id in sorted(claims - processed):
-        if request_id in _slow_pending:
+        if request_id in _slow_pending or request_id in (pending_ids or set()):
             continue
         if (STATE_DIR / "outbox" / f"{request_id}.json").exists():
             continue
@@ -331,7 +353,7 @@ def _call_webhook(request):
     method, path_template, _, _ = ACTION_ALLOWLIST[action]
     path = path_template.format(**request["args"])
     target = ACTION_ALLOWLIST[action][3]
-    token = _get_cloud_runner_token() if target in ("e2e-remote", "e2e") or action in LIFECYCLE_TIMEOUTS else _get_reader_token()
+    token = _get_cloud_runner_token() if gated(action) else _get_reader_token()
     headers = {"Authorization": f"Bearer {token}"}
     data = _request_body(request)
     http_request = urllib.request.Request(
@@ -529,14 +551,14 @@ def _watch_entry(request_id, request, response):
 
 
 def _write_commit(repo, parent, request_id, response, artifacts=None, watch_add=None,
-                  watch_remove=None, final=False, record_processed=True):
+                  watch_remove=None, final=False, record_processed=True, pending=False):
     artifacts = artifacts or {}
     response_bytes = (json.dumps(response, sort_keys=True) + "\n").encode()
     try:
         ledger = _git(repo, ["show", f"{parent}:ledger/processed.txt"])
     except RuntimeError:
         ledger = ""
-    if record_processed and request_id not in ledger.splitlines():
+    if record_processed and not pending and request_id not in ledger.splitlines():
         ledger += request_id + "\n"
     ledger_bytes = ledger.encode()
     watching = _read_watching(repo, parent)
@@ -556,7 +578,7 @@ def _write_commit(repo, parent, request_id, response, artifacts=None, watch_add=
         response_file.write_bytes(response_bytes)
         ledger_file.write_bytes(ledger_bytes)
         ledger_hash = _git(repo, ["hash-object", "-w", str(ledger_file)], env=env).strip()
-        if not final:
+        if not final and not pending:
             response_hash = _git(repo, ["hash-object", "-w", str(response_file)], env=env).strip()
             _git(repo, ["update-index", "--add", "--cacheinfo",
                         f"100644,{response_hash},responses/{request_id}.json"], env=env)
@@ -584,6 +606,10 @@ def _write_commit(repo, parent, request_id, response, artifacts=None, watch_add=
                 finally:
                     empty_tree.rmdir()
         response_path = f"responses/{request_id}{'.final' if final else ''}.json"
+        if pending:
+            response_hash = _git(repo, ["hash-object", "-w", str(response_file)], env=env).strip()
+            _git(repo, ["update-index", "--add", "--cacheinfo",
+                        f"100644,{response_hash},responses/{request_id}.pending.json"], env=env)
         if final:
             final_response_file = Path(index_path + ".final-response")
             final_response_file.write_bytes(response_bytes)
@@ -608,6 +634,25 @@ def _write_commit(repo, parent, request_id, response, artifacts=None, watch_add=
                 pass
 
 
+def _run_request_tail(repo, ref, request_id, request):
+    response = _call_webhook(request)
+    response["id"] = request_id
+    body = response.get("body")
+    if request["action"] == "job-status" and isinstance(body, dict) and "output" in body:
+        body["output"] = scrub_credentials(body["output"])
+    artifacts, paths = job_artifacts(repo, ref, request_id, request, response)
+    if paths:
+        response["artifacts"] = paths
+    watch_add = _watch_entry(request_id, request, response)
+    _store_outbox(request_id, response, watch_add=watch_add, artifacts=artifacts)
+    if watch_add:
+        ref = _write_commit(repo, ref, request_id, response, artifacts, watch_add=watch_add)
+    else:
+        ref = _write_commit(repo, ref, request_id, response, artifacts)
+    _remove_outbox(request_id)
+    return ref
+
+
 def process_tick(repo, root, last_tip=None):
     global _watch_warning_logged
     _watch_warning_logged = False
@@ -617,7 +662,16 @@ def process_tick(repo, root, last_tip=None):
     processed = _processed(repo, ref)
     claims = _claimed_ids()
     ref, processed_this_tick = _publish_outbox(repo, ref, processed)
-    ref, recovered_count = _recover_orphaned_claims(repo, ref, processed, claims)
+    try:
+        approval_store = load_approvals(_approvals_path())
+        approval_store_error = False
+    except StoreError:
+        approval_store = None
+        approval_store_error = True
+        _LOG.error("approval state is unreadable on the bridge")
+    ref, recovered_count = _recover_orphaned_claims(
+        repo, ref, processed, claims,
+        pending_ids=set(approval_store.pending) if approval_store else set()) if not approval_store_error else (ref, 0)
     processed_this_tick += recovered_count
     for request_id, response in _completed_slow_requests():
         if request_id in processed:
@@ -652,6 +706,51 @@ def process_tick(repo, root, last_tip=None):
         ref = _write_commit(repo, ref, entry["request_id"], response, artifacts,
                             watch_remove=entry["request_id"], final=True, record_processed=False)
         processed_this_tick += 1
+    # Approval draining runs even when the request branch tip did not change.
+    now = time.time()
+    if approval_store is not None and due_for_drain(approval_store, now):
+        drain_url, drain_token, slack_url = _approval_config()
+        configured = bool(drain_url and drain_url.startswith("https://") and drain_token and slack_url)
+        items = fetch_approvals(drain_url, drain_token, id_pattern=CLOUD_ACTION_ID_RE) if configured else []
+        decisions = decide(approval_store, items, now)
+        save_approvals(_approvals_path(), approval_store)
+        for decision in decisions:
+            if decision.kind == "drop":
+                if configured:
+                    delete_approval(drain_url, drain_token, decision.approval_id,
+                                    id_pattern=CLOUD_ACTION_ID_RE)
+            elif decision.kind in ("deny", "expire"):
+                reason = "denied by the operator" if decision.kind == "deny" else "not approved before the request expired"
+                response = _response(decision.request_id, decision.request["action"], "rejected", 0, reason=reason)
+                _store_outbox(decision.request_id, response)
+                ref = _write_commit(repo, ref, decision.request_id, response)
+                _remove_outbox(decision.request_id)
+                processed.add(decision.request_id)
+                processed_this_tick += 1
+            elif decision.kind == "execute":
+                if time.time() >= decision.expires_at:
+                    response = _response(decision.request_id, decision.request["action"], "rejected", 0,
+                                         reason="not approved before the request expired")
+                    _store_outbox(decision.request_id, response)
+                    ref = _write_commit(repo, ref, decision.request_id, response)
+                    _remove_outbox(decision.request_id)
+                else:
+                    ref = _run_request_tail(repo, ref, decision.request_id, decision.request)
+                processed.add(decision.request_id)
+                processed_this_tick += 1
+    if approval_store is not None:
+        for pending in approval_store.pending.values():
+            if pending.notice_published:
+                continue
+            notice = _response(pending.request_id, pending.request["action"], "ok", 202,
+                               body={"status": "approval-pending", "approval_id": pending.approval_id,
+                                     "expires_at": _iso_utc(pending.expires_at)})
+            try:
+                ref = _write_commit(repo, ref, pending.request_id, notice, pending=True)
+                pending.notice_published = True
+                save_approvals(_approvals_path(), approval_store)
+            except Exception:
+                pass
     if not changed:
         return ref, processed_this_tick
     for request_id in _request_ids(repo, ref):
@@ -666,25 +765,60 @@ def process_tick(repo, root, last_tip=None):
         else:
             request, response = prepare_request(request_id, raw, processed)
             if response is None:
+                if gated(request["action"]):
+                    if approval_store_error:
+                        response = _response(request_id, request["action"], "rejected", 0,
+                                             reason="approval state is unreadable on the bridge")
+                    else:
+                        drain_url, drain_token, slack_url = _approval_config()
+                        if not (drain_url and drain_url.startswith("https://") and drain_token and slack_url):
+                            response = _response(request_id, request["action"], "rejected", 0,
+                                                 reason="operator approval is not configured on the bridge")
+                        else:
+                            pending = admit(approval_store, request_id, request, time.time())
+                            if hasattr(pending, "reason"):
+                                response = _response(request_id, request["action"], "rejected", 0,
+                                                     reason=pending.reason)
+                            else:
+                                save_approvals(_approvals_path(), approval_store)
+                                try:
+                                    message, blocks = card(pending)
+                                    delivered = post_interactive(slack_url, message, blocks)
+                                except Exception:
+                                    delivered = False
+                                if not delivered:
+                                    remove(approval_store, request_id)
+                                    save_approvals(_approvals_path(), approval_store)
+                                    response = _response(request_id, request["action"], "rejected", 0,
+                                                         reason="approval card not delivered; file a new request")
+                                else:
+                                    notice = _response(request_id, request["action"], "ok", 202,
+                                                       body={"status": "approval-pending",
+                                                             "approval_id": pending.approval_id,
+                                                             "expires_at": _iso_utc(pending.expires_at)})
+                                    try:
+                                        ref = _write_commit(repo, ref, request_id, notice, pending=True)
+                                        pending.notice_published = True
+                                        save_approvals(_approvals_path(), approval_store)
+                                    except Exception:
+                                        _LOG.warning("approval pending notice commit failed")
+                                    processed_this_tick += 1
+                                    if processed_this_tick >= MAX_PER_TICK:
+                                        return None, processed_this_tick
+                                    continue
+                if response is not None:
+                    _store_outbox(request_id, response)
+                    ref = _write_commit(repo, ref, request_id, response)
+                    _remove_outbox(request_id)
+                    processed_this_tick += 1
+                    if processed_this_tick >= MAX_PER_TICK:
+                        return None, processed_this_tick
+                    continue
                 if request["action"] in SLOW_ACTIONS:
                     if request_id not in _slow_pending:
                         _queue_slow_request(request_id, request)
                     continue
-                response = _call_webhook(request)
-                response["id"] = request_id
-                body = response.get("body")
-                if request["action"] == "job-status" and isinstance(body, dict) and "output" in body:
-                    body["output"] = scrub_credentials(body["output"])
-                artifacts, paths = job_artifacts(repo, ref, request_id, request, response)
-                if paths:
-                    response["artifacts"] = paths
-                watch_add = _watch_entry(request_id, request, response)
-                _store_outbox(request_id, response, watch_add=watch_add, artifacts=artifacts)
-                if watch_add:
-                    ref = _write_commit(repo, ref, request_id, response, artifacts, watch_add=watch_add)
-                else:
-                    ref = _write_commit(repo, ref, request_id, response, artifacts)
-                _remove_outbox(request_id)
+                ref = _run_request_tail(repo, ref, request_id, request)
                 processed.add(request_id)
                 processed_this_tick += 1
                 if processed_this_tick >= MAX_PER_TICK:
@@ -724,6 +858,13 @@ def main():
     root = Path(os.environ.get("K3DM_REPO_ROOT", ROOT))
     repo = Path(os.environ.get("K3DM_CLOUD_BRIDGE_REPO",
                               str(Path.home() / ".k3d-manager" / "cloud-bridge" / "repo.git")))
+    STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock_fd = os.open(STATE_DIR / "bridge.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("k3dm-cloud-bridge: another bridge is running", file=sys.stderr)
+        raise SystemExit(1)
     _ensure_bare_repo(repo, root)
     last_tip = None
     last_activity = time.monotonic()

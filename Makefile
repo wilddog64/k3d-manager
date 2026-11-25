@@ -922,6 +922,10 @@ install-cloud-bridge:
 	  { echo "[install-cloud-bridge] ERROR: python@3.14 is not installed; run: brew install python@3.14" >&2; exit 1; }; \
 	security find-generic-password -s k3dm-webhook-token-reader -a k3dm >/dev/null 2>&1 || \
 	  { echo "[install-cloud-bridge] ERROR: Keychain item k3dm-webhook-token-reader (account k3dm) not found — create it from a real terminal first; see docs/howto/cloud-session-requests.md" >&2; exit 1; }; \
+	security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm >/dev/null 2>&1 || \
+	  echo "[install-cloud-bridge] WARNING: approval drain token is missing; gated requests will be rejected as not configured" >&2; \
+	security find-generic-password -s k3dm-slack-webhook -a k3dm >/dev/null 2>&1 || \
+	  echo "[install-cloud-bridge] WARNING: Slack approval webhook is missing; gated requests will be rejected as not configured" >&2; \
 	[ -n "$$(git ls-remote --heads origin cloud-requests)" ] || \
 	  { echo "[install-cloud-bridge] ERROR: origin/cloud-requests does not exist — run: make init-cloud-requests" >&2; exit 1; }
 	sed \

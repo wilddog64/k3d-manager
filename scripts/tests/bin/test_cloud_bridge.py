@@ -4,6 +4,8 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import fcntl
+import subprocess
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -33,6 +35,433 @@ NOW = datetime(2026, 9, 25, 20, 14, 3, tzinfo=timezone.utc)
 @pytest.fixture(autouse=True)
 def isolated_bridge_state(tmp_path, monkeypatch):
     monkeypatch.setattr(bridge, "STATE_DIR", tmp_path / "bridge-state", raising=False)
+    keychain_reads = []
+
+    def fake_keychain(service):
+        keychain_reads.append(service)
+        return "test-secret"
+
+    def fake_post(*_args):
+        return True
+
+    def fake_fetch(*_args, **_kwargs):
+        return []
+
+    def fake_delete(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(bridge, "_keychain_secret", fake_keychain)
+    monkeypatch.setattr(bridge, "post_interactive", fake_post)
+    monkeypatch.setattr(bridge, "fetch_approvals", fake_fetch)
+    monkeypatch.setattr(bridge, "delete_approval", fake_delete)
+    monkeypatch.setenv("K3DM_HERMES_APPROVAL_DRAIN_URL", "https://relay.invalid/approvals")
+    assert bridge._approvals_path().parent == bridge.STATE_DIR
+    assert bridge._approval_config.__globals__["_keychain_secret"] is fake_keychain
+    assert bridge.post_interactive is fake_post
+    assert bridge.fetch_approvals is fake_fetch
+    assert bridge.delete_approval is fake_delete
+
+
+@pytest.fixture
+def approval_bridge(monkeypatch):
+    clock = [NOW.timestamp()]
+    requests = {}
+    processed = set()
+    commits = []
+    webhook_calls = []
+    cards = []
+    drained = []
+    deleted = []
+    token_reads = []
+    keychain_reads = []
+    tip = [None]
+    drain_items = []
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge.time, "time", lambda: clock[0])
+    monkeypatch.setattr(bridge, "_remote_tip", lambda _repo: "remote")
+    monkeypatch.setattr(bridge, "_fetch", lambda _repo: "tip")
+    monkeypatch.setattr(bridge, "_processed", lambda _repo, _ref: set(processed))
+    monkeypatch.setattr(bridge, "_read_watching", lambda _repo, _ref: [])
+    monkeypatch.setattr(bridge, "_request_ids", lambda _repo, _ref: list(requests))
+    monkeypatch.setattr(bridge, "_read_request", lambda _repo, _ref, request_id: (requests[request_id], None))
+    monkeypatch.setattr(bridge, "_get_cloud_runner_token", lambda: token_reads.append("cloud") or "cloud-token")
+    monkeypatch.setattr(bridge, "_get_reader_token", lambda: token_reads.append("reader") or "reader-token")
+    monkeypatch.setattr(bridge, "_keychain_secret", lambda service: keychain_reads.append(service) or "secret")
+    monkeypatch.setattr(bridge, "post_interactive", lambda *args: cards.append(args) or True)
+    monkeypatch.setattr(bridge, "fetch_approvals", lambda *args, **kwargs:
+                        drained.append((args, kwargs)) or (drain_items.pop(0) if drain_items else []))
+    monkeypatch.setattr(bridge, "delete_approval", lambda *args, **kwargs: deleted.append((args, kwargs)) or True)
+
+    def call_webhook(value):
+        if bridge.gated(value["action"]):
+            bridge._get_cloud_runner_token()
+        else:
+            bridge._get_reader_token()
+        webhook_calls.append(value)
+        return bridge._response("", value["action"], "ok", 200, body={"status": "complete"})
+
+    def write_commit(*args, **kwargs):
+        commits.append((args, kwargs))
+        response = args[3]
+        if not kwargs.get("pending"):
+            processed.add(args[2])
+        return "tip"
+
+    monkeypatch.setattr(bridge, "_call_webhook", call_webhook)
+    monkeypatch.setattr(bridge, "_write_commit", write_commit)
+
+    def tick():
+        result = bridge.process_tick(Path("/scratch/repo.git"), ROOT, last_tip=tip[0])
+        if result[0] is not None:
+            tip[0] = result[0]
+        return result
+
+    def submit(request_id="20260925T201403Z-sandbox-up", value=None):
+        requests[request_id] = value or request("sandbox-up", expires=NOW + timedelta(minutes=10))
+        return tick()
+
+    return {"clock": clock, "requests": requests, "processed": processed, "commits": commits,
+            "webhook_calls": webhook_calls, "cards": cards, "drain_items": drain_items,
+            "deleted": deleted, "token_reads": token_reads, "keychain_reads": keychain_reads,
+            "tip": tip, "tick": tick, "submit": submit}
+
+
+def _last_approval_response(harness):
+    return harness["commits"][-1][0][3]
+
+
+def _pending_approval(harness, request_id="20260925T201403Z-sandbox-up"):
+    return bridge.load_approvals(bridge._approvals_path()).pending[request_id]
+
+
+def _drain_item(pending, decision="approve", nonce=None, approval_id=None):
+    return {"action_id": approval_id or pending.approval_id,
+            "nonce": pending.nonce if nonce is None else nonce,
+            "approved_by": "U123ABC", "decision": decision}
+
+
+def test_gated_request_is_pending_without_token_or_webhook(approval_bridge):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    response = _last_approval_response(harness)
+    assert len(harness["cards"]) == 1
+    assert response["status"] == "ok" and response["http_status"] == 202
+    assert response["body"]["status"] == "approval-pending"
+    assert response["body"]["approval_id"] == _pending_approval(harness).approval_id
+    assert response["body"]["expires_at"].endswith("Z")
+    assert "nonce" not in response and "nonce" not in json.dumps(response)
+    assert harness["processed"] == set()
+    assert harness["token_reads"] == []
+    assert harness["webhook_calls"] == []
+    assert harness["commits"][-1][1]["pending"] is True
+
+
+def test_write_commit_publishes_pending_path_without_processing(tmp_path, monkeypatch):
+    repo = tmp_path / "fake-repo"
+    remote = tmp_path / "fake-origin.git"
+    repo.mkdir()
+
+    def git(*args, cwd=None):
+        result = subprocess.run(["git", *args], cwd=cwd, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.strip()
+
+    git("init", "--bare", str(remote))
+    git("init", "-b", "cloud-requests", str(repo))
+    git("config", "user.name", "Bridge Test", cwd=repo)
+    git("config", "user.email", "bridge-test@example.invalid", cwd=repo)
+    (repo / "ledger").mkdir()
+    (repo / "ledger" / "processed.txt").write_text("", encoding="utf-8")
+    git("add", "ledger/processed.txt", cwd=repo)
+    git("commit", "-m", "seed fixture", cwd=repo)
+    git("remote", "add", "origin", str(remote), cwd=repo)
+    git("push", "origin", "cloud-requests", cwd=repo)
+    parent = git("rev-parse", "HEAD", cwd=repo)
+    monkeypatch.setattr(bridge, "_read_watching", lambda *_args: [])
+    request_id = "20260925T201403Z-sandbox-up"
+    nonce = "0123456789abcdef"
+    response = bridge._response(request_id, "sandbox-up", "ok", 202,
+                                body={"status": "approval-pending", "approval_id": "c1-01234567",
+                                      "expires_at": "2026-09-25T20:24:03Z"})
+    commit = bridge._write_commit(repo, parent, request_id, response, pending=True)
+    pending = git("show", f"{commit}:responses/{request_id}.pending.json", cwd=repo)
+    ledger = git("show", f"{commit}:ledger/processed.txt", cwd=repo)
+    paths = git("ls-tree", "-r", "--name-only", commit, cwd=repo).splitlines()
+    assert json.loads(pending)["body"]["status"] == "approval-pending"
+    assert nonce not in pending
+    assert request_id not in ledger.splitlines()
+    assert f"responses/{request_id}.pending.json" in paths
+    assert f"responses/{request_id}.json" not in paths
+
+
+def test_matching_approve_runs_once_and_commits_normal_response(approval_bridge, monkeypatch):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    pending = _pending_approval(harness)
+    harness["clock"][0] += 31
+    harness["drain_items"].append([_drain_item(pending)])
+    harness["tick"]()
+    assert len(harness["webhook_calls"]) == 1
+    assert harness["webhook_calls"][0] == harness["requests"][request_id]
+    assert harness["token_reads"] == ["cloud"]
+    assert request_id in harness["processed"]
+    assert harness["commits"][-1][0][3]["status"] == "ok"
+    assert harness["commits"][-1][0][3]["http_status"] == 200
+    harness["tick"]()
+    assert len(harness["webhook_calls"]) == 1
+
+
+def test_deny_expiry_wrong_nonce_and_unknown_id_do_not_run(approval_bridge):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    pending = _pending_approval(harness)
+    harness["clock"][0] += 31
+    harness["drain_items"].append([_drain_item(pending, decision="deny")])
+    harness["tick"]()
+    assert _last_approval_response(harness)["reason"] == "denied by the operator"
+    assert harness["webhook_calls"] == []
+
+    # Separate pending entries exercise expiry, wrong nonce, and unknown id.
+    request_id2 = "20260925T201404Z-sandbox-up"
+    harness["submit"](request_id2)
+    pending2 = _pending_approval(harness, request_id2)
+    harness["clock"][0] = pending2.expires_at + 1
+    harness["drain_items"].append([])
+    harness["tick"]()
+    assert _last_approval_response(harness)["reason"] == "not approved before the request expired"
+
+    request3_expiry = datetime.fromtimestamp(harness["clock"][0] + 600, timezone.utc)
+    request_id3 = "20260925T201405Z-sandbox-up"
+    harness["submit"](request_id3, request("sandbox-up", expires=request3_expiry))
+    pending3 = _pending_approval(harness, request_id3)
+    harness["clock"][0] += 31
+    harness["drain_items"].append([_drain_item(pending3, nonce="0" * 16)])
+    harness["tick"]()
+    assert request_id3 in bridge.load_approvals(bridge._approvals_path()).pending
+    assert harness["deleted"][-1][0][2] == pending3.approval_id
+
+    harness["drain_items"].append([_drain_item(pending3, approval_id="c9-deadbeef")])
+    harness["clock"][0] += 31
+    harness["tick"]()
+    assert request_id3 in bridge.load_approvals(bridge._approvals_path()).pending
+    assert harness["deleted"][-1][0][2] == "c9-deadbeef"
+    assert harness["webhook_calls"] == []
+
+
+def test_expiry_recheck_after_decide_prevents_token_read(approval_bridge, monkeypatch):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    pending = _pending_approval(harness)
+    harness["drain_items"].append([_drain_item(pending)])
+    harness["clock"][0] = NOW.timestamp() + 31
+    clock_reads = [0]
+
+    def advancing_clock():
+        clock_reads[0] += 1
+        if clock_reads[0] == 2:
+            return pending.expires_at + 1
+        return harness["clock"][0]
+
+    monkeypatch.setattr(bridge.time, "time", advancing_clock)
+    harness["tick"]()
+    assert _last_approval_response(harness)["reason"] == "not approved before the request expired"
+    assert harness["token_reads"] == []
+    assert harness["webhook_calls"] == []
+
+
+@pytest.mark.parametrize("config, expected", [
+    ({"url": ""}, "operator approval is not configured on the bridge"),
+    ({"url": "http://relay.invalid"}, "operator approval is not configured on the bridge"),
+    ({"token": ""}, "operator approval is not configured on the bridge"),
+    ({"slack": ""}, "operator approval is not configured on the bridge"),
+    ({"store_error": True}, "approval state is unreadable on the bridge"),
+    ({"too_many": True}, "too many requests awaiting approval; try again later"),
+    ({"too_soon": True}, "request expires too soon for approval; file it with at least 5 minutes left"),
+    ({"post": False}, "approval card not delivered; file a new request"),
+    ({"post": "raise"}, "approval card not delivered; file a new request"),
+])
+def test_admission_rejections_have_exact_reasons(approval_bridge, monkeypatch, config, expected):
+    harness = approval_bridge
+    if "url" in config:
+        monkeypatch.setenv("K3DM_HERMES_APPROVAL_DRAIN_URL", config["url"])
+    if "token" in config or "slack" in config:
+        monkeypatch.setattr(bridge, "_keychain_secret",
+                            lambda service: "" if service.endswith("token") and config.get("token") == ""
+                            or service.endswith("webhook") and config.get("slack") == "" else "secret")
+    if config.get("store_error"):
+        bridge._approvals_path().parent.mkdir(parents=True, exist_ok=True)
+        bridge._approvals_path().write_text("invalid", encoding="utf-8")
+    if config.get("too_many"):
+        store = bridge.load_approvals(bridge._approvals_path())
+        for index in range(3):
+            value = request("sandbox-up", expires=NOW + timedelta(minutes=10))
+            bridge.admit(store, f"pending-{index}", value, NOW.timestamp())
+        bridge.save_approvals(bridge._approvals_path(), store)
+    if config.get("post") is False:
+        monkeypatch.setattr(bridge, "post_interactive", lambda *args: False)
+    elif config.get("post") == "raise":
+        monkeypatch.setattr(bridge, "post_interactive", lambda *args: (_ for _ in ()).throw(RuntimeError("private")))
+    value = request("sandbox-up", expires=(NOW + timedelta(minutes=4) if config.get("too_soon")
+                                            else NOW + timedelta(minutes=10)))
+    harness["submit"]("20260925T201403Z-sandbox-up", value)
+    assert _last_approval_response(harness)["reason"] == expected
+
+
+def test_decided_record_is_saved_away_before_crash(approval_bridge, monkeypatch):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    pending = _pending_approval(harness)
+    harness["clock"][0] += 31
+    harness["drain_items"].append([_drain_item(pending)])
+    tails = []
+
+    def crash_tail(*_args):
+        tails.append("tail")
+        raise RuntimeError("simulated crash")
+
+    monkeypatch.setattr(bridge, "_run_request_tail", crash_tail)
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        harness["tick"]()
+    assert request_id not in bridge.load_approvals(bridge._approvals_path()).pending
+    harness["tick"]()
+    assert tails == ["tail"]
+
+
+def test_restart_preserves_pending_claim_until_approve(approval_bridge, monkeypatch):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    pending = _pending_approval(harness)
+    restarted = importlib.util.module_from_spec(SPEC)
+    SPEC.loader.exec_module(restarted)
+    restarted.STATE_DIR = bridge.STATE_DIR
+    restarted.time.time = lambda: harness["clock"][0]
+    restarted._remote_tip = lambda _repo: "remote"
+    restarted._fetch = lambda _repo: "tip"
+    restarted._processed = lambda _repo, _ref: set()
+    restarted._read_watching = lambda _repo, _ref: []
+    restarted._request_ids = lambda _repo, _ref: [request_id]
+    restarted._read_request = lambda *_args: (harness["requests"][request_id], None)
+    restarted._call_webhook = lambda value: harness["webhook_calls"].append(value) or restarted._response(
+        "", value["action"], "ok", 200, body={})
+    restarted._write_commit = lambda *args, **kwargs: harness["commits"].append((args, kwargs)) or "tip"
+    restarted._read_watching = lambda *_args: []
+    restarted.fetch_approvals = lambda *args, **kwargs: []
+    restarted.delete_approval = lambda *args, **kwargs: True
+    restarted._completed_slow_requests = lambda: iter(())
+    restarted._publish_outbox = lambda _repo, ref, _processed: (ref, 0)
+    restarted._recover_orphaned_claims = lambda *args, **kwargs: pytest.fail("pending claim recovered")
+    # The real recovery path must leave the claim untouched while the pending record exists.
+    restarted._recover_orphaned_claims = bridge._recover_orphaned_claims
+    restarted._store_outbox = bridge._store_outbox
+    restarted._remove_outbox = bridge._remove_outbox
+    restarted._watch_warning_logged = False
+    restarted._get_cloud_runner_token = lambda: "cloud-token"
+    restarted._get_reader_token = lambda: "reader-token"
+    restarted.scrub_credentials = lambda value: value
+    restarted.job_artifacts = lambda *_args: ({}, [])
+    restarted._watch_entry = lambda *_args: None
+    restarted.save_approvals = bridge.save_approvals
+    restarted.load_approvals = bridge.load_approvals
+    restarted.StoreError = bridge.StoreError
+    restarted.due_for_drain = bridge.due_for_drain
+    restarted.decide = bridge.decide
+    restarted.CLOUD_ACTION_ID_RE = bridge.CLOUD_ACTION_ID_RE
+    restarted._approval_config = lambda: ("https://relay.invalid", "token", "slack")
+    before_restart_tick = len(harness["commits"])
+    monkeypatch.setattr(restarted, "fetch_approvals", lambda *args, **kwargs: [])
+    restarted.process_tick(Path("/scratch/repo.git"), ROOT, last_tip="tip")
+    assert harness["webhook_calls"] == []
+    assert len(harness["commits"]) == before_restart_tick
+    assert request_id not in harness["processed"]
+    harness["clock"][0] += 31
+    monkeypatch.setattr(restarted, "fetch_approvals", lambda *args, **kwargs: [_drain_item(pending)])
+    restarted.process_tick(Path("/scratch/repo.git"), ROOT, last_tip="tip")
+    assert len(harness["webhook_calls"]) == 1
+
+
+def test_store_error_skips_recovery_and_reader_still_runs(approval_bridge, monkeypatch):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    reader_id = "20260925T201404Z-cluster-status"
+    bridge._approvals_path().parent.mkdir(parents=True, exist_ok=True)
+    bridge._approvals_path().write_text("invalid", encoding="utf-8")
+    harness["requests"][request_id] = request("sandbox-up")
+    harness["requests"][reader_id] = request("cluster-status")
+    recovered = []
+    monkeypatch.setattr(bridge, "_recover_orphaned_claims",
+                        lambda *args, **kwargs: recovered.append(True) or (args[1], 0))
+    harness["tick"]()
+    assert recovered == []
+    reasons = [entry[0][3].get("reason") for entry in harness["commits"]]
+    assert "approval state is unreadable on the bridge" in reasons
+    assert len(harness["webhook_calls"]) == 1
+    assert harness["webhook_calls"][0]["action"] == "cluster-status"
+
+
+def test_reader_runs_while_three_records_are_pending(approval_bridge):
+    harness = approval_bridge
+    store = bridge.load_approvals(bridge._approvals_path())
+    for index in range(3):
+        bridge.admit(store, f"pending-{index}", request("sandbox-up"), NOW.timestamp())
+    bridge.save_approvals(bridge._approvals_path(), store)
+    reader_id = "20260925T201403Z-cluster-status"
+    harness["requests"][reader_id] = request("cluster-status")
+    harness["tick"]()
+    assert [call["action"] for call in harness["webhook_calls"]] == ["cluster-status"]
+    assert reader_id in harness["processed"]
+
+
+def test_idle_tick_makes_no_approval_keychain_reads(approval_bridge):
+    harness = approval_bridge
+    harness["tick"]()
+    assert harness["keychain_reads"] == []
+
+
+def test_pending_notice_commit_retries_without_reposting_card(approval_bridge, monkeypatch, caplog):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    write_commit = bridge._write_commit
+    failures = [1]
+
+    def fail_once(*args, **kwargs):
+        if kwargs.get("pending") and failures.pop() if failures else False:
+            raise OSError("private")
+        return write_commit(*args, **kwargs)
+
+    monkeypatch.setattr(bridge, "_write_commit", fail_once)
+    reader_id = "20260925T201404Z-cluster-status"
+    harness["requests"][reader_id] = request("cluster-status")
+    harness["submit"](request_id)
+    assert len(harness["cards"]) == 1
+    assert [call["action"] for call in harness["webhook_calls"]] == ["cluster-status"]
+    assert "approval pending notice commit failed" in caplog.text
+    pending = _pending_approval(harness)
+    assert pending.notice_published is False
+    harness["tick"]()
+    assert len(harness["cards"]) == 1
+    retried = _pending_approval(harness)
+    assert retried.notice_published is True
+    pending_commits = [json.dumps(args[3]) for args, kwargs in harness["commits"] if kwargs.get("pending")]
+    assert pending_commits
+    assert all(retried.nonce not in content for content in pending_commits)
+
+
+def test_nonce_is_absent_from_commits_outbox_and_logs(approval_bridge, caplog):
+    harness = approval_bridge
+    request_id = "20260925T201403Z-sandbox-up"
+    harness["submit"](request_id)
+    pending = _pending_approval(harness)
+    contents = [json.dumps(args[3]) for args, _kwargs in harness["commits"]]
+    contents.extend(path.read_text(encoding="utf-8") for path in (bridge.STATE_DIR / "outbox").glob("*.json"))
+    contents.append(caplog.text)
+    assert all(pending.nonce not in content for content in contents)
 
 
 def request(action="cluster-status", args=None, expires=None):
@@ -44,6 +473,27 @@ def request(action="cluster-status", args=None, expires=None):
         "requested_at": "2026-09-25T20:14:03Z",
         "expires_at": (expires or NOW + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
     }
+
+
+def test_gated_actions_are_exactly_the_cloud_runner_actions():
+    assert {action for action in bridge.ACTION_ALLOWLIST if bridge.gated(action)} == {
+        "sandbox-up", "sandbox-down", "make-e2e", "make-e2e-remote"}
+
+
+def test_main_refuses_a_second_bridge_lock(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("K3DM_REPO_ROOT", str(ROOT))
+    monkeypatch.setenv("K3DM_CLOUD_BRIDGE_REPO", str(tmp_path / "repo.git"))
+    bridge.STATE_DIR.mkdir(parents=True)
+    lock_path = bridge.STATE_DIR / "bridge.lock"
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        with pytest.raises(SystemExit) as error:
+            bridge.main()
+    finally:
+        os.close(lock_fd)
+    assert error.value.code == 1
+    assert capsys.readouterr().err.strip() == "k3dm-cloud-bridge: another bridge is running"
 
 
 @pytest.mark.parametrize("action", ["ask", "analyze", "nope"])
@@ -259,6 +709,7 @@ def test_process_tick_fetches_once_and_returns_pushed_tip(monkeypatch):
     pushed = "b" * 40
     monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
     monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge.time, "time", lambda: NOW.timestamp())
 
     def fake_fetch(repo):
         calls.append("fetch")
@@ -530,6 +981,7 @@ def test_slow_health_runs_off_loop_and_main_thread_commits(monkeypatch):
         "20260925T201400Z-health": request("health"),
         "20260925T201401Z-cluster-status": request("cluster-status"),
     }
+
     processed = set()
 
     monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
@@ -596,24 +1048,48 @@ def test_queued_make_response_adds_one_watch_entry(monkeypatch):
     ("sandbox-up", 3600), ("sandbox-down", 1800),
     ("make-e2e", bridge.MAKE_TARGETS["e2e"]["timeout"]),
 ])
+def test_watch_entry_uses_lifecycle_or_make_timeout(action, expected_timeout):
+    # agent-audit: allow assert-removed gated actions now reach the webhook only after Approve, so the timeout is asserted on _watch_entry directly
+    response = bridge._response("", action, "ok", 202, body={"status": "queued", "job_id": "a" * 8})
+    entry = bridge._watch_entry(f"20260925T201403Z-{action}", request(action), response)
+    assert entry["timeout"] == expected_timeout
+    assert entry["job_id"] == "a" * 8
+
+
+@pytest.mark.parametrize("action, expected_timeout", [
+    ("sandbox-up", 3600), ("sandbox-down", 1800),
+    ("make-e2e", bridge.MAKE_TARGETS["e2e"]["timeout"]),
+])
 def test_queued_lifecycle_and_make_responses_commit_watch_entries(monkeypatch, action, expected_timeout):
     request_id = f"20260925T201403Z-{action}"
     writes = []
+    cards = []
+    token_reads = []
     monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
     monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge.time, "time", lambda: NOW.timestamp())
     monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
     monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
     monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: [request_id])
-    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, rid: (request(action), None))
-    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
-        "", action, "ok", 202, body={"status": "queued", "job_id": "a" * 8}))
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, rid: (
+        request(action, expires=NOW + timedelta(minutes=10)), None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: pytest.fail("gated action reached webhook"))
+    monkeypatch.setattr(bridge, "_get_cloud_runner_token", lambda: token_reads.append("cloud"))
+    monkeypatch.setattr(bridge, "_get_reader_token", lambda: token_reads.append("reader"))
+    monkeypatch.setattr(bridge, "post_interactive", lambda *args: cards.append(args) or True)
     monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append((args, kwargs)) or "b" * 40)
 
     bridge.process_tick(Path("/nonexistent"), ROOT)
 
     assert writes
-    assert writes[0][1]["watch_add"]["timeout"] == expected_timeout
-    assert writes[0][0][3]["body"]["status"] == "queued"
+    assert writes[0][1]["pending"] is True
+    assert bridge.gated(action)
+    assert len(cards) == 1
+    assert token_reads == []
+    pending = bridge.load_approvals(bridge._approvals_path()).pending[request_id]
+    committed_response = json.dumps(writes[0][0][3])
+    assert pending.nonce not in committed_response
+    assert "nonce" not in committed_response
 
 
 def test_malformed_watch_lines_do_not_stop_tick_or_new_request(monkeypatch, caplog):
