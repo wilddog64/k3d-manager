@@ -1,15 +1,20 @@
-## Handoff — 2026-11-25 13:20 PST — v1.45.1 released; v1.46.0 open — START HERE
+## Handoff — 2026-11-25 14:30 PST — v1.45.1 released; v1.46.0 open — START HERE
 
 - **Session 2026-11-25 afternoon (operator home, said go):**
   - dirused M10b4 rev 3 `52bbe180`: split into M10b4a docs (Flash) + M10b4b DocsDriftTests (Luna). Fable blind review READY WITH
     FIXES; Argon READY WITH FIXES (overlapping). All findings verified, rev 4 `2dd4cb70`. Next: operator intent approval, then
     dispatch a (Flash) + b (Luna) in parallel; land a first, b with the full portable suite.
+  - **M10b4 DISPATCHED** (intents approved): `dirused-m10b4a-docs` (Flash, running) and `dirused-m10b4b-docs-drift` (Luna, exited 0,
+    uncommitted; round 2 correction for a spec defect — Markdown padding put a trailing space in two state strings; verified 3 red
+    / 4 green). Land a first, then b with `dotnet test tests/Dirused.Tests.Portable`, then mutants (a)-(e).
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
     cloud-runner requests (sandbox-up/down aws, make-e2e[-remote]) wait for operator approval (reuse Hermes/Slack approve);
     GitHub ruleset limits pushes to `cloud-requests`. Spec rewrite next (Fable + Astra review: shared contract).
   - Triage: 63 untriaged OPEN bugs (2 P2, 61 P3; oldest batch 11-17). Operator: Argon classifies blind, Claude verifies and
     proposes, operator approves in one pass. Argon done: real count 61 (2 were LIVE-VERIFIED docs with a stale lower Status
-    subsection; my filter bug). Proposal: 8 P3->P2, 12 patch, 6 next-minor, 43 backlog. Awaiting operator pass.
+    subsection; my filter bug). **Applied `b19970dd`:** operator "go with patch release v1.46.1" — 12 bugs to v1.46.1
+    (batches A1 codex-dispatch, A2 rule violations, A3 ops, A4 Hermes, B small; roadmap section + milestones json), 6 next-minor,
+    42 backlog, 1 upstream (lib-foundation file locks). 8 priorities raised to P2. Batch specs not written yet.
   - Plan 1 mechanism map done (Explore): Hermes relay/drain with a new id prefix + bridge-local pending state is the
     reuse candidate; hub_approval is promote-only and blocked by the request-spam bug. Draft remote-promote-3a already
     designs `approval-pending`. Bridge needs a persisted pending set, revisit path, non-job watch entries, --wait semantics.
