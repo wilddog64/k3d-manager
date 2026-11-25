@@ -198,3 +198,4 @@
 - **2026-11-25:** V4 defect 1 dispatched to Luna (`v4-ldap-resync`), WIP 3/3.
 - **2026-11-25:** gate recovery paste/lookalike fix LANDED `16199b9c`; E4 live owed after promote.
 - **2026-11-25:** dirused b3c: operator option 2 (in-runner mutants); test-gap correction 1 to Luna.
+- **2026-11-25:** dirused b3c LANDED a224279 (mutants 6/6). Gate promote SHA c7c8f8d1. V4 in verification.

@@ -36,7 +36,7 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
   (`scratchpad/b3c-mutants/`: mutants.yml, run-mutant.ps1, mutants.json; 6 mutants + control). After correction 1: review, commit
   code + harness on the task branch, push, read windows + mutants runs, land b3c. Then b3d, M10b4 docs, dirused PR.
 
-**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), `dirused-m10b3c-windows` (correction 1 running, resume 4: missing tests M1/M2+N1/M3/M6/M7+N2; `status` shows `unknown` for this resume — watch pid instead).
+**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), dirused b3c LANDED (dirused `a224279`, pushed). `v4-ldap-resync` exited 0; independent verifier running.
 
 **Owed / carried:** MEMORY.md over 9 KB (compress at a break); release groom Sun 2026-11-29; triage of captured bugs;
 argon classification backlog; PR #158 (dependabot wrangler-action) open; m5-air test cert `~/.ssh/k3dm-console-test*`
@@ -214,3 +214,6 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-25: V4 rev 3 E1 intent approved (operator); dispatched Luna `v4-ldap-resync`; branch pushed (1ed88a1f).
 - 2026-11-25: gate-recovery-paste LANDED `16199b9c` (verifier PASS-with-gaps e/j, closed by Claude test section 1b). Bug Waiting on live check E4 (promote + install-web-console-totp + paste a recovery code). HoverFocus P2 probe run 05:58: probe UX broken (variants skipped); data: B frontmost w/o raise but typing lands only in TextEdit.
 - 2026-11-25: dirused b3c option 2 recorded in plan `27a51ff5`; Luna correction 1 (tests only) running. CI on c7c8f8d1 being watched for the promote SHA (gate fix 16199b9c).
+- 2026-11-25: dirused b3c LANDED a224279 on m10b-scheduled-purge: CI 45637198171 + run2 green; mutants run (a224279) control PASS, 6/6 killed by intended tests; harness scope exception approved (f323dc74). Flaky ProgramPurgeTests.RootSharedOpenDoesNotBlockConfirmDelete (temp dir in use) — P3 capture owed in dirused.
+- 2026-11-25: promote SHA for gate fix = c7c8f8d1 (7/7 check runs success). Operator: hub-deploy, hub-promote-status, install-web-console-totp, E4.
+- 2026-11-25: V4 Luna exited 0 (4 files, order store-Ready→ES per N5); verifier (Acceptance, sandbox-exec, Linux sim TMPDIR unset) running.
