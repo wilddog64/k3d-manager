@@ -347,3 +347,9 @@ are never reached (`feedback_mutation_harness_sudo_guard`, `feedback_never_run_i
 - Keep the `ISTIOCTL_VERSION` override (Claude's recommendation, accepted).
 - Delete the local `_install_istioctl` copy in `scripts/lib/core.sh` (child B).
 - Operator live steps at home: replace m4-air istioctl 1.30.0; raise hub istiod to 1.31.4.
+
+## Follow-up (2026-11-24): E6 run hung — P1 filed
+
+The first live E6 run on m2-air hung 1 h 47 min in `_istioctl_client_version` (`istioctl version --short` contacts the cluster;
+the drill's KUBECONFIG names a cluster that does not exist yet). Fix and evidence:
+`docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md` (lib-foundation v0.5.10). E6/E7 rerun after that lands.
