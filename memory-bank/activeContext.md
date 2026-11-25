@@ -217,3 +217,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-25: dirused b3c LANDED a224279 on m10b-scheduled-purge: CI 45637198171 + run2 green; mutants run (a224279) control PASS, 6/6 killed by intended tests; harness scope exception approved (f323dc74). Flaky ProgramPurgeTests.RootSharedOpenDoesNotBlockConfirmDelete (temp dir in use) — P3 capture owed in dirused.
 - 2026-11-25: promote SHA for gate fix = c7c8f8d1 (7/7 check runs success). Operator: hub-deploy, hub-promote-status, install-web-console-totp, E4.
 - 2026-11-25: V4 Luna exited 0 (4 files, order store-Ready→ES per N5); verifier (Acceptance, sandbox-exec, Linux sim TMPDIR unset) running.
+- 2026-11-25: gate recovery paste bug LIVE-VERIFIED (E4 m5: pasted code via m4→m5, log +113 B, remaining 9→8; promoted c7c8f8d1).

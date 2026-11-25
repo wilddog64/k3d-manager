@@ -1,6 +1,8 @@
 # Bug: the console gate rejects a pasted recovery code (and 0/1/8 lookalikes) as "Invalid code" without saying why
 
-**Status:** LANDED — `16199b9c` on `k3d-manager-v1.45.1` (2026-11-25); E1-E3 offline PASS (independent verifier: new test red on 9cca0789, 11 of 12 mutants red; gaps e/j closed by Claude, both mutants then red); E4 live pending
+**Status:** LIVE-VERIFIED — `16199b9c` on `k3d-manager-v1.45.1` (2026-11-25); E1-E3 offline PASS (independent verifier; gaps e/j closed by Claude); E4 live PASS on m5-air 2026-11-25 (promoted `c7c8f8d1`)
+**Live evidence:** 2026-11-25 · run operator-e4-m4-to-m5-console · env m5-air · scenario pasted-recovery-code-unlocks-console-count-9-to-8 · commit c7c8f8d1 · proves E4
+**Fix commit:** 16199b9c
 **Priority:** P2 (operator, 2026-11-25) — degraded: a recovery code works only when typed by hand, blind, with the right
 letters; the person using one is already locked out. Workaround: type it by hand with the letters O and I.
 **Triage:** patch → v1.45.1 (operator, 2026-11-25: "go ahead to file P2, have Fable review it then dispatch to Flash")
@@ -8,7 +10,6 @@ letters; the person using one is already locked out. Workaround: type it by hand
 **Introduced by:** totp-a2 (`93ecfb83`, recovery codes accepted at the gate prompt)
 **Should have been caught by:** spec (no case for pasted input or lookalike characters at the echo-off prompt)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-25 (E4; this bug cannot go VERIFIED or LIVE-VERIFIED on offline evidence alone)
 **Intent approved:** operator, 2026-11-25
 **Intent note:** "go ahead to file P2, have Fable review it then dispatch to Flash"
 **Review:** Fable 2026-11-25 rev 1 → "ready after should-fix" (1 blocker, 6 should-fix, 4 nits), all taken in rev 2
@@ -164,3 +165,17 @@ interface:
 - Land `16199b9c`: test_web_console_totp.py 194 passed, web_console_totp.bats PASS (341 s), doc-links PASS.
 - E4 (live, operator): after promote and `make install-web-console-totp` on m5-air, paste one recovery code at `Code:`; login works;
   `sudo totpctl recovery-status` drops by one.
+
+## Live result (E4, m5-air, 2026-11-25)
+
+- Promote: operator `make hub-deploy REF=c7c8f8d1` (`ahead of deploy/hub: 0`), `make install-web-console-totp`. Claude (read-only
+  SSH): installed `/Library/PrivilegedHelperTools/k3dm-web-console/forced-command` blob `1751a026…` (25467 B) = the gate at
+  `c7c8f8d1`; totpd running under CommandLineTools Python 3.9.
+- Operator from m4: `ssh -t m5-air.local 'ssh -p 42722 -i ~/.ssh/k3dm-console-test -o IdentitiesOnly=yes cliang@127.0.0.1'`, pasted
+  one recovery code at `Code:` (bracketed paste through two ssh hops), console session opened.
+- Log `/var/log/k3dm-web-console-totp.log` (root 600; Claude byte counts): 499 B (last entry 05:30:37, `remaining=9`) → 612 B at
+  07:24:56 PST, +113 B = exactly the two lines the operator pasted:
+  `2026-11-25T15:24:56Z event=totp-unlock source=recovery`, `2026-11-25T15:24:56Z event=totp-recovery-used remaining=8`.
+  No `totp-recovery-failure` line, no code in the log.
+- `sudo …/totpctl recovery-status` → `8 recovery codes remaining` (9 → 8).
+- Red control: the 2026-11-25 L2 attempt where a pasted code was refused at the gate with no totpd line.
