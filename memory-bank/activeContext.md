@@ -19,7 +19,7 @@
   - **Docs review (operator ask 16:30) DONE `af3b96c2`:** 119 docs mechanical pass + Flash audit of 31 drifted docs;
     13 stale statements verified and fixed in 11 docs (webhook :7443 / `make setup-worker`, copilot auth, cve-pins/hub, Trivy
     metric, confirm targets, log path, Pushgateway wording, Hermes R5/R6/R10 note, dr-drill ldap_resync, doctor Slack checks).
-  - Plan 1 intents approved (`91d88a47`); dispatch a + b1 + c waits on push (pre-push fast gate slow). Split work tip `2022216d`,
+  - Plan 1 intents approved (`91d88a47`); **dispatched a, b1, c on Luna 2026-11-25** (slugs v1460-p1a, v1460-p1b1, v1460-p1c; 3/3 WIP). Next: verify + land each, then d, b, e. Split work tip `2022216d`,
     `2720e262`. CI red on `88d86c23` = machine-secrets 1-in-256 CBC flake, captured P3
     `docs/bugs/2026-11-25-machine-secrets-wrong-passphrase-decrypts-1-in-256.md`. K3dmPromoteWaiting alert = operator promote.
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
