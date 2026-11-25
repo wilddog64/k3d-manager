@@ -303,3 +303,14 @@ interface:
 | 18 | Host "." form (Fable nit) | Accepted: §6 |
 | 19 | Warning fires for intentionally stopped services (Fable nit) | Kept: a stopped Tomcat next to a full disk is worth a line |
 | 20 | E1W fixture with an active dependent (Astra) | Rejected: cmd.exe services never reach Running; covered by fakes (N3) |
+
+## Live check 2026-11-23 (operator)
+
+On the office jump box against us03p02ffm01 (dirused v0.0.26), the operator ran `dirused /purge /fromlist m9a2.txt /confirm` and
+answered N at `Stop service Tomcat85 on us03p02ffm01 to delete 2 held file(s), 175.2 GB? ... [y/N]`. Result: both held Tomcat
+redirect logs `skipped: in use, not confirmed`; the unheld 9.8 GB log `deleted`; `Purge: deleted 1 file(s), 9.8 GB freed;
+2 skipped; 0 failed`. Disk went from 94.1% CRIT to 89.2% WARN. A dry run afterwards listed the 2 held files (176.2 GB; the stderr
+log had grown 165G → 166G).
+
+Verified live: the decline path (prompt text, N → no stop, unheld rows still deleted). **Not yet live-verified:** the y path
+(stop, delete, start, health; E2 above). M10b's live check depends on it (`dirused-m10b-scheduled-purge.md` P5).

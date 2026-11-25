@@ -1,23 +1,28 @@
 # Promote authority on the hub
 
-At the physical console, run `bin/k3dm-promote-authority print-plan`, then
-`make promote-authority-install OPERATOR_IDS=U0123ABCD,cli` with your actual Slack IDs. The installer fetches
-deploy/hub unless you supply INSTALL_REF for the first installation. Watch the installation and review the rendered
-configuration before enrolling. The installer checks the interpreter chain and staged files. An operator process
-already present during installation could change the expected hashes or shell wrapper.
+At the physical console, stage the release commit using the verified stage wrapper (see [verified-stage.md](verified-stage.md)):
+`/usr/local/libexec/k3dm/k3dm-verified-stage stage <commit> [--ref deploy/hub]`
+Compare the printed commit and tips with GitHub on a second device (the iPad), then run:
+`/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority print-plan`
+followed by:
+`/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority install OPERATOR_IDS=U0123ABCD,cli`
+with your actual Slack IDs.
 
-Run `make promote-authority-enrol` outside tmux or screen. Save the TOTP seed on your authenticator.
+An empty `INSTALL_REF` now installs the checkout's `HEAD` (the installer no longer fetches `deploy/hub`); a non-empty `INSTALL_REF` must equal `HEAD`. Watch the installation and review the rendered configuration before enrolling. The installer checks the interpreter chain and staged files. Direct runs (such as `make promote-authority-install`) still execute from the checkout without the verified-stage environment scrub; always route installations through `k3dm-verified-stage run`.
+
+Run `make promote-authority-enrol` outside tmux or screen (or `/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority enrol`). Save the TOTP seed on your authenticator.
 On your own device use `wrangler secret put PROMOTE_RELAY_HMAC_KEY` and paste the displayed key at the prompt.
 Register the displayed public key as the repository's only write deploy key, enter a read token, and compare
 the scanned SSH fingerprint against GitHub's published fingerprint on your own device before typing yes.
 A successful first fetch creates the primed marker. Repeat enrol after an interruption.
-Use `bin/k3dm-promote-authority enrol --rotate KIND` for totp, relay-key, deploy-key, token or host-key.
+Use `/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority enrol --rotate KIND` for totp, relay-key, deploy-key, token or host-key.
 Update the corresponding Worker secret or remove the old public key on rotation. Rotate exposed console secrets.
 Use `make promote-authority-status` after enrol and after reboot.
 
-For state loss, stop activity, retain the audit files and run `bin/k3dm-promote-authority enrol --reset-state`
+For state loss, stop activity, retain the audit files and run:
+`/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority enrol --reset-state`
 at the console. This archives state under state.lost.UTC and starts a new serial, replay and rate-limit history.
-Credentials and the mirror survive. Uninstall removes the daemon and plist and retains credentials, configuration and state.
+Credentials and the mirror survive. Uninstall (`/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority uninstall`) removes the daemon and plist and retains credentials, configuration and state.
 
 ## Activation
 
@@ -46,7 +51,7 @@ For each non-deploy credential, attempt to add a deploy key and change the probe
 ## Probe record
 
 Configure matching probe rules for refs/heads/deploy/hub-ruleset-probe and refs/tags/hub-promote-probe/*.
-Run `bin/k3dm-promote-authority probe-deploy-key`. Clear a stale probe branch in the web UI before retrying.
+Run `/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority probe-deploy-key`. Clear a stale probe branch in the web UI before retrying.
 Copy the seven deploy-key rows. Use the printed B, T, S, P and Q during the hold.
 For each of gh-token, ssh-push-key and cve-write-token, select its own authenticated Git transport.
 Use a credential helper for HTTPS tokens. Never put a token in the URL.
@@ -75,7 +80,7 @@ inventory|path-to-inventory|YYYY-MM-DD
 ```
 
 Replace the first line with all 28 rows. Porcelain words are new, fast-forward, forced, deleted, remote-rejected or other.
-Use `bin/k3dm-promote-authority ruleset-verified PROBE_FILE=path` and confirm the ruleset ID on the console.
+Use `/usr/local/libexec/k3dm/k3dm-verified-stage run <commit> k3dm-promote-authority ruleset-verified PROBE_FILE=/absolute/path` and confirm the ruleset ID on the console.
 Status shows “not asserted” before recording and “asserted YYYY-MM-DD” afterwards. This is a dated operator assertion.
 Record live permissions, uid 501 socket access, denial to other users and denial of secret, state, mirror and code access,
 plus status after reboot, on the actual hub.
@@ -91,9 +96,9 @@ reduces the protection to TOTP and the public check. Root compromise defeats the
 after Python startup, and the rules protect remote refs while the hub checkout remains writable by its owner.
 
 An install, upgrade or uninstall is a root-trust decision in the checkout: the installers source `scripts/lib/system.sh`
-from the working tree, so a process running as the operator can change what runs under sudo. Until
-[the fix](../bugs/2026-11-23-root-installers-source-writable-checkout.md) lands, install from a fresh clone of the protected remote
-ref at a commit checked on a second channel.
+from the working tree, so a process running as the operator can change what runs under sudo.
+Installs, enrolments, rotations, and state resets should always go through `k3dm-verified-stage stage` and `run` (see [verified-stage.md](verified-stage.md)).
+The fresh-clone workaround only defeats tampering done before the clone; it does not defeat a watcher that edits the clone afterwards, nor does it provide the environment scrub (`CDPATH`, `SCRIPT_DIR`, `DEVELOPER_DIR`, `K3DM_WC_ROOT`, `PATH`, `BASH_ENV`) enforced by `k3dm-verified-stage run`.
 
 ### Hub evidence to record
 

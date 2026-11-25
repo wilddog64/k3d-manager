@@ -26,3 +26,48 @@ To restore the daemon after revoke, use `make install-web-console-sshd AFTER_REV
 - **R-CONFIG.** A process running as the operator can edit the tunnel configurations that C7 reads. Verify the route inventory through part B.
 - **R-REPARENT.** A process that daemonizes before the stop snapshot can survive, including a detached tmux server. Revoke checks sockets and session descendants.
 - **R-PORT-GAP.** While the daemon is down another local process can bind the console port. Part B stops the tunnel first.
+
+## Revoking an Individual Certificate (RevokedKeys)
+
+To revoke a specific compromised user certificate without stopping the console sshd daemon (see parent [`docs/bugs/2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md`](../bugs/2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md), section B7):
+
+Update the Key Revocation List (KRL) as root:
+```bash
+sudo ssh-keygen -k -u -f /etc/k3dm-web-console/revoked_keys /path/to/compromised-cert.pub
+```
+
+Running `ssh-keygen -k -u` against a certificate revokes that specific certificate only. For a lost or stolen private key, revoke the key itself by listing its plain public key (the `.pub` file of the key, not the `-cert.pub`); revoking the public key ensures that any newly re-issued certificate using that same key is also refused.
+
+Audit or check revocation status with `-Q`:
+```bash
+ssh-keygen -Q -f /etc/k3dm-web-console/revoked_keys /path/to/cert.pub
+```
+Reports `REVOKED` (exit code 1) if the key or certificate is revoked, or `ok` (exit code 0) if allowed. Listing the CA public key in `revoked_keys` revokes every certificate signed by that CA.
+
+**Contrast with the whole-console revoked marker:**
+The whole-console revoke (`make revoke-web-console-sshd`) creates `/etc/k3dm-web-console/revoked`, which halts the launchd service and stops all console logins. In contrast, `/etc/k3dm-web-console/revoked_keys` is an OpenSSH KRL configured via `RevokedKeys` in `sshd_config`; it denies access only to revoked certificates while sshd continues serving valid connections.
+
+**Persistence:**
+`/etc/k3dm-web-console/revoked_keys` is created as an empty KRL (mode 0644, root:wheel) during initial installation if absent. It is never overwritten on reinstall and survives non-purge uninstall (`make uninstall-web-console-sshd`). It is removed only when uninstalled with `PURGE=1` (`make uninstall-web-console-sshd PURGE=1`).
+
+## Upgrade Order for v1.45.1
+
+The v1.45.1 release adds the `RevokedKeys` directive and escalating TOTP recovery. Upgrades must follow a four-step order (see parent [`docs/bugs/2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md`](../bugs/2026-11-23-console-totp-gate-silent-lockout-and-socket-dos.md), section "Upgrade order"):
+
+1. **Promote:** Operator runs `make hub-deploy REF=<v1.45.1 tag>`.
+   Promote updates the `deploy/hub` checkout without running root installer commands. The running console sshd retains its installed v1.45.0 configuration, so **login keeps working**. During this window, `make web-console-sshd-check` reports:
+   - C1 FAIL: `_wc_files_healthy` requires `/etc/k3dm-web-console/revoked_keys`.
+   - C2 FAIL: `_wc_check_config` detects that installed `sshd_config` lacks `RevokedKeys`.
+   These failures are expected until step 2.
+2. **Install sshd (operator at home, root/sudo):**
+   ```bash
+   make install-web-console-sshd
+   ```
+   Creates the empty KRL `/etc/k3dm-web-console/revoked_keys` (0644, root:wheel) and activates the new `sshd_config` containing `RevokedKeys`. Reinstalling part A while part C is installed is safe when the port matches. C1 and C2 checks pass after this step.
+3. **Install TOTP gate and regenerate recovery codes (operator at home, root/sudo):**
+   ```bash
+   make install-web-console-totp
+   sudo /Library/PrivilegedHelperTools/k3dm-web-console/totpctl recovery-regen
+   ```
+   Installs the updated `totpd`, `gate`, and `totpctl` (enabling escalating lockouts, decay, and recovery codes). Then regenerate the initial set of 10 recovery codes (existing enrolments have 0 recovery codes until regenerated). Confirm with `yes` and a valid 6-digit TOTP code, then store the 10 printed recovery codes securely off the travel device.
+4. **Verification:** Claude verifies L1 (read-only); operator verifies L2.

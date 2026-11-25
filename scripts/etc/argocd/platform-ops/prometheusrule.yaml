@@ -34,7 +34,7 @@ spec:
         - alert: ArgoCDAppDegraded
           expr: |
             argocd_app_info{
-              name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)",
+              name=~"(.+-)?shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)",
               health_status="Degraded"
             } == 1
           for: 5m
@@ -47,7 +47,7 @@ spec:
         - alert: ArgoCDAppOutOfSync
           expr: |
             argocd_app_info{
-              name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)",
+              name=~"(.+-)?shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)",
               sync_status="OutOfSync"
             } == 1
           for: 15m

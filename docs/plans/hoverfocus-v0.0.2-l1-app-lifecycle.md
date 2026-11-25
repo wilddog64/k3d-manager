@@ -1,7 +1,7 @@
 # hoverfocus v0.0.2 L1 — reload fails closed; watch Accessibility trust without a menu click
 
-**Status:** spec rev 2 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 3 should-fix, 4 nits; all applied, Claude
-verified the blocker); not dispatched (operator intent approval and go)
+**Status:** spec rev 3 — Fable reviewed rev 1 (NEEDS FIXES: 1 blocker, 3 should-fix, 4 nits; all applied) and rev 2
+(2026-11-24, NEEDS FIXES: 1 blocker (SwiftPM nested sandbox), 2 should-fix, 1 nit; all applied); not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.2-bug-batches.md`](hoverfocus-v0.0.2-bug-batches.md) (batch L1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.2` (cut from `main` at `d426f18`, tag `v0.0.1`)
@@ -9,7 +9,7 @@ verified the blocker); not dispatched (operator intent approval and go)
 **Implementer:** Luna (`agy`, logic). Runs in parallel with F1 (no shared file). **Verifier:** Claude, from
 `## Acceptance` only.
 **Filed:** 2026-11-23
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-24
 **Approval:** operator 2026-11-23 ("plan for bugs distributions between flash and luna"; "ship v0.0.1 and fix bugs in
 v0.0.2")
 
@@ -18,11 +18,14 @@ v0.0.2")
 | Input | Defect (v0.0.1) |
 |---|---|
 | Argon #1 (`docs/issues/2026-11-23-argon-hoverfocus-pr1-review-findings.md`) | `AppDelegate.reloadConfig()` (`AppDelegate.swift:229-236`): an invalid `config.json` sets `config = Config()` (defaults, `enabled: true`) and still calls `controller.apply(config)`; a running controller keeps focusing with defaults while the menu shows the config error (fails open) |
-| B3 part 3 (`docs/bugs/2026-11-23-hoverfocus-install-launchagent-and-tcc-grant-gaps.md`) | trust is polled only after the **Grant Accessibility…** menu click (`AppDelegate.swift:208-226`, 2 s × 60). Granting in System Settings directly leaves the app untrusted until restart |
+| B3 part 3 (`docs/hoverfocus/bugs/2026-11-23-hoverfocus-install-launchagent-and-tcc-grant-gaps.md`) | trust is polled only after the **Grant Accessibility…** menu click (`AppDelegate.swift:208-226`, 2 s × 60). Granting in System Settings directly leaves the app untrusted until restart |
 
 ## Before You Start
 
-1. `git log --oneline -1` shows `d426f18`; `swift build` and `swift run hoverfocus-selftest` pass.
+1. `git log --oneline -1` shows `d426f18`; `swift build --disable-sandbox` and
+   `swift run --disable-sandbox hoverfocus-selftest` pass (59 passed on `d426f18` under the sandbox profile, Fable
+   2026-11-24). SwiftPM's own sandbox cannot nest inside `sandbox-exec` (`sandbox_apply: Operation not permitted`), so
+   every `swift build`/`swift run` in this spec carries `--disable-sandbox`.
 2. Read `Sources/HoverFocusCore/Interface.swift` (`FocusControlling`, `Config`, `ConfigError`, `ControllerError`),
    `Sources/hoverfocus/AppDelegate.swift` and `Sources/hoverfocus-selftest/main.swift`.
 3. Do not edit `Interface.swift`, `Package.swift`, `Controller.swift`, `CSkyLight/*`, `MenuModel.swift`, `main.swift`
@@ -50,6 +53,9 @@ AppKit work (menu, icon, timers) and calls the coordinator.
    }
    ```
 
+   - **Initial state** after `init`: `config = Config()`, `configError = nil`, `startError = nil`,
+     `watchingTrust = false`; `init` calls nothing on the controller. `AppDelegate` now builds the controller with
+     `Config()` (today `AppDelegate.swift:31` builds it from the loaded config) and then calls `coordinator.load(...)`.
    - `load(.failure(e))`: `configError = e`; `controller.stop()`; `config` unchanged (the last valid one, so the menu
      checkmarks stay meaningful); **no** `apply`, **no** `start`. Then `watchingTrust = !isTrusted()`.
    - `load(.success(c))`: `config = c`, `configError = nil`, `controller.apply(c)`, then `tryStart()`. Then
@@ -87,6 +93,7 @@ AppKit work (menu, icon, timers) and calls the coordinator.
    throw or no-op; keeps `isRunning` (`start` when running is a no-op, as in `HoverFocusController`), and throws a
    settable `ControllerError?` from `start`. A settable `trusted` flag feeds
    `isTrusted`. Cases, each a named `check`:
+   - Every case below builds a **fresh** `AppCoordinator` and a fresh fake controller; call counts are per case.
    - **A1 fails closed:** load valid `Config(dwellMs: 200)` (trusted) → running; then `load(.failure(.invalid(...)))`
      → `stop` recorded, `isRunning == false`, no `apply` after the failure, `config.dwellMs == 200`, `configError`
      set.
@@ -125,7 +132,8 @@ seen without a relaunch, L1's trust watch is replaced by a documented kickstart 
 
 - No edit outside `## Files`. No new dependency, no distributed-notification observer (polling is the chosen
   mechanism: provable offline and cheap at 2 s).
-- Do not launch the app with a window server session; use `swift run hoverfocus-selftest` and the CLI flags.
+- Do not launch the app with a window server session; use `swift run --disable-sandbox hoverfocus-selftest` and the
+  CLI flags.
 - Run every command under
   `sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/sudo") (literal "/bin/launchctl"))'`.
 
@@ -145,28 +153,28 @@ must_not:
   - id: L1-N2
     text: "trust granted in System Settings goes unnoticed until restart or a menu click (paired: trust already granted at load does not watch)"
   - id: L1-N3
-    text: "trust granted while a config error is showing starts the controller (paired: the same grant with a valid config starts it)"
+    text: "regression guard (already green on v0.0.1, startController returns on configError at AppDelegate.swift:122-124): trust granted while a config error is showing starts the controller (paired: the same grant with a valid config starts it)"
 evidence:
   - id: L1-E1
     proves: [L1-M1, L1-N1]
     kind: offline
-    command: "swift build; swift run hoverfocus-selftest rc 0 with the A1 fails-closed, A1 recovers and positive-control checks named in the output or counted. Red control, restored byte-identical: make load(.failure) set config = Config() and call controller.apply(config) without stop (the v0.0.1 behaviour) — the fails-closed checks fail, the positive control still passes"
-    intent: pending
+    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with the A1 fails-closed, A1 recovers and positive-control checks named in the output or counted. Red control, restored byte-identical: make load(.failure) set config = Config() and call controller.apply(config) without stop (the v0.0.1 behaviour) — the fails-closed checks fail, the positive control still passes"
+    intent: "A broken config file stops focus-follows-mouse instead of quietly running with default settings; fixing the file and reloading starts it again."
   - id: L1-E2
     proves: [L1-M2, L1-N2, L1-N3]
     kind: offline
     command: "same selftest run: watch-without-a-click, config-error-stays-closed and trusted-at-launch checks pass. Red controls, each restored byte-identical: (a) do not set watchingTrust in load — watch-without-a-click fails; (a2) set watchingTrust = true always in load — trusted-at-launch fails; (b) stop watching after 60 ticks — the 100-tick check fails; (c) drop the configError guard in trustTick — config-error-stays-closed fails"
-    intent: pending
+    intent: "Granting Accessibility permission in System Settings starts the app within about 2 seconds, with no menu click and no time limit, but not while a config error is showing."
   - id: L1-E3
     proves: [L1-M3]
     kind: offline
     command: "git grep -nE 'controller\\.(start|stop|apply)\\(' -- Sources/hoverfocus/AppDelegate.swift prints nothing (main.swift's --print-status path keeps its own controller calls and is out of scope); git grep -n 'accessibilityAttempts' -- Sources prints nothing; code reading of syncTrustTimer and updateUI against Behaviour 2, quoted with line numbers"
-    intent: pending
+    intent: "Only one piece of code starts and stops the app, so the menu, permission and reload paths cannot disagree about whether it is running."
   - id: L1-EL
     proves: [L1-M2, L1-M1]
     kind: live
     command: "operator on m2 (home): install v0.0.2 build, tccutil reset Accessibility com.wilddog64.hoverfocus, start the app (menu: Needs Accessibility permission), grant in System Settings without touching the menu — within ~4 s the menu shows Running and hover focus works; then break config.json, Reload Config — menu shows Error: config and hovering no longer focuses; fix it, Reload — Running again"
-    intent: pending
+    intent: "On m2, after resetting the permission, granting it in System Settings without touching the menu switches the menu to Running and hover focus starts within about 4 seconds."
 interface: "adds public AppCoordinator in HoverFocusCore; no change to Interface.swift, CLI flags or config keys"
 ```
 
@@ -174,3 +182,20 @@ interface: "adds public AppCoordinator in HoverFocusCore; no change to Interface
 
 - Change only the files in the table. Report each command, its rc and the proving lines; list every error seen; show
   each red control's failing output and `git diff --stat` after restoring it. Commit nothing; Claude lands.
+
+## Live check log
+
+- 2026-11-24 18:05, m2 (macOS 26.5.1), build `42273f0` installed 17:57: after `tccutil reset`, grant via System Settings
+  **+** with no menu click. Unified log: 2 s trust-poll wakeups until 17:58:54, then TCC check, SkyLight session
+  connect (controller start), polling stops. Operator typed "testing from hoverfocus" into TextEdit behind iTerm2
+  (screenshot 145). **L1-EL grant half: pass.** Pending: break config.json, Reload Config shows Error: config and hover
+  stops; fix, Reload, Running.
+- 2026-11-24 ~04:10 PST, m2, build `42273f0` (agent started 04:03:36 by `make install`): operator removed the closing
+  `}` from `~/.config/hoverfocus/config.json` → Reload Config → menu status line reads
+  `Error: config /Users/cliang/.config/hoverfocus/config.json: invalid JSON` (screenshot 5). **L1-EL error half: pass.**
+  Pending: restore `}` → Reload Config → `Running`, hover-focus works. Operator UX note: the grey disabled status line
+  is hard to read; idea filed in `docs/ideas.md` (red error line + one Notification Center message).
+- 2026-11-24 ~04:20 PST, m2: operator restored `}` and reloaded; Claude confirmed over SSH that the config parses again.
+  Operator confirmation that the status line reads `Running` and hover-focus works is the last L1-EL step.
+- 2026-11-24 ~04:35 PST, m2: after restoring `}` and Reload Config, the menu status line reads `Running` (screenshot 10);
+  operator confirms. **L1-EL: PASS (grant half, error half, recovery half).** v0.0.2 merge gate cleared for L1.

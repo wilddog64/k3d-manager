@@ -12,12 +12,12 @@ function _wc_sources() {
     scripts/lib/foundation/scripts/lib/system.sh scripts/lib/agent_rigor.sh
     "$_WC_CONFIG_TEMPLATE" "$_WC_PLIST_TEMPLATE" "$_WC_STUB_SOURCE")
   local file blob
-  { _wc_tool /usr/bin/git ls-files --error-unmatch -- "${paths[@]}" >/dev/null 2>&1 &&
-    _wc_tool /usr/bin/git diff --quiet HEAD -- "${paths[@]}"; } || {
+  { _wc_tool /Library/Developer/CommandLineTools/usr/bin/git ls-files --error-unmatch -- "${paths[@]}" >/dev/null 2>&1 &&
+    _wc_tool /Library/Developer/CommandLineTools/usr/bin/git diff --quiet HEAD -- "${paths[@]}"; } || {
       _wc_message 'sources differ from HEAD; commit or discard first'; return 9
     }
   for file in "${paths[@]}"; do
-    blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$file") || return 9
+    blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$file") || return 9
     printf '%s %s\n' "$blob" "$file"
   done
 }
@@ -39,6 +39,7 @@ function _wc_render() {
     "PubkeyAuthentication yes"
     "AuthenticationMethods publickey"
     "TrustedUserCAKeys /etc/k3dm-web-console/access_ca.pub"
+    "RevokedKeys /etc/k3dm-web-console/revoked_keys"
     "AuthorizedKeysFile none"
     "AllowUsers $login"
     "DisableForwarding yes"
@@ -146,13 +147,14 @@ function _wc_trust_install() {
       [[ -d "$_WC_PREFIX$path" ]] && _wc_trust_check "$path" || return 8
     fi
   done
+  # shellcheck disable=SC2153 # _WC_LOG is assigned by web_console_common.sh.
   _wc_dest_check "$_WC_LOG" "$_WC_LAUNCHD_DIR/${_WC_LABEL}.plist" "$_WC_JOURNAL" \
-    "$_WC_CONF_DIR"/{manifest,access_ca.pub,ssh_host_ed25519_key,ssh_host_ed25519_key.pub,sshd_config,revoked,launchd.plist.pending,launchd.plist.revoked} \
+    "$_WC_CONF_DIR"/{manifest,access_ca.pub,ssh_host_ed25519_key,ssh_host_ed25519_key.pub,sshd_config,revoked,revoked_keys,launchd.plist.pending,launchd.plist.revoked} \
     "$_WC_HELPER_DIR"/{forced-command,forced-command.stub}
 }
 
 function _wc_blob() {
-  _wc_tool /usr/bin/git cat-file blob "HEAD:$1" && printf '.'
+  _wc_tool /Library/Developer/CommandLineTools/usr/bin/git cat-file blob "HEAD:$1" && printf '.'
 }
 
 function _wc_check_config() {
@@ -225,6 +227,7 @@ function _wc_files_healthy() {
     [[ -d "$_WC_PREFIX$path" ]] && _wc_file_mode "$path" "$mode" || return 1
   done
   _wc_file_mode "$_WC_CONF_DIR/manifest" 644 && _wc_file_mode "$_WC_LOG" 600 && _wc_file_mode "$_WC_CONF_DIR/ssh_host_ed25519_key" 600 || return 1
+  _wc_file_mode "$_WC_CONF_DIR/revoked_keys" 644 || return 1
   for path in "$_WC_CONF_DIR"/{sshd_config,access_ca.pub,ssh_host_ed25519_key.pub} "$_WC_LAUNCHD_DIR/${_WC_LABEL}.plist" "$_WC_HELPER_DIR"/{forced-command,forced-command.stub}; do
     mode=644; [[ "${path%/*}" != "$_WC_HELPER_DIR" ]] || mode=755
     _wc_file_mode "$path" "$mode" && _wc_manifest_row "$path" || return 1
@@ -463,6 +466,11 @@ function _wc_stage_gate() {
 
 function _wc_stage_keys() {
   local name=ssh_host_ed25519_key digest
+  if [[ ! -e "$_WC_PREFIX$_WC_CONF_DIR/revoked_keys" && ! -L "$_WC_PREFIX$_WC_CONF_DIR/revoked_keys" ]]; then
+    _wc_priv /usr/bin/ssh-keygen -k -f "$conf_stage/revoked_keys" 2>/dev/null || return 8
+    _wc_priv /bin/chmod 0644 "$conf_stage/revoked_keys" 2>/dev/null || return 8
+    changes+=("$_WC_CONF_DIR/revoked_keys")
+  fi
   hostkey="$_WC_PREFIX$_WC_CONF_DIR/$name"
   if [[ ! -f "$hostkey" ]]; then
     hostkey="$conf_stage/$name"
@@ -681,16 +689,16 @@ function _wc_install() {
   config="${config%.}"
   plist=$(_wc_blob "$_WC_PLIST_TEMPLATE") && stub=$(_wc_blob "$_WC_STUB_SOURCE") || return 9
   plist="${plist%.}"; stub="${stub%.}"
-  config_blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$_WC_CONFIG_TEMPLATE") &&
-    stub_blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$_WC_STUB_SOURCE") &&
-    plist_blob=$(_wc_tool /usr/bin/git rev-parse "HEAD:$_WC_PLIST_TEMPLATE") || return 9
+  config_blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$_WC_CONFIG_TEMPLATE") &&
+    stub_blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$_WC_STUB_SOURCE") &&
+    plist_blob=$(_wc_tool /Library/Developer/CommandLineTools/usr/bin/git rev-parse "HEAD:$_WC_PLIST_TEMPLATE") || return 9
   if (( dry )); then
     _wc_chosen_ca || return 2
     printf '%s' "${config//"AllowUsers $_WC_LOGIN"/AllowUsers <login>}"
     local name
     printf 'root:wheel 0755 %s\n' "$_WC_CONF_DIR" "$_WC_CONF_DIR/zdotdir" "$_WC_HELPER_DIR" "$_WC_HELPER_DIR/forced-command" "$_WC_HELPER_DIR/forced-command.stub"
     printf 'root:wheel 0700 %s\n' "$_WC_CONF_DIR/.prev" "$_WC_HELPER_DIR/.prev"
-    for name in sshd_config ssh_host_ed25519_key.pub manifest; do printf 'root:wheel 0644 %s/%s\n' "$_WC_CONF_DIR" "$name"; done
+    for name in sshd_config ssh_host_ed25519_key.pub manifest revoked_keys; do printf 'root:wheel 0644 %s/%s\n' "$_WC_CONF_DIR" "$name"; done
     printf 'root:wheel 0600 %s\n' "$_WC_CONF_DIR/ssh_host_ed25519_key" "$_WC_LOG" "$_WC_JOURNAL"
     printf '%s\n' 'mkdir lock; install -d directories; mktemp -d stages; tee payloads; shasum -a 256 staged files' \
       'ssh-keygen -q -t ed25519 if the host key is missing; install log if absent' \
@@ -745,6 +753,7 @@ function main() {
   local repo="${BASH_SOURCE[0]%/*}/.." caller_dir="$PWD"
   cd -- "$repo" || return 2
   # shellcheck source=scripts/lib/web_console_common.sh
+  # shellcheck disable=SC1091 # Loaded from the repository root after cd above.
   source scripts/lib/web_console_common.sh
   _wc_fixture_gate || return 2
   if [[ -z "$_WC_PREFIX" ]]; then

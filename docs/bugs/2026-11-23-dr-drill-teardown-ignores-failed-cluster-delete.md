@@ -30,3 +30,11 @@ warning with the delete output and the manual command, and the drill's exit code
 ## Workaround
 
 `k3d cluster delete dr-drill`, then rerun.
+
+## Recurrence (2026-11-24, m2-air, Claude over SSH)
+
+A `dr-drill` cluster left from the 2026-11-23 runs (`1/1 3/3`, containers up 23 h) blocked `make dr-drill` at preflight.
+`k3d cluster delete dr-drill` (k3d v5.9.0) **returned 0** but left `dr-drill 0/0 0/2` (two agents `Exited (137)`). A
+second delete printed `WARN Failed to delete cluster network … not found`, then `Successfully deleted cluster dr-drill!`,
+rc 0, and the cluster was gone. So checking the delete's exit code is not enough: k3d reports success on a partial
+delete. The fix must re-check `k3d cluster list` after the delete and retry once (as Expected above already says).

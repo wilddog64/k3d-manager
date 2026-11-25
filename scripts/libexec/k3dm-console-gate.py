@@ -295,13 +295,19 @@ def _run_impl(conf_path, sock_path, tmux_prefix, expected_server_uid, expected_c
             termios.tcsetattr(outer_fd, termios.TCSANOW, prompt_attr)
             failed_prompts = 0
             code_verified = False
+            FILTER_NORMAL = 0
+            FILTER_ESC = 1
+            FILTER_CSI = 2
+            FILTER_SS3 = 3
             while failed_prompts < 10 and not code_verified:
                 if term_raised[0]:
                     return 1
-                clear_screen = b"\x1b[H\x1b[2J\x1b[3JCode: "
+                clear_screen = b"\x1b[?2004l\x1b[H\x1b[2J\x1b[3JCode: "
                 if not write_with_timeout(1, clear_screen, timeout=2.0, clock=clock):
                     return 1
                 line_buf = bytearray()
+                overflow = False
+                filter_state = FILTER_NORMAL
                 start_read = clock()
                 while True:
                     if term_raised[0]:
@@ -321,20 +327,65 @@ def _run_impl(conf_path, sock_path, tmux_prefix, expected_server_uid, expected_c
                     start_read = clock()
                     if b in (b"\x03", b"\x1a", b"\x1c", b"\x04"):
                         line_buf.clear()
-                        if not write_with_timeout(1, b"\nCode: ", timeout=2.0, clock=clock):
+                        overflow = False
+                        filter_state = FILTER_NORMAL
+                        if not write_with_timeout(1, b"\x1b[?2004l\nCode: ", timeout=2.0, clock=clock):
                             return 1
                         continue
                     if b in (b"\r", b"\n"):
                         break
-                    if len(line_buf) < 7:
-                        line_buf.extend(b)
-                code_str = line_buf.decode("ascii", errors="replace")
-                if len(code_str) != 6 or not code_str.isdigit():
+                    if filter_state == FILTER_ESC:
+                        if b == b"[":
+                            filter_state = FILTER_CSI
+                            continue
+                        if b == b"O":
+                            filter_state = FILTER_SS3
+                            continue
+                        if b == b"\x1b":
+                            filter_state = FILTER_ESC
+                            continue
+                        filter_state = FILTER_NORMAL
+                    elif filter_state == FILTER_CSI:
+                        if 0x40 <= b[0] <= 0x7E:
+                            filter_state = FILTER_NORMAL
+                        continue
+                    elif filter_state == FILTER_SS3:
+                        filter_state = FILTER_NORMAL
+                        continue
+
+                    if filter_state == FILTER_NORMAL:
+                        if b == b"\x1b":
+                            filter_state = FILTER_ESC
+                            continue
+                        if b in (b" ", b"\t") or b[0] >= 0x80:
+                            continue
+                        if b in (b"\x7f", b"\x08"):
+                            if line_buf:
+                                line_buf.pop()
+                            continue
+                        if len(line_buf) < 20:
+                            line_buf.extend(b)
+                        else:
+                            overflow = True
+                typed = line_buf.decode("ascii", errors="replace")
+                code_str = typed.replace(" ", "").replace("-", "").upper()
+                if overflow:
                     failed_prompts += 1
-                    write_with_timeout(1, b"\nInvalid code\n", timeout=2.0, clock=clock)
+                    write_with_timeout(1, b"\nInvalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\n", timeout=2.0, clock=clock)
                     time.sleep(2.0)
                     continue
-                v_res = verify_totp(sock_path, code_str, expected_server_uid=expected_server_uid, connect_fn=connect_fn)
+                if len(code_str) == 6 and code_str.isdigit():
+                    verify_code = code_str
+                else:
+                    mapped_str = code_str.translate(str.maketrans("018", "OIB"))
+                    if len(mapped_str) == 16 and re.fullmatch(r"[A-Z2-7]{16}", mapped_str):
+                        verify_code = "-".join(mapped_str[i:i + 4] for i in range(0, 16, 4))
+                    else:
+                        failed_prompts += 1
+                        write_with_timeout(1, b"\nInvalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\n", timeout=2.0, clock=clock)
+                        time.sleep(2.0)
+                        continue
+                v_res = verify_totp(sock_path, verify_code, expected_server_uid=expected_server_uid, connect_fn=connect_fn)
                 if v_res == "OK":
                     code_verified = True
                     break
@@ -345,7 +396,9 @@ def _run_impl(conf_path, sock_path, tmux_prefix, expected_server_uid, expected_c
                     continue
                 if v_res.startswith("WAIT"):
                     failed_prompts += 1
-                    write_with_timeout(1, b"\nToo many attempts; try again later\n", timeout=2.0, clock=clock)
+                    wait_match = re.fullmatch(r"WAIT ([0-9]+)", v_res)
+                    seconds = wait_match.group(1) if wait_match else "?"
+                    write_with_timeout(1, f"\nToo many attempts; try again later ({seconds} s)\n".encode(), timeout=2.0, clock=clock)
                     time.sleep(2.0)
                     continue
                 sys.stderr.write("console login unavailable\n")

@@ -35,7 +35,9 @@ _run_command() {
             */git)
                 case "$3" in
                     rev-parse)
-                        if [[ "$4" == --verify ]]; then echo base; else git hash-object "$tree/${4#*:}"; fi ;;
+                        if [[ "$4" == --verify ]]; then
+                            case "$6" in HEAD\^\{commit\}|base\^\{commit\}) echo base ;; *) echo other ;; esac
+                        else git hash-object "$tree/${4#*:}"; fi ;;
                     cat-file)
                         for src in "${sources[@]}"; do
                             if [[ $(git hash-object "$tree/$src") == "$5" ]]; then cat "$tree/$src"; return; fi
@@ -73,6 +75,7 @@ _run_command() {
             if [[ $1 == */usr/bin/python3 ]]; then echo ../../Library/Frameworks/Python3.framework/Versions/3.9/bin/python3
             else echo python3.9; fi ;;
         */sh) "$prog" "$@" ;;
+        */cat) cat "$@" ;;
         */mkdir|*/rm) [[ ${!#} == "$fake/"* ]] && "$prog" "$@" ;;
         */install)
             dest=${!#}
@@ -80,7 +83,36 @@ _run_command() {
             if [[ $1 == -d ]]; then mkdir -p "$dest"; chmod "$3" "$dest"; else cp "$7" "$dest"; chmod "$2" "$dest"; fi ;;
         */ditto)
             if [[ $1 == --noacl && $2 == --noextattr ]]; then shift 2; fi
+            case "${damage:-none}" in
+              values-operator|values-uid|values-gid)
+                python3 - "$1/values.json" "${damage#values-}" <<'PYDAMAGE'
+import json, sys
+path = sys.argv[1]
+field = {"operator": "operator_ids", "uid": "operator_uid", "gid": "operator_gid"}[sys.argv[2]]
+with open(path) as stream:
+    values = json.load(stream)
+values[field] = ("cli" if values[field] != "cli" else "ATTACKER") if field == "operator_ids" else str(int(values[field]) + 1)
+with open(path, "w") as stream:
+    json.dump(values, stream, separators=(",", ":"))
+    stream.write("\n")
+PYDAMAGE
+                python3 "$1/k3dm-promote-daemon.py" render "$1"
+                ;;
+            esac
             cp -R "$1/." "$2/"
+            if [[ ${damage:-none} == stage-values ]]; then
+                python3 - "$2/values.json" <<'PYDAMAGE'
+import json, sys
+path = sys.argv[1]
+with open(path) as stream:
+    values = json.load(stream)
+values["operator_uid"] = str(int(values["operator_uid"]) + 1)
+with open(path, "w") as stream:
+    json.dump(values, stream, separators=(",", ":"))
+    stream.write("\n")
+PYDAMAGE
+                python3 "$2/k3dm-promote-daemon.py" render "$2"
+            fi
             case "${damage:-none}" in
                 acl)
                     touch "$2/acl-injected"
@@ -125,6 +157,71 @@ STUB
     grep -q 'launchctl bootstrap' "$ops"
     [[ -f "$fake/etc/k3dm-promote/promote.conf" ]]
     run ! compgen -G "$fake/var/db/k3dm-promote/staging.*"
+}
+
+@test "install uses only HEAD and never fetches" {
+    scratch
+    for ref in '' HEAD; do
+        : > "$ops"
+        "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli "INSTALL_REF=$ref"
+        grep -Fq 'rev-parse --verify --end-of-options HEAD^{commit}' "$ops"
+        run ! grep -q ' fetch ' "$ops"
+    done
+}
+
+@test "install refuses a commit other than HEAD" {
+    scratch
+    : > "$ops"
+    run "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=other
+    [[ $status != 0 && $output == *'INSTALL_REF must be the staged commit'* ]]
+    run ! grep -q 'launchctl bootstrap' "$ops"
+    run ! grep -q ' fetch ' "$ops"
+}
+
+@test "install refuses staged values changed before privileged copy" {
+    scratch
+    run env damage=values-operator "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+    [[ $status != 0 && $output == *'Staged values mismatch'* ]]
+    run ! grep -q 'launchctl bootstrap' "$ops"
+    run ! grep -q 'render-check' "$ops"
+    run "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+    [[ $status == 0 ]]
+    grep -q 'render-check' "$ops"
+    grep -q 'launchctl bootstrap' "$ops"
+}
+
+@test "install checks the supplied operator ids in staged values" {
+    scratch
+    "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=AB12,cli INSTALL_REF=HEAD
+    grep -q 'launchctl bootstrap' "$ops"
+    : > "$ops"
+    run env damage=values-operator "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=AB12,cli INSTALL_REF=HEAD
+    [[ $status != 0 && $output == *'Staged values mismatch'* ]]
+    run ! grep -q 'launchctl bootstrap' "$ops"
+    run ! grep -q 'render-check' "$ops"
+}
+
+@test "install checks uid and gid against the operator in staged values" {
+    scratch
+    for field in uid gid; do
+        : > "$ops"
+        run env "damage=values-$field" "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+        [[ $status != 0 && $output == *'Staged values mismatch'* ]]
+        run ! grep -q 'launchctl bootstrap' "$ops"
+        run ! grep -q 'render-check' "$ops"
+    done
+    : > "$ops"
+    "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+    grep -q 'render-check' "$ops"
+    grep -q 'launchctl bootstrap' "$ops"
+}
+
+@test "install compares staged values rather than the operator temp copy" {
+    scratch
+    run env damage=stage-values "$tree/bin/k3dm-promote-authority" install OPERATOR_IDS=cli INSTALL_REF=HEAD
+    [[ $status != 0 && $output == *'Staged values mismatch'* ]]
+    run ! grep -q 'launchctl bootstrap' "$ops"
+    run ! grep -q 'render-check' "$ops"
 }
 
 @test "render mismatch refuses activation and uninstall keeps state" {

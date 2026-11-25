@@ -1164,8 +1164,8 @@ data:
         {
           "id": 85,
           "type": "bargauge",
-          "title": "Human continuation prompts",
-          "description": "Explicitly recorded operator events by reason. The tracked tasks bar is the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
+          "title": "Coordinator → agent prompts",
+          "description": "Resume prompts the coordinator (Claude) sent to dispatched agents, by recorded reason. Not operator turns: those are counted by the v1.45.0 human-operator-turns plan. The tracked tasks bar is the coverage denominator.",
           "gridPos": {"h": 8, "w": 18, "x": 6, "y": 57},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [

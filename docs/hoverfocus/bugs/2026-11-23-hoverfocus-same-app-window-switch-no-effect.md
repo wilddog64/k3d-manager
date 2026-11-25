@@ -6,8 +6,8 @@
 **Should have been caught by:** spec (the probe skipped same-app targets; `docs/plans/hoverfocus-m1a-focus-core.md:33-35`)
 **Introducing change reviewed:** yes (Fable)
 **Waiting on:** dispatch
-**Triage:** carry → hoverfocus v0.0.2 (operator, 2026-11-23: "ship v0.0.1 and fix bugs in v0.0.2")
-**Prior art:** `docs/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (filed same day, no score run) — read, related mechanism (key-window state), different symptom
+**Triage:** carry → hoverfocus v0.0.3 (operator, 2026-11-24, D1: v0.0.2 = L1 + F1; deferred focus work moves to v0.0.3 batch L3)
+**Prior art:** `docs/hoverfocus/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (filed same day, no score run) — read, related mechanism (key-window state), different symptom
 **Filed:** 2026-11-23
 **Detected by:** operator, E-L1 step 3 on m2-air (2026-11-23)
 

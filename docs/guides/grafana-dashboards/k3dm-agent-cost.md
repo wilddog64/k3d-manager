@@ -66,9 +66,10 @@ idle time and overnight waits; it is not worker runtime or active review. **Fina
 is the wall-clock gap from the final qualifying Codex exit to land, and missing exits remain N/A.
 Both values are means rather than footer sums because parallel dispatches overlap. The former
 includes the full dispatch-to-land interval; the latter is not proof of human waiting. Live
-verification happens after land. **Human continuation prompts** counts explicit operator records
-by reason and displays the tracked-task coverage denominator; older history is unknown and is not
-backfilled. Codex tokens uses the cumulative session total from the last
+verification happens after land. **Coordinator → agent prompts** counts resume prompts the
+coordinator (Claude) sent to dispatched agents, by recorded reason, and displays the tracked-task
+coverage denominator. These are not operator turns; those are counted by the v1.45.0 human-operator-turns
+plan. Codex tokens uses the cumulative session total from the last
 exit after a resume; summing those exits would double count. API equiv. counts each Codex session's
 recorded cumulative usage once and each agy run's usage once.
 

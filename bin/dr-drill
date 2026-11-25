@@ -177,9 +177,23 @@ _dr_drill_preflight() {
     mkdir -p "$DR_DRILL_STAGE"
   fi
   _dr_drill_install_credential_guard "$DR_DRILL_STAGE"
+  _no_trace _dr_drill_identity_ok || _dr_drill_refuse '[dr-drill] age identity unreadable (login Keychain locked over SSH?): run security unlock-keychain ~/Library/Keychains/login.keychain-db'
   if ! _dr_drill_latest_export "$DR_DRILL_STAGE"; then
     _dr_drill_refuse '[dr-drill] newest export is missing or older than 26h'
   fi
+}
+
+_dr_drill_identity_ok() {
+  local identity="${K3DM_HUB_DATA_AGE_IDENTITY:-}"
+  if [[ -z "$identity" ]]; then
+    identity="$(_secret_load_data k3dm-hub-data-age identity age || true)"
+  fi
+  if [[ "$identity" == AGE-SECRET-KEY-1* ]]; then
+    unset identity
+    return 0
+  fi
+  unset identity
+  return 1
 }
 
 _dr_drill_v0_one() {
@@ -245,6 +259,7 @@ _dr_drill_all_false() { local name; for name in V0 V1 V2 V3 V4 V5 V6 V7; do _dr_
 _dr_drill_fail() { _dr_drill_set failed "$1"; _dr_drill_all_false; _dr_drill_phase 5 report; _dr_drill_report; _dr_drill_phase 6 teardown; return 1; }
 
 _dr_drill_run() {
+  local ldap_resync_failed=0
   _dr_drill_phase 1 preflight
   _dr_drill_preflight || return 2
   _dr_drill_phase 2 'build isolated hub'; _dr_drill_phase2_started="$(date +%s)"; _dr_drill_started=1
@@ -266,7 +281,15 @@ _dr_drill_run() {
   _dr_drill_check V0 _dr_drill_v0
   if [[ "${DR_CHECKS[V0]}" == true ]]; then
     if ! hub_data_unseal_dr '[dr-drill]'; then _dr_drill_set failed unseal; _dr_drill_set V1 false; _dr_drill_set V2 false; _dr_drill_set V3 false; _dr_drill_set V4 false; _dr_drill_set V5 false
-    else _dr_drill_check V1 _dr_drill_verify_unsealed; _dr_drill_check V2 _dr_drill_verify_vault; _dr_drill_check V3 _dr_drill_verify_keycloak; _dr_drill_check V4 _dr_drill_verify_ldap; _dr_drill_check V5 _dr_drill_verify_placement; fi
+    else
+      if ! _hub_data_drill_ldap_resync "$DR_DRILL_CONTEXT"; then _dr_drill_set failed ldap_resync; ldap_resync_failed=1; fi
+      _dr_drill_check V1 _dr_drill_verify_unsealed
+      _dr_drill_check V2 _dr_drill_verify_vault
+      _dr_drill_check V3 _dr_drill_verify_keycloak
+      _dr_drill_check V4 _dr_drill_verify_ldap
+      (( ldap_resync_failed == 0 )) || _dr_drill_set V4 false
+      _dr_drill_check V5 _dr_drill_verify_placement
+    fi
   else
     _dr_drill_set failed V0
     for _dr_name in V1 V2 V3 V4 V5; do _dr_drill_set "$_dr_name" false; done

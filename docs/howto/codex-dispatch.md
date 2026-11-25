@@ -165,11 +165,13 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
 - **Final worker exit → land** is `max(0, land.ts - latest qualifying codex_exit.ts)`, using the
   latest valid Codex exit at or before land. Missing or invalid timestamps are omitted. This is a
   wall-clock gap, not proven human waiting or active review; live verification occurs after land.
-- Human continuation prompts are explicit manual records, not inferred from chat or elapsed time.
-  Record one with `bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other`.
+- **Coordinator → agent prompts** counts resume prompts the coordinator (Claude) sent to dispatched
+  agents, by recorded reason. It is not a count of operator turns; those are counted by the v1.45.0
+  human-operator-turns plan. Record one with
+  `bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other`.
   The first accepted record writes a coverage-start marker. The dashboard's tracked-task count is
   the denominator from that point; older history remains unknown and zero recorded prompts does
-  not prove no human effort occurred.
+  not prove no prompt was sent.
 - Agent efficiency is Codex tokens per landed task. It excludes Claude's verification tokens and
   is not converted to dollars because token pricing is not stable.
 - Per-spec series include the latest Codex token total, Codex seconds summed across runs, elapsed

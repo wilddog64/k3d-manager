@@ -3,6 +3,7 @@ import errno
 import hashlib
 import hmac
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -254,6 +255,7 @@ def test_N1_and_M2_lockout_and_hmac_calls():
         with open(os.path.join(state_dir, "state.json"), "w") as f:
             json.dump(initial_state, f)
         cur_time = [59.0]
+        mono_time = [10.0]
         def clock_fn():
             return cur_time[0]
         hmac_count = [0]
@@ -271,6 +273,7 @@ def test_N1_and_M2_lockout_and_hmac_calls():
                 runner=make_stub_runner(),
                 peer_cred_fn=lambda s: (os.getuid(), 30001),
                 clock=clock_fn,
+                monotonic=lambda: mono_time[0],
                 expected_conf_owner=os.getuid(),
                 expected_dir_owner=os.getuid(),
                 exit_on_idle=False,
@@ -305,16 +308,17 @@ def test_N1_and_M2_lockout_and_hmac_calls():
         assert resp_locked == "WAIT 300"
         assert hmac_count[0] == before_lock_hmac
         cur_time[0] = 358.0
+        mono_time[0] = 309.0
         resp_locked_1 = send_verify("287082")
         assert resp_locked_1 == "WAIT 1"
         assert hmac_count[0] == before_lock_hmac
-        cur_time[0] = 359.0
+        mono_time[0] = 310.0
         resp_after_expiry_wrong = send_verify("000000")
         assert resp_after_expiry_wrong == "NO"
         with open(os.path.join(state_dir, "state.json")) as f:
             st = json.load(f)
         assert st["failures"] == 1
-        assert st["locked_until"] == 0
+        assert st["locked_until"] == 359  # agent-audit: allow assert-removed expired deadline now retained for escalation (M1/N1)
         resp_after_expiry_ok = send_verify("481090")
         assert resp_after_expiry_ok == "OK"
         with open(os.path.join(state_dir, "state.json")) as f:
@@ -844,6 +848,8 @@ class VerifierFixture:
         self.root = Path(root)
         assert self.root.name.startswith("wct.") and self.root.is_dir()
         self.state_dir, self.run_dir = make_state_and_run_dirs(root)
+        assert Path(self.state_dir).is_relative_to(self.root)
+        assert Path(self.run_dir).is_relative_to(self.root)
         self.config = self.root / "totp.conf"
         self.config.write_text("uid=501\ntmux=/usr/bin/tmux\nidle_seconds=120\nconsole_port=42722\n")
         self.state = Path(self.state_dir, "state.json")
@@ -882,6 +888,8 @@ class VerifierFixture:
             assert self.condition.wait_for(lambda: self.events.count(name) >= count, timeout=4), self.events
 
     def start(self):
+        assert Path(self.state_dir).is_relative_to(self.root)
+        assert Path(self.run_dir).is_relative_to(self.root)
         self.stop.clear()
         self.events.clear()
         self.result = []
@@ -1413,6 +1421,11 @@ def test_N5_N9_N10_M8_admin_commit_at_pty(verifier, monkeypatch, verb, fault):
 
 
 @pytest.mark.parametrize("verb", ["enroll", "rotate"])
+def test_enrol_failure_warns(verifier, monkeypatch, verb):
+    admin_commit_at_pty(verifier, monkeypatch, verb, "wrong-code")
+
+
+@pytest.mark.parametrize("verb", ["enroll", "rotate"])
 def test_N5_E3_secret_never_creates_temp_files(verifier, monkeypatch, verb):
     scratch_tmp = verifier.root / "tmp"
     scratch_tmp.mkdir()
@@ -1426,6 +1439,147 @@ def test_N5_E3_secret_never_creates_temp_files(verifier, monkeypatch, verb):
             path.unlink(missing_ok=True)
 
 
+def _matrix_from_hex_rows(rows):
+    return [[bool((int(value, 16) >> (40 - col)) & 1) for col in range(41)] for value in rows]
+
+
+def test_qr_reference_matrices_and_limits():
+    # python-qrcode 8.0 (version 6, ERROR_CORRECT_L, byte mode, mask_pattern 0), each decoded back with zxing-cpp 2.3.0;
+    # m4-air, 2026-11-24. Replaces segno 1.6.6 vectors (segno inserts a non-canonical 0x00 before the EC/11 padding).
+    first = """1fca4426e7f 1046abbbe41 1758133005d 1746aaa825d 17468008e5d 10490c0ce41 1fd5555557f 001f999df00 1dfa22bfdc4 08163414149 16c89888065 0a2c2233c51 09ec22019e0 120eaaaa149 1278c4000eb 182eaaefca2 0ef1009d8cf 0c33fbd98ea 0e595445cef 14beedcfc12 03d15557ae9 133ffff58c9 014ff331cb7 0b0ddd9fc71 1c4e22ebbce 1f9b7351160 094188888cf 13970011d32 04640023bc8 0ea2a22914f 154484048c7 0f86eaedf83 11fd000bbfe 0013cf89312 1fdc4554b57 1054ccccb10 175175559f3 174f7f75618 175377f4997 1051d99c9aa 1fd6f328903""".split()
+    second = """1fcbee66e7f 10426ea7a41 1751115045d 174c45dde5d 174bef8885d 1048babbf41 1fd5555557f 001d8888f00 1dff9999dc4 1e31111094b 07771d54467 08b3aeaf8d1 1d42ae2c1d1 0b8a1547301 1ec454451cf 0b869b88eb2 0c49b9b98c3 060999990e9 0f611d5dc6f 06aaeeafc51 046f7bf3eda 1e971133f09 176b4455dbb 13a59ba8f51 17d3b99b9ca 0b151999961 0c659190ccd 022a2aa9d72 06723aa33e8 071e113772b 14d444558d3 0d2a88aac82 11f599b99f1 00199119b13 1fd15154757 105aeee8b12 17577eb01f0 174f5173612 175b444599c 1051b8ba9e2 1fdfb99a9cb""".split()
+    uris = [b"otpauth://totp/k3dm-console-m5-air?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=k3dm-console",
+            b"otpauth://totp/k3dm-console-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=k3dm-console"]
+    assert len(uris[0]) == 94 and len(uris[1]) == 128
+    assert totpctl._qr_matrix(uris[0]) == _matrix_from_hex_rows(first)
+    assert totpctl._qr_matrix(uris[1]) == _matrix_from_hex_rows(second)
+    assert totpctl._qr_matrix(b"x" * 135) is None
+    matrix = totpctl._qr_matrix(b"x" * 134)
+    assert len(matrix) == 41 and all(len(row) == 41 for row in matrix)
+
+
+def test_qr_render_has_exact_quiet_zone_and_sgr_cells():
+    matrix = [[(r + c) % 3 == 0 for c in range(41)] for r in range(41)]
+    rendered = totpctl._qr_render(matrix)
+    lines = rendered.splitlines(keepends=True)
+    assert len(lines) == 25
+    padded = [[False] * 49 for _ in range(4)]
+    padded.extend([[False] * 4 + row + [False] * 4 for row in matrix])
+    padded.extend([[False] * 49 for _ in range(4)])
+    for index, line in enumerate(lines):
+        assert line.endswith("\x1b[0m\n")
+        cells = re.findall(r"\x1b\[(30|97);(40|107)m\u2580", line[:-5])
+        assert len(cells) == 49
+        for col, (fg, bg) in enumerate(cells):
+            assert (fg == "30") == padded[index * 2][col]
+            assert (bg == "40") == (padded[index * 2 + 1][col] if index * 2 + 1 < 49 else False)
+
+
+def test_totpctl_is_stdlib_only_and_python39_safe(verifier):
+    source = Path(TOTPCTL_PATH).read_text()
+    assert not re.search(r"\b(subprocess|popen|system|execv?e?|spawn\w*)\s*\(", source)
+    tree = __import__("ast").parse(source)
+    imported = {alias.name.split(".", 1)[0] for node in __import__("ast").walk(tree)
+                if isinstance(node, (__import__("ast").Import, __import__("ast").ImportFrom))
+                for alias in node.names}
+    assert imported <= set(sys.stdlib_module_names)
+    hub_python = "/Library/Developer/CommandLineTools/usr/bin/python3"
+    if not Path(hub_python).exists():
+        pytest.skip("hub CommandLineTools Python 3 not installed on this host")
+    assert Path(verifier.root).is_dir()
+    path, server, worker, _commands = _admin_stub(verifier.root, [("STATUS", "ENROLLED")])
+    program = ("import importlib.util, sys; "
+               "spec=importlib.util.spec_from_file_location('ctl', sys.argv[1]); "
+               "ctl=importlib.util.module_from_spec(spec); spec.loader.exec_module(ctl); "
+               "raise SystemExit(ctl.run(['status', '--wire'], admin_sock=sys.argv[2], check_root=False))")
+    env = os.environ.copy()
+    env["HOME"] = str(verifier.root)
+    try:
+        result = subprocess.run([hub_python, "-IS", "-c", program, TOTPCTL_PATH, str(path)],
+                                cwd=verifier.root, env=env, capture_output=True, text=True, timeout=10)
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+    finally:
+        server.close()
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "ENROLLED\n"
+
+
+class _ReadRecorder(io.StringIO):
+    def __init__(self, value, output):
+        super().__init__(value)
+        self.output = output
+        self.read_lengths = []
+    def readline(self, size=-1):
+        self.read_lengths.append(len(self.output.getvalue()))
+        return super().readline(size)
+    def isatty(self):
+        return False
+
+
+@pytest.mark.parametrize("verb", ["enroll", "rotate", "recovery-regen"])
+def test_pause_keeps_codes_until_read_and_clear_after(verifier, monkeypatch, verb):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    if verb == "recovery-regen":
+        incoming = "yes\n287082\n\n"
+    else:
+        secret = base64.b32encode(b"only-in-test-secret!").decode()
+        incoming = "287082\n\n"
+    assert Path(verifier.root).is_dir()
+    commands = []
+    alphabet = "234567ABCD"
+    def fake_admin(_path, command):
+        commands.append(command)
+        if command in ("ENROLL_BEGIN", "ROTATE_BEGIN"):
+            return f"SECRET {secret}"
+        if command == "RECOVERY_BEGIN":
+            return "RECOVERY_PENDING"
+        if command.startswith("RECOVERY_GET "):
+            index = int(command.rsplit(" ", 1)[1])
+            return f"CODE AAAA-BBBB-CCCC-AAA{alphabet[index]}"
+        if command.endswith(" 287082"):
+            return "OK"
+        return "OK"
+    monkeypatch.setattr(totpctl, "send_admin_cmd", fake_admin)
+    path = str(verifier.root / "stub-admin.sock")
+    try:
+        output = io.StringIO()
+        reader = _ReadRecorder(incoming, output)
+        assert totpctl.run([verb], admin_sock=str(path), tty_in=reader, tty_out=output, check_root=False) == 0
+        assert len(reader.read_lengths) == (3 if verb == "recovery-regen" else 2)
+        before_pause_read = reader.read_lengths[-1]
+        assert "\x1b[3J\x1b[H\x1b[2J" not in output.getvalue()[:before_pause_read]
+        assert "Save the recovery codes now" in output.getvalue()[:before_pause_read]
+        assert "\x1b[3J\x1b[H\x1b[2J" in output.getvalue()[before_pause_read:]
+        assert commands[-1].endswith("COMMIT 287082")
+    finally:
+        pass
+
+
+def test_pause_unavailable_keeps_potentially_live_codes(verifier, monkeypatch):
+    assert Path(verifier.root).is_dir()
+    secret = base64.b32encode(b"only-in-test-secret!").decode()
+    def fake_admin(_path, command):
+        if command == "ENROLL_BEGIN":
+            return f"SECRET {secret}"
+        if command.startswith("RECOVERY_GET "):
+            index = int(command.rsplit(" ", 1)[1])
+            return f"CODE AAAA-BBBB-CCCC-AAA{'234567ABCD'[index]}"
+        if command.startswith("ENROLL_COMMIT "):
+            return "UNAVAILABLE"
+        return "OK"
+    monkeypatch.setattr(totpctl, "send_admin_cmd", fake_admin)
+    output = io.StringIO()
+    reader = _ReadRecorder("287082\n\n", output)
+    assert totpctl.run(["enroll"], admin_sock=str(verifier.root / "stub.sock"), tty_in=reader,
+                       tty_out=output, check_root=False) == 1
+    before_clear = output.getvalue().index("\x1b[3J\x1b[H\x1b[2J")
+    assert output.getvalue().index("commit not confirmed; run web-console-totp-status") < output.getvalue().index(
+        "Save the recovery codes now") < before_clear
+    assert len(reader.read_lengths) == 2
+
+
 def admin_commit_at_pty(verifier, monkeypatch, verb, fault, tmpdir=None):
     raw = b"only-in-test-secret!"
     assert len(raw) == 20
@@ -1435,9 +1589,13 @@ def admin_commit_at_pty(verifier, monkeypatch, verb, fault, tmpdir=None):
     old_state = verifier.state.read_bytes()
     if verb == "enroll":
         verifier.state.unlink()
+    random_calls = {10: 0, 16: 0}
     def generate(size):
-        assert size == 20
-        return raw
+        if size == 20:  # agent-audit: allow assert-removed generate() now also serves 10/16-byte recovery draws
+            return raw
+        assert size in (10, 16)
+        random_calls[size] += 1
+        return bytes([random_calls[size] % 256]) * size
     monkeypatch.setattr(totpd.os, "urandom", generate)
     monkeypatch.setattr(totpd.run, "injected_commit_fault", fault, raising=False)
     verifier.start()
@@ -1469,6 +1627,8 @@ raise SystemExit(ctl.run([sys.argv[3]], admin_sock=sys.argv[2], check_root=False
         while b"Code: " not in transcript:
             assert select.select([master], [], [], 3)[0]
             transcript.extend(os.read(master, 4096))
+        assert b"Scan this with your phone's camera or authenticator app:" in transcript
+        assert transcript.index(b"Scan this with your phone's camera or authenticator app:") < transcript.index(b"Secret:")
         assert b"otpauth://totp/" in transcript and secret in transcript
         assert not verifier.state.exists() if verb == "enroll" else verifier.state.read_bytes() == old_state
         assert not verifier.state.with_suffix(".json.tmp").exists()
@@ -1476,6 +1636,13 @@ raise SystemExit(ctl.run([sys.argv[3]], admin_sock=sys.argv[2], check_root=False
             if file.is_file():
                 assert secret not in file.read_bytes() and raw not in file.read_bytes()
         os.write(master, (wrong_code if fault == "wrong-code" else code) + b"\n")
+        if fault != "wrong-code":
+            prompt = b"Save the recovery codes now (not on your travel device), then press Enter to clear the screen: "
+            while prompt not in transcript:
+                assert select.select([master], [], [], 3)[0]
+                transcript.extend(os.read(master, 4096))
+            assert b"\x1b[3J\x1b[H\x1b[2J" not in transcript
+            os.write(master, b"\n")
         deadline = time.monotonic() + 4
         while proc.poll() is None or select.select([master], [], [], 0)[0]:
             assert time.monotonic() < deadline
@@ -1495,7 +1662,12 @@ raise SystemExit(ctl.run([sys.argv[3]], admin_sock=sys.argv[2], check_root=False
         assert proc.returncode == (1 if fault else 0)
         assert code not in transcript and wrong_code not in transcript
         if fault == "wrong-code":
+            assert b"Save the recovery codes now" not in transcript
             assert b"Invalid code" in transcript
+            assert b"The recovery codes shown are void." in transcript
+            assert transcript.count(b"The recovery codes shown are void.") == 1
+            assert b"\x1b[3J\x1b[H\x1b[2J" in transcript
+            assert _recovery_admin(verifier, "RECOVERY_GET 0") == "UNAVAILABLE"
         elif fault:
             assert b"commit not confirmed; run web-console-totp-status" in transcript
         else:
@@ -1732,6 +1904,292 @@ def test_N3_M3_admin_refuses_unprivileged_peer(verifier):
     assert receive(client) == b"ENROLLED\n"
 
 
+def test_escalating_lock_decay_and_expiry_reset(verifier):
+    verifier.start()
+    def verify(code="000000"):
+        client = verifier.connect()
+        client.sendall(f"VERIFY {code}\n".encode())
+        return receive(client).strip().decode()
+    level = 0
+    for expected in (300, 1800, 14400, 86400, 86400):
+        for _ in range(4 if expected != 300 else 5):
+            assert verify() == "NO"
+        level = min(4, level + 1)
+        state = totpd.load_state(verifier.state_dir)
+        assert state["lock_level"] == level
+        assert state["locked_until"] - verifier.wall == expected
+        verifier.tick += expected
+        verifier.wall += expected
+        assert verify() == "NO"
+        state = totpd.load_state(verifier.state_dir)
+        assert state["failures"] == 1 and state["locked_until"] > 0
+        verifier.wall += 5
+
+
+def test_decay_after_full_days(verifier):
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=2, locked_until=verifier.wall - 1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.wall += 86400
+    verifier.start()
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 1
+    verifier.finish()
+    verifier.wall += 86400
+    verifier.start()
+    state = totpd.load_state(verifier.state_dir)
+    assert state["lock_level"] == 0 and state["locked_until"] == 0
+    assert set(json.loads(verifier.state.read_text())) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
+
+
+def _verify_wrong(verifier):
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    return receive(client).strip().decode()
+
+
+def test_decay_counts_each_day_once(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall - 86400)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    levels = []
+    for _ in range(3):
+        assert _verify_wrong(verifier) == "NO"
+        current = totpd.load_state(verifier.state_dir)
+        levels.append(current["lock_level"])
+    assert levels == [3, 3, 3]
+    assert current["locked_until"] == state["locked_until"] + 86400
+
+
+def test_decay_keeps_part_day_remainder(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall - 43200)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    verifier.wall += 86400
+    assert _verify_wrong(verifier) == "NO"
+    first = totpd.load_state(verifier.state_dir)
+    assert first["lock_level"] == 3
+    assert first["locked_until"] == state["locked_until"] + 86400
+    verifier.wall += 43200
+    assert _verify_wrong(verifier) == "NO"
+    second = totpd.load_state(verifier.state_dir)
+    assert second["lock_level"] == 2
+    assert second["locked_until"] == state["locked_until"] + 2 * 86400
+    verifier.finish()
+    verifier.start()
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 2
+
+
+def test_decay_spans_several_days(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall - 1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.wall += 3 * 86400
+    verifier.start()
+    current = totpd.load_state(verifier.state_dir)
+    assert current["lock_level"] == 1
+    assert current["locked_until"] == state["locked_until"] + 3 * 86400
+
+
+def test_decay_two_restarts_same_day(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=3, locked_until=verifier.wall - 86401)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    first = totpd.load_state(verifier.state_dir)
+    assert first["lock_level"] == 2
+    first_until = first["locked_until"]
+    assert first_until == state["locked_until"] + 86400
+    verifier.finish()
+    verifier.wall += 100
+    verifier.tick += 100
+    verifier.start()
+    second = totpd.load_state(verifier.state_dir)
+    assert second["lock_level"] == 2
+    assert second["locked_until"] == first_until
+
+
+def test_decay_resets_failures_at_startup(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=3, lock_level=2, locked_until=verifier.wall - 86401)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    current = totpd.load_state(verifier.state_dir)
+    assert (current["lock_level"], current["failures"]) == (1, 0)
+    for index in range(5):
+        assert _verify_wrong(verifier) == "NO"
+    assert _verify_wrong(verifier) == "WAIT 1800"
+
+
+def test_decay_resets_failures_on_request(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=3, lock_level=2, locked_until=verifier.wall + 100)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    verifier.wall += 100 + 86400
+    verifier.tick += 100 + 86400
+    assert _verify_wrong(verifier) == "NO"
+    current = totpd.load_state(verifier.state_dir)
+    assert current["failures"] == 1
+    assert current["lock_level"] == 1
+
+
+def test_no_phantom_lock_after_clock_correction(verifier):
+    verifier.wall = 200000
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=2, lock_level=1, locked_until=verifier.wall + 300)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _verify_wrong(verifier) == "NO"
+    verifier.finish()
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=4, lock_level=1, locked_until=verifier.wall + 300)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _verify_wrong(verifier) == "NO"
+    verifier.finish()
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=1, locked_until=verifier.wall + 300)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _verify_wrong(verifier).startswith("WAIT ")
+
+
+def test_rotate_clears_lock_level(verifier):
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=3, locked_until=verifier.wall + 1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    admin = verifier.connect("admin")
+    admin.sendall(b"ROTATE_BEGIN\n")
+    secret_reply = receive(admin).decode().strip()
+    admin.close()
+    assert secret_reply.startswith("SECRET ")
+    secret = base64.b32decode(secret_reply.split()[1])
+    code = totpd.compute_hotp(secret, int(verifier.wall // 30))
+    admin = verifier.connect("admin")
+    admin.sendall(f"ROTATE_COMMIT {code}\n".encode())
+    assert receive(admin) == b"OK\n"
+    current = json.loads(verifier.state.read_text())
+    assert current["failures"] == current["locked_until"] == 0
+    for index in range(5):
+        assert _verify_wrong(verifier) == "NO"
+    assert _verify_wrong(verifier) == "WAIT 300"
+    assert set(current) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
+
+
+def test_level4_reply(verifier):
+    state = totpd.load_state(verifier.state_dir)
+    state.update(failures=5, lock_level=4, locked_until=verifier.wall + 86400)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    assert receive(client) == b"WAIT 86400\n"
+    gate_source = (Path(__file__).parents[2] / "libexec" / "k3dm-console-gate.py").read_text()
+    assert 'Too many attempts; try again later' in gate_source
+
+
+def test_restart_keeps_level(verifier):
+    verifier.start()
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    verifier.finish()
+    state = totpd.load_state(verifier.state_dir)
+    state["locked_until"] = verifier.wall - 1
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    state = totpd.load_state(verifier.state_dir)
+    assert state["lock_level"] == 2 and state["locked_until"] - verifier.wall == 1800
+
+
+def test_monotonic_deadline_once_and_success_resets(verifier):
+    verifier.start()
+    def request(code):
+        client = verifier.connect()
+        client.sendall(f"VERIFY {code}\n".encode())
+        return receive(client).strip()
+    for _ in range(5):
+        assert request("000000") == b"NO"
+    verifier.wall += 301
+    assert request("000000") == b"WAIT 300"
+    state = totpd.load_state(verifier.state_dir)
+    assert state["locked_until"] > 0
+    verifier.tick += 300
+    code = totpd.compute_hotp(base64.b32decode(verifier.secret), verifier.wall // 30)
+    assert request(code) == b"OK"
+    state = totpd.load_state(verifier.state_dir)
+    assert (state["failures"], state["locked_until"], state["lock_level"]) == (0, 0, 0)
+
+
+def test_unlock_migration_and_level0_five_keys(verifier):
+    legacy = {"secret": verifier.secret, "last_counter": 0, "failures": 5,
+              "locked_until": verifier.wall + 300, "enrolled": True}
+    totpd.commit_state(verifier.state_dir, legacy)
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 1
+    assert totpd.load_state(verifier.state_dir)["locked_until"] == verifier.wall + 300
+    verifier.start()
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    assert receive(client) == b"WAIT 300\n"
+    verifier.tick += 300
+    verifier.wall += 300
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 2
+    client = verifier.connect()
+    client.sendall(b"VERIFY 000000\n")
+    assert receive(client) == b"WAIT 1800\n"
+    client = verifier.connect("admin")
+    client.sendall(b"UNLOCK\n")
+    assert receive(client) == b"UNLOCKED\n"
+    assert set(json.loads(verifier.state.read_text())) == {"secret", "last_counter", "failures", "locked_until", "enrolled"}
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 0
+    level_zero = dict(legacy, lock_level=0)
+    totpd.commit_state(verifier.state_dir, level_zero)
+    assert totpd.load_state(verifier.state_dir)["lock_level"] == 0
+    assert totpd.load_state(verifier.state_dir)["locked_until"] == legacy["locked_until"]
+    assert totpd.load_state(verifier.state_dir) is not False
+    for level in (True, -1, 5, "1"):
+        totpd.commit_state(verifier.state_dir, dict(legacy, lock_level=level))
+        assert totpd.load_state(verifier.state_dir) is False
+    totpd.commit_state(verifier.state_dir, dict(legacy, extra="refused"))
+    assert totpd.load_state(verifier.state_dir) is False
+
+
+def test_totpctl_unlock_cli(monkeypatch, capsys):
+    monkeypatch.setattr(totpctl, "send_admin_cmd", lambda _sock, command: "UNLOCKED" if command == "UNLOCK" else "UNAVAILABLE")
+    assert totpctl.run(["unlock"], check_root=False) == 0
+    assert capsys.readouterr().out == "unlocked\n"
+
+
+def test_structured_log_and_level4_reply(verifier):
+    verifier.start()
+    for _ in range(5):
+        client = verifier.connect()
+        client.sendall(b"VERIFY 000000\n")
+        assert receive(client) == b"NO\n"
+    log = (verifier.root / "log").read_text()
+    assert "event=totp-failure failures=5 lock_level=1" in log
+    assert "event=totp-lock lock_level=1 seconds=300" in log
+    assert "000000" not in log and verifier.secret not in log
+
+
 @pytest.mark.parametrize("operation", ["enroll", "rotate"])
 def test_N9_M8_pending_secret_lifetime(verifier, operation):
     if operation == "enroll":
@@ -1907,7 +2365,7 @@ def test_N1_N8_M4_failed_prompt_limit(verifier, start_gate, failure):
             message = b"Invalid code"
         else:
             if failure == "NO":
-                verifier.wall += 301
+                verifier.tick += 86401
             code = b"000000"
             message = b"Too many attempts" if failure == "WAIT" and i >= 5 else b"Invalid code"
         instance.send(code + b"\n")
@@ -2056,12 +2514,20 @@ def test_N1_M2_restart_persists_gate_decision(verifier, sequence):
     verifier.start()
     assert verify(b"287082") == (b"WAIT 300\n" if sequence == "lockout" else b"NO\n")
     verifier.wall = 359
+    verifier.tick += 300
     assert verify(b"481090") == b"OK\n"
 
 
 def test_N9_M8_rotation_verifies_only_the_committed_secret(verifier, monkeypatch):
     new = b"only-in-test-secret!"
-    monkeypatch.setattr(totpd.os, "urandom", lambda size: new)
+    random_calls = {10: 0, 16: 0}
+    def generate(size):
+        if size == 20:
+            return new
+        assert size in (10, 16)
+        random_calls[size] += 1
+        return bytes([random_calls[size] % 256]) * size
+    monkeypatch.setattr(totpd.os, "urandom", generate)
     verifier.start()
     def request(name, wire):
         sock = verifier.connect(name)
@@ -2335,6 +2801,13 @@ if mode == "exec":
 
     verifier.runner = runner
     admin_commit_at_pty(verifier, monkeypatch, "enroll", None)
+    recovery_raw = bytes([1]) * 10
+    recovery_code = base64.b32encode(recovery_raw).decode()
+    recovery_path = Path(verifier.state_dir, "recovery.json")
+    recovery_data = json.loads(recovery_path.read_text())
+    assert len(recovery_data["codes"]) == 10
+    assert all(recovery_code not in recovery_path.read_text() for recovery_code in
+               (base64.b32encode(bytes([i]) * 10).decode() for i in range(1, 11)))
     raw = b"only-in-test-secret!"
     secret = base64.b32encode(raw)
     verifier.wall = 89
@@ -2349,8 +2822,9 @@ if mode == "exec":
     instance.send(wrong + b"\n")
     instance.until(b"Invalid code")
     instance.until(b"Code: ")
-    instance.send(code + b"\n")
+    instance.send(("-".join(recovery_code[i:i + 4] for i in range(0, 16, 4))).encode() + b"\n")
     wait_clients(control, 1)
+    assert "event=totp-recovery-used remaining=9" in (verifier.root / "log").read_text()
     records_data = [json.loads(line) for line in records.read_text().splitlines()]
     commands = [row[0] for row in records_data]
     expected_tmux_env = {
@@ -2371,7 +2845,7 @@ if mode == "exec":
         assert all(env[key] == value for key, value in expected_tmux_env.items())
     for tool in ("/bin/ps", "/usr/sbin/netstat", "/bin/launchctl", argv[0]):
         assert any(call[0] == tool for call in commands)
-    values = (raw, secret, code, wrong)
+    values = (raw, secret, code, wrong, recovery_raw, recovery_code.encode())
     for file in verifier.root.rglob("*"):
         assert all(value not in os.fsencode(file.name) for value in values)
         if file.is_file() and file != verifier.state:
@@ -2441,6 +2915,602 @@ def test_N1_D40_concurrent_same_code_is_accepted_once(verifier):
     first.sendall(b"VERIFY 287082\n")
     second.sendall(b"VERIFY 287082\n")
     assert sorted((receive(first), receive(second))) == [b"NO\n", b"OK\n"]
+
+
+def _recovery_admin(verifier, command):
+    sock = verifier.connect("admin")
+    sock.sendall(command.encode("ascii") + b"\n")
+    return receive(sock).decode("ascii").strip()
+
+
+def test_recovery_generate_and_storage(verifier):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    grouped = [_recovery_admin(verifier, f"RECOVERY_GET {index}").removeprefix("CODE ") for index in range(10)]
+    assert len(set(grouped)) == 10
+    assert all(re.fullmatch(r"[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}", code) for code in grouped)
+    assert _recovery_admin(verifier, "RECOVERY_GET 10") == "UNAVAILABLE"
+    assert _recovery_admin(verifier, "RECOVERY_GET -1") == "UNAVAILABLE"
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    recovery_path = Path(verifier.state_dir, "recovery.json")
+    assert recovery_path.stat().st_mode & 0o777 == 0o600
+    stored = json.loads(recovery_path.read_text())
+    assert type(stored["v"]) is int and stored["v"] == 1 and len(stored["codes"]) == 10
+    assert all(set(item) == {"s", "h"} for item in stored["codes"])
+    assert all(item["h"] == hashlib.sha256(bytes.fromhex(item["s"]) + code.replace("-", "").encode()).hexdigest()
+               for item, code in zip(stored["codes"], grouped))
+    for code in grouped:
+        plain = code.replace("-", "").encode()
+        assert plain not in recovery_path.read_bytes()
+        assert plain not in verifier.state.read_bytes()
+        log_path = verifier.root / "log"
+        assert plain not in (log_path.read_bytes() if log_path.exists() else b"")
+    assert set(json.loads(verifier.state.read_text())) == {
+        "secret", "last_counter", "failures", "locked_until", "enrolled"
+    }
+    assert _recovery_admin(verifier, "RECOVERY_GET 0") == "UNAVAILABLE"
+
+
+def test_recovery_plaintext_scan_positive_controls(verifier):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    codes = [_recovery_admin(verifier, f"RECOVERY_GET {index}").removeprefix("CODE ") for index in range(10)]
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    recovery_path = Path(verifier.state_dir, "recovery.json")
+    stored = json.loads(recovery_path.read_text())
+    assert len(stored["codes"]) == 10
+    for code in codes:
+        raw = code.replace("-", "").encode()
+        assert raw not in recovery_path.read_bytes()
+        assert raw not in verifier.state.read_bytes()
+        log_path = verifier.root / "log"
+        assert raw not in (log_path.read_bytes() if log_path.exists() else b"")
+    client = verifier.connect()
+    client.sendall(f"VERIFY {codes[0]}\n".encode())
+    assert receive(client) == b"OK\n"
+    assert "event=totp-recovery-used remaining=9" in (verifier.root / "log").read_text()
+
+
+def test_recovery_wrong_code_not_logged(verifier):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    codes = [_recovery_admin(verifier, f"RECOVERY_GET {index}").removeprefix("CODE ") for index in range(10)]
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    wrong = "AAAA-BBBB-CCCC-DDDD"
+    assert wrong not in codes
+    client = verifier.connect()
+    client.sendall(f"VERIFY {wrong}\n".encode())
+    assert receive(client) != b"OK\n"
+    log = (verifier.root / "log").read_text()
+    assert "totp-recovery-failure" in log
+    assert wrong not in log and wrong.replace("-", "") not in log
+    client = verifier.connect()
+    client.sendall(f"VERIFY {codes[0]}\n".encode())
+    assert receive(client) == b"OK\n"
+
+
+def test_recovery_unlock_burns_before_reply(verifier):
+    state = json.loads(verifier.state.read_text())
+    state.update(failures=5, locked_until=86459, lock_level=1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    codes = [_recovery_admin(verifier, f"RECOVERY_GET {index}").removeprefix("CODE ") for index in range(10)]
+    code = codes[0]
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    client = verifier.connect()
+    client.sendall(f"VERIFY {code}\n".encode())
+    assert receive(client) == b"OK\n"
+    after = json.loads(verifier.state.read_text())
+    assert (after["failures"], after["locked_until"], after.get("lock_level", 0)) == (0, 0, 0)
+    client = verifier.connect()
+    client.sendall(f"VERIFY {code}\n".encode())
+    assert receive(client) == b"NO\n"
+    for code in codes[1:8]:
+        client = verifier.connect()
+        client.sendall(f"VERIFY {code}\n".encode())
+        assert receive(client) == b"OK\n"
+    stored = json.loads(Path(verifier.state_dir, "recovery.json").read_text())
+    assert len(stored["codes"]) == 2
+    assert "event=totp-recovery-used remaining=9" in (verifier.root / "log").read_text()
+    assert "event=totp-recovery-low remaining=2" in (verifier.root / "log").read_text()
+
+
+@pytest.mark.parametrize("locked", [False, True])
+def test_recovery_after_wrong_attempts(verifier, locked):
+    if locked:
+        state = json.loads(verifier.state.read_text())
+        state.update(failures=5, locked_until=86459, lock_level=1)
+        totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    code = _recovery_admin(verifier, "RECOVERY_GET 0").removeprefix("CODE ")
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    before = json.loads(verifier.state.read_text())
+    for _ in range(20):
+        client = verifier.connect()
+        client.sendall(b"VERIFY AAAA-BBBB-CCCC-DDDD\n")
+        assert receive(client) == b"NO\n"
+    assert json.loads(verifier.state.read_text()) == before
+    verifier.tick += 60
+    client = verifier.connect()
+    client.sendall(b"VERIFY AAAA-BBBB-CCCC-DDDD\n")
+    assert receive(client) == b"NO\n"
+    client = verifier.connect()
+    client.sendall(f"VERIFY {code}\n".encode())
+    assert receive(client) == b"OK\n"
+    failures = [line for line in (verifier.root / "log").read_text().splitlines()
+                if line.startswith("totp-recovery-failure ")]
+    assert failures == ["totp-recovery-failure count=1", "totp-recovery-failure count=20"]
+
+
+def test_recovery_concurrent_same_code_is_accepted_once(verifier):
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    code = _recovery_admin(verifier, "RECOVERY_GET 0").removeprefix("CODE ")
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    first, second = verifier.connect(), verifier.connect()
+    verifier.wait("admitted", 2)
+    first.sendall(f"VERIFY {code}\n".encode())
+    second.sendall(f"VERIFY {code}\n".encode())
+    assert sorted((receive(first), receive(second))) == [b"NO\n", b"OK\n"]
+
+
+def test_gate_recovery_reaches_locked_totpd(verifier, start_gate, scratch_tmux):
+    argv, control = scratch_tmux
+    state = json.loads(verifier.state.read_text())
+    state.update(failures=5, locked_until=86459, lock_level=1)
+    totpd.commit_state(verifier.state_dir, state)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    code = _recovery_admin(verifier, "RECOVERY_GET 0").removeprefix("CODE ")
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    instance = start_gate(tmux_prefix=argv)
+    instance.until(b"Code: ")
+    instance.send(code.lower().encode() + b"\n")
+    wait_clients(control, 1)
+    assert "event=totp-recovery-used remaining=9" in (verifier.root / "log").read_text()
+    result = json.loads(verifier.state.read_text())
+    assert (result["failures"], result["locked_until"], result.get("lock_level", 0)) == (0, 0, 0)
+
+
+@pytest.mark.parametrize("operation", ["ENROLL", "ROTATE"])
+def test_recovery_codes_are_generated_for_enroll_and_rotate(verifier, monkeypatch, operation):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    if operation == "ENROLL":
+        verifier.state.unlink()
+    calls = {10: 0, 16: 0}
+    def generate(size):
+        if size == 20:
+            return b"Z" * 20
+        assert size in calls
+        calls[size] += 1
+        return bytes([calls[size]]) * size
+    monkeypatch.setattr(totpd.os, "urandom", generate)
+    verifier.start()
+    begin = _recovery_admin(verifier, operation + "_BEGIN")
+    assert begin.startswith("SECRET ")
+    codes = [_recovery_admin(verifier, f"RECOVERY_GET {index}").removeprefix("CODE ")
+             for index in range(10)]
+    assert len(set(codes)) == 10
+    raw = base64.b32decode(begin.removeprefix("SECRET "))
+    commit_code = totpd.compute_hotp(raw, verifier.wall // 30)
+    assert _recovery_admin(verifier, operation + "_COMMIT " + commit_code) == "OK"
+    assert len(json.loads(Path(verifier.state_dir, "recovery.json").read_text())["codes"]) == 10
+    assert _recovery_admin(verifier, "RECOVERY_GET 0") == "UNAVAILABLE"
+
+
+@pytest.mark.parametrize("end", ["commit", "abort", "expiry", "fifth-wrong"])
+def test_recovery_pending_ends_clear_codes(verifier, end):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "UNAVAILABLE"
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    assert _recovery_admin(verifier, "ENROLL_BEGIN") == "REFUSED"
+    assert _recovery_admin(verifier, "ROTATE_BEGIN") == "REFUSED"
+    assert _recovery_admin(verifier, "RECOVERY_GET 3").startswith("CODE ")
+    if end == "commit":
+        assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    elif end == "abort":
+        assert _recovery_admin(verifier, "ABORT") == "OK"
+    elif end == "expiry":
+        verifier.wall = 659
+    else:
+        for _ in range(5):
+            assert _recovery_admin(verifier, "RECOVERY_COMMIT 000000") == "NO"
+    assert _recovery_admin(verifier, "RECOVERY_GET 3") == "UNAVAILABLE"
+
+
+def test_recovery_tmp_cleanup(verifier):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    tmp = Path(verifier.state_dir, "recovery.json.tmp")
+    tmp.write_text("stale")
+    verifier.start()
+    assert not os.path.lexists(tmp)
+    verifier.stop.set()
+    verifier.worker.join(timeout=3)
+    tmp.symlink_to(verifier.root / "missing-target")
+    verifier.start()
+    assert not os.path.lexists(tmp)
+
+
+@pytest.mark.parametrize("damage", ["symlink", "dangling", "mode", "version"])
+def test_recovery_damaged_does_not_block_totp(verifier, damage):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    verifier.start()
+    path = Path(verifier.state_dir, "recovery.json")
+    if damage == "symlink":
+        target = verifier.root / "recovery-target"
+        target.write_text('{"v": 1, "codes": []}')
+        path.symlink_to(target)
+    elif damage == "dangling":
+        path.symlink_to(verifier.root / "missing-target")
+    elif damage == "mode":
+        path.write_text('{"v": 1, "codes": []}')
+        path.chmod(0o644)
+    else:
+        path.write_text('{"v": true, "codes": []}')
+        path.chmod(0o600)
+    assert _recovery_admin(verifier, "RECOVERY_STATUS") == "RECOVERY 0"
+    client = verifier.connect()
+    client.sendall(b"VERIFY 287082\n")
+    assert receive(client) == b"OK\n"
+    assert "totp-recovery-damaged" in (verifier.root / "log").read_text()
+
+
+def _admin_stub(root, replies):
+    assert root.name.startswith("wct.") and root.is_dir()
+    path = root / "admin.sock"
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(path))
+    server.listen(16)
+    commands = []
+    def serve():
+        for expected, response in replies:
+            conn, _ = server.accept()
+            with conn:
+                request = bytearray()
+                while b"\n" not in request:
+                    request.extend(conn.recv(64))
+                command = request.split(b"\n", 1)[0].decode("ascii")
+                commands.append(command)
+                assert command == expected
+                conn.sendall(response.encode("ascii") + b"\n")
+    worker = threading.Thread(target=serve, daemon=True)
+    worker.start()
+    return path, server, worker, commands
+
+
+def test_recovery_status_prints_remaining(verifier, capsys):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    path, server, worker, _commands = _admin_stub(verifier.root, [("RECOVERY_STATUS", "RECOVERY 9")])
+    try:
+        assert totpctl.run(["recovery-status"], admin_sock=str(path), check_root=False) == 0
+        assert capsys.readouterr().out == "9 recovery codes remaining\n"
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize("answer,expected", [("no", ["RECOVERY_BEGIN", "ABORT"]),
+                                               ("yes", ["RECOVERY_BEGIN", *[f"RECOVERY_GET {i}" for i in range(10)],
+                                                        "RECOVERY_COMMIT 287082"])])
+def test_recovery_regen_confirmation_and_clear(verifier, capsys, answer, expected):
+    assert Path(verifier.run_dir).is_relative_to(verifier.root)
+    assert Path(verifier.state_dir).is_relative_to(verifier.root)
+    replies = [("RECOVERY_BEGIN", "RECOVERY_PENDING")]
+    if answer == "no":
+        replies.append(("ABORT", "OK"))
+    else:
+        alphabet = "234567ABCD"
+        replies.extend((f"RECOVERY_GET {index}", f"CODE AAAA-BBBB-CCCC-AAA{alphabet[index]}")
+                       for index in range(10))
+        replies.append(("RECOVERY_COMMIT 287082", "OK"))
+    path, server, worker, commands = _admin_stub(verifier.root, replies)
+    try:
+        output = io.StringIO()
+        code_input = io.StringIO(answer + "\n" + ("287082\n" if answer == "yes" else ""))
+        result = totpctl.run(["recovery-regen"], admin_sock=str(path), tty_in=code_input,
+                             tty_out=output, check_root=False)
+        assert result == (0 if answer == "yes" else 1)
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert commands == expected
+        if answer == "yes":
+            assert "Recovery codes (each works once):" in output.getvalue()
+            assert output.getvalue().count("AAAA-BBBB-CCCC-") == 10
+            assert "\x1b[3J\x1b[H\x1b[2J" in output.getvalue()
+        else:
+            assert "Recovery codes" not in output.getvalue()
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize("fault,expected", [
+    ({"recovery.json": "pre-rename-fsync"}, "retry"),
+    ({"state.json": "pre-rename-open"}, "burned"),
+    ({"recovery.json": "post-rename-dir-fsync"}, "fatal"),
+])
+def test_recovery_burn_fault_order(verifier, monkeypatch, fault, expected):
+    verifier.start()
+    assert _recovery_admin(verifier, "RECOVERY_BEGIN") == "RECOVERY_PENDING"
+    code = _recovery_admin(verifier, "RECOVERY_GET 0").removeprefix("CODE ")
+    assert _recovery_admin(verifier, "RECOVERY_COMMIT 287082") == "OK"
+    monkeypatch.setattr(totpd.run, "injected_commit_fault", fault, raising=False)
+    client = verifier.connect()
+    client.sendall(f"VERIFY {code}\n".encode())
+    assert receive(client) == b"UNAVAILABLE\n"
+    if expected == "retry":
+        monkeypatch.setattr(totpd.run, "injected_commit_fault", None, raising=False)
+        client = verifier.connect()
+        client.sendall(f"VERIFY {code}\n".encode())
+        assert receive(client) == b"OK\n"
+    else:
+        before = json.loads(verifier.state.read_text())
+        if expected == "fatal":
+            verifier.worker.join(timeout=3)
+            assert not verifier.worker.is_alive()
+            assert json.loads(verifier.state.read_text()) == before
+            assert len(json.loads(Path(verifier.state_dir, "recovery.json").read_text())["codes"]) == 9
+        else:
+            client = verifier.connect()
+            client.sendall(f"VERIFY {code}\n".encode())
+            assert receive(client) == b"NO\n"
+
+
+def test_gate_recovery_input_normalization_and_cap():
+    tmp = Path(make_short_tmpdir())
+    assert tmp.is_dir() and tmp.name.startswith("wct.")
+    try:
+        conf = tmp / "totp.conf"
+        conf.write_text(f"uid={os.getuid()}\ntmux=/usr/bin/tmux\nidle_seconds=120\nconsole_port=42722\n")
+        sock_path = tmp / "totp.sock"
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(sock_path))
+        server.listen(8)
+        server.settimeout(4)
+        captured = []
+        def serve():
+            for index in range(7):
+                conn, _ = server.accept()
+                with conn:
+                    conn.settimeout(2)
+                    captured.append(conn.recv(64))
+                    conn.sendall((b"WAIT 42\n" if index == 6 else b"NO\n"))
+        worker = threading.Thread(target=serve, daemon=True)
+        worker.start()
+        instance = GateProcess(tmp, dict(conf_path=str(conf), sock_path=str(sock_path),
+                                          expected_conf_owner=os.getuid(), expected_server_uid=os.getuid(),
+                                          prompt_timeout=5, short_retry=True))
+        code = "GEZDGNBVGY3TQOJQ"
+        inputs = [b"GEZD-GNBV-GY3T-QOJQ\n", code.encode() + b"\n", code.lower().encode() + b"\n",
+                  b"GEZD GNBV GY3T QOJQ\n", b"G-EZDGNBVGY3TQOJQ\n", code.encode() + b"X\x7f\n"]
+        try:
+            instance.until(b"Code: ")
+            for data in inputs:
+                instance.send(data)
+                instance.until(b"Invalid code")
+                instance.until(b"Code: ")
+            assert captured == [b"VERIFY GEZD-GNBV-GY3T-QOJQ\n"] * 6
+            instance.send(code.encode() + b"XXXXX\n")
+            instance.until(b"Invalid code")
+            instance.until(b"Code: ")
+            assert len(captured) == 6
+            instance.send(b"287082\n")
+            instance.until(b"(42 s)")
+            worker.join(timeout=2)
+            assert not worker.is_alive()
+            assert captured[-1] == b"VERIFY 287082\n"
+        finally:
+            instance.close()
+            server.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_gate_recovery_paste_and_lookalikes():
+    tmp = Path(make_short_tmpdir())
+    assert tmp.is_dir() and tmp.name.startswith("wct.")
+    try:
+        conf = tmp / "totp.conf"
+        conf.write_text(f"uid={os.getuid()}\ntmux=/usr/bin/tmux\nidle_seconds=120\nconsole_port=42722\n")
+        sock_path = tmp / "totp.sock"
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(sock_path))
+        server.listen(16)
+        server.settimeout(5)
+        captured = []
+        running = [True]
+
+        def serve():
+            while running[0]:
+                try:
+                    conn, _ = server.accept()
+                except OSError:
+                    break
+                with conn:
+                    conn.settimeout(2)
+                    try:
+                        data = conn.recv(64)
+                    except OSError:
+                        continue
+                    if data:
+                        captured.append(data)
+                        conn.sendall(b"NO\n")
+
+        worker = threading.Thread(target=serve, daemon=True)
+        worker.start()
+
+        def make_gate():
+            return GateProcess(
+                tmp,
+                dict(
+                    conf_path=str(conf),
+                    sock_path=str(sock_path),
+                    expected_conf_owner=os.getuid(),
+                    expected_server_uid=os.getuid(),
+                    prompt_timeout=5,
+                    short_retry=True,
+                ),
+            )
+
+        # Section 1: Positive controls and input normalization / filter (M1, M2, N2, N3)
+        instance1 = make_gate()
+        try:
+            instance1.until(b"Code: ")
+            # Positive controls: plain recovery code and 6-digit code pass on pre-fix and post-fix
+            instance1.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            instance1.send(b"108080\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M1: Bracketed-paste recovery code
+            instance1.send(b"\x1b[200~GEZD-GNBV-GY3T-QOJQ\x1b[201~\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M1: Spaces and tab
+            instance1.send(b"  GEZD-GNBV-GY3T-QOJQ\t\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M1: En-dash replacement
+            instance1.send(b"GEZD\xe2\x80\x93GNBV\xe2\x80\x93GY3T\xe2\x80\x93QOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # M2, N2: Lookalike 0/1/8 mapped to O/I/B
+            instance1.send(b"18EZ-GNBV-GY3T-Q0JQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # N3: Escape sequence inside code (CSI arrow key)
+            instance1.send(b"GEZDGNBV\x1b[DGY3TQOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            # N3: Escape sequence inside code (SS3)
+            instance1.send(b"GEZDGNBV\x1bOAGY3TQOJQ\n")
+            instance1.until(b"Invalid code")
+            instance1.until(b"Code: ")
+
+            assert captured == [
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY 108080\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY IBEZ-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+            ]
+        finally:
+            instance1.close()
+
+        # Section 1b: filter-state edges from the Fix item 2 state machine
+        base = len(captured)
+        instance1b = make_gate()
+        try:
+            instance1b.until(b"Code: ")
+            # A lone Esc drops only the ESC; the next byte is kept
+            instance1b.send(b"\x1bGEZD-GNBV-GY3T-QOJQ\n")
+            instance1b.until(b"Invalid code")
+            instance1b.until(b"Code: ")
+
+            # Ctrl-C inside an open CSI sequence resets the filter to NORMAL
+            instance1b.send(b"\x1b[\x03")
+            instance1b.until(b"\x1b[?2004l\r\nCode: ")
+            instance1b.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance1b.until(b"Invalid code")
+            instance1b.until(b"Code: ")
+
+            assert captured[base:] == [
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+            ]
+        finally:
+            instance1b.close()
+        del captured[base:]
+
+        # Section 2: Prompt markers (M3), hint markers (M4), whole-line paste (N1), overflow (M5)
+        instance2 = make_gate()
+        try:
+            # M3: First prompt reads until \x1b[?2004l\x1b[H\x1b[2J\x1b[3JCode:
+            instance2.until(b"\x1b[?2004l\x1b[H\x1b[2J\x1b[3JCode: ")
+
+            # M3: Ctrl-C re-prompt reads until \x1b[?2004l\r\nCode:
+            instance2.send(b"\x03")
+            instance2.until(b"\x1b[?2004l\r\nCode: ")
+
+            # M4: Local rejection hint on short input
+            instance2.send(b"GEZD\n")
+            instance2.until(b"Invalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\r\n")
+            instance2.until(b"Code: ")
+
+            # M2: 16-character input containing 9 is local rejection with hint
+            instance2.send(b"GEZD-GNBV-GY3T-9OJQ\n")
+            instance2.until(b"Invalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\r\n")
+            instance2.until(b"Code: ")
+
+            # M5: 21 real characters with escape inside overflows and gives local rejection hint
+            instance2.send(b"GEZDGNBVGY3TQOJQXXXXX\x1b[D\n")
+            instance2.until(b"Invalid code (6 digits, or a 16-character recovery code: letters A-Z, digits 2-7)\r\n")
+            instance2.until(b"Code: ")
+
+            # M4: Verifier NO marker has no hint
+            instance2.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance2.until(b"\r\nInvalid code\r\n\x1b[?2004l\x1b[H")
+            instance2.until(b"Code: ")
+
+            # N1: Whole-line copy where newline is inside brackets
+            instance2.send(b"\x1b[200~GEZD-GNBV-GY3T-QOJQ\n\x1b[201~")
+            instance2.until(b"Invalid code")
+            instance2.until(b"Code: ")
+            instance2.send(b"GEZD-GNBV-GY3T-QOJQ\n")
+            instance2.until(b"Invalid code")
+            instance2.until(b"Code: ")
+
+            # 3 more VERIFY lines were captured
+            assert captured == [
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY 108080\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY IBEZ-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+                b"VERIFY GEZD-GNBV-GY3T-QOJQ\n",
+            ]
+
+            # M5: Every captured line matches expected wire format, no ESC byte reached verifier
+            for line in captured:
+                assert re.fullmatch(rb"VERIFY ([0-9]{6}|[A-Z2-7]{4}(-[A-Z2-7]{4}){3})\n", line)
+            assert b"\x1b" not in b"".join(captured)
+        finally:
+            instance2.close()
+            running[0] = False
+            server.close()
+            worker.join(timeout=2)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def test_N2_G9b_ctrl_c_is_forwarded_after_attach(verifier, start_gate, scratch_tmux):

@@ -629,6 +629,10 @@ function _hub_data_restore_one() {
     fi
     identity="$(_secret_load_data k3dm-hub-data-age identity age)"
   fi
+  if [[ -z "$identity" ]]; then
+    printf '%s\n' 'ERROR: [hub-data] age identity is empty (locked Keychain?)' >&2
+    return 1
+  fi
   if [[ "${DR_DRILL_MODE:-0}" == 1 && "${HUB_DATA_RESTORE_TARGET:-drill}" != hub && "k3d-${cluster}-${node}" != k3d-dr-drill-* ]]; then
     _err '[hub-data] refusing: target is not the drill cluster (docker restore target)'
     return 2
@@ -823,6 +827,39 @@ function _hub_data_refresh_dependents() {
   _kubectl --context "$context" -n identity rollout status statefulset/openldap --timeout=300s || return 1
 }
 
+function _hub_data_drill_ldap_resync() (
+  local context="$1" token="" before="" refresh="" ready="" store="${LDAP_ESO_SECRETSTORE:-vault-kv-store}" sync_epoch
+  local secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}" waited=0 poll="${K3DM_HUB_DATA_ESO_POLL_S:-5}" limit="${K3DM_HUB_DATA_ESO_WAIT_S:-300}" rc=0
+  _hub_data_drill_fail() { printf 'ERROR: [dr-drill] LDAP admin re-sync failed at %s\n' "$1" >&2; return 1; }
+
+  token="$( _hub_data_generate_root secrets vault 2>/dev/null )" || { _hub_data_drill_fail auth; return 1; }
+  _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$token" 2>/dev/null || rc=1
+  _hub_data_vault_revoke "$token" secrets vault >/dev/null 2>&1 || rc=1
+  [[ "$rc" -eq 0 ]] || { _hub_data_drill_fail auth; return 1; }
+
+  before="$(_kubectl --no-exit --context "$context" -n identity get externalsecret "$secret" -o jsonpath='{.status.refreshTime}' 2>/dev/null)" || { _hub_data_drill_fail mark; return 1; }
+  sync_epoch="$(date +%s)"
+  _kubectl --no-exit --context "$context" -n identity annotate secretstore "$store" "force-sync=$sync_epoch" --overwrite 2>/dev/null || { _hub_data_drill_fail store-sync; return 1; }
+  while :; do
+    store="$(_kubectl --no-exit --context "$context" -n identity get secretstore "${LDAP_ESO_SECRETSTORE:-vault-kv-store}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" || { _hub_data_drill_fail store-wait; return 1; }
+    [[ "$store" == True ]] && break
+    (( waited >= limit )) && { _hub_data_drill_fail store-wait; return 1; }
+    sleep "$poll" 2>/dev/null; waited=$((waited + poll))
+  done
+
+  _kubectl --no-exit --context "$context" -n identity annotate externalsecret --all "force-sync=$sync_epoch" --overwrite 2>/dev/null || { _hub_data_drill_fail sync; return 1; }
+  waited=0
+  while :; do
+    refresh="$(_kubectl --no-exit --context "$context" -n identity get externalsecret "$secret" -o jsonpath='{.status.refreshTime}' 2>/dev/null)" || { _hub_data_drill_fail wait; return 1; }
+    ready="$(_kubectl --no-exit --context "$context" -n identity get externalsecret "$secret" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" || { _hub_data_drill_fail wait; return 1; }
+    [[ "$refresh" != "$before" && "$ready" == True ]] && break
+    (( waited >= limit )) && { _hub_data_drill_fail wait; return 1; }
+    sleep "$poll" 2>/dev/null; waited=$((waited + poll))
+  done
+  _kubectl --no-exit --context "$context" -n identity rollout restart statefulset/openldap 2>/dev/null || { _hub_data_drill_fail restart; return 1; }
+  _kubectl --no-exit --context "$context" -n identity rollout status statefulset/openldap --timeout=300s 2>/dev/null || { _hub_data_drill_fail rollout; return 1; }
+)
+
 function _hub_data_record_rto() {
   local run_dir="$1" fallback="$2" approval_epoch
   approval_epoch="$(cat "$run_dir/approval_epoch" 2>/dev/null || true)"
@@ -991,16 +1028,16 @@ function hub_data_verify_keycloak() {
   want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
   if jq -e 'has("keycloak_usernames_sha256")' "$inventory" >/dev/null 2>&1; then
     expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"; digest="$(_hub_data_keycloak_user_digest _kubectl --context "$context")"
-    [[ "$expected" == "$digest" ]] || { _err '[hub-data] Keycloak usernames digest mismatch'; return 1; }
+    [[ "$expected" == "$digest" ]] || { printf '%s\n' 'ERROR: [hub-data] Keycloak usernames digest mismatch' >&2; return 1; }
   fi
 }
 function hub_data_verify_ldap() {
   local inventory="$1" context="$2" want actual expected digest
   want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
-  _hub_data_ldap_admin_bind _kubectl --context "$context" || { _err '[hub-data] LDAP admin bind failed with the openldap-admin password'; return 1; }
+  _hub_data_ldap_admin_bind _kubectl --no-exit --context "$context" || { printf '%s\n' 'ERROR: [hub-data] LDAP admin bind failed with the openldap-admin password' >&2; return 1; }
   if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null 2>&1; then
     expected="$(jq -r '.ldap_dns_sha256' "$inventory")"; digest="$(_hub_data_ldap_dn_digest _kubectl --context "$context")"
-    [[ "$expected" == "$digest" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }
+    [[ "$expected" == "$digest" ]] || { printf '%s\n' 'ERROR: [hub-data] LDAP DN digest mismatch' >&2; return 1; }
   fi
 }
 function hub_data_verify_placement() {
@@ -1010,7 +1047,7 @@ function hub_data_verify_placement() {
   [[ -r "$metadata" ]] || { printf '%s\n' "[hub-data] V5: no readable pv-pvc.yaml (set by the drill stage or K3DM_HUB_DATA_EXPORT_DIR): '${metadata}'" >&2; return 1; }
   postgres="$(_kubectl --context "$context" -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"; [[ -n "$postgres" ]] || return 1
   while IFS=$'\t' read -r ns pod claim; do
-    _kubectl --context "$context" -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null || return 1
+    _kubectl --no-exit --context "$context" -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null || return 1
     expected="$(_hub_data_meta_field "$metadata" "$ns" "$claim" logicalNode)"; actual="$(_kubectl --context "$context" -n "$ns" get pod "$pod" -o jsonpath='{.spec.nodeName}')"; logical="$(_hub_recovery_logical_node "$actual")"; [[ "$logical" == "$expected" ]] || return 1
   done <<EOF
 secrets	vault-0	data-vault-0

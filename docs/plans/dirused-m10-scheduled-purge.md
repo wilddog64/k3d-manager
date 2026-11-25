@@ -1,6 +1,6 @@
 # dirused M10: schedule a reviewed purge to run later (e.g. after 7:00 PM Pacific)
 
-**Status:** DRAFT — operator request 2026-11-19; waits for M9 (operator: "let's wait for M9"); then spec review
+**Status:** SPLIT — M10a landed (PR #35); M10b is `docs/plans/dirused-m10b-scheduled-purge.md` (SPEC rev 1, 2026-11-23); recurring rules drafted in `docs/plans/dirused-m10c-recurring-purge-rules.md`. This draft is history.
 (Fable + Astra blind: high risk, it deletes files unattended and stops production services), then intent approval
 **Tracked:** dirused (OOB repo), not a k3d-manager release.
 **Depends on:** M8b, and M9 (`docs/plans/dirused-m9-purge-stop-service-for-locked-files.md`) merged and released.

@@ -42,6 +42,10 @@ setup() {
   export METRIC_STATE="${BATS_TEST_TMPDIR}/metric-state.log"
   export NOTIFY_LOG="${BATS_TEST_TMPDIR}/notify.log"
   export KUBECTL_LOG="${BATS_TEST_TMPDIR}/kubectl.log"
+  export APP_KUBECONFIG_TMPDIR="${BATS_TEST_TMPDIR}/kubeconfig-tmp"
+  export KUBECONFIG_CAPTURE_DIR="${BATS_TEST_TMPDIR}/kubeconfig-captured"
+  mkdir -p "$APP_KUBECONFIG_TMPDIR" "$KUBECONFIG_CAPTURE_DIR"
+  scan_env+=("APP_KUBECONFIG_TMPDIR=$APP_KUBECONFIG_TMPDIR" "KUBECONFIG_CAPTURE_DIR=$KUBECONFIG_CAPTURE_DIR")
   : >"${TRIVY_LOG}"
   : >"${WGET_LOG}"
   : >"${CURL_LOG}"
@@ -360,7 +364,8 @@ printf '%s\n' "$*" >>"${KUBECTL_LOG}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --server|--token|--certificate-authority)
+    --server|--token|--certificate-authority|--kubeconfig)
+      if [ "$1" = --kubeconfig ]; then cp "$2" "${KUBECONFIG_CAPTURE_DIR}/config"; fi
       shift 2
       ;;
     --insecure-skip-tls-verify=true)
@@ -1511,6 +1516,190 @@ EOF
   grep -q 'read:packages' "${NOTIFY_LOG}"
   run grep -qF "${GH_TOKEN}" "${CURL_LOG}"
   [ "$status" -eq 1 ]
+}
+
+@test "app cluster requests use a private kubeconfig with current context and clean up" {
+  _run_basket_candidate_scan empty UNKNOWN
+  [ -f "${KUBECONFIG_CAPTURE_DIR}/config" ]
+  grep -q '^current-context: app-cluster-context$' "${KUBECONFIG_CAPTURE_DIR}/config"
+  grep -q 'server: "https://2.25.146.252:6443"' "${KUBECONFIG_CAPTURE_DIR}/config"
+  grep -q 'token: "remote-token"' "${KUBECONFIG_CAPTURE_DIR}/config"
+  grep -q '^    insecure-skip-tls-verify: true$' "${KUBECONFIG_CAPTURE_DIR}/config"
+  grep -q -- '--kubeconfig ' "${KUBECTL_LOG}"
+  run grep -q -- '--token' "${KUBECTL_LOG}"
+  [ "$status" -eq 1 ]
+  run grep -q 'remote-token' "${KUBECTL_LOG}"
+  [ "$status" -eq 1 ]
+  [ -z "$(find "$APP_KUBECONFIG_TMPDIR" -mindepth 1 -print -quit)" ]
+  find "${KUBECONFIG_CAPTURE_DIR}/config" -prune -perm 600 | grep -q .
+}
+
+@test "CA and plain app secrets retain their matching kubeconfig TLS shape" {
+  local shape
+  for shape in ca plain; do
+    if [ "$shape" = ca ]; then
+      TEST_SECRET_CONFIG_B64="$(printf '%s' '{"bearerToken":"remote-token","tlsClientConfig":{"caData":"QUJD"}}' | base64)"
+    else
+      TEST_SECRET_CONFIG_B64="$(printf '%s' '{"bearerToken":"remote-token","tlsClientConfig":{}}' | base64)"
+    fi
+    export TEST_SECRET_CONFIG_B64
+    : >"$KUBECTL_LOG"
+    _run_basket_candidate_scan empty UNKNOWN
+    grep -q '^current-context: app-cluster-context$' "${KUBECONFIG_CAPTURE_DIR}/config"
+    if [ "$shape" = ca ]; then
+      grep -q 'certificate-authority-data: "QUJD"' "${KUBECONFIG_CAPTURE_DIR}/config"
+      run grep -q 'insecure-skip-tls-verify' "${KUBECONFIG_CAPTURE_DIR}/config"
+      [ "$status" -eq 1 ]
+    else
+      run grep -q 'certificate-authority-data\|insecure-skip-tls-verify' "${KUBECONFIG_CAPTURE_DIR}/config"
+      [ "$status" -eq 1 ]
+    fi
+    run grep -q -- '--token\|remote-token' "$KUBECTL_LOG"
+    [ "$status" -eq 1 ]
+  done
+}
+
+_make_app_access_probe() {
+  local dir="$1"
+  mkdir -p "$dir/wrappers"
+  sed '/^# === MAIN ===/,$d' "$SCAN_SCRIPT" >"$dir/functions.sh"
+  for _cmd in base64 sed mktemp rm cp; do
+    _real="$(command -v "$_cmd")"
+    cat >"$dir/wrappers/$_cmd" <<EOF
+#!/bin/sh
+printf '%s %s\\n' '$_cmd' "\$*" >>"\$ARGV_LOG"
+exec "$_real" "\$@"
+EOF
+    chmod +x "$dir/wrappers/$_cmd"
+  done
+  cat >"$dir/kubectl" <<'EOF'
+#!/bin/sh
+printf 'kubectl %s\n' "$*" >>"$ARGV_LOG"
+case "$1" in
+  --kubeconfig)
+    printf '%s\n' "$2" >"$OBSERVED_FILE"
+    case "${PROBE_MODE:-ok}" in
+      fail) exit 7 ;;
+      term) kill -TERM "$PPID"; exit 0 ;;
+    esac
+    ;;
+esac
+exit 0
+EOF
+  chmod +x "$dir/kubectl"
+  cat >"$dir/run.sh" <<'EOF'
+#!/bin/bash
+set -eu
+  . "$APP_FUNCTIONS"
+_KUBECTL_BIN="$APP_KUBECTL_BIN"
+_hub_kubectl() {
+  case "$*" in
+    *jsonpath*server*) printf '%s' "$TEST_SERVER_B64" ;;
+    *jsonpath*config*) printf '%s' "$TEST_CONFIG_B64" ;;
+    *) return 0 ;;
+  esac
+}
+_before="$(umask)"
+_load_app_cluster_access
+[ "$(umask)" = "$_before" ] || exit 90
+if [ -n "${_APP_KUBECONFIG_DIR:-}" ]; then
+  printf '%s\n' "$_APP_KUBECONFIG_DIR" >"$OBSERVED_DIR"
+  find "$_APP_KUBECONFIG_DIR" -prune -perm 700 | grep -q . || exit 91
+  find "$_APP_KUBECONFIG_FILE" -prune -perm 600 | grep -q . || exit 92
+fi
+_app_kubectl get ns
+EOF
+  chmod +x "$dir/run.sh"
+}
+
+@test "access loader preserves umask and creates mode 0700/0600 files" {
+  local probe="$BATS_TEST_TMPDIR/access-probe"
+  _make_app_access_probe "$probe"
+  run env -i TMPDIR="$TMPDIR" PATH="$probe/wrappers:$PATH" APP_FUNCTIONS="$probe/functions.sh" \
+    APP_KUBECTL_BIN="$probe/kubectl" APP_KUBECONFIG_TMPDIR="$APP_KUBECONFIG_TMPDIR" \
+    TEST_SERVER_B64="$(printf '%s' 'https://192.0.2.10:6443' | base64)" \
+    TEST_CONFIG_B64="$(printf '%s' '{"bearerToken":"argv-token","tlsClientConfig":{"insecure":true}}' | base64)" \
+    ARGV_LOG="$probe/argv.log" OBSERVED_DIR="$probe/dir" OBSERVED_FILE="$probe/file" \
+    /bin/bash "$probe/run.sh"
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  local dir file
+  dir="$(cat "$probe/dir")"
+  file="$(cat "$probe/file")"
+  [[ "$file" == "$dir/config" ]]
+  [ ! -e "$dir" ]
+}
+
+@test "access directory is removed after kubectl failure and TERM exits 143" {
+  local probe="$BATS_TEST_TMPDIR/access-cleanup"
+  _make_app_access_probe "$probe"
+  local mode expected
+  for mode in fail term; do
+    run env -i TMPDIR="$TMPDIR" PATH="$probe/wrappers:$PATH" APP_FUNCTIONS="$probe/functions.sh" \
+      APP_KUBECTL_BIN="$probe/kubectl" APP_KUBECONFIG_TMPDIR="$APP_KUBECONFIG_TMPDIR" \
+      TEST_SERVER_B64="$(printf '%s' 'https://192.0.2.10:6443' | base64)" \
+      TEST_CONFIG_B64="$(printf '%s' '{"bearerToken":"argv-token","insecure":true}' | base64)" \
+      PROBE_MODE="$mode" ARGV_LOG="$probe/argv.log" OBSERVED_DIR="$probe/dir" OBSERVED_FILE="$probe/file" \
+      /bin/bash "$probe/run.sh"
+    if [ "$mode" = fail ]; then expected=7; else expected=143; fi
+    [ "$status" -eq "$expected" ] || { printf 'mode=%s status=%s output=%s\n' "$mode" "$status" "$output"; return 1; }
+    [ ! -e "$(cat "$probe/dir")" ]
+  done
+}
+
+@test "access loader external argv never contains the bearer token" {
+  local probe="$BATS_TEST_TMPDIR/access-argv"
+  _make_app_access_probe "$probe"
+  run env -i TMPDIR="$TMPDIR" PATH="$probe/wrappers:$PATH" APP_FUNCTIONS="$probe/functions.sh" \
+    APP_KUBECTL_BIN="$probe/kubectl" APP_KUBECONFIG_TMPDIR="$APP_KUBECONFIG_TMPDIR" \
+    TEST_SERVER_B64="$(printf '%s' 'https://192.0.2.10:6443' | base64)" \
+    TEST_CONFIG_B64="$(printf '%s' '{"bearerToken":"argv-token","insecure":true}' | base64)" \
+    ARGV_LOG="$probe/argv.log" OBSERVED_DIR="$probe/dir" OBSERVED_FILE="$probe/file" \
+    /bin/bash "$probe/run.sh"
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  run grep -F 'argv-token' "$probe/argv.log"
+  [ "$status" -eq 1 ]
+}
+
+@test "malformed server and token secrets fail before kubeconfig kubectl calls" {
+  local probe="$BATS_TEST_TMPDIR/access-malformed"
+  _make_app_access_probe "$probe"
+  local server config failures=0
+  for server in newline; do
+    config="$(printf '%s' '{"bearerToken":"valid-token"}' | base64)"
+    : >"$probe/argv.log"
+    run env -i TMPDIR="$TMPDIR" PATH="$probe/wrappers:$PATH" APP_FUNCTIONS="$probe/functions.sh" \
+      APP_KUBECTL_BIN="$probe/kubectl" APP_KUBECONFIG_TMPDIR="$APP_KUBECONFIG_TMPDIR" \
+      TEST_SERVER_B64="$(printf 'https://192.0.2.10:6443\n' | base64)" TEST_CONFIG_B64="$config" \
+      ARGV_LOG="$probe/argv.log" OBSERVED_DIR="$probe/dir" OBSERVED_FILE="$probe/file" /bin/bash "$probe/run.sh"
+    if [ "$status" -ne 1 ] || [[ "$output" != *malformed* ]]; then failures=1; fi
+    run grep -q '^kubectl --kubeconfig ' "$probe/argv.log"
+    if [ "$status" -ne 1 ] || [ -s "$probe/dir" ]; then failures=1; fi
+    [ -z "$(find "$APP_KUBECONFIG_TMPDIR" -mindepth 1 -print -quit)" ] || failures=1
+  done
+  for config in '{"bearerToken":"bad token"}' '{"bearerToken":"bad$token"}'; do
+    : >"$probe/argv.log"
+    run env -i TMPDIR="$TMPDIR" PATH="$probe/wrappers:$PATH" APP_FUNCTIONS="$probe/functions.sh" \
+      APP_KUBECTL_BIN="$probe/kubectl" APP_KUBECONFIG_TMPDIR="$APP_KUBECONFIG_TMPDIR" \
+      TEST_SERVER_B64="$(printf '%s' 'https://192.0.2.10:6443' | base64)" TEST_CONFIG_B64="$(printf '%s' "$config" | base64)" \
+      ARGV_LOG="$probe/argv.log" OBSERVED_DIR="$probe/dir" OBSERVED_FILE="$probe/file" /bin/bash "$probe/run.sh"
+    if [ "$status" -ne 1 ] || [[ "$output" != *malformed* ]]; then failures=1; fi
+    run grep -q '^kubectl --kubeconfig ' "$probe/argv.log"
+    if [ "$status" -ne 1 ] || [ -s "$probe/dir" ]; then failures=1; fi
+    [ -z "$(find "$APP_KUBECONFIG_TMPDIR" -mindepth 1 -print -quit)" ] || failures=1
+  done
+  [ "$failures" -eq 0 ]
+}
+
+@test "both CVE CronJob pods mount the memory kubeconfig volume and set its temp directory" {
+  local manifest="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  command -v yq >/dev/null 2>&1 || skip "yq unavailable for CronJob structure check"
+  local cronjob
+  for cronjob in app-cve-scan cve-remediation-verify; do
+    yq -e "select(.kind == \"CronJob\" and .metadata.name == \"$cronjob\") | .spec.jobTemplate.spec.template.spec.volumes[] | select(.name == \"kubeconfig-tmp\") | .emptyDir.medium == \"Memory\"" "$manifest"
+    yq -e "select(.kind == \"CronJob\" and .metadata.name == \"$cronjob\") | .spec.jobTemplate.spec.template.spec.volumes[] | select(.name == \"kubeconfig-tmp\") | .emptyDir.sizeLimit == \"1Mi\"" "$manifest"
+    yq -e "select(.kind == \"CronJob\" and .metadata.name == \"$cronjob\") | .spec.jobTemplate.spec.template.spec.containers[0].volumeMounts[] | select(.name == \"kubeconfig-tmp\") | .mountPath == \"/kubeconfig-tmp\"" "$manifest"
+    yq -e "select(.kind == \"CronJob\" and .metadata.name == \"$cronjob\") | .spec.jobTemplate.spec.template.spec.containers[0].env[] | select(.name == \"APP_KUBECONFIG_TMPDIR\") | .value == \"/kubeconfig-tmp\"" "$manifest"
+  done
 }
 
 @test "tags list 401 with GH_TOKEN is classified auth instead of no-match" {

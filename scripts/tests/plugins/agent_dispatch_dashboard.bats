@@ -22,6 +22,17 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "agent dispatch dashboard: no panel has the old human continuation title" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
+assert all(p["title"]!="Human continuation prompts" for p in panels)
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
 @test "agent dispatch dashboard: verification ladder contract" {
   run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-dispatch.yaml" "${BATS_TEST_DIRNAME}/../../../docs/guides/grafana-dashboards/k3dm-agent-dispatch.md" "$BASELINE_FIXTURE" <<'PY'
 import json, re, sys
@@ -65,7 +76,7 @@ old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
 assert set(new) == set(old) | {123,124} | set(range(125,134))
 assert new[123]["title"] == "Unreported coordinator share"
-for panel_id in old.keys() - {105, 12, 103, 9}:
+for panel_id in old.keys() - {105, 12, 103, 9, 85}:
     assert old[panel_id] == new[panel_id], panel_id
 print("ok: verification ladder contract; other panels unchanged")
 PY
@@ -274,7 +285,8 @@ per=panels["Per spec"]
 assert any("k3dm_dispatch_task_post_exit_land_seconds" in t["expr"] for t in per["targets"])
 assert any(p["title"]=="Time to land" for p in d["panels"])
 assert "k3dm_dispatch_post_exit_land_minutes_per_landed" in panels["Final worker exit → land"]["targets"][0]["expr"]
-human=panels["Human continuation prompts"]
+human=panels["Coordinator → agent prompts"]
+assert human["id"]==85
 assert any("k3dm_dispatch_intervention_tracking_tasks" in t["expr"] for t in human["targets"])
 assert any("k3dm_dispatch_human_continuation_prompts" in t["expr"] for t in human["targets"])
 assert human["type"]=="bargauge" and human["options"]["namePlacement"]=="top" and all(t.get("instant") for t in human["targets"]),human["type"]
@@ -1073,7 +1085,7 @@ from pathlib import Path
 text=Path(sys.argv[1]).read_text()
 panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
 by_title={p["title"]:p for p in panels}
-for title,group,metric,legend in (("Untracked by repo","repo, mode","k3dm_codex_untracked_sessions","{{repo}} {{mode}}"),("Tokens by repo","repo","k3dm_codex_tokens","{{repo}}")):
+for title,group,metric,legend in (("Codex untracked by repo","repo, mode","k3dm_codex_untracked_sessions","{{repo}} {{mode}}"),("Tokens by repo","repo","k3dm_codex_tokens","{{repo}}")):
     panel=by_title[title]
     base=f'sum by ({group}) ({metric}{{window="$window"}})'
     named,other=panel["targets"]
@@ -1127,7 +1139,7 @@ assert options["orientation"]=="horizontal" and options["namePlacement"]=="left"
 later={"Per run evidence":(10,18,6,39), "First-pass live verification":(10,6,0,39),
        "Lines changed total":(4,6,0,49), "Median lines / spec":(4,6,6,49),
        "Acceptance items total":(4,6,12,49), "Measured":(4,6,18,49),
-       "Final worker exit → land":(8,6,0,54), "Human continuation prompts":(8,18,6,54)}
+       "Final worker exit → land":(8,6,0,54), "Coordinator → agent prompts":(8,18,6,54)}
 assert {p["title"] for p in d["panels"] if 42<=p["gridPos"]["y"]<65}==set(later)
 for title,(h,w,x,y) in later.items():
     assert panels[title]["gridPos"]=={"h":h,"w":w,"x":x,"y":y+3},title
@@ -1515,13 +1527,19 @@ PY
 }
 
 @test "agent activity: Codex layout and non-position panel fields match the contract" {
-  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
 import hashlib, json, sys
 from pathlib import Path
 text = Path(sys.argv[1]).read_text().split('  agent-activity.json: |\n', 1)[1]
 panels = json.loads('\n'.join(line[4:] for line in text.splitlines()))['panels']
-# SHA-256 of all panel fields except gridPos on the dispatched base commit.
-content = [{k: v for k, v in panel.items() if k != 'gridPos'} for panel in panels]
+approved = {'Codex untracked by repo': 'Untracked by repo', 'Codex sessions by mode': 'Sessions by mode', 'agy sessions by mode': 'agy sessions by mode', 'agy untracked by repo': 'agy untracked by repo'}
+content = []
+for panel in panels:
+    normalized = {k: v for k, v in panel.items() if k != 'gridPos'}
+    if panel['title'] in approved:
+        normalized['title'] = approved[panel['title']]
+        normalized.pop('transformations', None)
+    content.append(normalized)
 digest = hashlib.sha256(json.dumps(content, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 assert digest == '0c9000fd40a49743831a416aca47f0e9e6674280b3882bf23d8e819b69cc1d7f', 'panel content changed'
 by_id = {panel['id']: panel for panel in panels}
@@ -1529,6 +1547,33 @@ for pid, x in ((53, 0), (58, 8), (83, 16)):
     assert by_id[pid]['gridPos'] == {'h': 6, 'w': 8, 'x': x, 'y': 20}, (pid, by_id[pid]['gridPos'])
 for pid, x in ((54, 0), (55, 6), (56, 12), (57, 18)):
     assert by_id[pid]['gridPos'] == {'h': 12, 'w': 6, 'x': x, 'y': 26}, (pid, by_id[pid]['gridPos'])
+print('ok')
+PYTEST
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "agent activity: mode panels share clear display labels" {
+  run python3 - "${AGENT_DASHBOARD_DIR}/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json, re, sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text().split('  agent-activity.json: |\n', 1)[1]
+panels = json.loads('\n'.join(line[4:] for line in text.splitlines()))['panels']
+titles = ('Codex untracked by repo', 'Codex sessions by mode', 'agy sessions by mode', 'agy untracked by repo')
+by_title = {p['title']: p for p in panels}
+assert all(title in by_title for title in titles)
+renames = [t for p in panels for t in p.get('transformations', []) if t.get('id') == 'renameByRegex']
+assert len(renames) == 4
+assert sorted(p['title'] for p in panels if p.get('transformations')) == sorted(titles)
+for title in titles:
+    rename, = [t for t in by_title[title].get('transformations', []) if t.get('id') == 'renameByRegex']
+    assert rename['options'] == {'regex': '^(.* )?(exec|print)$', 'renamePattern': '$1headless'}
+    regex = re.compile(rename['options']['regex'])
+    pattern = rename['options']['renamePattern']
+    def apply(name):
+        return regex.sub(lambda m: pattern.replace('$1', m.group(1) or '').replace('$2', m.group(2) or ''), name)
+    for sample, expected in (('print','headless'), ('exec','headless'), ('interactive','interactive'), ('other','other'), ('k3d-manager print','k3d-manager headless'), ('k3d-manager exec','k3d-manager headless'), ('k3d-manager interactive','k3d-manager interactive'), ('codexec','codexec')):
+        assert apply(sample) == expected, (title, sample, apply(sample), expected)
+    assert all(not re.search(r'(^| )(exec|print)$', apply(name)) for name in ('print', 'exec', 'k3d-manager print', 'k3d-manager exec'))
 print('ok')
 PY
   [ "$status" -eq 0 ] || { echo "$output"; false; }

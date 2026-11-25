@@ -220,9 +220,14 @@ function _cluster_preflight_render_services_appset() {
     envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "$template" > "$tmp"
   sed \
     -e "s/^  name: services-git$/  name: ${cluster_name}-preflight-services-git/" \
-    -e "s/^      name: '{{.path.basename}}'$/      name: '${cluster_name}-preflight-{{.path.basename}}'/" \
+    -e "s/^      name: '{{.name}}-{{.path.basename}}'$/      name: '${cluster_name}-preflight-{{.path.basename}}'/" \
     "$tmp" > "$rendered"
   rm -f "$tmp"
+  if ! grep -Fqx "  name: ${cluster_name}-preflight-services-git" "$rendered" ||
+     ! grep -Fqx "      name: '${cluster_name}-preflight-{{.path.basename}}'" "$rendered"; then
+    _err "services appset template did not contain the expected name lines"
+    return 1
+  fi
 }
 
 function _cluster_preflight_render_platform_appset() {

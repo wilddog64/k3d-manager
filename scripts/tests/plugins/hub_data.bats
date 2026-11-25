@@ -269,6 +269,19 @@ freeze_clock() {
   [ "$(grep -c IDENTITY-SENTINEL "$VLOG" || true)" -eq 0 ]; [ "$(printf '%s' "$output" | grep -c IDENTITY-SENTINEL || true)" -eq 0 ]; grep -q IDENTITY-SENTINEL "$STDIN_LOG"
 }
 
+@test "hub data restore: empty identity returns an error without exiting or invoking age" {
+  make_fixture; source_plugin
+  local encrypted="$TEST_ROOT/empty.tar.age"
+  : > "$encrypted"
+  _secret_load_data() { :; }
+  run _hub_data_restore_one secrets data-vault-0 "$encrypted" node-a /data
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'ERROR: [hub-data] age identity is empty (locked Keychain?)'* ]]
+  if grep -q '^age ' "$CALL_LOG"; then return 1; fi
+  printf 'shell-kept-running\n' >> "$TEST_ROOT/continued"
+  [ "$(cat "$TEST_ROOT/continued")" = shell-kept-running ]
+}
+
 @test "hub data restore: node mismatch stops before extraction" {
   make_fixture; source_plugin; export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage" DR_TEST_MISMATCH=1
   run hub_data_restore; [ "$status" -ne 0 ]; [ "$(grep -c docker "$CALL_LOG" || true)" -eq 0 ]
@@ -752,6 +765,75 @@ _fake_vault_tree() {
   K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 run _hub_data_refresh_dependents other-ctx; [ "$status" -eq 0 ]; [ "$(wc -c < "$CALL_LOG")" -eq 0 ]
   run _hub_data_refresh_dependents k3d-k3d-cluster; [ "$status" -eq 0 ]
   grep -q 'rollout restart deployment/keycloak' "$CALL_LOG"; grep -q 'annotate externalsecret --all' "$CALL_LOG"
+}
+
+@test "dr drill LDAP resync: restores auth config, waits for store and fresh ExternalSecret, then restarts LDAP" {
+  source_plugin
+  : > "$CALL_LOG"
+  local auth_args="$TEST_ROOT/auth-args" auth_stdin="$TEST_ROOT/auth-stdin"
+  _hub_data_generate_root() { printf root-token-sentinel; }
+  _hub_data_vault_revoke() { printf 'revoke %s %s %s\n' "$1" "$2" "$3" >> "$CALL_LOG"; }
+  _vault_exec_stream() {
+    printf 'vault-write %s\n' "$*" >> "$CALL_LOG"
+    printf '%s\n' "$*" > "$auth_args"
+    cat > "$auth_stdin"
+  }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    if [[ "$*" == *'annotate externalsecret --all'* ]]; then : > "$TEST_ROOT/refresh-count"; return 0; fi
+    if [[ "$*" == *'get secretstore'* ]]; then
+      store_count=$(( $(cat "$TEST_ROOT/store-count" 2>/dev/null || printf 0) + 1 )); printf '%s' "$store_count" > "$TEST_ROOT/store-count"
+      if (( store_count <= 2 )); then printf False; else printf True; fi
+      return 0
+    fi
+    if [[ "$*" == *'refreshTime'* ]]; then
+      refresh_count=$(( $(cat "$TEST_ROOT/refresh-count" 2>/dev/null || printf 0) + 1 )); printf '%s' "$refresh_count" > "$TEST_ROOT/refresh-count"
+      if (( refresh_count < 3 )); then printf old; else printf new; fi
+      return 0
+    fi
+    [[ "$*" == *'conditions'* ]] && { printf True; return 0; }
+    return 0
+  }
+  K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=5 _hub_data_drill_ldap_resync ctx
+  grep -q '^vault-write --no-exit --stdin' "$CALL_LOG"
+  grep -q '^revoke root-token-sentinel secrets vault$' "$CALL_LOG"
+  [[ "$(cat "$auth_args")" != *root-token-sentinel* ]]
+  [ "$(cat "$auth_stdin")" = root-token-sentinel ]
+  [ "$(grep -c '^--no-exit --context ctx' "$CALL_LOG")" -eq 14 ]
+  [ "$(grep -n 'annotate secretstore' "$CALL_LOG" | cut -d: -f1)" -lt "$(grep -n 'get secretstore' "$CALL_LOG" | sed -n '1p' | cut -d: -f1)" ]
+  [ "$(grep -n 'get secretstore' "$CALL_LOG" | sed -n '3p' | cut -d: -f1)" -lt "$(grep -n 'annotate externalsecret' "$CALL_LOG" | cut -d: -f1)" ]
+  [ "$(grep -n 'get externalsecret' "$CALL_LOG" | tail -1 | cut -d: -f1)" -lt "$(grep -n 'rollout restart statefulset/openldap' "$CALL_LOG" | cut -d: -f1)" ]
+  grep -q 'rollout status statefulset/openldap' "$CALL_LOG"
+}
+
+@test "dr drill LDAP resync: a SecretStore that stays NotReady times out before ExternalSecret sync" {
+  source_plugin
+  : > "$CALL_LOG"
+  _hub_data_generate_root() { printf root-token-sentinel; }
+  _hub_data_vault_revoke() { :; }
+  _vault_exec_stream() { cat >/dev/null; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    [[ "$*" == *'get secretstore'* ]] && { printf False; return 0; }
+    return 0
+  }
+  export K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=1
+  run --separate-stderr _hub_data_drill_ldap_resync ctx
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *'failed at store-wait'* ]]
+  [ "$(grep -c 'annotate externalsecret --all' "$CALL_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill LDAP resync: step failure returns one error without calling _err" {
+  source_plugin
+  _hub_data_generate_root() { printf root-token; }
+  _hub_data_vault_revoke() { :; }
+  _vault_exec_stream() { cat >/dev/null; return 0; }
+  _kubectl() { return 1; }
+  run --separate-stderr _hub_data_drill_ldap_resync ctx
+  [ "$status" -eq 1 ]
+  [ "$(wc -l <<<"$stderr" | tr -d ' ')" -eq 1 ]
+  [[ "$stderr" == *'failed at mark'* ]]
 }
 
 @test "recover D1: credential guard security shim survives its installer function" {
@@ -1373,6 +1455,89 @@ STUB
   run --separate-stderr hub_data_verify_ldap "$TEST_ROOT/inventory.json" target-context
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"LDAP admin bind failed"* ]]
+}
+
+_setup_v_check_failure_case() {
+  source_plugin
+  printf '%s\n' '{"keycloak_realm_user_count":3,"ldap_entry_count":2,"keycloak_usernames_sha256":"want-keycloak","ldap_dns_sha256":"want-ldap"}' > "$TEST_ROOT/inventory.json"
+  export HUB_DATA_VERIFY_REPORT="$TEST_ROOT/verify-report.json"
+  _hub_data_pin_context() { :; }
+  _vault_exec() { printf '{"sealed":false}\n'; }
+  hub_data_verify_vault_paths() { :; }
+  hub_data_verify_unsealed() { :; }
+  hub_data_verify_externalsecrets() { :; }
+  _hub_data_keycloak_user_count() { printf 3; }
+  _hub_data_keycloak_user_digest() { printf '%s' "${DR_TEST_KEYCLOAK_DIGEST:-want-keycloak}"; }
+  _hub_data_ldap_entry_count() { printf 2; }
+  _hub_data_ldap_dn_digest() { printf '%s' "${DR_TEST_LDAP_DIGEST:-want-ldap}"; }
+  _hub_data_meta_field() { printf agent-0; }
+  _hub_recovery_logical_node() { printf agent-0; }
+  _kubectl() {
+    local soft=0
+    if [[ "${1:-}" == --no-exit ]]; then soft=1; shift; fi
+    case "$*" in
+      *'get pods -l app.kubernetes.io/name=postgres-keycloak'*) printf postgres-0; return 0 ;;
+      *'wait --for=condition=Ready pod/openldap-0'*)
+        [[ "${DR_TEST_FAIL_READY:-0}" != 1 ]] && return 0
+        (( soft == 1 )) && { printf 'pod not ready\n' >&2; return 1; }
+        printf 'pod not ready\n' >&2
+        exit 1
+        ;;
+      *'exec statefulset/openldap'*)
+        [[ "${DR_TEST_FAIL_BIND:-0}" != 1 ]] && return 0
+        (( soft == 1 )) && { printf 'invalid credentials\n' >&2; return 1; }
+        printf 'invalid credentials\n' >&2
+        exit 1
+        ;;
+      *'get pod'*'-o jsonpath={.spec.nodeName}'*) printf k3d-dr-drill-agent-0; return 0 ;;
+    esac
+    return 0
+  }
+  mkdir -p "$TEST_ROOT/export"
+  : > "$TEST_ROOT/export/pv-pvc.yaml"
+  export K3DM_HUB_DATA_EXPORT_DIR="$TEST_ROOT/export" DR_DRILL_METADATA="$TEST_ROOT/export/pv-pvc.yaml"
+}
+
+@test "verify V4: hard kubectl bind failure is reported and later checks run" {
+  _setup_v_check_failure_case
+  export DR_TEST_FAIL_BIND=1
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V4\tfalse'* ]]
+  [[ "$output" == *$'V5\ttrue'* ]]
+  [[ "$output" == *$'V8\ttrue'* ]]
+  [ "$stderr" = 'ERROR: [hub-data] LDAP admin bind failed with the openldap-admin password' ]
+  [ "$(jq -r .V4 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
+@test "verify V4: LDAP DN digest mismatch is reported and later checks run" {
+  _setup_v_check_failure_case
+  export DR_TEST_LDAP_DIGEST=wrong
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V4\tfalse'* && "$output" == *$'V5\ttrue'* && "$output" == *$'V8\ttrue'* ]]
+  [ "$stderr" = 'ERROR: [hub-data] LDAP DN digest mismatch' ]
+  [ "$(jq -r .V4 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
+@test "verify V3: Keycloak digest mismatch is reported and later checks run" {
+  _setup_v_check_failure_case
+  export DR_TEST_KEYCLOAK_DIGEST=wrong
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V3\tfalse'* && "$output" == *$'V5\ttrue'* && "$output" == *$'V8\ttrue'* ]]
+  [ "$stderr" = 'ERROR: [hub-data] Keycloak usernames digest mismatch' ]
+  [ "$(jq -r .V3 "$HUB_DATA_VERIFY_REPORT")" = false ]
+}
+
+@test "verify V5: hard kubectl wait failure is reported and V8 runs" {
+  _setup_v_check_failure_case
+  export DR_TEST_FAIL_READY=1
+  run --separate-stderr hub_data_verify "$TEST_ROOT/inventory.json" identity target-context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *$'V5\tfalse'* && "$output" == *$'V8\ttrue'* ]]
+  [[ "$stderr" == *'pod not ready'* ]]
+  [ "$(jq -r .V5 "$HUB_DATA_VERIFY_REPORT")" = false ]
 }
 
 @test "recover B4-R4: resume failure is logged and report records false" {
