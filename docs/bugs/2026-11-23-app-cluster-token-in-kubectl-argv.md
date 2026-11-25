@@ -1,11 +1,11 @@
 # Bug: app-cluster bearer token passed in kubectl argv by the CVE scan and verifier
 
-**Status:** LANDED — `4b831c81` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier pass after correction); header corrected 2026-11-24 (was stale "intent approval")
+**Status:** LANDED — `4b831c81` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier pass after correction); hub promoted `65fd63f2` 2026-11-25; E9 scan half PASS live, verify half not exercisable (no promotion_requested events) — operator decision
 **Priority:** P2
 **Introduced by:** pre-existing in `cve-remediation-verify.sh:9-11` (not in the v1.45.0 diff); `app-cve-scan.sh:149-160` unknown (file rewritten in plan 2e)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-23 (E9: Claude reads app-cve-scan and cve-remediation-verify job logs on the hub after a promote)
+**Waiting on:** operator decision — since 2026-11-25 (E9 verify half: accept the job's clean run plus offline E1/E2, or wait for the next promotion_requested remediation event)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "distribute tasks across flash and luna")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -179,3 +179,17 @@ Luna: 2 script files of shell logic, 1 manifest, 2 test files. Not Flash (logic 
 - The token still lives in the scripts' shell memory and, briefly, in the memory-backed file. Anyone who can exec into
   the job pod as its uid can read either; that is the same trust boundary as the mounted ServiceAccount token.
 - Insecure TLS stays wherever `bin/cluster-refresh` writes it (Fix 6).
+
+## Live result (E9, 2026-11-25)
+
+Hub promoted to `65fd63f2` (deploy/hub `c7c8f8d..65fd63f`, tag `hub-promote/20261125T180004Z`, platform-ops applied).
+Claude read-only on m5-air, long strings masked before reading.
+
+- **Scan half — PASS.** One-off `app-cve-scan-e9` (operator: "go ahead to run this one-off job"), created
+  18:02:27Z from the promoted CronJob, succeeded. Its log lists HIGH/CRITICAL counts from the app cluster's
+  VulnerabilityReports for all five stage services (basket 2, frontend 0, order 4, payment 0, product-catalog 82) as before,
+  so `--kubeconfig` access to the app cluster works; no token appears in the log. Job deleted afterwards.
+- **Verify half — not exercised.** `cve-remediation-verify-29927175` (18:15:00Z, promoted template) succeeded with an empty
+  log. `_load_access` built the kubeconfig (it fails the job with a message otherwise), but the script calls the app cluster
+  only for `promotion_requested` events, and all 6 remediation events are `applied`, so no app-cluster call was made. The
+  script never prints the server, so E9's "server in a verify job's kubectl output" is not observable without such an event.
