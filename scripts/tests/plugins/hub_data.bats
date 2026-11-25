@@ -767,6 +767,75 @@ _fake_vault_tree() {
   grep -q 'rollout restart deployment/keycloak' "$CALL_LOG"; grep -q 'annotate externalsecret --all' "$CALL_LOG"
 }
 
+@test "dr drill LDAP resync: restores auth config, waits for store and fresh ExternalSecret, then restarts LDAP" {
+  source_plugin
+  : > "$CALL_LOG"
+  local auth_args="$TEST_ROOT/auth-args" auth_stdin="$TEST_ROOT/auth-stdin"
+  _hub_data_generate_root() { printf root-token-sentinel; }
+  _hub_data_vault_revoke() { printf 'revoke %s %s %s\n' "$1" "$2" "$3" >> "$CALL_LOG"; }
+  _vault_exec_stream() {
+    printf 'vault-write %s\n' "$*" >> "$CALL_LOG"
+    printf '%s\n' "$*" > "$auth_args"
+    cat > "$auth_stdin"
+  }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    if [[ "$*" == *'annotate externalsecret --all'* ]]; then : > "$TEST_ROOT/refresh-count"; return 0; fi
+    if [[ "$*" == *'get secretstore'* ]]; then
+      store_count=$(( $(cat "$TEST_ROOT/store-count" 2>/dev/null || printf 0) + 1 )); printf '%s' "$store_count" > "$TEST_ROOT/store-count"
+      if (( store_count <= 2 )); then printf False; else printf True; fi
+      return 0
+    fi
+    if [[ "$*" == *'refreshTime'* ]]; then
+      refresh_count=$(( $(cat "$TEST_ROOT/refresh-count" 2>/dev/null || printf 0) + 1 )); printf '%s' "$refresh_count" > "$TEST_ROOT/refresh-count"
+      if (( refresh_count < 3 )); then printf old; else printf new; fi
+      return 0
+    fi
+    [[ "$*" == *'conditions'* ]] && { printf True; return 0; }
+    return 0
+  }
+  K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=5 _hub_data_drill_ldap_resync ctx
+  grep -q '^vault-write --no-exit --stdin' "$CALL_LOG"
+  grep -q '^revoke root-token-sentinel secrets vault$' "$CALL_LOG"
+  [[ "$(cat "$auth_args")" != *root-token-sentinel* ]]
+  [ "$(cat "$auth_stdin")" = root-token-sentinel ]
+  [ "$(grep -c '^--no-exit --context ctx' "$CALL_LOG")" -eq 14 ]
+  [ "$(grep -n 'annotate secretstore' "$CALL_LOG" | cut -d: -f1)" -lt "$(grep -n 'get secretstore' "$CALL_LOG" | sed -n '1p' | cut -d: -f1)" ]
+  [ "$(grep -n 'get secretstore' "$CALL_LOG" | sed -n '3p' | cut -d: -f1)" -lt "$(grep -n 'annotate externalsecret' "$CALL_LOG" | cut -d: -f1)" ]
+  [ "$(grep -n 'get externalsecret' "$CALL_LOG" | tail -1 | cut -d: -f1)" -lt "$(grep -n 'rollout restart statefulset/openldap' "$CALL_LOG" | cut -d: -f1)" ]
+  grep -q 'rollout status statefulset/openldap' "$CALL_LOG"
+}
+
+@test "dr drill LDAP resync: a SecretStore that stays NotReady times out before ExternalSecret sync" {
+  source_plugin
+  : > "$CALL_LOG"
+  _hub_data_generate_root() { printf root-token-sentinel; }
+  _hub_data_vault_revoke() { :; }
+  _vault_exec_stream() { cat >/dev/null; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    [[ "$*" == *'get secretstore'* ]] && { printf False; return 0; }
+    return 0
+  }
+  export K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=1
+  run --separate-stderr _hub_data_drill_ldap_resync ctx
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *'failed at store-wait'* ]]
+  [ "$(grep -c 'annotate externalsecret --all' "$CALL_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill LDAP resync: step failure returns one error without calling _err" {
+  source_plugin
+  _hub_data_generate_root() { printf root-token; }
+  _hub_data_vault_revoke() { :; }
+  _vault_exec_stream() { cat >/dev/null; return 0; }
+  _kubectl() { return 1; }
+  run --separate-stderr _hub_data_drill_ldap_resync ctx
+  [ "$status" -eq 1 ]
+  [ "$(wc -l <<<"$stderr" | tr -d ' ')" -eq 1 ]
+  [[ "$stderr" == *'failed at mark'* ]]
+}
+
 @test "recover D1: credential guard security shim survives its installer function" {
   source_plugin; local run_dir="$TEST_ROOT/guard"; mkdir -p "$run_dir"
   cat > "$TEST_ROOT/real-security" <<'STUB'

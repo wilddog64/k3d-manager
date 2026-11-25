@@ -827,6 +827,39 @@ function _hub_data_refresh_dependents() {
   _kubectl --context "$context" -n identity rollout status statefulset/openldap --timeout=300s || return 1
 }
 
+function _hub_data_drill_ldap_resync() (
+  local context="$1" token="" before="" refresh="" ready="" store="${LDAP_ESO_SECRETSTORE:-vault-kv-store}" sync_epoch
+  local secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}" waited=0 poll="${K3DM_HUB_DATA_ESO_POLL_S:-5}" limit="${K3DM_HUB_DATA_ESO_WAIT_S:-300}" rc=0
+  _hub_data_drill_fail() { printf 'ERROR: [dr-drill] LDAP admin re-sync failed at %s\n' "$1" >&2; return 1; }
+
+  token="$( _hub_data_generate_root secrets vault 2>/dev/null )" || { _hub_data_drill_fail auth; return 1; }
+  _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$token" 2>/dev/null || rc=1
+  _hub_data_vault_revoke "$token" secrets vault >/dev/null 2>&1 || rc=1
+  [[ "$rc" -eq 0 ]] || { _hub_data_drill_fail auth; return 1; }
+
+  before="$(_kubectl --no-exit --context "$context" -n identity get externalsecret "$secret" -o jsonpath='{.status.refreshTime}' 2>/dev/null)" || { _hub_data_drill_fail mark; return 1; }
+  sync_epoch="$(date +%s)"
+  _kubectl --no-exit --context "$context" -n identity annotate secretstore "$store" "force-sync=$sync_epoch" --overwrite 2>/dev/null || { _hub_data_drill_fail store-sync; return 1; }
+  while :; do
+    store="$(_kubectl --no-exit --context "$context" -n identity get secretstore "${LDAP_ESO_SECRETSTORE:-vault-kv-store}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" || { _hub_data_drill_fail store-wait; return 1; }
+    [[ "$store" == True ]] && break
+    (( waited >= limit )) && { _hub_data_drill_fail store-wait; return 1; }
+    sleep "$poll" 2>/dev/null; waited=$((waited + poll))
+  done
+
+  _kubectl --no-exit --context "$context" -n identity annotate externalsecret --all "force-sync=$sync_epoch" --overwrite 2>/dev/null || { _hub_data_drill_fail sync; return 1; }
+  waited=0
+  while :; do
+    refresh="$(_kubectl --no-exit --context "$context" -n identity get externalsecret "$secret" -o jsonpath='{.status.refreshTime}' 2>/dev/null)" || { _hub_data_drill_fail wait; return 1; }
+    ready="$(_kubectl --no-exit --context "$context" -n identity get externalsecret "$secret" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" || { _hub_data_drill_fail wait; return 1; }
+    [[ "$refresh" != "$before" && "$ready" == True ]] && break
+    (( waited >= limit )) && { _hub_data_drill_fail wait; return 1; }
+    sleep "$poll" 2>/dev/null; waited=$((waited + poll))
+  done
+  _kubectl --no-exit --context "$context" -n identity rollout restart statefulset/openldap 2>/dev/null || { _hub_data_drill_fail restart; return 1; }
+  _kubectl --no-exit --context "$context" -n identity rollout status statefulset/openldap --timeout=300s 2>/dev/null || { _hub_data_drill_fail rollout; return 1; }
+)
+
 function _hub_data_record_rto() {
   local run_dir="$1" fallback="$2" approval_epoch
   approval_epoch="$(cat "$run_dir/approval_epoch" 2>/dev/null || true)"

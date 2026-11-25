@@ -2,11 +2,11 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-  unset DR_DRILL_CLUSTER DR_DRILL_CONTEXT DR_TEST_CLUSTER_LIST DR_TEST_HOST DR_TEST_NOT_READY DR_TEST_CURL_RC DR_TEST_EXEC_FAIL DR_TEST_UNSEAL_FAIL DR_TEST_RESTORE_FAIL DR_TEST_VAULT_STATUS_FAIL DR_TEST_VAULT_LIST_FAIL
+  unset DR_DRILL_CLUSTER DR_DRILL_CONTEXT DR_TEST_CLUSTER_LIST DR_TEST_HOST DR_TEST_NOT_READY DR_TEST_CURL_RC DR_TEST_EXEC_FAIL DR_TEST_UNSEAL_FAIL DR_TEST_RESTORE_FAIL DR_TEST_VAULT_STATUS_FAIL DR_TEST_VAULT_LIST_FAIL DR_TEST_ES_NOT_READY DR_TEST_STORE_NOT_READY DR_TEST_STORE_ALWAYS_NOT_READY DR_TEST_ES_GET_FAIL
   export TEST_ROOT="$BATS_TEST_TMPDIR/root" STUB_BIN="$BATS_TEST_TMPDIR/root/bin" HOME="$BATS_TEST_TMPDIR/home"
-  export KLOG="$TEST_ROOT/kubectl.log" VLOG="$TEST_ROOT/vault.log" SHARD_LOG="$TEST_ROOT/phase.log" PHASE_LOG="$TEST_ROOT/phase.log" RESTORE_LOG="$TEST_ROOT/restore.log"
+  export KLOG="$TEST_ROOT/kubectl.log" VLOG="$TEST_ROOT/vault.log" SHARD_LOG="$TEST_ROOT/phase.log" PHASE_LOG="$TEST_ROOT/phase.log" RESTORE_LOG="$TEST_ROOT/restore.log" ORDER_LOG="$TEST_ROOT/resync-order.log"
   mkdir -p "$STUB_BIN" "$TEST_ROOT" "$HOME"
-  : > "$KLOG"; : > "$VLOG"; : > "$PHASE_LOG"; : > "$RESTORE_LOG"
+  : > "$KLOG"; : > "$VLOG"; : > "$PHASE_LOG"; : > "$RESTORE_LOG"; : > "$ORDER_LOG"
   export DR_DRILL_TEST_TTY=1 DR_DRILL_ALLOW_HOST=1 DR_DRILL_DOCKER_FREE_GB=20 DR_DRILL_EGRESS_WAIT_S=0 DR_TEST_EXPORT_TS="$(date -u +%Y%m%dT%H%M%SZ)"
   export JQ_REAL="$(command -v jq)"
   cat > "$STUB_BIN/hostname" <<'STUB'
@@ -98,6 +98,15 @@ for arg in "$@"; do
 done
 { printf 'kubectl'; printf ' %q' "$@"; printf '\n'; } >> "$KLOG"
 args="$*"
+case "$args" in
+  *'annotate secretstore '*) printf 'store-annotate\n' >> "$ORDER_LOG" ;;
+  *'get secretstore '*) printf 'store-poll\n' >> "$ORDER_LOG" ;;
+  *'annotate externalsecret --all'*) printf 'es-annotate\n' >> "$ORDER_LOG" ;;
+  *'get externalsecret openldap-admin '*) printf 'es-poll\n' >> "$ORDER_LOG" ;;
+  *'rollout restart statefulset/openldap'*) printf 'ldap-restart\n' >> "$ORDER_LOG" ;;
+  *'rollout status statefulset/openldap'*) printf 'ldap-rollout\n' >> "$ORDER_LOG" ;;
+  *'exec statefulset/openldap'*) printf 'ldap-bind\n' >> "$ORDER_LOG" ;;
+esac
 if [[ "$args" == *'config get-contexts'* ]]; then printf '%b' "${DR_TEST_CONTEXTS:-k3d-dr-drill}"; printf '\n'; exit 0
 elif [[ "$args" == *'config view'* ]]; then printf 'https://127.0.0.1:%s\n' "${DR_TEST_SERVER_PORT:-6445}"; exit 0
 elif [[ "$args" == *' run dr-egress-check-'* ]]; then exit 0
@@ -114,6 +123,18 @@ elif [[ "$args" == *'get pod vault-0'*'nodeName'* ]]; then printf 'dr-drill-serv
 elif [[ "$args" == *'get pod postgres-keycloak-abc'*'nodeName'* ]]; then printf 'dr-drill-agent-0\n'; exit 0
 elif [[ "$args" == *'get pod openldap-0'*'nodeName'* ]]; then printf 'dr-drill-agent-1\n'; exit 0
 elif [[ "$args" == *'get pod'*'containers[0].name'* ]]; then exit 0
+elif [[ "$args" == *'get secretstore'*'conditions'* ]]; then
+  n=$(( $(cat "$HOME/store-polls" 2>/dev/null || echo 0) + 1 )); printf '%s' "$n" > "$HOME/store-polls"
+  if [[ "${DR_TEST_STORE_ALWAYS_NOT_READY:-0}" == 1 || ( "${DR_TEST_STORE_NOT_READY:-0}" == 1 && "$n" -le 2 ) ]]; then printf False; else printf True; fi; exit 0
+elif [[ "$args" == *'annotate externalsecret --all'* ]]; then
+  : > "$HOME/es-refresh-polls"
+elif [[ "$args" == *'get externalsecret'*'refreshTime'* ]]; then
+  [[ "${DR_TEST_ES_GET_FAIL:-0}" == 1 ]] && exit 1
+  n=$(( $(cat "$HOME/es-refresh-polls" 2>/dev/null || echo 0) + 1 )); printf '%s' "$n" > "$HOME/es-refresh-polls"
+  if [[ "${DR_TEST_ES_NOT_READY:-0}" == 1 ]]; then printf old; else [[ "$n" -ge 3 ]] && printf new || printf old; fi; exit 0
+elif [[ "$args" == *'get externalsecret'*'conditions'* ]]; then
+  printf True; exit 0
+elif [[ "$args" == *'rollout restart statefulset/openldap'* || "$args" == *'rollout status statefulset/openldap'* ]]; then exit 0
 elif [[ "$args" == *' exec '* ]]; then
   command=(); marker=0
   for arg in "$@"; do [[ "$arg" == -- ]] && marker=1 && continue; (( marker == 1 )) || continue; command+=("$arg"); done
@@ -128,6 +149,7 @@ STUB
 #!/usr/bin/env bash
 { printf 'vault'; printf ' %q' "$@"; printf '\n'; } >> "$VLOG"
 { printf 'vault'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
+[[ "$*" == *'auth/kubernetes/config'* ]] && printf 'auth-write\n' >> "$ORDER_LOG"
 [[ "$*" == *SHARDSENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97
 case "$*" in
   *'operator unseal'*) printf "Error unsealing: Error making API request.\nCode: 400. Errors:\n* 'key' must be a valid hex or base64 string\n" >&2; exit 2 ;;
@@ -159,6 +181,68 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   for pair in "1 2" "2 3" "3 4" "4 5" "5 6"; do read -r before after <<<"$pair"; [ "$(grep -n "Phase $before/6" <<<"$output" | cut -d: -f1)" -lt "$(grep -n "Phase $after/6" <<<"$output" | cut -d: -f1)" ]; done
   result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
   [ "$(jq -r .success "$result")" = true ]
+  [ "$(jq -r '.credentials_unexpected | length' "$result")" -eq 0 ]
+  [ "$(grep -Ec 'rollout restart (deployment/(keycloak|kube-prometheus-stack-grafana|argocd-server))' "$KLOG" || true)" -eq 0 ]
+  [ "$(grep -Ec 'k3dm-vault-root-token' "$PHASE_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: LDAP resync orders SecretStore readiness, ExternalSecret refresh and restart before V1" {
+  export DR_TEST_STORE_NOT_READY=1 K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=5
+  run_drill
+  [ "$status" -eq 0 ]
+  auth_write="$(grep -n '^auth-write$' "$ORDER_LOG" | cut -d: -f1)"
+  store_sync="$(grep -n '^store-annotate$' "$ORDER_LOG" | cut -d: -f1)"
+  store_poll_1="$(grep -n '^store-poll$' "$ORDER_LOG" | sed -n '1p' | cut -d: -f1)"
+  store_poll_3="$(grep -n '^store-poll$' "$ORDER_LOG" | sed -n '3p' | cut -d: -f1)"
+  es_sync="$(grep -n '^es-annotate$' "$ORDER_LOG" | cut -d: -f1)"
+  es_poll_last="$(grep -n '^es-poll$' "$ORDER_LOG" | tail -1 | cut -d: -f1)"
+  ldap_restart="$(grep -n '^ldap-restart$' "$ORDER_LOG" | cut -d: -f1)"
+  ldap_rollout="$(grep -n '^ldap-rollout$' "$ORDER_LOG" | cut -d: -f1)"
+  ldap_bind="$(grep -n '^ldap-bind$' "$ORDER_LOG" | tail -1 | cut -d: -f1)"
+  [ "$auth_write" -lt "$store_sync" ]
+  [ "$store_sync" -lt "$store_poll_1" ]
+  [ "$store_poll_3" -lt "$es_sync" ]
+  [ "$es_sync" -lt "$es_poll_last" ]
+  [ "$es_poll_last" -lt "$ldap_restart" ]
+  [ "$ldap_restart" -lt "$ldap_rollout" ]
+  [ "$ldap_rollout" -lt "$ldap_bind" ]
+}
+
+@test "dr drill: SecretStore timeout reports ldap_resync and continues through report and teardown" {
+  export DR_TEST_STORE_ALWAYS_NOT_READY=1 K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=1
+  run_drill
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'LDAP admin re-sync failed at store-wait'* ]]
+  [[ "$output" == *'Phase 5/6'* && "$output" == *'Phase 6/6'* ]]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
+  [ "$(jq -r .failed "$result")" = ldap_resync ]
+  [ "$(jq -r .checks.V4 "$result")" = false ]
+  [ "$(grep -c 'annotate externalsecret --all' "$KLOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: failed ExternalSecret read records ldap_resync and still evaluates V4 and phases 5 and 6" {
+  export DR_TEST_ES_GET_FAIL=1 K3DM_HUB_DATA_ESO_POLL_S=1 K3DM_HUB_DATA_ESO_WAIT_S=2
+  run_drill
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Phase 5/6'* && "$output" == *'Phase 6/6'* ]]
+  [[ "$output" == *'LDAP admin re-sync failed at mark'* ]]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
+  [ "$(jq -r .failed "$result")" = ldap_resync ]
+  [ "$(jq -r '.checks | has("V4")' "$result")" = true ]
+  [ "$(jq -r .checks.V4 "$result")" = false ]
+}
+
+@test "dr drill: stale Ready and a failed refresh records ldap_resync and still reaches phases 5 and 6" {
+  export DR_TEST_ES_NOT_READY=1 K3DM_HUB_DATA_ESO_POLL_S=0 K3DM_HUB_DATA_ESO_WAIT_S=0
+  run_drill
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Phase 5/6'* && "$output" == *'Phase 6/6'* ]]
+  [[ "$output" == *'LDAP admin re-sync failed at wait'* ]]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
+  [ "$(jq -r .failed "$result")" = ldap_resync ]
+  [ "$(jq -r .checks.V4 "$result")" = false ]
+  [ "$(jq -r .checks.V6 "$result")" = true ]
+  jq -e '.checks | [.V1,.V2,.V3,.V4,.V5,.V6,.V7] | all(. != null)' "$result" >/dev/null
 }
 
 @test "dr drill: empty age identity refuses before export clone and hub-up" {
