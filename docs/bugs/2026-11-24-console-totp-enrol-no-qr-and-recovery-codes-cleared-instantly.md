@@ -1,13 +1,14 @@
 # Bug: console TOTP enrolment shows no QR code, and the recovery codes are wiped from the screen the instant they appear
 
-**Status:** LANDED — `6eccd121` on `k3d-manager-v1.45.1` (2026-11-24); verify pass (independent Sonnet verifier, 11/15 red on 0420904b); E4 live pending (operator enrol on m5-air after promote). Spec rev 3.
+**Status:** LIVE-VERIFIED — `6eccd121` (+ lint fix `a1486486`) on `k3d-manager-v1.45.1`; verify pass (independent Sonnet verifier, 11/15 red on 0420904b); E4 live PASS on m5-air 2026-11-25 (promoted `a1486486`). Spec rev 3.
+**Live evidence:** 2026-11-25 · run operator-totp-enroll · env m5 · scenario authenticator-qr-scan-then-status-enrolled · commit a1486486 · proves E4
+**Fix commit:** 6eccd121
 **Priority:** P2 (enrolment works only by hand-typing a 32-character secret, and the ten recovery codes cannot be saved; workaround: phone app "Enter a setup key", and `totpctl recovery-regen` later, which has the same instant clear)
 **Triage:** patch → v1.45.1 (blocks the operator's first enrolment and the TOTP live checks of the open release)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** totp-a (enrol design: codes printed then cleared in `finally`); no QR since the start
 **Should have been caught by:** spec (no step said the operator must be able to copy the codes before the clear; no scannable form was asked for)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Intent note:** "go ahead to make the change: option 1" (option 1 = enrolment shows the QR code itself and pauses on the recovery codes until Enter)
 **Prior art:** `ls docs/bugs/*totp*` → three TOTP bugs (tests connect-before-listen, A1 decay, silent lockout/socket DoS), all different root causes; `make find-similar-docs` not run (vector store not reachable from m4) — read, different root cause
@@ -81,6 +82,18 @@ The `/dev/tty` dialogue is read only by the operator. Callers: `bin/k3dm-web-con
 (read by `_wct_repeat_check`, `bin/k3dm-web-console-totp:259`) is unchanged, but it runs the same file under 3.9.6, so an
 import-time syntax error would break install and status too (M7). The installer hash of `totpctl` changes, so a reinstall
 replaces it (`:253`). How-to phrases are read by `scripts/tests/bin/web_console_totp.bats:49-59`.
+
+## Live check — E4 (operator, m5-air, 2026-11-25)
+
+- Promote `a1486486` (the first promote of `9f274656` was refused by hub-promote: CI lint red, ruff F841 in the new test;
+  fixed in `a1486486`), `make install-web-console-totp` replaced the helper, `make web-console-totp-enroll` in Terminal.
+- Scan: the iPhone Camera app handed the QR to a file browser (no code offered); scanning from inside Google Authenticator
+  worked. Proof it was the QR, not hand entry: the new entry is named `k3dm-console: k3dm-console-m5-air`, the issuer and
+  label from the encoded `otpauth://` URI (operator screenshot).
+- `make web-console-totp-status` → `enrolled` (operator screenshot). Enrol only finishes after Enter at the recovery-code
+  pause; the operator did not report the codes clearing early (not separately confirmed).
+- Follow-up for the how-to: say "scan from inside the authenticator app (Google Authenticator: + → Scan a QR code)", not the
+  Camera app.
 
 ## Acceptance
 

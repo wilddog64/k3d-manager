@@ -1,13 +1,14 @@
 # Bug: `make install-web-console-sshd` always fails on macOS: it calls `/usr/bin/chmod`, which does not exist
 
-**Status:** LANDED — `ee2416eb` on `k3d-manager-v1.45.1` (2026-11-24); E1 offline PASS (red on 3a23e839); E2 live pending (operator install on m5-air after promote)
+**Status:** LIVE-VERIFIED — `ee2416eb` on `k3d-manager-v1.45.1` (2026-11-24); E1 offline PASS (red on 3a23e839); E2 live PASS on m5-air 2026-11-24
+**Live evidence:** 2026-11-24 · run operator-install-web-console-sshd · env m5 · scenario first-install-then-sshd-check-exit-0 · commit ee2416eb · proves E2
+**Fix commit:** ee2416eb
 **Priority:** P1 (blocks the v1.45.1 first install of part A, so the TOTP and RevokedKeys live checks cannot run; no workaround without editing the installer)
 **Triage:** patch → v1.45.1 (blocks the open release)
 **Branch:** k3d-manager-v1.45.1
 **Introduced by:** `d6e1e7a6` (totp-b, "enforce RevokedKeys KRL for console certificates")
 **Should have been caught by:** offline test (the fixture resolves every tool by basename, `scripts/lib/web_console_common.sh:26`, so an absolute path that does not exist on macOS can never fail a test)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Prior art:** `ls docs/bugs/*chmod*` none; `make find-similar-docs` returned no rows (vector store not reachable from m4) — none above threshold
 **Detected by:** operator, first `make install-web-console-sshd CA_FILE=…` on m5-air (the hub), 2026-11-24; exit 8 after `web-console-sshd: rolled back an interrupted install`
@@ -36,6 +37,11 @@
 |---|---|
 | `bin/k3dm-web-console-sshd` | line 471 only |
 | `scripts/tests/bin/web_console_tool_paths.bats` (new) | E1 below |
+
+## Live check — E2 (operator, m5-air, 2026-11-24)
+
+`make install-web-console-sshd CA_FILE=…` completed (only the harmless first-install "Unable to load host key" warnings),
+`make web-console-sshd-check` exit 0, sshd listening on 127.0.0.1:42722 (operator screenshots, read by Claude).
 
 ## Acceptance
 
