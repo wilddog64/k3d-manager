@@ -12,7 +12,7 @@ end of this file.
 **Filed:** 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Intent note:** E-B3d carries the approved E-B3W intent unchanged.
-**Approval:** operator, 2026-11-23 — D9; operator, 2026-11-24 — D14, "intents approved"
+**Approval:** operator, 2026-11-23 — D9; operator, 2026-11-24 — D14, "intents approved"; operator, 2026-11-25 — scope exception: `tests/mutants/run-mutant.ps1` (per-mutant test filter), `tests/mutants/mutants.json` (4 b3d mutants), `.github/workflows/mutants.yml` (paths and matrix), landed with b3d.
 
 ## Already on the branch after b3a–b3c
 
@@ -276,3 +276,4 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
   PlanRunner" is checked by diff review (no new control field or parameter reaches PlanRunner), as E-B3d already does for
   PurgeList.Read. Remaining E-B3d mutants (refusal kept, update check before dispatch, cleanup not skipped, isWindows dropped)
   need a per-mutant test filter in the harness: operator scope exception pending.
+- Mutants pushed with the harness change (`386339b`): b3d-refusal-kept (M1), b3d-update-check-first (N2), b3d-cleanup-not-skipped (M4), b3d-iswindows-dropped (M2); each builds locally with 0 errors.
