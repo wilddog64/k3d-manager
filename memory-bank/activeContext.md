@@ -20,7 +20,7 @@
     13 stale statements verified and fixed in 11 docs (webhook :7443 / `make setup-worker`, copilot auth, cve-pins/hub, Trivy
     metric, confirm targets, log path, Pushgateway wording, Hermes R5/R6/R10 note, dr-drill ldap_resync, doctor Slack checks).
   - Plan 1 intents approved (`91d88a47`); **a `358f10b9`, b1 `ee277703`, c `4e3f3c81` LANDED** (verified: tests, red on base, mutants; a had one correction
-    — drop decisions carry approval_id). Two P2 bridge bugs LANDED. **d LANDED `2e90b8c6`** (11 tests, 4 red on base, 4 mutants). **b LANDED `58821022`** (134 tests, 7 mutants; audit caught removed b1 assertions -> Claude restored a direct _watch_entry timeout test). **e dispatched to Flash** (v1460-p1e). Then: plan 1 live check (operator: hub promote, make deploy-worker, make install-cloud-bridge). Note: `resume` returns at once; watch `status`. Next:
+    — drop decisions carry approval_id). Two P2 bridge bugs LANDED. **d LANDED `2e90b8c6`** (11 tests, 4 red on base, 4 mutants). **b LANDED `58821022`, e LANDED `1f87c6f0` — plan 1 all six children landed, offline verified.** Next: CI green on head, then E-P1-live (operator: hub promote, make deploy-worker, make install-cloud-bridge; Deny then Approve one gated request, cluster-status meanwhile). Note: `resume` returns at once; watch `status`. Next:
     verify/land d, b; then e (Flash); GNU-df fix needs operator intent approval + slot. Note: land does not push — push between lands.
   - **e2e M2 skip (P2)** `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md`: M2 ~/.zshenv puts gnubin first,
     `df -g` fails, probe reports 0 GiB (real 307). Spec rev 2 `80a59ad6` after Fable NOT READY (12 findings applied). Waits on
