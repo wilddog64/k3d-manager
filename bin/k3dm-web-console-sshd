@@ -468,7 +468,7 @@ function _wc_stage_keys() {
   local name=ssh_host_ed25519_key digest
   if [[ ! -e "$_WC_PREFIX$_WC_CONF_DIR/revoked_keys" && ! -L "$_WC_PREFIX$_WC_CONF_DIR/revoked_keys" ]]; then
     _wc_priv /usr/bin/ssh-keygen -k -f "$conf_stage/revoked_keys" 2>/dev/null || return 8
-    _wc_priv /usr/bin/chmod 0644 "$conf_stage/revoked_keys" 2>/dev/null || return 8
+    _wc_priv /bin/chmod 0644 "$conf_stage/revoked_keys" 2>/dev/null || return 8
     changes+=("$_WC_CONF_DIR/revoked_keys")
   fi
   hostkey="$_WC_PREFIX$_WC_CONF_DIR/$name"
