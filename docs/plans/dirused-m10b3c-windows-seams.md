@@ -10,7 +10,8 @@ the end of this file.
 **Risk:** high — real ACL, owner and schtasks calls; fail-open mistakes here weaken every plan
 **Implementer:** Luna (Codex). Luna cannot run `tests/Dirused.Tests` (net10.0-windows) on macOS: it must build, and the windows CI job
 is the test gate.
-**Verifier:** Claude: code review from Acceptance, windows CI run, scratch-branch mutants on windows CI
+**Verifier:** Claude: code review from Acceptance, windows CI run, mutants applied inside the windows CI runner (`.github/workflows/mutants.yml`, `tests/mutants/`; no mutated code on any branch)
+**Mutant method:** operator, 2026-11-25 — option 2 ("go with your recommendation 2"): mutate inside the CI runner. The scratch-branch push of mutated security code was blocked (public repo, 2026-11-24). Intent text unchanged.
 **Filed:** 2026-11-24
 **Intent approved:** operator, 2026-11-24
 **Intent note:** E-B3c carries the approved E-B3W intent unchanged.
@@ -154,7 +155,7 @@ evidence:
   - id: E-B3c
     proves: [B3c-M1, B3c-M2, B3c-M3, B3c-M4, B3c-M5, B3c-M6, B3c-M7, B3c-M8, B3c-M9, B3c-N1, B3c-N2]
     kind: offline
-    command: "windows-latest CI job (ci.yml 'windows', dotnet test -c Release). Windows-only mutants proved by Claude on a scratch branch whose windows job goes red, then deleted: skip QueryDosDevice check; MoveNew with overwrite true; IsReparsePoint error → false; skip Load ACL check; Secure without protection; runner reads stdout synchronously (timeout test hangs past 10 s)"
+    command: "windows-latest CI job (ci.yml 'windows', dotnet test -c Release). Windows-only mutants proved by Claude in the runner (workflow `mutants`: a `control` job must pass unmutated; each mutant job applies one find/replace from `tests/mutants/mutants.json`, must build, and the suite must go red): skip QueryDosDevice check; MoveNew with overwrite true; IsReparsePoint error → false; skip Load ACL check; Secure without protection; runner reads stdout synchronously (timeout test hangs past 10 s)"
     intent: "The real Windows task and folder-permission calls are checked on a throwaway task in CI, so a wrong setting is caught before it reaches the jump box."
 interface:
   - "not on a local fixed drive"
@@ -309,3 +310,10 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
   `ChangePermissions`, `TakeOwnership`, `WriteData`/`CreateFiles`, `AppendData`/`CreateDirectories` map to their bits; generic-write
   ACEs → `GenericWrite` plus the bits they imply.
 
+## Verification log (Claude)
+
+- 2026-11-25 review of the Luna diff (`ScheduleWindows.cs` 176 lines, tests 55 lines): code accepted for now; tests miss B3c-M1
+  (Everyone / inherit-only ACEs), B3c-M2 + N1 (no subst test), B3c-M3 (IsReparsePoint), B3c-M6 (no schtasks test), B3c-M7 + N2
+  (extra Everyone ACE on trust.txt). Correction 1 (tests only) sent to Luna, resume 4.
+- Mutant harness drafted by Claude (workflow + `run-mutant.ps1` + `mutants.json`, 6 mutants + control); each find text matches
+  exactly once in the reviewed code. Added to the branch after correction 1 lands.
