@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 08:10 PST — v1.45.1 live checks done; gate fix dispatched — START HERE
+## Handoff — 2026-11-25 06:10 PST — v1.45.1 live checks done; gate fix dispatched — START HERE
 
 **Operator:** at home today (m5-air hub, m2 drill Mac reachable). Only the operator can: hub promote (`make hub-deploy
 REF=…` then `make hub-promote-status`), live checks at a keyboard (m2 drill/HoverFocus, m5 console), the dirused b3c
@@ -209,3 +209,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-24: dirused PR #40 merged by operator (966b32b); Claude tagged v0.0.27 (release workflow building the exe). M10b0/M10b0a/M10b0b → LANDED. Next: operator live E-B0L on jump box with v0.0.27 (schtasks before/after, /schedule 00:30 preview, /confirm not-available); then M10b1–M10b4 (one-time scheduling) need intent approval + jump-box probes P2/P3/P8/P10/P12.
 - 2026-11-24: M10b0 LIVE-VERIFIED on the jump box (v0.0.27): preview exact, UTC right, /confirm not-available line, schtasks before/after empty. Note for M10b2: list size vs current size (one row gone) — say "in the list". Next: M10b1–M10b4 intents (update for D14) + probe script P2/P3/P8/P10/P12.
 - 2026-11-25: istioctl pin bug + hang bug LIVE-VERIFIED `12489efd` (local, push batched with gate-recovery-paste land). m2 hf-p2 log header-only; V4 probe file is the dead first run.
+- 2026-11-25: V4 pre-dispatch probe PASS on m2 (store Valid after auth repoint, bind rc 0); found ES-before-store-Ready ordering race; plan rev 3 (N5, E1 intent) — needs operator E1 re-approval, then dispatch Luna.
