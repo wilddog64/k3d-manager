@@ -1,88 +1,49 @@
-## Handoff — 2026-11-25 06:10 PST — v1.45.1 live checks done; gate fix dispatched — START HERE
+## Handoff — 2026-11-25 11:25 PST — v1.45.1 released; v1.46.0 open — START HERE
 
-**Operator:** at home today (m5-air hub, m2 drill Mac reachable). Only the operator can: hub promote (`make hub-deploy
-REF=…` then `make hub-promote-status`), live checks at a keyboard (m2 drill/HoverFocus, m5 console), the dirused b3c
-choice, and the jump-box probe. **Undelivered reminder:** dirused overnight probe on the office jump box (normal window):
-`tools/m10b3-probes.ps1` from dirused branch `m10b-scheduled-purge` → `setup`, `run12`, disconnect; next morning `collect`,
-`cleanup`; send output (confirms P10, gates E-B3L1/E-B3L2). Ask whether it was started.
+- **Operator:** home today; at the office tomorrow (jump box reachable only there). Only the operator can: collect the
+  dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, check CI first), m5
+  console steps, merges, approvals and live-check waivers.
 
-**1. Gate recovery-code paste/lookalike fix (P2, v1.45.1)** — `docs/bugs/2026-11-25-console-gate-recovery-code-paste-and-lookalikes-rejected-silently.md`
-- Spec rev 2 (Fable "ready after should-fix", all taken) `125899d6`; dispatched to Flash (agy, gemini-3.8-flash-medium),
-  slug `gate-recovery-paste`, worktree `~/.local/share/k3d-manager/worktrees/v1.45.1/gate-recovery-paste`.
-- Next (Claude): `bin/k3dm-codex-dispatch status gate-recovery-paste`; independent verify from Acceptance only (E1/E2 red
-  on `9cca0789` then green; whole `scripts/tests/bin/test_web_console_totp.py`; gate must stay Python 3.9 `-IS`); land
-  with that pytest file as `--test`. Then operator: promote + `make install-web-console-totp` + E4 (paste a recovery code
-  at the console; count drops by one; Claude checks log +113 B). Bug cannot close without E4.
+1. **dirused (OOB, branch `m10b-scheduled-purge`, worktrees under `~/.local/share/k3d-manager/worktrees/v0.0.28/`).**
+   Done: b3c `a224279`, b3d `009fb14` (10/10 in-runner mutants, windows CI 114/114). Next, in order: (a) 2026-11-26 the
+   operator runs the probe `collect` on the jump box and sends `report.txt`, then `cleanup`; Claude records the result
+   in `docs/plans/dirused-m10b3-runplan-windows.md` and `docs/plans/dirused-m10b-scheduled-purge.md` (gates E-B3L1 and
+   E-B3L2). (b) E-B3L1 attended small-file purge (operator). (c) M10b4 docs (intents pending operator approval).
+   (d) dirused PR. E-B3L2 waits on log growth (team cleaned the logs). Claude can draft M10b4 now.
+2. **k3d-manager v1.46.0 (branch `k3d-manager-v1.46.0`, groomed 5/5 on 2026-11-22; see `docs/roadmap.md`).** Not started
+   this session. Claude can begin per the dispatch queue once the operator says go.
+3. **v1.45.1 carry-overs, LANDED, live check pending (P2/P3, non-blocking):** console TOTP A1 decay/rotate and gate
+   lockout (`docs/bugs/2026-11-23-console-totp-*`), CVE pins at-home steps
+   (`docs/bugs/2026-11-23-cve-pins-branch-trusted-without-verification.md`), `make sync-branch` round trip, next sandbox
+   preflight. Each bug's Waiting-on line says who acts.
+4. **HoverFocus:** P2 probe UX broken; get the make-key event-record layout from upstream source pinned at a tag
+   (cite it), rewrite the probe to check itself, then write L3/F2/U1 child specs.
+5. **Triage due:** P3 captures from 2026-11-23..25 under `docs/bugs/` with `OPEN — capture` (incl. unpinned Copilot CLI
+   in CI, 15-minute drill preflight clone). Captures still owed: first-install host-key warning; lib-foundation
+   `timeout` missing on macOS in install_istioctl.bats; QR how-to note (scan from inside the authenticator app); flaky
+   dirused ProgramPurgeTests; hub_data export-path intermittent failure.
 
-**2. v1.45.1 release (branch `k3d-manager-v1.45.1`, HEAD pushed, hub promoted `a1486486`)**
-- LIVE-VERIFIED today: TOTP enrol QR bug (E4), chmod install bug (E2), totp-b L1 and totp-a2 L2 (plans updated).
-  istioctl pin bug + version-probe hang bug LIVE-VERIFIED `12489efd` (E6/E7/E4 read from m2 `~/k3dm-e6e7-20261124T193757/`; E7 proves M1).
-- Blocking the release PR: V4 LDAP resync. Operator runs `~/k3dm-v4-probe.sh` on m2 (plain Terminal; kept `dr-drill`
-  cluster, kubeconfig `~/.k3dm/dr-drill/kubeconfig`; only file on m2 is the 2026-11-24 20:28 first run that died — rerun owed); Claude reads `~/k3dm-v4-probe-*.txt`, records under "Pre-dispatch
-  proof" in `docs/plans/v1.45.1-dr-drill-v4-ldap-resync.md`, then dispatches V4 defect 1 to Luna if the bind passes.
-- Then release PR (normal, not draft; Argon blind review, Copilot capped until 2026-12-01), CI green, live smoke.
-- P3 captures owed (short docs, Waiting on: operator decision): first-install "Unable to load host key" warning;
-  `timeout` absent on bare macOS in lib-foundation `install_istioctl.bats`; drill preflight clone ~15 min on m2;
-  TOTP how-to: scan the QR from inside the authenticator app, not the Camera app.
+**Dispatches:** 0 open of WIP 3 (`bin/k3dm-codex-dispatch open` empty; Argon review run abandoned after triage).
+**Open PRs:** #158 Dependabot wrangler-action v3→v4, deferred by operator (needs a v4 changes look).
 
-**3. HoverFocus v0.0.3** — `docs/plans/hoverfocus-v0.0.3-plan.md`
-- P3 signing PASS (recorded in plan "Probe results"); m2 now runs the signed build ("HoverFocus Local Signing").
-- Next: operator runs `~/hf-probe/hf-p2.sh` on m2 (iTerm needs Accessibility); log `~/hf-p2-*.txt` (04:38 run 2026-11-25 has the header only — no scenario results; ask operator). Then Claude writes
-  child specs L3 (focus correctness, Luna), F2 (signing + README, Flash; README must say: quit Settings, remove, re-add),
-  U1 (visible errors, Luna); U2 after L3. Fable review before dispatch. Branch `v0.0.3` not cut yet.
-
-**4. dirused (OOB, office jump box)**
-- Operator chose option 2 (2026-11-25): mutants applied inside the windows CI runner. Harness drafted in scratch
-  (`scratchpad/b3c-mutants/`: mutants.yml, run-mutant.ps1, mutants.json; 6 mutants + control). After correction 1: review, commit
-  code + harness on the task branch, push, read windows + mutants runs, land b3c. Then b3d, M10b4 docs, dirused PR.
-
-**Dispatches:** 2 open of WIP 3 — `v4-ldap-resync` (Luna, running, spec rev 3 `1ed88a1f`), dirused b3c LANDED (dirused `a224279`, pushed). `v4-ldap-resync` LANDED `cf743007` (E5 live drill on m2 pending).
-
-**Owed / carried:** MEMORY.md over 9 KB (compress at a break); release groom Sun 2026-11-29; triage of captured bugs;
-argon classification backlog; PR #158 (dependabot wrangler-action) open; m5-air test cert `~/.ssh/k3dm-console-test*`
-expires 2026-11-26 (operator may delete).
+**Owed / decisions:** ideas for next grooming: drill failure-path hook, OOB client onboarding checklist (pilot dirused).
+product-catalog 82 HIGH/CRIT with candidate still 62: remediation rebuilds may not converge (base image?), look after
+v1.46.0 starts. Copilot capped until 2026-12-01: release PRs get a blind Argon review.
 
 **Standing facts:**
 - Handoff guard: `.claude/hooks/handoff-on-clear.sh` reports STALE if commits land after this header; bump the time on edit.
 - Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-25.md` (then `-2026-11-23.md`, `-2026-11-22.md`).
 - Source of truth for open work: `docs/bugs/` Waiting-on lines, `bin/k3dm-codex-dispatch open`, plan Status lines.
 - Push via `SSH_AUTH_SOCK=/var/run/com.apple.launchd.uw3bpQR945/Listeners`; each push restarts CI; hub-promote refuses a
-  SHA whose check runs are not all green (lint included: run `make lint-python RUFF=<ruff 0.15.8>` before landing Python).
-- Never ask for or accept secrets in chat: the operator pasted two recovery codes 2026-11-25; set regenerated since.
-- Known agent failure modes: Codex sandbox cannot commit; agents report suites they did not run; worker cd failures can
-  delete untracked files in the main checkout; mutants can reach real sudo unless the suite stubs sudo/launchctl.
+  SHA whose check runs are not all green; check CI on the exact SHA before giving promote commands.
+- verified-stage needs the full 40-hex commit and `--ref deploy/hub` until a release reaches `main`; dr-drill needs a
+  TTY (`ssh -tt`); m2/m5 reachable as `m2-air.local` / `m5-air.local`.
+- Never ask for or accept secrets in chat.
+- Known agent failure modes: Codex sandbox cannot commit; agents report suites they did not run; workers bend production
+  code to pass a wrong test (check the spec's design rule); tests can pass on leftover runner state (isolate state).
 - Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
-  agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first).
-
-- 2026-11-25 post-merge: v1.45.1 merged 19d396ed, tagged and released; enforce_admins restored; now on k3d-manager-v1.46.0 (groomed 5/5). Open carry-overs: 5 LANDED P2/P3 live checks (totp a1 decay, totp gate lockout, cve-pins, make sync-branch, preflight rename); dirused jump-box probe collect 2026-11-26; HoverFocus probe rewrite; #158 deferred.
-- 2026-11-25 11:55 Argon PR #165: 2 low (V1 _err via pipeline: refuted; totpctl fin/fout isatty: real, unreachable) → no change, docs/issues/2026-11-25-argon-pr165-review-findings.md. Waiting CI on final head, then enforce_admins off.
-- 2026-11-25 11:40 PR #165 (v1.45.1) opened, not draft. Argon blind review dispatched (release-pr165-v1.45.1-review, agy gemini-4-argon-medium, pid 86935); CI on head running. Alerts L1 LIVE-VERIFIED; 5 P2/P3 still LANDED (listed in PR notes). #158 deferred (operator).
-- 2026-11-25 11:10 root-installers E15 LIVE-VERIFIED (m5 console; bootstrap installed at 65fd63f2, stage --ref deploy/hub, sudo dropped both times). All v1.45.1 bugs LIVE-VERIFIED → release PR next.
-- 2026-11-25 10:35 LIVE-VERIFIED: age-identity E6 (ssh -tt drill on m2: Phase 1 refusal in 2 s), token bug (E9 scan + operator accept), V4 bug (E5 + defect 2 waived). Idea filed: drill failure-path hook. Remaining for v1.45.1: root-installers E15 (operator at m5 console), then release PR.
-- 2026-11-25 10:20 hub promoted 65fd63f2. Token bug E9: scan half PASS (app-cve-scan-e9, deleted); verify half not exercisable (6 events all applied) → operator decision. Open: defect 2 E4 decision, age-identity E6 (locked-Keychain SSH drill), root-installers E15 (m5 console). Note: product-catalog 82 HIGH/CRIT, candidate still 62 — rebuild loop may not converge.
-- 2026-11-25 09:50 P3 captured: docs/bugs/2026-11-25-ci-copilot-cli-installed-unpinned-latest.md (CI run 45660622977 red at Copilot CLI checksum). Hub promote of 65fd63f2 waits on its CI (operator rerun when green).
-- 2026-11-25 09:40 V4 defect 1 LIVE-VERIFIED: m2 drill 20261125T173312Z success, V0-V9 true, RTO 644 s (HEAD c5bcf645). Defect 2 E4 (V4-false path) not exercisable by a passing drill → operator decision. Next: v1.45.1 release PR.
-- 2026-11-25 09:35 P3 captured: docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md (preflight clone 09:07→09:22 on m2). E5 drill running on m2 (watching).
-- 2026-11-25 09:05 dirused b3d LANDED `009fb14` (10/10 mutants, CI green; N2 state-isolation fix `009fb14`). Next dirused: jump-box probe collect 11-26 → E-B3L1 → M10b4 docs → PR.
-- (prior) 2026-11-25 08:55 dirused b3d: windows CI green on task branch `e34100a` (114/114 + 391); 3 CI rounds fixed test defects (Claude reverted Luna's Pacific-zone production change; spec rev 2 M2 uses `22:30 PT`). Next: harness per-mutant filter (operator scope exception) → 4 mutants → land.
-
-## Handoff (2026-11-25, after v1.45.1 release)
-
-- **Objective done:** v1.45.1 shipped — PR #165 merged `19d396ed`, tag + GitHub release v1.45.1 (latest), enforce_admins
-  restored, next branch `k3d-manager-v1.46.0` (groomed 5/5). Retro `docs/retro/2026-11-25-v1.45.1-retrospective.md`.
-- **Evidence:** 9 bugs LIVE-VERIFIED with Live evidence lines (V4 drill 20261125T173312Z; age-identity E6 SSH drill 2 s;
-  token E9 scan; root-installers E15 m5 console; alerts L1 hub Prometheus; gate paste; istioctl x2; sshd chmod; QR).
-  Argon PR #165: 2 low, no change (`docs/issues/2026-11-25-argon-pr165-review-findings.md`). Hub smoke 30/30 healthy.
-- **Decisions (operator):** V4 defect 2 E4 waived + drill failure-path hook idea; token E9 verify half accepted offline;
-  #158 (wrangler-action v4) deferred; OOB client onboarding checklist idea filed (pilot dirused).
-- **Open, next session:** (1) dirused jump-box probe collect 2026-11-26 → report.txt, cleanup, record E-B3L1/E-B3L2 gates;
-  then E-B3L1 attended, M10b4 docs, dirused PR (b3d LANDED `009fb14`). (2) 5 LANDED P2/P3 live checks: totp a1 decay,
-  totp gate lockout, cve-pins at-home steps, make sync-branch round trip, next sandbox preflight. (3) HoverFocus probe
-  rewrite from upstream source at a tag. (4) P3 captures owed: host-key warning, lib-foundation `timeout` on macOS, QR
-  how-to note, dirused flaky ProgramPurgeTests, hub_data export-path flake. (5) product-catalog 82 HIGH/CRIT, candidate 62:
-  rebuild loop may not converge (base image?). (6) Triage due: several P3 captures from 2026-11-23..25.
-- **Gotchas learned:** verified-stage needs the full 40-hex commit and `--ref deploy/hub` before a release reaches main;
-  dr-drill needs a TTY (`ssh -tt`); check CI on the exact SHA before giving promote commands.
+  agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first);
+  old local tags v0.1.0-v1.0.3 differ from origin (`fetch --tags` refuses; harmless).
 
 ## Standing rules (current)
 
