@@ -44,6 +44,11 @@ purpose, client-only, never contacts the cluster. Then tag v0.5.10, and `git sub
 
 Dispatch A: `bin/k3dm-codex-dispatch start --spec docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md --repo ~/src/gitrepo/personal/lib-foundation --branch release/v0.5.10 --agent codex --model gpt-6-luna --coordinator anthropic/claude-opus-5-5`
 
+## Files
+
+Child A (lib-foundation): `scripts/lib/core.sh`, `scripts/tests/lib/install_istioctl.bats`, `CHANGE.md`.
+Child B (k3d-manager, Claude): `scripts/lib/foundation/` (subtree pull), `CHANGELOG.md`.
+
 ## Contract readers
 
 `_istioctl_client_version` and `_ISTIOCTL_FOUND_VERSION` (grep `scripts/` in lib-foundation, 2026-11-24): writer
