@@ -193,3 +193,4 @@
 - 2026-11-23: A2 approved, intents E1–E3 approved by operator; waits for a WIP slot (no WIP exception given).
 - 2026-11-23: m4-air istioctl upgraded 1.30.0 → 1.31.4 (sha256 verified against spec pin) by operator via Claude script; no longer refused by the istioctl-a 1.31.x gate.
 - 2026-11-24: r2-a correction 3 dispatched (operator approved); Fable bootstrap design review approved as pre-land gate.
+- **2026-11-25:** istioctl pin bug (2026-11-23) + version-probe hang bug (2026-11-24) LIVE-VERIFIED `12489efd`: E6 refusal, E7 pinned 1.31.4 downloaded + precheck clean (drill rc 2 from V4 only), E4 no hang.

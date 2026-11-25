@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 05:55 PST — v1.45.1 live checks done; gate fix dispatched — START HERE
+## Handoff — 2026-11-25 08:10 PST — v1.45.1 live checks done; gate fix dispatched — START HERE
 
 **Operator:** at home today (m5-air hub, m2 drill Mac reachable). Only the operator can: hub promote (`make hub-deploy
 REF=…` then `make hub-promote-status`), live checks at a keyboard (m2 drill/HoverFocus, m5 console), the dirused b3c
@@ -16,11 +16,9 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
 
 **2. v1.45.1 release (branch `k3d-manager-v1.45.1`, HEAD pushed, hub promoted `a1486486`)**
 - LIVE-VERIFIED today: TOTP enrol QR bug (E4), chmod install bug (E2), totp-b L1 and totp-a2 L2 (plans updated).
-  istioctl hang fix live PASS (E6/E7 on m2) but `docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md`
-  still says LANDED/E4 pending — Claude: mark LIVE-VERIFIED (needs Live evidence + Fix commit lines; pre-commit enforces)
-  and update the parent istioctl bug's E6/E7.
+  istioctl pin bug + version-probe hang bug LIVE-VERIFIED `12489efd` (E6/E7/E4 read from m2 `~/k3dm-e6e7-20261124T193757/`; E7 proves M1).
 - Blocking the release PR: V4 LDAP resync. Operator runs `~/k3dm-v4-probe.sh` on m2 (plain Terminal; kept `dr-drill`
-  cluster, kubeconfig `~/.k3dm/dr-drill/kubeconfig`); Claude reads `~/k3dm-v4-probe-*.txt`, records under "Pre-dispatch
+  cluster, kubeconfig `~/.k3dm/dr-drill/kubeconfig`; only file on m2 is the 2026-11-24 20:28 first run that died — rerun owed); Claude reads `~/k3dm-v4-probe-*.txt`, records under "Pre-dispatch
   proof" in `docs/plans/v1.45.1-dr-drill-v4-ldap-resync.md`, then dispatches V4 defect 1 to Luna if the bind passes.
 - Then release PR (normal, not draft; Argon blind review, Copilot capped until 2026-12-01), CI green, live smoke.
 - P3 captures owed (short docs, Waiting on: operator decision): first-install "Unable to load host key" warning;
@@ -29,7 +27,7 @@ choice, and the jump-box probe. **Undelivered reminder:** dirused overnight prob
 
 **3. HoverFocus v0.0.3** — `docs/plans/hoverfocus-v0.0.3-plan.md`
 - P3 signing PASS (recorded in plan "Probe results"); m2 now runs the signed build ("HoverFocus Local Signing").
-- Next: operator runs `~/hf-probe/hf-p2.sh` on m2 (iTerm needs Accessibility); log `~/hf-p2-*.txt`. Then Claude writes
+- Next: operator runs `~/hf-probe/hf-p2.sh` on m2 (iTerm needs Accessibility); log `~/hf-p2-*.txt` (04:38 run 2026-11-25 has the header only — no scenario results; ask operator). Then Claude writes
   child specs L3 (focus correctness, Luna), F2 (signing + README, Flash; README must say: quit Settings, remove, re-add),
   U1 (visible errors, Luna); U2 after L3. Fable review before dispatch. Branch `v0.0.3` not cut yet.
 
@@ -210,3 +208,4 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-11-24: M10b0a LANDED c6283a2 on dirused PR #40 (248/248 incl. verifier + Claude acceptance; day-before DST regression fixed in correction 1), verify + offline_tested. Windows CI failed again (writers LF, expectations Environment.NewLine) → M10b0b test-only spec, Luna, LANDED 8a4eb86 (4 lines, grep gate 0), verify + offline_tested. Waiting: PR #40 windows CI on 8a4eb86, then operator live E-B0L on jump box, operator merge + release tag.
 - 2026-11-24: dirused PR #40 merged by operator (966b32b); Claude tagged v0.0.27 (release workflow building the exe). M10b0/M10b0a/M10b0b → LANDED. Next: operator live E-B0L on jump box with v0.0.27 (schtasks before/after, /schedule 00:30 preview, /confirm not-available); then M10b1–M10b4 (one-time scheduling) need intent approval + jump-box probes P2/P3/P8/P10/P12.
 - 2026-11-24: M10b0 LIVE-VERIFIED on the jump box (v0.0.27): preview exact, UTC right, /confirm not-available line, schtasks before/after empty. Note for M10b2: list size vs current size (one row gone) — say "in the list". Next: M10b1–M10b4 intents (update for D14) + probe script P2/P3/P8/P10/P12.
+- 2026-11-25: istioctl pin bug + hang bug LIVE-VERIFIED `12489efd` (local, push batched with gate-recovery-paste land). m2 hf-p2 log header-only; V4 probe file is the dead first run.
