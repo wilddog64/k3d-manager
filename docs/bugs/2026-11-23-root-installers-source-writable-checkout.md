@@ -1,11 +1,12 @@
 # Bug: root installers source libraries from the operator-writable checkout
 
-**Status:** LANDED — all children on k3d-manager-v1.45.1: A `ff3e6cf9`, B `901329af`, C `5d9e6410`, D `afb79533` (2026-11-24); live check after hub promote and the operator Rollout (E15)
+**Status:** LIVE-VERIFIED — all children on k3d-manager-v1.45.1: A `ff3e6cf9`, B `901329af`, C `5d9e6410`, D `afb79533`; E15 live PASS on m5-air console 2026-11-25 (bootstrap at `65fd63f2`)
+**Live evidence:** 2026-11-25 · run operator-e15-m5-console · env m5-air · scenario bootstrap-stage-run-sudo-dropped · commit 65fd63f2 · proves E15
+**Fix commit:** ff3e6cf9 (A); 901329af (B); 5d9e6410 (C); afb79533 (D)
 **Priority:** P2 (operator, 2026-11-23: doc + bug, does not block v1.45.0)
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-24 (hub promote, then operator Rollout / E15)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "can you spec R2 and have Fable and Argon to review independently")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -588,3 +589,18 @@ Fable round 2 on rev 2 (e350217d). Operator decisions: S8 accepted; Q9 allow wit
 | Directive (operator via Claude) | F1.11 runs the installer as a child, not via `exec`, so the bootstrap can run `sudo -k` after it |
 
 Rev 2 references above (F2.1-F2.4, F3.1-F3.6, M8, N7, N9, E6, E8, E13) name rev 2's numbering; rev 3 removed or renumbered them.
+
+## Live result (E15, 2026-11-25)
+
+Operator at the m5-air physical console; Claude read the pasted output.
+
+- Bootstrap: iPad GitHub API `sha` for `bin/k3dm-verified-stage?ref=65fd63f2` = `b364d3a21b2327ab84a35416ad4f9df568a7f57f`;
+  root `env -i` curl download hashed with clean-env `git hash-object` = same; installed root:wheel 0755; `sudo -k`.
+- Stage: short hash refused (`invalid commit`: the bootstrap requires 40 hex). Full hash with the default ref refused
+  `commit not reachable from main` (v1.45.1 not merged yet). `stage 65fd63f2b00e7490a6e84b49eba27d4a3dba7c5d --ref deploy/hub`
+  printed `commit: 65fd63f2…`, `origin/deploy/hub: 65fd63f2… (commit tip)`, the protected blob list and the three `run`
+  forms. `sudo -n true` right after: failed (`sudo dropped: OK`).
+- Run: `k3dm-promote-authority print-plan` printed the plan only; `k3dm-web-console-sshd check` C1-C7 and C10 PASS,
+  C8 WARN (reports PasswordAuthentication no, KbdInteractiveAuthentication no), C9 INFO; `k3dm-web-console-totp status`
+  `enrolled`. `sudo -n true` after the runs: failed (`sudo dropped: OK`).
+- Note for the how-to: stage needs the full 40-character commit, and `--ref deploy/hub` until the release reaches `main`.

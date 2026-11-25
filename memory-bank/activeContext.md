@@ -54,6 +54,7 @@ expires 2026-11-26 (operator may delete).
 - Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
   agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first).
 
+- 2026-11-25 11:10 root-installers E15 LIVE-VERIFIED (m5 console; bootstrap installed at 65fd63f2, stage --ref deploy/hub, sudo dropped both times). All v1.45.1 bugs LIVE-VERIFIED → release PR next.
 - 2026-11-25 10:35 LIVE-VERIFIED: age-identity E6 (ssh -tt drill on m2: Phase 1 refusal in 2 s), token bug (E9 scan + operator accept), V4 bug (E5 + defect 2 waived). Idea filed: drill failure-path hook. Remaining for v1.45.1: root-installers E15 (operator at m5 console), then release PR.
 - 2026-11-25 10:20 hub promoted 65fd63f2. Token bug E9: scan half PASS (app-cve-scan-e9, deleted); verify half not exercisable (6 events all applied) → operator decision. Open: defect 2 E4 decision, age-identity E6 (locked-Keychain SSH drill), root-installers E15 (m5 console). Note: product-catalog 82 HIGH/CRIT, candidate still 62 — rebuild loop may not converge.
 - 2026-11-25 09:50 P3 captured: docs/bugs/2026-11-25-ci-copilot-cli-installed-unpinned-latest.md (CI run 45660622977 red at Copilot CLI checksum). Hub promote of 65fd63f2 waits on its CI (operator rerun when green).
