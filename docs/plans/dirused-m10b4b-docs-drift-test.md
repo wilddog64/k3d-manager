@@ -112,7 +112,7 @@ evidence:
   - id: E-B4b-mutants
     proves: [B4b-M2, B4b-N2]
     kind: offline
-    command: "with M10b4a landed, in a scratch copy, each change makes the named fact fail: (a) add the literal \"refused: test only\" to any src/Dirused.Common file -> Purge_doc_section_names_every_refusal; (b) delete one /schedule line from README.md -> Readme_contains_every_schedule_usage_line; (c) delete '`task missing`' from purge.md -> Purge_doc_section_names_every_list_state; (d) rename dirused.sln -> all three docs facts fail on the root assertion; (e) delete src/Dirused.Common/PlanRunner.cs -> Purge_doc_section_names_every_refusal fails on the 10-prefix floor"
+    command: "with M10b4a landed, in a scratch copy, each change makes the named fact fail: (a) add the literal \"refused: test only\" to any src/Dirused.Common file -> Purge_doc_section_names_every_refusal; (b) delete one /schedule line from README.md -> Readme_contains_every_schedule_usage_line; (c) delete '`task missing`' from purge.md -> Purge_doc_section_names_every_list_state; (d) rename dirused.sln -> all three docs facts fail on the root assertion; (e) rewrite every \"refused: literal in src/Dirused.Common/PlanRunner.cs to \"denied: (deleting the file does not compile) -> Purge_doc_section_names_every_refusal fails on the 10-prefix floor"
     intent: "Adding a new refusal or option without updating the docs makes CI fail."
   - id: E-B4b-scope
     proves: [B4b-N3]
