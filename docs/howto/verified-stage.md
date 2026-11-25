@@ -65,7 +65,9 @@ Run the stage wrapper as the operator (**do not type sudo**; the wrapper manages
 ```bash
 /usr/local/libexec/k3dm/k3dm-verified-stage stage <c> [--ref <branch>]
 ```
+- `<c>` must be the **full 40-character commit hash**; a short hash is refused with `invalid commit`.
 - If `--ref` is omitted, it defaults to `main`.
+- A commit not yet merged to `main` (a release before its PR merges) is refused with `commit not reachable from main`; stage it with `--ref deploy/hub` once it has been promoted.
 - If `--ref` is set to any branch other than `main` (for example, `--ref deploy/hub` or a release branch), the bootstrap prints an `UNPROTECTED REF <name>` notice to remind the operator that the branch lacks ruleset protection.
 - The wrapper invalidates any existing sudo ticket (`sudo -k`), invokes the root staging step via `sudo`, and immediately invalidates the ticket again (`sudo -k`) upon completion or interruption.
 - The bootstrap fetches into `/private/var/db/k3dm-verified/repo.git`, recreates `/private/var/db/k3dm-verified/stage/<c>`, writes the verified marker `.git/k3dm-verified`, strips ACLs (`chmod -RN`), removes write bits (`chmod -R go-w`), and prints:
