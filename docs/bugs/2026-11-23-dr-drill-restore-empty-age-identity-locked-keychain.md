@@ -1,11 +1,12 @@
 # Bug: `make dr-drill` restore fails with an opaque `age: no identities found` when the login Keychain is locked
 
-**Status:** LANDED — `77d5a836` on k3d-manager-v1.45.1 (2026-11-23), Sonnet acceptance verify pass; E6 live (operator, m2-air drill) pending; was: OPEN — spec rev 2
+**Status:** LIVE-VERIFIED — `77d5a836` on k3d-manager-v1.45.1 (2026-11-23); E6 live PASS on m2-air 2026-11-25
+**Live evidence:** 2026-11-25 · run claude-ssh-tty-drill-20261125 · env m2-air · scenario ssh-locked-keychain-refuses-phase1-in-2s · commit ed0b1f82 · proves E6
+**Fix commit:** 77d5a836
 **Priority:** P2 (Claude's proposal; the drill cannot run from an SSH session, workaround: unlock the Keychain first)
 **Introduced by:** edfc9a5c (v1.43.0, hub data restore)
 **Should have been caught by:** offline test (empty identity from `_secret_load_data` is not rejected)
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-23
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -131,3 +132,12 @@ interface:
 ## Routing
 
 Luna, one task together with the V4 fix (both touch `hub_data.sh` and `hub_data.bats`).
+
+## Live result (E6, 2026-11-25)
+
+Claude ran `make dr-drill` on m2-air over `ssh -tt` (operator: "you can trigger drill on m2?"), HEAD `ed0b1f82` (contains
+`77d5a836`). `security show-keychain-info` in the same session: "User interaction is not allowed" (login Keychain not
+usable over SSH; nothing was locked or unlocked by Claude). Output: `[dr-drill] Phase 1/6 — preflight`, then
+`ERROR: [dr-drill] age identity unreadable (login Keychain locked over SSH?): run security unlock-keychain
+~/Library/Keychains/login.keychain-db`, make exit 2, 2 seconds end to end, no clone and no cluster (M1). A first attempt
+without a terminal stopped earlier at `interactive TTY required`, as designed.

@@ -1,11 +1,12 @@
 # Bug: app-cluster bearer token passed in kubectl argv by the CVE scan and verifier
 
-**Status:** LANDED — `4b831c81` on `k3d-manager-v1.45.1` (2026-11-23; independent verifier pass after correction); hub promoted `65fd63f2` 2026-11-25; E9 scan half PASS live, verify half not exercisable (no promotion_requested events) — operator decision
+**Status:** LIVE-VERIFIED — `4b831c81` on `k3d-manager-v1.45.1`; hub promoted `65fd63f2` 2026-11-25; E9 scan half live PASS, verify half accepted on the job's clean run plus offline E1/E2 (operator, 2026-11-25)
+**Live evidence:** 2026-11-25 · run app-cve-scan-e9 · env m5-air · scenario promoted-scan-reads-app-cluster-via-kubeconfig · commit 65fd63f2 · proves E9
+**Fix commit:** 4b831c81
 **Priority:** P2
 **Introduced by:** pre-existing in `cve-remediation-verify.sh:9-11` (not in the v1.45.0 diff); `app-cve-scan.sh:149-160` unknown (file rewritten in plan 2e)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-25 (E9 verify half: accept the job's clean run plus offline E1/E2, or wait for the next promotion_requested remediation event)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: "distribute tasks across flash and luna")
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -193,3 +194,6 @@ Claude read-only on m5-air, long strings masked before reading.
   log. `_load_access` built the kubeconfig (it fails the job with a message otherwise), but the script calls the app cluster
   only for `promotion_requested` events, and all 6 remediation events are `applied`, so no app-cluster call was made. The
   script never prints the server, so E9's "server in a verify job's kubectl output" is not observable without such an event.
+
+**Operator decision (2026-11-25):** "first two accept your recommendation" — the verify half of E9 is accepted on the
+18:15Z job's clean run (kubeconfig built) plus offline E1/E2; it shares the kubeconfig builder the scan proved live.

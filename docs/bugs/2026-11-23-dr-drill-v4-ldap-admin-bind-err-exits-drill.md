@@ -1,11 +1,12 @@
 # Bug: dr-drill dies silently at V4 — restored LDAP rejects the admin password and `_err` exits the drill
 
-**Status:** LANDED — defect 1 `cf743007` LIVE-VERIFIED 2026-11-25 (E5: drill report 20261125T173312Z on m2-air, success, V4 true); defect 2 `da956fbd` (2026-11-23): its live E4 needs a drill where V4 fails, which a passing drill cannot show — operator decision
+**Status:** LIVE-VERIFIED — defect 1 `cf743007` (E5 live PASS, m2-air drill 20261125T173312Z); defect 2 `da956fbd` accepted on offline E1-E3 (operator, 2026-11-25)
+**Live evidence:** 2026-11-25 · run 20261125T173312Z · env m2-air · scenario full-dr-drill-v4-true-success · commit c5bcf645 · proves E5
+**Fix commit:** cf743007 (defect 1); da956fbd (defect 2)
 **Priority:** P2 (proposed) — the DR drill cannot pass, so there is no current restore proof; no workaround
 **Introduced by:** unknown (the `_err` inside `hub_data_verify_ldap`; last full drill pass 2026-11-04)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-25 (defect 2 E4: accept the offline E1-E3 proof, or run one drill with V4 forced false)
 **Triage:** patch → v1.45.1 (operator, 2026-11-23: v1.45.1 = security and DR release)
 **Branch:** k3d-manager-v1.45.1
 **Intent approved:** operator, 2026-11-23
@@ -157,3 +158,7 @@ V0-V7 and V9 all true, `rto_seconds: 644`, `rpo_seconds: 20921`. Drill cluster d
 `k3d-cluster` remain). Phases: preflight clone 09:07-09:22 (P3 filed:
 `docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md`), hub-up 09:22, restore 09:27, checks
 and report 09:32, teardown 09:33.
+
+**Operator decision (2026-11-25):** "accept your recommendation" — defect 2's live E4 (a drill with V4 false) is waived:
+E1's fake kubectl exits the shell on failure like the real one. A drill test hook to force V4 false is filed in
+`docs/ideas.md` (2026-11-25).
