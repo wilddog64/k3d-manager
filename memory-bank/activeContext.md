@@ -20,7 +20,7 @@
     13 stale statements verified and fixed in 11 docs (webhook :7443 / `make setup-worker`, copilot auth, cve-pins/hub, Trivy
     metric, confirm targets, log path, Pushgateway wording, Hermes R5/R6/R10 note, dr-drill ldap_resync, doctor Slack checks).
   - Plan 1 intents approved (`91d88a47`); **a `358f10b9`, b1 `ee277703`, c `4e3f3c81` LANDED** (verified: tests, red on base, mutants; a had one correction
-    — drop decisions carry approval_id). Two P2 bridge bugs LANDED. **d and b dispatched to Luna** (v1460-p1d, v1460-p1b). Next:
+    — drop decisions carry approval_id). Two P2 bridge bugs LANDED. **d LANDED `2e90b8c6`** (11 tests, 4 red on base, 4 mutants). **b**: code OK but only 2 tests -> 12-test correction resume running (note: `resume` returns at once; watch `status`). Next:
     verify/land d, b; then e (Flash); GNU-df fix needs operator intent approval + slot. Note: land does not push — push between lands.
   - **e2e M2 skip (P2)** `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md`: M2 ~/.zshenv puts gnubin first,
     `df -g` fails, probe reports 0 GiB (real 307). Spec rev 2 `80a59ad6` after Fable NOT READY (12 findings applied). Waits on
