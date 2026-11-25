@@ -41,6 +41,7 @@
 - **2026-11-24:** two ideas rows added to docs/ideas.md for Sunday groom: independent second plan (Argon writes its own plan for large designs), cap spec review at 2 rounds. b3c correction 1 (trust store refuses junctions, spec rev 2) running with Luna; b3b windows CI green (run 45512746865).
 - **2026-11-24:** b3c windows CI run 45514086420 red (elevated runner: trust.txt owned by Administrators, Load rejects); spec rev 3 (Save sets trust.tmp owner to the user), correction 2 running with Luna. Ideas row added: hybrid prior-art search (tsvector + RRF), from a reader comment.
 - **2026-11-24 v1.45.1 operator steps:** hub istiod 1.31.1→1.31.4 done by operator on m5-air (istioctl SHA matched pin; 5 sidecars 1.31.1 until restart). m4-air istioctl already 1.31.4. R1 ruleset `cve-pins-hub` id 28034766 created by Claude via gh api at operator request (deletion, non_fast_forward, update; bypass repo admin). Pending: GIT_WRITE_TOKEN fine-grained PAT + Keychain + argocd_sync_git_writer_secret, then R1 probes; hub promote after CI green.
+- **2026-11-24 R1 operator steps DONE:** fine-grained git-writer PAT (k3d-manager only, Contents RW, expires 2027-02-23) in hub Keychain + Secret synced; Claude probes PASS (private repo 404, other-repo write 403, own-repo write 422 zero-SHA, ruleset PUT/hooks/dispatch 403). Remind operator: delete the old git-writer token; add 2027-02-23 expiry to token reminders. Next: hub promote REF=fd5812a0 (CI green run 45514528556), then web-console installs, live checks, m2 E6/E7 + V4 probe.
 
 ## v1.45.0 status (compressed 2026-11-22)
 
