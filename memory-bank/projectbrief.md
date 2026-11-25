@@ -107,6 +107,9 @@ directory integration plugin, mirroring the same pattern as cluster providers.
   five-minute repo-sync LaunchAgent (`bin/k3dm-repo-sync`) fast-forwards each machine's
   configured checkouts by machine role and reports hub sync lag and pending deploy steps
   without running them.
+  Root installers (web-console sshd and TOTP, promote authority) run from a commit staged
+  by the root-owned bootstrap `bin/k3dm-verified-stage` (v1.45.1), installed once at the hub
+  console and checked against GitHub on a second device, never from the writable checkout.
 
 **Out of scope:**
 - Production cluster management.

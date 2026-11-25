@@ -66,6 +66,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - `_run_command --require-sudo` for operations that always need root.
 - Flag any multi-attempt permission cascades (trying the same operation 2+ times with escalating privilege).
 - When reviewing shell scripts, check that every privileged operation is routed through `_run_command`; only the runner internals may call `sudo` directly.
+- Root installers (`bin/k3dm-web-console-sshd`, `bin/k3dm-web-console-totp`, `bin/k3dm-promote-authority`) run only from a tree staged by the root-owned bootstrap `bin/k3dm-verified-stage` (v1.45.1+), never from the operator-writable checkout. Flag any change that lets them source a library from the checkout, fetch at install time, or keep a sudo ticket alive after a stage or run (`docs/howto/verified-stage.md`).
 - When reviewing shell scripts, call out unquoted variables, direct `eval`, ad hoc `sudo`, and commands that will fail non-interactively in CI.
 
 ### Platform Detection
