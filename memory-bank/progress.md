@@ -207,3 +207,4 @@
 - 2026-11-25: v1.45.1 release prep — all 8 Branch-v1.45.1 bugs + alerts L1 LIVE-VERIFIED; 5 P2/P3 fixes still LANDED awaiting live checks (totp a1 decay, totp gate lockout, cve-pins, make sync-branch, preflight rename). CHANGELOG [1.45.1] - 2026-11-25, releases tables, verified-stage how-to. Hub smoke PASS (30/30 apps Synced+Healthy, vault unsealed, deploy/hub 65fd63f2 = release code). Opening release PR; Argon blind review (Copilot capped).
 - 2026-11-25: v1.45.1 MERGED (PR #165, 19d396ed); tag v1.45.1 + GitHub release created; next branch k3d-manager-v1.46.0; enforce_admins restored.
 - 2026-11-25: dirused M10b4 rev 3 split a/b (`52bbe180`), Fable review in; v1.46.0 plan 1 threat model = approval gate (operator); triage of 63 started via Argon.
+- 2026-11-25: M10b4 rev 4 `2dd4cb70` (Fable+Argon fixes applied); triage proposal ready (61 docs); plan 1 approval-mechanism map done.

@@ -1,13 +1,18 @@
-## Handoff — 2026-11-25 12:40 PST — v1.45.1 released; v1.46.0 open — START HERE
+## Handoff — 2026-11-25 13:20 PST — v1.45.1 released; v1.46.0 open — START HERE
 
 - **Session 2026-11-25 afternoon (operator home, said go):**
   - dirused M10b4 rev 3 `52bbe180`: split into M10b4a docs (Flash) + M10b4b DocsDriftTests (Luna). Fable blind review READY WITH
-    FIXES (6 major, 8 minor; spot-checked 4, all hold). Argon blind review running. Apply merged fixes, then intent approval, then dispatch.
+    FIXES; Argon READY WITH FIXES (overlapping). All findings verified, rev 4 `2dd4cb70`. Next: operator intent approval, then
+    dispatch a (Flash) + b (Luna) in parallel; land a first, b with the full portable suite.
   - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
     cloud-runner requests (sandbox-up/down aws, make-e2e[-remote]) wait for operator approval (reuse Hermes/Slack approve);
     GitHub ruleset limits pushes to `cloud-requests`. Spec rewrite next (Fable + Astra review: shared contract).
   - Triage: 63 untriaged OPEN bugs (2 P2, 61 P3; oldest batch 11-17). Operator: Argon classifies blind, Claude verifies and
-    proposes, operator approves in one pass.
+    proposes, operator approves in one pass. Argon done: real count 61 (2 were LIVE-VERIFIED docs with a stale lower Status
+    subsection; my filter bug). Proposal: 8 P3->P2, 12 patch, 6 next-minor, 43 backlog. Awaiting operator pass.
+  - Plan 1 mechanism map done (Explore): Hermes relay/drain with a new id prefix + bridge-local pending state is the
+    reuse candidate; hub_approval is promote-only and blocked by the request-spam bug. Draft remote-promote-3a already
+    designs `approval-pending`. Bridge needs a persisted pending set, revisit path, non-job watch entries, --wait semantics.
 
 - **Operator:** home today; at the office tomorrow (jump box reachable only there). Only the operator can: collect the
   dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, check CI first), m5
