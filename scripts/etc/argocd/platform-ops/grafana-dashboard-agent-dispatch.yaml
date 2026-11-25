@@ -2030,7 +2030,7 @@ data:
           "id": 106,
           "type": "table",
           "title": "Split work",
-          "description": "One row per parent spec that was split into child dispatches. Build / Review / Verify: how many child dispatches are linked to the parent in each role (codex-dispatch link --parent P --role build|review|verify). Conflicts: merge conflicts reported by the last codex-dispatch combine for that parent. Combine: that combine's result, pass or fail; pending means no combine has been recorded yet, so Conflicts and Elapsed stay blank. Elapsed (s): from the earliest child's start to the last combine. Self-reported: the numbers come from the link and combine commands the coordinator ran, not from git, so a child dispatched without link is not counted. Top 20 parents per release; others are counted in k3dm_dispatch_split_parents_dropped.",
+          "description": "One row per parent spec that was split into child dispatches. Build / Review / Verify: how many child dispatches are linked to the parent in each role (codex-dispatch link --parent P --role build|review|verify). Conflicts: merge conflicts reported by the last codex-dispatch combine for that parent. Combine: that combine's result, pass or fail; pending means no combine has been recorded yet, so Conflicts and Elapsed stay blank. Elapsed (s): from the earliest child's start to the last combine. Self-reported and advisory: the numbers come from the link and combine commands the coordinator ran, not from git, so a child dispatched without link is not counted. Top 20 parents per release; others are counted in k3dm_dispatch_split_parents_dropped.",
           "gridPos": {
             "h": 10,
             "w": 24,

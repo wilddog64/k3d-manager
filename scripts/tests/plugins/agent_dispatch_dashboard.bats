@@ -76,8 +76,9 @@ old = {item["id"]: item for item in baseline_json["panels"]}
 new = {item["id"]: item for item in dashboard["panels"]}
 assert set(new) == set(old) | {123,124} | set(range(125,134))
 assert new[123]["title"] == "Unreported coordinator share"
-for panel_id in old.keys() - {105, 12, 103, 9, 85}:
+for panel_id in old.keys() - {105, 12, 103, 9, 85, 106}:
     assert old[panel_id] == new[panel_id], panel_id
+assert {k: v for k, v in old[106].items() if k != "description"} == {k: v for k, v in new[106].items() if k != "description"}, 106
 print("ok: verification ladder contract; other panels unchanged")
 PY
   [ "$status" -eq 0 ]
