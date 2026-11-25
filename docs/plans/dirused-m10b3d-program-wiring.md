@@ -270,3 +270,9 @@ purge-log lines `schedule <id> run <run ISO> files <n> bytes <total>` and `sched
   the purge-log and output cases (split; both messages verified). M2: Luna forced the Pacific zone in production for the
   non-Windows preview — Claude reverted it (breaks D7: a bare time only on a Pacific machine); the defect was the spec's bare
   `22:30` on a UTC runner, so M2 now uses `22:30 PT` (spec rev 2).
+- CI run 2 (`fa6dbc1`): one red — Claude's split output-collision test combined `/schedule` with `/output`, a parse-time refusal;
+  moved to plain `/fromlist … /purge /output <list>` (`e34100a`). CI run 3 (`e34100a`): windows 114/114, portable 391/391 green.
+- N1 by construction: `PlanRunner` passes literal `control: null` and `RunPlanSeams` has no control field, so "Control forwarded to
+  PlanRunner" is checked by diff review (no new control field or parameter reaches PlanRunner), as E-B3d already does for
+  PurgeList.Read. Remaining E-B3d mutants (refusal kept, update check before dispatch, cleanup not skipped, isWindows dropped)
+  need a per-mutant test filter in the harness: operator scope exception pending.

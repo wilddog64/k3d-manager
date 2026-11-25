@@ -202,3 +202,4 @@
 - **2026-11-25:** gate recovery paste/lookalike bug LIVE-VERIFIED (E4 on m5-air).
 - **2026-11-25:** dirused b3d dispatched (Luna).
 - **2026-11-25:** V4 defect 1 LANDED cf743007; E5 drill owed. Jump-box probe running (collect 2026-11-26).
+- [ ] dirused b3d (M10b3d): CI green `e34100a`; mutants pending harness exception, then land.
