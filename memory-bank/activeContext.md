@@ -66,6 +66,24 @@ expires 2026-11-26 (operator may delete).
 - 2026-11-25 09:05 dirused b3d LANDED `009fb14` (10/10 mutants, CI green; N2 state-isolation fix `009fb14`). Next dirused: jump-box probe collect 11-26 → E-B3L1 → M10b4 docs → PR.
 - (prior) 2026-11-25 08:55 dirused b3d: windows CI green on task branch `e34100a` (114/114 + 391); 3 CI rounds fixed test defects (Claude reverted Luna's Pacific-zone production change; spec rev 2 M2 uses `22:30 PT`). Next: harness per-mutant filter (operator scope exception) → 4 mutants → land.
 
+## Handoff (2026-11-25, after v1.45.1 release)
+
+- **Objective done:** v1.45.1 shipped — PR #165 merged `19d396ed`, tag + GitHub release v1.45.1 (latest), enforce_admins
+  restored, next branch `k3d-manager-v1.46.0` (groomed 5/5). Retro `docs/retro/2026-11-25-v1.45.1-retrospective.md`.
+- **Evidence:** 9 bugs LIVE-VERIFIED with Live evidence lines (V4 drill 20261125T173312Z; age-identity E6 SSH drill 2 s;
+  token E9 scan; root-installers E15 m5 console; alerts L1 hub Prometheus; gate paste; istioctl x2; sshd chmod; QR).
+  Argon PR #165: 2 low, no change (`docs/issues/2026-11-25-argon-pr165-review-findings.md`). Hub smoke 30/30 healthy.
+- **Decisions (operator):** V4 defect 2 E4 waived + drill failure-path hook idea; token E9 verify half accepted offline;
+  #158 (wrangler-action v4) deferred; OOB client onboarding checklist idea filed (pilot dirused).
+- **Open, next session:** (1) dirused jump-box probe collect 2026-11-26 → report.txt, cleanup, record E-B3L1/E-B3L2 gates;
+  then E-B3L1 attended, M10b4 docs, dirused PR (b3d LANDED `009fb14`). (2) 5 LANDED P2/P3 live checks: totp a1 decay,
+  totp gate lockout, cve-pins at-home steps, make sync-branch round trip, next sandbox preflight. (3) HoverFocus probe
+  rewrite from upstream source at a tag. (4) P3 captures owed: host-key warning, lib-foundation `timeout` on macOS, QR
+  how-to note, dirused flaky ProgramPurgeTests, hub_data export-path flake. (5) product-catalog 82 HIGH/CRIT, candidate 62:
+  rebuild loop may not converge (base image?). (6) Triage due: several P3 captures from 2026-11-23..25.
+- **Gotchas learned:** verified-stage needs the full 40-hex commit and `--ref deploy/hub` before a release reaches main;
+  dr-drill needs a TTY (`ssh -tt`); check CI on the exact SHA before giving promote commands.
+
 ## Standing rules (current)
 
 - M5 is the hub; M4 is the dev node and this session's host (its kube context is dead: query the M5 over ssh).
