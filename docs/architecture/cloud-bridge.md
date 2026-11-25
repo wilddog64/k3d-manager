@@ -51,6 +51,7 @@ sequenceDiagram
     participant GitHub as GitHub cloud-requests branch
     participant Bare as Bridge bare clone
     participant Bridge as k3dm-cloud-bridge
+    participant Slack as Slack / Relay
     participant Hook as Webhook at 127.0.0.1:7443
     participant Keychain as macOS Keychain
 
@@ -62,11 +63,20 @@ sequenceDiagram
     alt Action is not allowlisted or validation fails
         Bridge->>Bridge: Build rejected response
     else Action is allowlisted
-        Bridge->>Keychain: Read k3dm-webhook-token-reader, or k3dm-webhook-token-cloud-runner for e2e and sandbox-up/down
-        Keychain-->>Bridge: Credential for that action
-        Bridge->>Hook: POST or GET allowlisted path over loopback
-        Hook-->>Bridge: HTTP response and job status body
-        Bridge->>Bridge: Add artifacts when terminal job-status permits
+        alt Gated action (sandbox-up/down, make-e2e[-remote])
+            Bridge->>Slack: Post interactive approval card
+            Bridge->>GitHub: Commit responses/<id>.pending.json notice
+            Slack-->>Bridge: Operator Approve / Deny drained from relay
+        end
+        alt Denied or expired
+            Bridge->>Bridge: Build rejected response
+        else Approved or non-gated action
+            Bridge->>Keychain: Read k3dm-webhook-token-reader, or k3dm-webhook-token-cloud-runner for e2e and sandbox-up/down
+            Keychain-->>Bridge: Credential for that action
+            Bridge->>Hook: POST or GET allowlisted path over loopback
+            Hook-->>Bridge: HTTP response and job status body
+            Bridge->>Bridge: Add artifacts when terminal job-status permits
+        end
     end
     Bridge->>GitHub: Commit responses/<id>.json and ledger update
     GitHub-->>Agent: Fetch response commit
@@ -85,6 +95,8 @@ after the declared timeout plus ten minutes.
 |---|---|---|---|
 | Untrusted branch content | Request JSON, including action and args | Exact required fields, size cap, schema, expiry, regex validation, and consumed request ids | `bin/k3dm-cloud-bridge` |
 | Action allowlist | A request becomes one fixed webhook route and, where applicable, fixed action or Make target | `ACTION_ALLOWLIST`; unknown actions and extra or missing args are rejected | `scripts/lib/webhook/cloud_actions.py`, `bin/k3dm-cloud-bridge` |
+| Operator approval | Gated actions (`sandbox-up`, `sandbox-down`, `make-e2e`, `make-e2e-remote`) | Interactive Slack card, first decision wins, drain by prefix (`c`), executed only from stored request, request/card expiry, single bridge instance lock (`bridge.lock`) | `scripts/lib/webhook/cloud_approval.py`, `bin/k3dm-cloud-bridge`, `workers/slack-relay/index.js` |
+| Watch ledger | Ledger entries (`ledger/watching.txt`) from the public branch | Entries from the public branch are validated (`request_id` format, `job_id` format, finite positive `created_at` and `timeout` up to 86400; malformed lines skipped) | `bin/k3dm-cloud-bridge` |
 | Credential-bound role | Reader bearer credential and an optional role header | Reader token sets the ceiling; `X-K3DM-Role` can only narrow it; route and target policy still applies. Cloud-runner lifecycle capabilities bind the provider (`cluster-up@aws`, `cluster-down@aws`). | `bin/k3dm-cloud-bridge`, `scripts/lib/webhook/auth.py`, `scripts/lib/webhook/policy.py` |
 | Loopback-only webhook | The bridge's HTTP call to port 7443 | The bridge connects to `127.0.0.1`; the webhook's authentication and route policy remain in force | `bin/k3dm-cloud-bridge`, `bin/k3dm-webhook` |
 | Agent capability boundary | Read-only health, status, diagnostics and allowlisted test/query requests, plus the cloud-runner set: `make-e2e`, `make-e2e-remote`, and `sandbox-up`/`sandbox-down` fixed to provider `aws` | No hub lifecycle, fix, or other mutating action is in the allowlist; the reader credential cannot satisfy higher role floors, and the cloud-runner credential is bound to its named targets and `cluster-up@aws`/`cluster-down@aws` | `scripts/lib/webhook/cloud_actions.py`, `scripts/lib/webhook/make_targets.py`, `scripts/lib/webhook/policy.py` |

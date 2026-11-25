@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Cloud bridge operator approval gate.** Cloud-runner requests (`sandbox-up`, `sandbox-down`, `make-e2e`, and `make-e2e-remote`) now wait for operator approval via an interactive Slack card before the bridge runs them. The bridge posts an interactive card to Slack, commits an interim `responses/<id>.pending.json` notice, and drains Approve or Deny decisions from the Slack relay. Single-instance flock (`bridge.lock`) prevents multiple bridges from running concurrently. See [`docs/howto/cloud-session-requests.md`](docs/howto/cloud-session-requests.md) and [`docs/architecture/cloud-bridge.md`](docs/architecture/cloud-bridge.md).
+
+### Fixed
+
+- **Cloud bridge watch-ledger validation and sandbox lifecycle tracking.** Entries in `ledger/watching.txt` from the public `cloud-requests` branch are strictly validated against malformed inputs and non-finite timestamps or timeouts, skipping corrupted lines instead of crashing or freezing the bridge. The bridge also tracks asynchronous sandbox lifecycle jobs (`sandbox-up`, `sandbox-down`) through terminal responses in the watch ledger. See [`docs/architecture/cloud-bridge.md`](docs/architecture/cloud-bridge.md).
+
 ## [1.45.1] - 2026-11-25
 
 ### Fixed

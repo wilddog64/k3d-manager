@@ -93,6 +93,13 @@ Operator setup (run in Terminal.app):
    its channel, so a rebuild that creates a new one must pick that channel.
 4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
 
+The relay accepts three action ID prefixes:
+- `r` for Hermes repairs
+- `d` for dispatch recovery
+- `c` for cloud requests (`bin/k3dm-cloud-bridge`)
+
+Only `c` records Deny (with `decision: "deny"`) in KV; for `r` and `d`, Deny only dismisses the card and writes no approval record. For `c`, only the first decision is recorded (subsequent presses on the card report that the action was already decided). Each consumer drains and deletes only its own action IDs by matching prefix (`fetch_approvals` pattern filtering and `DELETE /hermes/approvals/<action_id>`), leaving other consumers' pending items intact. When listing pending approvals (`GET /hermes/approvals`), the relay lists at most 50 items.
+
 Dispatch recovery uses `d` action IDs in the same relay. The M4 worker needs Keychain copies of `k3dm-hermes-approval-drain-token` and `k3dm-slack-webhook` (the `k3d-manager` app webhook for `#grafana-notification`) to post cards and drain approvals. If the drain token is rotated on the M5, copy the new value to the M4 as well.
 
 
