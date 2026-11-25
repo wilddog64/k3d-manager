@@ -1,6 +1,6 @@
 # dirused M10b4: docs for scheduled purge
 
-**Status:** OPEN — SPEC rev 4, 2026-11-25; rev 3 reviewed blind by Fable and Argon (both READY WITH FIXES; all findings verified against `009fb14` and applied, see Review log); awaiting intent approval
+**Status:** OPEN — SPEC rev 4, 2026-11-25; rev 3 reviewed blind by Fable and Argon (both READY WITH FIXES; all findings verified against `009fb14` and applied, see Review log)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b](dirused-m10b-scheduled-purge.md) §9. Fourth of four; after [M10b3](dirused-m10b3-runplan-windows.md) (landed: b3d `009fb14`).
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge`
@@ -8,7 +8,7 @@
 **Children:** [M10b4a](dirused-m10b4a-docs.md) (Flash), [M10b4b](dirused-m10b4b-docs-drift-test.md) (Luna)
 **Verifier:** Claude, offline
 **Filed:** 2026-11-23
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25 ("approved dirused M10b4")
 **Approval:** operator, 2026-11-23 — split, docs as the last child; operator, 2026-11-25 — "dispatch across Flash and Luna", blind review by Fable and Argon
 
 ## Contract between the children

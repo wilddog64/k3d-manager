@@ -1,6 +1,6 @@
 # dirused M10b4a: scheduled purge docs
 
-**Status:** OPEN — SPEC rev 2, 2026-11-25; rev 1 reviewed blind by Fable and Argon, fixes applied (see parent's Review log); awaiting intent approval
+**Status:** OPEN — SPEC rev 2, 2026-11-25; rev 1 reviewed blind by Fable and Argon, fixes applied (see parent's Review log)
 **Tracked:** separately from k3d-manager releases (OOB repo). This file sits in k3d-manager only so `codex-dispatch start` can read it.
 **Parent:** [M10b4](dirused-m10b4-docs.md). The parent's contract is repeated below because the worker cannot read the parent.
 **Repo / branch:** wilddog64/dirused / `m10b-scheduled-purge` (base `009fb14`)
@@ -8,7 +8,7 @@
 **Implementer:** Flash (`--agent agy --model gemini-3.8-flash-medium`)
 **Verifier:** Claude, offline
 **Filed:** 2026-11-25
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25 ("approved dirused M10b4")
 **Approval:** operator, 2026-11-25 — split across Flash and Luna
 
 ## Contract (from the parent)
