@@ -55,8 +55,9 @@
    lockout (`docs/bugs/2026-11-23-console-totp-*`), CVE pins at-home steps
    (`docs/bugs/2026-11-23-cve-pins-branch-trusted-without-verification.md`), `make sync-branch` round trip, next sandbox
    preflight. Each bug's Waiting-on line says who acts.
-4. **HoverFocus:** P2 probe UX broken; get the make-key event-record layout from upstream source pinned at a tag
-   (cite it), rewrite the probe to check itself, then write L3/F2/U1 child specs.
+4. **HoverFocus:** make-key layout proven against yabai v7.1.25 / AutoRaise v5.7; the old rc 1002 was
+   kCGErrorInvalidConnection (probe never initialised AppKit), recorded in the v0.0.3 plan. Next: Claude writes the
+   self-checking P2b probe, operator runs it once on m2, then L3/F2/U1 child specs.
 5. **Triage due:** P3 captures from 2026-11-23..25 under `docs/bugs/` with `OPEN — capture` (incl. unpinned Copilot CLI
    in CI, 15-minute drill preflight clone). Captures still owed: first-install host-key warning; lib-foundation
    `timeout` missing on macOS in install_istioctl.bats; QR how-to note (scan from inside the authenticator app); flaky

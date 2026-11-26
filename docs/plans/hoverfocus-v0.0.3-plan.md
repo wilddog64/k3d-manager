@@ -1,7 +1,7 @@
 # HoverFocus v0.0.3 — plan
 
 **Filed:** 2026-11-24
-**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); next: P2 probe on m2, then child specs and Fable spec review
+**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); next: P2b probe on m2, then child specs and Fable spec review
 **Repo:** `hoverfocus`, branch `v0.0.3` cut from `main` after v0.0.2 merges
 **Approval:** "let's plan to work on hoverfocus v0.0.3" (operator, 2026-11-24); Electron + indicator → v0.0.3 and local
 signing identity approved the same day
@@ -58,6 +58,30 @@ Kit: `hf-p3-signing.sh` (scratch, copied to m2 `~/hf-probe/`), checkout `42273f0
   (The script's build-3 "fail" was a y/n answer given ~5 s after restart; the objective checks and the recheck pass.)
 - Run 1 lesson: after `tccutil reset`, an already-open System Settings shows a stale ON switch; the TCC row stayed
   `auth_value 0, auth_reason 4` with no csreq. F2's README must say: quit System Settings, remove, re-add.
+
+### P2 — make-key records: the rc 1002 re-diagnosed (desk check, Claude, 2026-11-25)
+
+The P2 run of 2026-11-25 (13 usable rounds; the probe's own frontmost/pointer guards skipped the rest) showed B
+activates the app without making the hovered window *key* in Chrome, Mail, VS Code, Safari and same-app TextEdit,
+and BM/BF do not fix it. So L3 needs the "make key window" event records that M1a variants C/D tried and dropped.
+
+- **Layout is not the cause.** The probe's record (`probe/focus-flags:probe/focus_probe.swift:63-67`, 0xf8 bytes,
+  0x04=0xf8, 0x3a=0x10, 0x20..0x2f=0xff, wid at 0x3c, then 0x08=0x01 and 0x08=0x02) matches byte for byte
+  `koekeishiya/yabai` tag `v7.1.25` `src/window_manager.c:1269-1291` (`window_manager_make_key_window`) and
+  `sbmpost/AutoRaise` tag `v5.7` `AutoRaise.mm:173-186` (focus-follows-mouse without raise, the same product idea).
+- **rc 1002 is `kCGErrorInvalidConnection`** (`CGError.h`, macOS SDK 26.5): the calling process had no window-server
+  connection. The probe was a bare `swift focus_probe.swift` script that never initialised AppKit. yabai calls
+  `NSApplicationLoad()` and then `SLSMainConnectionID()` before any record (`src/yabai.c:139-143` at `v7.1.25`).
+- **The shipped app already has the connection** (`Sources/hoverfocus/main.swift:70` `NSApplication.shared`), so the
+  1002 was most likely a probe artifact, not a platform refusal.
+- **Variant D was also wrong:** yabai's deactivate/activate records set `0x08=0x0d` with `0x8a=0x02`/`0x01` and a 40 ms
+  gap (`window_manager.c:1300-1318`); the probe set only `0x8a`.
+
+Next probe (P2b, Claude writes, one short operator run on m2): an AppKit-initialised probe (`NSApplication.shared`
+plus `SLSMainConnectionID()` before posting) that runs B + make-key (and yabai-exact D) per app, restores the probe
+terminal to the front itself between variants, and checks typed-text delivery itself via AX `AXValue` on the target's
+focused text element; the operator answers only "did it come to the front?". Pass for L3 = record rc 0 and text lands
+with no raise in TextEdit (two windows), Chrome, Safari and Mail.
 
 ## Decisions (operator, 2026-11-24: "go with your recommendation"; D3 "yes, and other command hotkeys")
 
