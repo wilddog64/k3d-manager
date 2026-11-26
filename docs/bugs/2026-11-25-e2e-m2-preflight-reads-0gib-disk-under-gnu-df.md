@@ -1,11 +1,11 @@
 # e2e M2 preflight reads 0 GiB free disk when GNU `df` is first on PATH, so Hermes skips the daily e2e
 
-**Status:** OPEN — captured 2026-11-25
+**Status:** LANDED — 2026-11-25 (Luna, verified by Claude: red on base, 4 named mutants caught; land gate incl. shellcheck + lint-python)
 **Priority:** P2 (daily Hermes e2e on M2 is skipped every slot; workaround: drop `gnubin` from M2's non-interactive PATH)
 **Introduced by:** `62c9ff27` (v1.27.0, the `df -g` disk probe) meeting a `gnubin` entry in M2's `~/.zshenv` (date unknown)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-25
+**Waiting on:** live check — since 2026-11-25
 **Triage:** fix now in v1.46.0 (operator, 2026-11-25: "go ahead to have Fable review and dispatch to Luna")
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Luna (`--agent codex --model gpt-6-luna`)
