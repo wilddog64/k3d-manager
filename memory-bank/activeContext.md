@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 20:00 PST — v1.46.0 plan 1 live-verified — START HERE
+## Handoff — 2026-11-25 20:45 PST — v1.46.0 plan 1 live-verified — START HERE
 
 - **Operator:** at the office 2026-11-26 (jump box reachable only there), home in the evening. Only the operator can: collect
   the dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, CI green first), run a
@@ -13,11 +13,10 @@
    from a cloud session (operator relays). `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md` LANDED
    `7bd1a7c4`; after the next promote Claude runs read-only `./scripts/k3d-manager e2e_runner_preflight m2`, then the next
    Hermes slot must post a result, not a skip. Next promote target = branch head once CI is green (Claude checks CI first).
-3. **HoverFocus v0.0.3.** Child specs rev 1 written 2026-11-25 19:xx: `docs/plans/hoverfocus-v0.0.3-l3-focus-correctness.md`
-   (Y sequence via injectable `hf_focus_ops`, Electron `AXManualAccessibility` on hit-test miss, `RecentCache`),
-   `...-f2-signing-identity.md`, `...-u1-visible-errors.md`. Blind reviews running: L3 Fable + Neon; F2, U1 Argon + Neon
-   (outputs in session scratchpad `reviews/`). Order: L3 ∥ F2, U1 after L3 (shared selftest file). Next: apply review
-   findings, then intents to the operator, then cut `v0.0.3` from `main` `d2cdb00` and dispatch L3 + F2.
+3. **HoverFocus v0.0.3.** Child specs rev 3 (`6b74bdf5`): L3, F2, U1 under `docs/plans/hoverfocus-v0.0.3-*`. Reviews done:
+   L3 Fable + Neon, F2/U1 Argon + Neon, all findings applied (Neon found a stuck-Running state in U1 and several
+   harness traps in F2). Next: operator approves intents (L3, F2, U1), then Claude cuts `v0.0.3` from `main` `d2cdb00`,
+   pushes it, dispatches L3 (Luna) + F2 (Flash); U1 after L3 lands.
 4. **dirused (OOB, branch `m10b-scheduled-purge`, head `eaa51be`, M10b4 landed).** Next: (a) 2026-11-26 operator runs the
    probe `collect` on the jump box, sends `report.txt`, then `cleanup`; Claude records it in
    `docs/plans/dirused-m10b3-runplan-windows.md` and `docs/plans/dirused-m10b-scheduled-purge.md`; (b) E-B3L1 attended
