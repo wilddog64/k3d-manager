@@ -973,6 +973,13 @@ update-webhook-slack-roles:
 	$(MAKE) restart-webhook
 	@echo "K3DM_SLACK_ROLE_MAP stored in Keychain — webhook restarted"
 
+## Store Slack notification route aliases in Keychain and restart the webhook
+update-webhook-slack-routes:
+	@[ -n "$${K3DM_SLACK_NOTIFICATION_ROUTES:-}" ] || { echo "ERROR: K3DM_SLACK_NOTIFICATION_ROUTES not set" >&2; exit 1; }
+	@PYTHONPATH=scripts/lib python3 -c 'import os,sys; from webhook.notify_routes import parse_routes, RouteMapError; raw=os.environ["K3DM_SLACK_NOTIFICATION_ROUTES"]; exec("try:\n parse_routes(raw)\nexcept RouteMapError:\n sys.exit(1)")' || { echo "ERROR: invalid notification route map" >&2; exit 1; }
+	@security add-generic-password -U -s k3dm-slack-notification-routes -a k3dm -w "$${K3DM_SLACK_NOTIFICATION_ROUTES}"
+	@$(MAKE) restart-webhook
+
 ## Inject SLACK_SIGNING_SECRET (Keychain k3dm-slack-signing-secret) into the webhook LaunchAgent plist and restart
 update-webhook-slack-secret:
 	@_sig="$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null)"; \
@@ -2356,6 +2363,7 @@ help:
 	@echo "    make fast-gate [BASE=<rev>]  Changed-file lint and tests before push (docs/howto/fast-gate.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
 	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
+	@echo "    make update-webhook-slack-routes  Store Slack notification route aliases and restart webhook"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"

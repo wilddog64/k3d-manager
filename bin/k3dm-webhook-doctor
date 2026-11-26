@@ -255,6 +255,22 @@ def _slack_role_map_status():
     return "missing"
 
 
+def _slack_notification_routes_status():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/lib"))
+    from webhook.notify_routes import ENV_VAR, KEYCHAIN_SERVICE, RouteMapError, parse_routes
+
+    raw = os.environ.get(ENV_VAR)
+    if not raw:
+        result = _run(["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", "k3dm", "-w"])
+        if _command_status(result) != "complete" or result.get("returncode") != 0:
+            return "absent"
+        raw = result.get("stdout", "")
+    try:
+        return "configured" if parse_routes(raw) else "absent"
+    except RouteMapError:
+        return "invalid"
+
+
 def diagnose(check=False):
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     if not check:
@@ -278,7 +294,7 @@ def diagnose(check=False):
         job["status"] == "loaded" and listener["status"] == "no_listener"
         and probe["http_responsive"] is False)
     webhook_plist = home / 'Library/LaunchAgents' / f'{LABEL}.plist'
-    return {"timestamp_utc": now, "mode": "check", "slack_role_map": _slack_role_map_status(), "slack_bot": _slack_bot_status(webhook_plist), "status_channel": _status_channel_status(webhook_plist), "launchd": job, "process": process, "listener": listener,
+    return {"timestamp_utc": now, "mode": "check", "slack_role_map": _slack_role_map_status(), "slack_notification_routes": _slack_notification_routes_status(), "slack_bot": _slack_bot_status(webhook_plist), "status_channel": _status_channel_status(webhook_plist), "launchd": job, "process": process, "listener": listener,
             "log": log, "health": probe, "health_timeout_seconds": HEALTH_TIMEOUT, "classification": classification,
             "credential": credential, "credential_action": _credential_action(credential),
             "recovery_recommended": reliable_unhealthy,

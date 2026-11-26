@@ -22,6 +22,8 @@ SPEC.loader.exec_module(doctor)
 
 @pytest.fixture(autouse=True)
 def isolate_role_map_probe(monkeypatch, request):
+    if request.node.name != "test_notification_routes_status_and_redaction":
+        monkeypatch.setattr(doctor, "_slack_notification_routes_status", lambda: "absent")
     if request.node.name != "test_slack_role_map_status_parses_and_redacts":
         monkeypatch.setattr(doctor, "_slack_role_map_status", lambda: "missing")
 
@@ -536,3 +538,33 @@ def test_unmapped_slack_user_remains_reader():
     namespace = {"SLACK_ROLE_MAP": {"fixture-known": "admin"}}
     exec(compile(ast.Module(body=[function], type_ignores=[]), str(auth), "exec"), namespace)
     assert namespace["_slack_user_role"]("fixture-unknown") == "reader"
+
+
+def test_notification_routes_status_and_redaction(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_SLACK_NOTIFICATION_ROUTES", "")
+    calls = []
+    def runner(argv):
+        calls.append(argv)
+        assert argv == ["security", "find-generic-password", "-s", "k3dm-slack-notification-routes", "-a", "k3dm", "-w"]
+        return {"returncode": 0, "stdout": "privatealias:C12345678", "timed_out": False, "output_limited": False}
+    monkeypatch.setattr(doctor, "_run", runner)
+    assert doctor._slack_notification_routes_status() == "configured"
+    assert tmp_path.is_dir()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "fixture")
+    monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "missing"})
+    monkeypatch.setattr(doctor, "_process_facts", lambda: {})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "no_listener"})
+    monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
+    monkeypatch.setattr(doctor, "_health_probe", lambda *_args, **_kwargs: {"status": "local_timeout", "http_responsive": False})
+    output = json.dumps(doctor.diagnose(check=True))
+    assert json.loads(output)["slack_notification_routes"] == "configured"
+    assert "privatealias" not in output and "C12345678" not in output
+    assert calls
+    monkeypatch.setenv("K3DM_SLACK_NOTIFICATION_ROUTES", "privatealias:C12345678:bad")
+    status = doctor._slack_notification_routes_status()
+    assert status == "invalid"
+    assert "privatealias" not in status and "C12345678" not in status
+    monkeypatch.setenv("K3DM_SLACK_NOTIFICATION_ROUTES", "")
+    monkeypatch.setattr(doctor, "_run", lambda _argv: {"returncode": 44})
+    assert doctor._slack_notification_routes_status() == "absent"
