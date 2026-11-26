@@ -68,7 +68,8 @@ The how-to gives the steps; no code changes tailnet policy:
 
 - The hub (M5) and each client join the tailnet. Identity login uses MFA, and device approval is on.
 - A deny-by-default grant: source is the operator's named client devices, destination is the hub, port `tcp:22`
-  only. Remove any catch-all rule first, as `docs/plans/v1.46.0-tailscale-break-glass-access.md` D1 requires.
+  only. Remove any catch-all rule first, as `docs/plans/v1.46.0-tailscale-break-glass-access.md` § The policy
+  requires; adding this grant means changing that literal policy and its pinned test (`test_tailscale_policy.py`) together.
 - No Funnel, no Serve, no exit node, no subnet routes. This plan does not use Tailscale SSH: the hub keeps macOS
   OpenSSH, which works the same with any Tailscale variant.
 - Pin the hub host key on the client: the first connection is made on the home LAN, or the fingerprint is compared
