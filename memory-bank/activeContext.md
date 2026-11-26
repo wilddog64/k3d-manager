@@ -41,6 +41,13 @@
 **Hub:** `deploy/hub` = `5d680788`, fully deployed after a re-run (first run lost the SSH connection on the tag push; P2 captured `docs/bugs/2026-11-25-hub-promote-tag-push-drops-connection-after-ref-moved.md`; promote tag missing). gnudf hub proof = next Hermes e2e slot.
 **Dispatches now:** `hf003-l3` LANDED `3951b67`, `hf003-u1` LANDED `4e66919` (both Claude-verified with red controls; live L3-EL/U1-EL pending on m2), `hf003-f2` LANDED (verified, 6 red controls). HoverFocus v0.0.3 on `v0.0.3`: L3 `3951b67`, U1 `4e66919`, F2 `7b42f63`, L4 `11e0e7c` (all Claude-verified with red controls), README Tested apps `2e30655`. **Live check done (m2, 2026-11-25):** F2 pass; L3+L4 pass for TextEdit (both windows), Safari (self-raises on Cmd+L / page hover: README), Chrome, Mail, Terminal, iTerm2, Slack and VS Code content; Dock hover does not steal focus; U1 config error red line + notification prompt pass (dedupe proven offline). Open: U1 trust loss inconclusive (`docs/hoverfocus/bugs/2026-11-25-hoverfocus-revoked-accessibility-not-detected-in-process.md`, investigation); iTerm solid cursor unconfirmed (B2 waits on live check); make-install stale copy captured (P2 Argon / P3 Claude). Next: U2 spec (after L4, shares Controller.swift), then v0.0.3 PR. Operator tests Universal Control with HoverFocus on 2026-11-26 (HoverFocus on both Macs; cross over, rest on a window behind another, type; watch the first keystrokes after crossing back during the 150 ms dwell); result goes in README Tested apps notes or docs/ideas.md.
 
+**Grooming 2026-11-29 agenda (operator, 2026-11-26: "note this down so we won't forget"):** (1) Argon-classify the
+unclassified bug backlog in one batch (~41 since 2026-11-20 lack `**Classified:**`, incl. `docs/bugs/2026-11-26-dispatch-identity-flags-optional.md`),
+run via `codex-dispatch start --role review` so it shows on Grafana; (2) decide the rule wording: rules.md:67 implies
+classification at capture, practice batches it at grooming/release cut: reword to "next grooming batch" or require
+`Classified` only at triage; (3) triage the P3 dispatch identity-flags bug (land refuses without --landing-actor; start
+defaults primary coordinator from --coordinator); (4) ideas row 2026-11-26 reviewer runs on dashboards (Fable via
+--agent claude or record-review).
 **Owed / decisions:** sandbox-lifecycle live check timing (operator). Ideas for grooming: approver attribution on approved
 cloud requests (new), drill failure-path hook, OOB client onboarding checklist, iPad password-show, rotation advance notice.
 product-catalog HIGH/CRIT remediation may not converge (look during v1.46.0). Copilot capped until 2026-12-01: release PRs
