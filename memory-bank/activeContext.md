@@ -1,6 +1,4 @@
-## Handoff — 2026-11-25 16:40 PST — v1.45.1 released; v1.46.0 open — START HERE
-
-## Handoff 2026-11-25 (evening) — v1.46.0 plan 1 complete
+## Handoff 2026-11-25 (evening) — v1.46.0 plan 1 complete — START HERE
 
 **Objective:** cloud-runner request approval gate (plan 1) — DONE, LIVE-VERIFIED `a49e3a99`.
 **Evidence:** Deny `c1-3aaa75de` -> rejected rc 3; Approve `c1-e3c802ec` -> job `853b827f` once; cluster-status ok in 21 s
@@ -104,6 +102,8 @@ v1.46.0 starts. Copilot capped until 2026-12-01: release PRs get a blind Argon r
 - Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
   agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first);
   old local tags v0.1.0-v1.0.3 differ from origin (`fetch --tags` refuses; harmless).
+
+## Handoff — 2026-11-25 16:40 PST — v1.45.1 released; v1.46.0 open
 
 ## Standing rules (current)
 
