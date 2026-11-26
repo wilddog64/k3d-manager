@@ -10,7 +10,7 @@ confirmed in `AppCoordinator.swift:29-35`); not dispatched
 **Risk:** low (menu and notification UI; one lifecycle change in `AppCoordinator.trustTick`)
 **Implementer:** Luna (`codex`, `gpt-6-luna`, logic). **Verifier:** Claude, from `## Acceptance` only.
 **Filed:** 2026-11-25
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25
 **Approval:** `docs/ideas.md` row 2026-11-24 (operator UX note during L1-EL: "the grey disabled status line is hard to
 read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "go ahead to do 1 .. 3"
 

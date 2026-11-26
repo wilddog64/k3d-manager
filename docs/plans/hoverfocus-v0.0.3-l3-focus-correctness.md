@@ -10,7 +10,7 @@ v0.0.2 merge) and pushes before dispatch
 **Implementer:** Luna (`codex`, `gpt-6-luna`, logic). Runs in parallel with F2 (no shared file). U1 waits for L3 to land
 (both edit `Sources/hoverfocus-selftest/main.swift`). **Verifier:** Claude, from `## Acceptance` only.
 **Filed:** 2026-11-25
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25
 **Approval:** operator 2026-11-24 ("let's plan to work on hoverfocus v0.0.3"; D1-D3); operator 2026-11-25 "go ahead to do
 1 .. 3" (write the L3/F2/U1 child specs)
 

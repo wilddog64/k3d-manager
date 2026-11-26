@@ -10,7 +10,7 @@ test line 5, snapshot logs), 3 should-fix, 1 nit; all applied); Neon blind revie
 **Implementer:** Flash (`agy`, `gemini-3.8-flash-medium`, Makefile/docs). Runs in parallel with L3 (no shared file).
 **Verifier:** Claude, from `## Acceptance` only.
 **Filed:** 2026-11-25
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25
 **Approval:** operator 2026-11-24 (local signing identity approved for v0.0.3); operator 2026-11-25 "go ahead to do 1 .. 3"
 
 ## Fixes
