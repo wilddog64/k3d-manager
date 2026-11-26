@@ -58,6 +58,14 @@ Do not change M2 or any dotfile.
 4. **Guide** (`docs/guides/vcluster-e2e-harness.md:451-454`): add `probe_failed` (free disk could not be read; not retried) to the
    status list.
 
+## Files
+
+- `scripts/plugins/e2e_remote.sh`
+- `scripts/tests/plugins/e2e_remote.bats`
+- `bin/k3dm-hermes`
+- `scripts/tests/bin/test_hermes_e2e_text.py`
+- `docs/guides/vcluster-e2e-harness.md`
+
 ## Contract readers
 
 Found by grep on `k3d-manager-v1.46.0`, 2026-11-25 (Fable review):

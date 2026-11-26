@@ -33,6 +33,11 @@ In `_spawn_capture_text`, call `os.posix_spawn(..., setsid=True)` as today; only
 it again with `setpgroup=0` instead (the child leads its own process group, so the timeout's `os.killpg(child_pid, ...)`
 still kills the whole tree). No `subprocess`/`fork` (the module exists to avoid fork on macOS). Nothing else changes.
 
+## Files
+
+- `scripts/lib/webhook/proc.py`
+- `scripts/tests/bin/test_proc_spawn_fallback.py` (new)
+
 ## Scope
 
 - Change: `scripts/lib/webhook/proc.py`.

@@ -38,6 +38,11 @@ branch)`). Any other ref in the same push still contributes its `remote_sha` and
 loop is unchanged. A push of only `cloud-requests` whose remote ref is new (all-zero `remote_sha`) must also skip the gate
 (today the empty `bases` path runs `fast_gate.sh` with no base).
 
+## Files
+
+- `.githooks/pre-push`
+- `scripts/tests/lib/fast_gate.bats`
+
 ## Scope
 
 - Change: `.githooks/pre-push`.
