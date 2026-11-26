@@ -1,0 +1,70 @@
+{
+  "groups": {
+    "group:operator": [
+      "operator@example.com"
+    ]
+  },
+  "tagOwners": {
+    "tag:k3dm-mac": [
+      "group:operator"
+    ]
+  },
+  "grants": [
+    {
+      "src": [
+        "group:operator"
+      ],
+      "dst": [
+        "tag:k3dm-mac"
+      ],
+      "ip": [
+        "tcp:22",
+        "tcp:5900"
+      ]
+    },
+    {
+      "src": [
+        "tag:k3dm-mac"
+      ],
+      "dst": [
+        "tag:k3dm-mac"
+      ],
+      "ip": [
+        "tcp:22"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "src": "operator@example.com",
+      "proto": "tcp",
+      "accept": [
+        "tag:k3dm-mac:22",
+        "tag:k3dm-mac:5900"
+      ],
+      "deny": [
+        "tag:k3dm-mac:443",
+        "tag:k3dm-mac:8080"
+      ]
+    },
+    {
+      "src": "operator@example.com",
+      "proto": "udp",
+      "deny": [
+        "tag:k3dm-mac:22",
+        "tag:k3dm-mac:5900"
+      ]
+    },
+    {
+      "src": "tag:k3dm-mac",
+      "proto": "tcp",
+      "accept": [
+        "tag:k3dm-mac:22"
+      ],
+      "deny": [
+        "tag:k3dm-mac:5900",
+        "tag:k3dm-mac:443"
+      ]
+    }
+  ]
+}
