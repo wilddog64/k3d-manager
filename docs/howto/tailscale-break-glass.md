@@ -93,6 +93,15 @@ Paste `docs/howto/tailscale/policy.hujson` with the real login substituted for `
 
 ## Set up SSH from the iPad
 
+- Make each Mac's SSH key-only first (the macOS default also accepts passwords). In System Settings -> General ->
+  Sharing -> Remote Login -> (i), set "Allow access for" to "Only these users" with only the operator account. Then, in
+  that Mac's terminal:
+  ```bash
+  printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' | sudo tee /etc/ssh/sshd_config.d/100-k3dm-key-only.conf
+  ```
+  It applies to new connections at once. Check from another machine with no credentials:
+  `ssh -o PubkeyAuthentication=no -o PreferredAuthentications=none <user>@<mac>.local true` must answer
+  `Permission denied (publickey)`. Undo: `sudo rm /etc/ssh/sshd_config.d/100-k3dm-key-only.conf`.
 - Generate a dedicated SSH key pair inside the iPad SSH application (using the Secure Enclave or iOS Keychain).
 - Append the public key to `~/.ssh/authorized_keys` on each Mac (`m2`, `m5`, `m4`), adding an explicit comment naming the iPad (for example, `operator-ipad-break-glass`).
 - Compare each Mac's host-key fingerprint on the home LAN (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`) before the first tailnet connection, and verify the host-key fingerprint matches when connecting from the iPad.
