@@ -1,5 +1,5 @@
 """Cleanup guard scenarios."""
-from .k3dm_tests import ROOT, _assert, BUGS
+from .k3dm_tests import ROOT, _assert
 from ..guard import run
 
 

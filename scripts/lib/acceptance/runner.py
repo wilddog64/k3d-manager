@@ -6,12 +6,9 @@ import os
 from pathlib import Path
 import re
 import shutil
-import sys
-import time
 import xml.etree.ElementTree as ET
 
 from webhook.redact import scrub_credentials
-from . import guard
 from .scenarios.k3dm_tests import BUGS, SCENARIOS
 from .scenarios.jobs import run_job
 from .scenarios.cleanup import cleanup_preview, cleanup_confirm, cleanup_vocabulary
@@ -127,7 +124,7 @@ def run_scenarios(run_root=None, scenario_ids=None, registry=None, capabilities=
             if not assertion.get("passed"):
                 ET.SubElement(case, "failure", message=redact(assertion["name"])).text = redact(assertion.get("detail", ""))
     ET.ElementTree(suite).write(run_dir / "junit.xml", encoding="utf-8", xml_declaration=True)
-    md = ["# Operator acceptance report", "", f"Schema: 1", f"Assertions: {total_assertions}", "", "| Scenario | Outcome | Cause | Bug |", "|---|---|---|---|"]
+    md = ["# Operator acceptance report", "", "Schema: 1", f"Assertions: {total_assertions}", "", "| Scenario | Outcome | Cause | Bug |", "|---|---|---|---|"]
     md.extend(f"| {r['id']} | {r['outcome']} | {r['cause']} | {r['linked_bug'] or ''} |" for r in results)
     (run_dir / "report.md").write_text(redact("\n".join(md) + "\n"))
     for path in run_dir.iterdir():

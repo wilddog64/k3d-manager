@@ -1,7 +1,5 @@
 """Isolation primitives for acceptance child processes."""
 import os
-import re
-import shutil
 import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
