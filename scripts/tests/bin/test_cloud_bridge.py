@@ -2,6 +2,7 @@
 
 import importlib.machinery
 import importlib.util
+import io
 import json
 import os
 import fcntl
@@ -1643,6 +1644,43 @@ def test_diagnose_bodies_pass_the_webhooks_own_validator(action):
     assert webhook._validate_diagnostics_request(json.loads(bridge._request_body(value))) is None
 
 
+@pytest.mark.parametrize("action, endpoint", [
+    ("make-test-all", "/api/v1/make"),
+    ("sandbox-up", "/api/v1/cluster"),
+])
+def test_routed_bridge_body_is_accepted_by_webhook(action, endpoint, monkeypatch, tmp_path):
+    from importlib.machinery import SourceFileLoader
+    loader = SourceFileLoader("k3dm_webhook_routed_seam", str(ROOT / "bin" / "k3dm-webhook"))
+    spec = importlib.util.spec_from_loader("k3dm_webhook_routed_seam", loader)
+    webhook = importlib.util.module_from_spec(spec)
+    loader.exec_module(webhook)
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook.notify_routes, "load_routes", lambda: ({"testing": "C12345678"}, "ok"))
+    monkeypatch.setattr(webhook, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(webhook, "_audit_remote_action", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webhook, "_running_cluster_job", lambda: None)
+    monkeypatch.setattr(webhook, "_MAKE_JOB_LOCK", threading.Lock())
+    monkeypatch.setattr(webhook.threading, "Thread", lambda **_kwargs: type("NoopThread", (), {"start": lambda self: None})())
+
+    routed_request = request(action)
+    routed_request["notify_route"] = "testing"
+    value, reason = bridge.validate_request(routed_request, now=NOW)
+    assert reason is None
+    body = json.loads(bridge._request_body(value))
+    encoded = json.dumps(body).encode("utf-8")
+    handler = object.__new__(webhook._Handler)
+    handler.path = endpoint
+    handler.headers = {"Content-Length": str(len(encoded))}
+    handler.rfile = io.BytesIO(encoded)
+    handler._auth = lambda: True
+    handler._token_role = "admin"
+    responses = []
+    handler._json = lambda status, payload: responses.append((status, payload))
+    handler.do_POST()
+    assert responses and responses[0][0] != 400
+    assert responses[0][0] == 202
+
+
 @pytest.fixture
 def route_names(monkeypatch):
     from unittest.mock import Mock
@@ -1762,9 +1800,19 @@ def test_route_http_error(monkeypatch, code, error, status):
 
 
 def test_route_privacy_in_published_records(approval_bridge, route_names, monkeypatch, tmp_path):
+    from webhook import auth, notify_routes
     h = approval_bridge
     routes = {"testing": "C12345678", "private-alias": "G87654321"}
     route_names.return_value = frozenset(routes)
+    loader_calls = []
+
+    def fake_load_routes():
+        loader_calls.append(True)
+        return dict(routes), "ok"
+
+    monkeypatch.setattr(notify_routes, "load_routes", fake_load_routes)
+    assert notify_routes.load_routes is fake_load_routes
+    monkeypatch.setattr(auth, "_keychain_secret", lambda *_: pytest.fail("real Keychain read"))
     rid = "20260925T201403Z-make-e2e"
     h["submit"](rid, dict(request("make-e2e"), notify_route="testing"))
     pending = _pending_approval(h, rid)

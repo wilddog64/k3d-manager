@@ -173,6 +173,8 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
     def _post_progress():
         elapsed = int((time.monotonic() - start) / 60)
         tail = _sanitize_cluster_output("\n".join(_read_job_tail(log_file)), _redact_secrets) or "—"
+        if (job_dir / "notify_route").exists():
+            tail = notify_routes.escape_code_block(tail)
         _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed — job `{job_id}`\n```{tail}```")
 
     def _wait(pid):
@@ -207,6 +209,8 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             log_file.write_text(output)
         lines = output.rstrip().splitlines()
         tail = _sanitize_cluster_output("\n".join(lines[-40:]), _redact_secrets)[-3000:]
+        if (job_dir / "notify_route").exists():
+            tail = notify_routes.escape_code_block(tail)
         if timed_out:
             status, icon, verdict = "failed", "⏱️", f"timed out after {timeout}s"
         elif rc == 0:

@@ -68,3 +68,8 @@ def routable(action: str) -> bool:
 
 def escape_label(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def escape_code_block(text: str) -> str:
+    """Escape untrusted text placed inside a Slack triple-backtick block."""
+    return escape_label(text).replace("`", "ˋ")

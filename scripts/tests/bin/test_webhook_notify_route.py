@@ -532,3 +532,79 @@ def test_BN4_control_unrouted_make_label_not_escaped(monkeypatch, tmp_path):
         assert jid == job_id
         assert "Q=<!channel>" in text
         assert "&lt;!channel&gt;" not in text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("<!channel>", "&lt;!channel&gt;"),
+    ("<@U12345678>", "&lt;@U12345678&gt;"),
+    ("```", "ˋˋˋ"),
+    ("a&b", "a&amp;b"),
+    ("plain text", "plain text"),
+])
+def test_escape_code_block(text, expected):
+    assert notify_routes.escape_code_block(text) == expected
+
+
+def test_routed_make_output_escapes_mentions_and_fences(monkeypatch, tmp_path):
+    ctx = _setup_webhook(monkeypatch, tmp_path, routes={"ci": "C99999999"})
+    job_id = "f1e2d3c6"
+    job_dir = tmp_path / job_id
+    job_dir.mkdir()
+    (job_dir / "notify_route").write_text("ci")
+    source = "``` <!channel> <@U12345678> &"
+    posted = []
+    timer = {}
+
+    class DeferredTimer:
+        def __init__(self, _delay, callback):
+            timer["callback"] = callback
+
+        def start(self):
+            pass
+
+        def cancel(self):
+            pass
+
+    def spawn(_cmd, log_file, **_kwargs):
+        log_file.write_text(source)
+        timer["callback"]()
+        return 424244
+
+    monkeypatch.setattr(threading, "Timer", DeferredTimer)
+    monkeypatch.setattr(lifecycle, "_notify_job", lambda jid, text: posted.append((jid, text)) or True)
+    monkeypatch.setattr(lifecycle, "_spawn_job", spawn)
+    monkeypatch.setattr(os, "waitpid", lambda pid, _opts: (pid, 0))
+    ctx["make_lock"].acquire()
+
+    lifecycle._run_make_target(job_id, ["find-similar-docs", "Q=ignored"], 30, "tester")
+
+    messages = [text for jid, text in posted if jid == job_id]
+    assert len(messages) == 3
+    for message in messages[1:]:
+        assert "<!" not in message
+        assert "<@" not in message
+        assert message.count("```") == 2
+        assert "ˋˋˋ &lt;!channel&gt; &lt;@U12345678&gt; &amp;" in message
+
+
+def test_unrouted_make_output_remains_raw(monkeypatch, tmp_path):
+    ctx = _setup_webhook(monkeypatch, tmp_path, routes={"ci": "C99999999"})
+    job_id = "f1e2d3c7"
+    job_dir = tmp_path / job_id
+    job_dir.mkdir()
+    source = "``` <!channel> <@U12345678> &"
+    posted = []
+
+    def spawn(_cmd, log_file, **_kwargs):
+        log_file.write_text(source)
+        return 424245
+
+    monkeypatch.setattr(lifecycle, "_notify_job", lambda jid, text: posted.append((jid, text)) or True)
+    monkeypatch.setattr(lifecycle, "_spawn_job", spawn)
+    monkeypatch.setattr(os, "waitpid", lambda pid, _opts: (pid, 0))
+    ctx["make_lock"].acquire()
+
+    lifecycle._run_make_target(job_id, ["find-similar-docs", "Q=ignored"], 30, "tester")
+
+    final = posted[-1][1]
+    assert final == f"✅ *make find-similar-docs Q=ignored* succeeded — job `{job_id}`\n```{source}```"
