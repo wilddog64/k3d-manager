@@ -214,3 +214,4 @@
 - 2026-11-25: plan 1 intents approved; docs audit done (13 fixes `af3b96c2`); machine-secrets CBC flake captured P3.
 - 2026-11-25: hoverfocus P2 make-key re-diagnosed: byte layout matches yabai v7.1.25 / AutoRaise v5.7; rc 1002 = kCGErrorInvalidConnection (bare swift script, no NSApplication). Recorded in hoverfocus-v0.0.3-plan.md; P2b probe next.
 - 2026-11-25: hoverfocus P2b probe written (self-checking; variants B/BK/Y) and copied to m2 ~/hf-probe/, type-checked on m2 (Swift 6.3.3). Waiting on operator run.
+- 2026-11-25: hoverfocus P2b run on m2 (54 trials, all rc 0): BK/Y pass TextEdit x2, Safari, Slack, Terminal; Chrome/Mail/VS Code inconclusive (read-back). Results in v0.0.3 plan; P2c ask-all mode added to the kit.

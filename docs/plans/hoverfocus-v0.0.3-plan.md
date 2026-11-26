@@ -1,7 +1,7 @@
 # HoverFocus v0.0.3 — plan
 
 **Filed:** 2026-11-24
-**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); next: P2b probe on m2, then child specs and Fable spec review
+**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); P2b done (BK/Y pass TextEdit x2, Safari, Slack, Terminal); next: P2c (Chrome, Mail, VS Code), then child specs and Fable spec review
 **Repo:** `hoverfocus`, branch `v0.0.3` cut from `main` after v0.0.2 merges
 **Approval:** "let's plan to work on hoverfocus v0.0.3" (operator, 2026-11-24); Electron + indicator → v0.0.3 and local
 signing identity approved the same day
@@ -89,6 +89,32 @@ deactivate/activate records, `kCPSUserGenerated`, make-key), two repeats each. I
 `SLSMainConnectionID()` is 0 or a self make-key on its own terminal window is refused, so a repeat of rc 1002 cannot
 pass as a result. Typing is checked by a synthetic token read back through `AXFocusedUIElement`/`AXValue` (operator
 asked only when an app's text is unreadable); raise is measured by window order. Log: `~/hf-p2b-<timestamp>.txt`.
+
+### P2b — results (m2-air, macOS 26.5.1, 2026-11-25 16:16 PST, log m2 `~/hf-p2b-20261125T161602.txt`)
+
+Connection self-check passed (`SLSMainConnectionID` 5373435, self make-key rc [0,0]); all 54 trials' records rc 0, so
+the M1a rc 1002 was the probe, not the platform. Two repeats per variant; raise from window order.
+
+| App | B (v0.0.2) | BK (B + make-key) | Y (yabai exact) |
+|---|---|---|---|
+| TextEdit | pass | pass | pass |
+| TextEdit, two windows (same app) | pass (contradicts live B1, see below) | pass | pass |
+| Safari probe page | lands (operator saw), text unreadable | **pass** (read back) | **pass** |
+| Slack (Electron) | lands but **raised** both times | **pass** | **pass** |
+| Terminal.app | pass | pass | pass |
+| Chrome probe page | read-back no | read-back no | read-back no |
+| Mail new message | 1 of 4 seen | read-back no | read-back no |
+| VS Code (Electron) | not seen | read-back no | read-back no |
+
+- BK/Y fix the Slack raise and Safari key status with no raise anywhere. BK and Y are equal here; prefer **Y** (upstream
+  sequence, explicit same-app branch).
+- Chrome/Mail/VS Code are **inconclusive**: "read-back no" means the token was not in the app's AX focused element, which
+  can be a different element (Chrome refused AX enablement: `AXManualAccessibility` rc -25205, `AXEnhancedUserInterface`
+  rc -25208), and the probe erased the token, so nobody looked. Follow-up P2c: `HF_P2B_ASK_ALL=1 ~/hf-probe/hf-p2b.sh`
+  for scenarios 3, 5, 6 (no read-back, no erase, operator reports the tokens seen).
+- Same-app B passed in the probe but failed live (E-L1 step 3). Candidate cause for L3: `Sources/HoverFocusCore/Engine.swift:59`
+  skips when `target.windowID == state.focusedWindowID`, and AX focused-window state was shown in P2 to report the target
+  while keys went elsewhere. L3 must prove which (selftest row plus live recheck).
 
 ## Decisions (operator, 2026-11-24: "go with your recommendation"; D3 "yes, and other command hotkeys")
 
