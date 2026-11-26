@@ -49,9 +49,9 @@
    in `docs/plans/dirused-m10b3-runplan-windows.md` and `docs/plans/dirused-m10b-scheduled-purge.md` (gates E-B3L1 and
    E-B3L2). (b) E-B3L1 attended small-file purge (operator). (c) M10b4 docs (intents pending operator approval).
    (d) dirused PR. E-B3L2 waits on log growth (team cleaned the logs). Claude can draft M10b4 now.
-0. **Plan 1 live check blocked (2026-11-25):** helper cannot submit from m4 (pre-push fast gate, v1460-prepush) or from
-   cloud sessions (posix_spawn setsid, v1460-spawn); both LANDED 2026-11-25 (Neon); v1460-gnudf LANDED (Luna). Hub already promoted to
-   cf653419 with relay + bridge installed. After land: rerun Deny/cluster-status/Approve; record Neon vs Luna/Flash trial row.
+0. **Plan 1 LIVE-VERIFIED 2026-11-25** (`a49e3a99`). Open live checks: watch-ledger P2 (final.json of job 853b827f), lifecycle-crash
+   P2 (needs a sandbox-up/down request; operator call, AWS cost), spawn fix E-S4 (cloud session cluster-status),
+   gnudf (read-only m2 preflight + next Hermes slot, after next promote). P3s captured for triage.
 2. **k3d-manager v1.46.0 (branch `k3d-manager-v1.46.0`, groomed 5/5 on 2026-11-22; see `docs/roadmap.md`).** Not started
    this session. Claude can begin per the dispatch queue once the operator says go.
 3. **v1.45.1 carry-overs, LANDED, live check pending (P2/P3, non-blocking):** console TOTP A1 decay/rotate and gate
