@@ -11,8 +11,8 @@
 **Implementer:** Luna (codex, `gpt-6-luna`).
 **Verifier:** Claude, from `## Acceptance` only.
 **Filed:** 2026-11-26
-**Intent approved:** operator, 2026-11-26 ("intents approved")
-**Approval:** operator 2026-11-26 "let's have Argon/Fable review P2 bug" then "dispatch to Luna after review complete"
+**Intent approved:** operator, 2026-11-26
+**Approval:** operator 2026-11-26 "intents approved"; "let's have Argon/Fable review P2 bug" then "dispatch to Luna after review complete"
 
 ## Problem (self-contained; the worker cannot read the bug doc)
 
