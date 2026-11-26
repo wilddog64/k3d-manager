@@ -41,7 +41,13 @@ def _spawn_capture_text(cmd, cwd=None, env=None, timeout=15):
         # argv values are constrained by anchored metacharacter-free fullmatch patterns in
         # parse_make_request and shlex.quote'd. See
         # docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md
-        child_pid = os.posix_spawn(exe, cmd, _env, file_actions=_file_actions, setsid=True)
+        def _spawn(**kwargs):
+            return os.posix_spawn(exe, cmd, _env, file_actions=_file_actions, **kwargs)
+
+        try:
+            child_pid = _spawn(setsid=True)
+        except NotImplementedError:
+            child_pid = _spawn(setpgroup=0)
         deadline = time.time() + timeout
         status = None
         timed_out = False
