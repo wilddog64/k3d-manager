@@ -1,5 +1,5 @@
 ## Handoff — 2026-11-25 21:15 PST — v1.46.0 plan 1 live-verified — START HERE
-- **2026-11-25 night — Tailscale plan 7 rev 3 dispatched:** Fable + Neon reviews applied, D1-D5 decided (D5 (a) device approval), intents approved; `4387194c`. 7a `v1460-p7a` (Luna: policy.hujson + test_tailscale_policy.py) and 7b `v1460-p7b` (Flash: runbook + cloud-bridge paragraph) running. Operator live test 2026-11-26 morning (P1, P2, L-E1, L-E2; separate go).
+- **2026-11-25 night — Tailscale plan 7 rev 3 dispatched:** Fable + Neon reviews applied, D1-D5 decided (D5 (a) device approval), intents approved; `4387194c`. 7a LANDED `77d4e814` (policy + pinned test; 4 red controls red) and 7b LANDED `8e7afe56` (runbook + cloud-bridge; Claude fixed webhook host m4→m5), both verified. Owed: P1, P2, L-E1 m2→m5→m4, L-E2. Note: the 2026-10-26 webhook bug doc still says m4 (stale since hub move). Ruff absent on m4: land gate used scratch venv ruff 0.15.8 via RUFF=. Operator live test 2026-11-26 morning (P1, P2, L-E1, L-E2; separate go).
 
 - **Operator:** at the office 2026-11-26 (jump box reachable only there), home in the evening. Only the operator can: collect
   the dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, CI green first), run a
