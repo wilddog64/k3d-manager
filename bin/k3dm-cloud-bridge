@@ -352,7 +352,6 @@ def _call_webhook(request):
     action = request["action"]
     method, path_template, _, _ = ACTION_ALLOWLIST[action]
     path = path_template.format(**request["args"])
-    target = ACTION_ALLOWLIST[action][3]
     token = _get_cloud_runner_token() if gated(action) else _get_reader_token()
     headers = {"Authorization": f"Bearer {token}"}
     data = _request_body(request)

@@ -102,7 +102,6 @@ def approval_bridge(monkeypatch):
 
     def write_commit(*args, **kwargs):
         commits.append((args, kwargs))
-        response = args[3]
         if not kwargs.get("pending"):
             processed.add(args[2])
         return "tip"

@@ -1,7 +1,5 @@
 """Named contract tests for the pure cloud approval store."""
 
-import json
-import os
 import sys
 from pathlib import Path
 
