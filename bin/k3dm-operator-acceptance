@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Run isolated offline operator acceptance scenarios."""
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/lib"))
+from acceptance.runner import REGISTRY, run_scenarios
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scenario", action="append", dest="scenarios")
+    parser.add_argument("--run-root")
+    args = parser.parse_args(argv)
+    known = {item[0] for item in REGISTRY}
+    unknown = set(args.scenarios or ()) - known
+    if unknown:
+        parser.error("unknown scenario: " + ", ".join(sorted(unknown)))
+    run_dir, report, passed = run_scenarios(args.run_root, args.scenarios)
+    print(f"acceptance run: {run_dir}")
+    for result in report["scenarios"]:
+        print(f"{result['id']}: {result['outcome']} ({result['cause']})" + (f" [{result['linked_bug']}]" if result["linked_bug"] else ""))
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

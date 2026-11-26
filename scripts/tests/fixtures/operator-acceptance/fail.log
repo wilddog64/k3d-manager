@@ -1,0 +1,6 @@
+# Source capture: scripts/tests/fixtures/k3dm-test-metrics.log (read-only fixture); host m4-air.local; 2026-11-26
+# file: clean.bats
+1..2
+ok 1 first
+not ok 2 failing case
+# reason: deliberately failing acceptance fixture

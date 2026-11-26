@@ -162,6 +162,7 @@ install-test-metrics:
 
 .PHONY: install-web-console-sshd uninstall-web-console-sshd revoke-web-console-sshd web-console-sshd-check install-web-console-totp uninstall-web-console-totp web-console-totp-enroll web-console-totp-rotate web-console-totp-status
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-host test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: test-operator-acceptance
 
 ## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
 trust-vault-ca:
@@ -1724,6 +1725,10 @@ test-pytest:
 	 if [ -n "$${K3DM_JUNIT_XML:-}" ]; then set -- "$$@" --junitxml "$$K3DM_JUNIT_XML" -o junit_logging=no; fi; \
 	 echo "[make] $$* (pytest suites)"; \
 	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
+
+## Run the offline operator acceptance scenarios and retain their report
+test-operator-acceptance:
+	@bin/k3dm-operator-acceptance $(if $(RUN_ROOT),--run-root '$(RUN_ROOT)',)
 
 test-alertmanager-behaviour:
 	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py scripts/tests/observability/test_kine_compaction_stalled.py scripts/tests/observability/test_cve_fix_available_alert.py -v
