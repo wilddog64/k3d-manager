@@ -216,3 +216,4 @@
 - 2026-11-25: hoverfocus P2b probe written (self-checking; variants B/BK/Y) and copied to m2 ~/hf-probe/, type-checked on m2 (Swift 6.3.3). Waiting on operator run.
 - 2026-11-25: hoverfocus P2b run on m2 (54 trials, all rc 0): BK/Y pass TextEdit x2, Safari, Slack, Terminal; Chrome/Mail/VS Code inconclusive (read-back). Results in v0.0.3 plan; P2c ask-all mode added to the kit.
 - 2026-11-25: hoverfocus P2c (Chrome, Mail, VS Code by operator sight): Y/BK pass all three, B fails VS Code. P2 done: Y passes all 8 apps. Next L3/F2/U1 specs.
+- 2026-11-25: plan 1 live check: promote cf653419 + deploy-worker + install-cloud-bridge done on m5 (plist has drain URL; Keychain items present). Step a/b from m4 failed to push: pre-push fast gate on the cloud-requests data push times out (bug captured 2026-11-25-cloud-request-helper-push-runs-fast-gate-and-times-out.md). Waiting on operator: file from a cloud session or approve another route.
