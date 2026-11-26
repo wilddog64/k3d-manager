@@ -1,4 +1,0 @@
-## sftp control without ForceCommand
-sftp> pwd
-Remote working directory: /Users/<login>
-sftp rc=0

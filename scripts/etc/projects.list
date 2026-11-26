@@ -1,4 +1,0 @@
-# name|local path|github repo|release scheme|default branch
-k3d-manager|.|wilddog64/k3d-manager|branch|main
-dirused|~/src/gitrepo/personal/dirused|wilddog64/dirused|tag|main
-hoverfocus|~/src/gitrepo/personal/hoverfocus|wilddog64/hoverfocus|tag|main

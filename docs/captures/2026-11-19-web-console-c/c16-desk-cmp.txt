@@ -1,6 +1,0 @@
-## 2026-11-20T03:43:36Z C16 desk-started: tmux server started from the operator's desktop session (Claude Code, Aqua)
-## C16 desk-started server 2026-11-20T03:43:36Z uid=501 managername=Background
-security show-keychain-info rc=0
-security find-generic-password -s k3dm-cloudflare-api-token (no -w) rc=0
-launchctl print gui/uid rc=0
-done

@@ -1,2 +1,0 @@
-## m4-air 2026-11-20T03:43:08Z C14 raw: pty-driven ssh -tt raw, client writes ^C ^Z ^\ ^D
-## raw client-output='READY isig=0\r\nRAW bytes=03,1a,1c,04\r\n' client-status=0

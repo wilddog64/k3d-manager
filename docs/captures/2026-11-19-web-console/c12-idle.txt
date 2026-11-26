@@ -1,8 +1,0 @@
-## registered no pid: launchctl print system/com.k3d-manager.capture-idle (operator)
-rc=0
-	state = not running
-	runs = 0
-	last exit code = (never exited)
-system/com.k3d-manager.capture-idle = {
-	active count = 0
-	path = /Library/LaunchDaemons/com.k3d-manager.capture-idle.plist

@@ -1,7 +1,0 @@
-## m4-air 2026-11-20T03:43:48Z C16 lldb attach by the login user to holdpy pid=11685 (started via scratch sshd), 20s timeout
-11685   501 /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python -IS /private/var/db/k3dm-capture-2026-11-19c/entry
-(lldb) process attach --pid 11685
-error: attach failed: this is a non-interactive debug session, cannot get permission to debug processes.
-lldb rc=1
-tmux -L k3dm-capture after kill-server: has-session rc=1
-tmux -L k3dm-capture-desk after kill-server: has-session rc=1

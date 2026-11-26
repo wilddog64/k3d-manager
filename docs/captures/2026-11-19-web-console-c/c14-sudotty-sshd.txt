@@ -1,1 +1,0 @@
-sudo PY -IS /dev/tty write over scratch sshd session: rc=0

@@ -1,6 +1,0 @@
-Server listening on 127.0.0.1 port 42723.
-Connection from 127.0.0.1 port 63105 on 127.0.0.1 port 42723
-Connection closed by 127.0.0.1 port 63105 [preauth]
-srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 1 seconds for penalty: connections without attempting authentication
-Connection from 127.0.0.1 port 63106 on 127.0.0.1 port 42723
-Received signal 15; terminating.

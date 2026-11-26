@@ -1,8 +1,0 @@
-## m4-air 2026-11-20T03:43:35Z C16 gate-started: ssh -tt tmux (tmux server started inside the scratch sshd session)
-TMUX server-before has-session rc=1
-TMUX new-session rc=0
-## C16 gate-started server 2026-11-20T03:43:35Z uid=501 managername=Background
-security show-keychain-info rc=36
-security find-generic-password -s k3dm-cloudflare-api-token (no -w) rc=0
-launchctl print gui/uid rc=0
-done

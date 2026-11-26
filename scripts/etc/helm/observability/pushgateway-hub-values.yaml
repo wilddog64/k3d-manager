@@ -1,8 +1,0 @@
-fullnameOverride: prometheus-pushgateway
-replicaCount: 1
-service:
-  type: ClusterIP
-resources:
-  requests:
-    cpu: 25m
-    memory: 32Mi

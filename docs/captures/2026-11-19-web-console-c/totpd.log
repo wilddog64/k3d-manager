@@ -1,7 +1,0 @@
-19:40:50 pid=90709 start
-19:42:26 pid=90709 totp uid=501 pid=5639 admit=True admitted
-19:42:26 pid=90709 totp uid=501 pid=5778 admit=False c: parent {'pid': 5775, 'ppid': 5568, 'uid': 501, 'lstart': 'Thu Nov 19 19:42:26 2026', 'comm': '/bin/zsh', 'args': '/bin/zsh -c <capture harness command, elided>'}
-19:42:35 pid=90709 admin uid=0 pid=7017 line=b'EXIT1\n'
-19:42:35 pid=90709 exit 1
-19:42:35 pid=7021 start
-19:42:50 pid=7021 totp uid=0 pid=8269 admit=False a: peer uid 0 != 501

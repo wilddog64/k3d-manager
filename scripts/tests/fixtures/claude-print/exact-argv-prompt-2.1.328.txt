@@ -1,5 +1,0 @@
-Reply with exactly these four lines and nothing else:
-=== DIAGNOSIS ===
-probe diagnosis
-=== CORRECTION ===
-probe correction

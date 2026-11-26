@@ -1,3 +1,0 @@
-#!/bin/sh
-printf '%s\n' 'console gate not installed' >&2
-exit 1

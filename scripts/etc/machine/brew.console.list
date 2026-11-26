@@ -1,8 +1,0 @@
-# Console role: browser, SSH, and dashboard access.
-formula:gh
-formula:git
-formula:jq
-formula:tmux
-
-cask:google-chrome
-cask:iterm2

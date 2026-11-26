@@ -1,8 +1,0 @@
-## 2026-11-20T03:42:26Z env -i SSH_ORIGINAL_COMMAND=client entry, run directly by the login user (not via sshd)
-CLIENT self pid=5778 server LOCAL_PEERCRED uid=0 LOCAL_PEERPID=90709
-SOCKET totp
-LOCAL_PEERCRED version=0 uid=501
-LOCAL_PEERPID 5778
-ADMIT no c: parent {'pid': 5775, 'ppid': 5568, 'uid': 501, 'lstart': 'Thu Nov 19 19:42:26 2026', 'comm': '/bin/zsh', 'args': '/bin/zsh -c <capture harness command, elided>'}
-CHAIN reject: c: parent {'pid': 5775, 'ppid': 5568, 'uid': 501, 'lstart': 'Thu Nov 19 19:42:26 2026', 'comm': '/bin/zsh', 'args': '/bin/zsh -c <capture harness command, elided>'}
-rc=0

@@ -1,4 +1,0 @@
-## 2026-11-20T03:42:26Z unprivileged connects (uid 501)
-/private/var/db/k3dm-capture-2026-11-19c/run/admin.sock: errno=13 Permission denied
-/private/var/db/k3dm-capture-2026-11-19c/state/run/totp.sock: errno=13 Permission denied
-ls state: ls: cannot open directory '/private/var/db/k3dm-capture-2026-11-19c/state': Permission denied

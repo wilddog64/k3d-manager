@@ -1,9 +1,0 @@
-## launchctl print system/com.k3d-manager.capture-totpd (sudo, filtered) 03:40:53
-	path = /Library/LaunchDaemons/com.k3d-manager.capture-totpd.plist
-	state = running
-	program = /Library/Developer/CommandLineTools/usr/bin/python3
-	runs = 1
-	pid = 90709
-	last exit code = (never exited)
-		state = active
-		state = active

@@ -1,2 +1,0 @@
-## sudo-run CLT python -IS writing /dev/tty, inside a tmux pane (this root script runs under sudo in tmux) 03:40:53
-rc=0
