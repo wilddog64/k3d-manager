@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 19:30 PST — v1.46.0 plan 1 live-verified — START HERE
+## Handoff — 2026-11-25 20:00 PST — v1.46.0 plan 1 live-verified — START HERE
 
 - **Operator:** at the office 2026-11-26 (jump box reachable only there), home in the evening. Only the operator can: collect
   the dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, CI green first), run a
@@ -24,9 +24,9 @@
    purge (operator); (c) Claude opens the dirused PR. E-B3L2 waits on log growth.
 5. **v1.46.0 remaining plans** (`docs/roadmap.md`, groomed 5/5): plan 1 done; Claude proposes the next per the dispatch queue
    once the operator says go. v1.46.1 patch batch specs (12 bugs, batches A1–A4, B) still to write.
-6. **Triage prepared 2026-11-25 (operator decides).** 66 `OPEN — capture` docs; 14 lacked `**Classified:**`, now classified
-   by Argon (lines added). Recommendations: 6 patch → v1.46.1, 14 carry → v1.47.0, 27 backlog carry, 7 close, 12 already
-   mapped; flags: promote-mover gate bypass (Argon P2), 10 Argon-higher docs. Report: `docs/grooming/2026-11-25-triage-proposal.md`. Older text: P3 captures 2026-11-23..25 (`OPEN — capture`), incl. today's: helper concurrent-wait race, approval card
+6. **Triage DONE 2026-11-25 evening** (operator: "go with your recommendation"): 6 patch → v1.46.1 (A1 +5 codex-dispatch P3s,
+   A3 + dr-drill preflight P2; v1.46.1 at the 10-P3 cap), 14 carry → v1.47.0, 6 closed; record
+   `docs/grooming/2026-11-25-triage-proposal.md`, roadmap updated. Next triage trigger counts from today. Older text: P3 captures 2026-11-23..25 (`OPEN — capture`), incl. today's: helper concurrent-wait race, approval card
    wording ("with none", "Approve repair?", "Run Run"), gnudf test gaps (`[:200]`, `$HOME` fallback), e2e order 429
    (`docs/bugs/2026-11-25-e2e-order-cancel-flow-hits-order-rate-limit-429.md`, investigation). Captures still owed:
    first-install host-key warning; lib-foundation `timeout` on macOS in install_istioctl.bats; QR how-to note; flaky dirused
