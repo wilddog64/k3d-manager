@@ -1,6 +1,6 @@
-# Triage proposal — 2026-11-25 (pending operator decision)
+# Triage — 2026-11-25 evening
 
-**Status:** proposal; no `**Triage:**`/`**Branch:**` lines written yet. Prepared by a Claude subagent; Argon classifications added to 14 docs.
+**Status:** DECIDED — operator, 2026-11-25: "for triage, go with your recommendation". Applied: 6 patch → v1.46.1, 14 carry → v1.47.0, 6 closed (won't-fix, reopen on recurrence); `lib-foundation-file-locks` keeps its upstream line instead of closing; backlog and already-mapped rows unchanged. Prepared by a Claude subagent; Argon classifications added to 14 docs.
 
 # Bug triage recommendations, 2026-11-25
 

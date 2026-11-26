@@ -3,10 +3,12 @@
 **Status:** OPEN — capture
 **Priority:** P3 (test-only; the landed code is correct, two behaviours have no test)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — Test-only coverage gap for the 200-character reason cap and `$HOME` disk fallback with no production defect
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation")
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** `7bd1a7c4` (v1460-gnudf)
 **Should have been caught by:** review
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md` (parent, same change) — follow-up
 **Filed:** 2026-11-25
 **Detected by:** Neon blind post-land review, confirmed by Claude with mutants

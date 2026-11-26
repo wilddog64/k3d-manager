@@ -1,10 +1,9 @@
 # Release forecast Earliest/Latest dates render red from Grafana's default thresholds
 
-**Status:** OPEN — captured 2026-11-13
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (triage 2026-11-25, operator ("go with your recommendation")); was: OPEN — captured 2026-11-13
 **Priority:** P3 (Claude proposal: cosmetic; red reads as "late" but means nothing)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The release forecast dates are displayed accurately, and the red coloring caused by Grafana's default threshold on epoch milliseconds is a purely cosmetic visual issue.)
-**Triage:** carry → v1.45.0 — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-13
+**Triage:** close — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 — triage 2026-11-14, operator
 **Introduced by:** 2e0fa2d8 (panels 29 and 30 rewritten without a thresholds block)
 **Should have been caught by:** review
 **Prior art:** `docs/bugs/2026-11-11-bugs-dashboard-target-forecast-tiles-always-no-date.md` (exact-topic read) — the fix that rewrote these panels

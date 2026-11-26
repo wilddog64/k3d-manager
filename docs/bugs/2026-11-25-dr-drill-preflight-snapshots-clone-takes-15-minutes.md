@@ -3,12 +3,13 @@
 **Status:** OPEN — captured 2026-11-25, not triaged
 **Priority:** P3 (operator, 2026-11-25: "go ahead to file P3") — slow, not broken: the drill completes; the clone adds about
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — `dr-drill` preflight is degraded by a 15-minute full snapshot clone just to check export age, though the drill still completes
-**Triage:** backlog — pull into a release that already touches `bin/dr-drill` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Triage:** patch → v1.46.1 — triage 2026-11-25, operator ("go with your recommendation"); was: backlog — pull into a release that already touches `bin/dr-drill` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1`
 15 minutes to every run before any cluster work starts.
 **Introduced by:** v1.43.0 (`edfc9a5c`, preflight export-age check added with the drill)
 **Should have been caught by:** live check (the first drill runs would have shown the duration; nobody timed the phase)
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-25
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** docs/bugs/ exact-slug glob (no match); `make find-similar-docs` not run — vector store unavailable
 (context `k3d-k3d-cluster` does not exist)
 

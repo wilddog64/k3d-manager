@@ -2,12 +2,13 @@
 
 **Status:** OPEN — captured 2026-11-18 from Argon's blind review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — latent; no registered project uses `scheme=branch` today
-**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Triage:** patch → v1.46.1 — triage 2026-11-25, operator ("go with your recommendation"); was: backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1`
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Latent defect where `scheme=branch` projects use a non-`v*` directory invisible to readers, affecting no currently registered projects.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18
 

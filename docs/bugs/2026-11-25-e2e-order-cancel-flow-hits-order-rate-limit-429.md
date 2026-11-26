@@ -3,6 +3,8 @@
 **Status:** OPEN — capture
 **Priority:** P3 (proposed) — one e2e test fails on the order service's own rate limit; 85 of 86 run tests passed
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — The e2e suite fails on the order cancellation flow by tripping the order service's HTTP 429 rate limiter
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation")
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown

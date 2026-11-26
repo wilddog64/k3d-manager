@@ -651,9 +651,9 @@ iPad SSH and tailscale (plans 6 and 7 below). Remote-promote 3a/3b went to the o
 
 | Batch | Bugs | Priority |
 |---|---|---|
-| A1 `bin/k3dm-codex-dispatch` | `docs/bugs/2026-11-17-open-count-ignores-linked-review-role.md`, `docs/bugs/2026-11-18-codex-dispatch-status-project-task-state-unknown.md`, `docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md`, `docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md` | P2 |
+| A1 `bin/k3dm-codex-dispatch` | `docs/bugs/2026-11-17-open-count-ignores-linked-review-role.md`, `docs/bugs/2026-11-18-codex-dispatch-status-project-task-state-unknown.md`, `docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md`, `docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md`; added by the 2026-11-25 evening triage: `docs/bugs/2026-11-18-codex-dispatch-project-version-above-release-hides-k3d-manager-tasks.md`, `docs/bugs/2026-11-18-codex-dispatch-branch-scheme-project-version-is-branch-name.md`, `docs/bugs/2026-11-18-codex-dispatch-non-semver-highest-tag-resets-project-version.md`, `docs/bugs/2026-11-18-codex-dispatch-multi-project-low-findings.md`, `docs/bugs/2026-11-18-codex-dispatch-resolve-version-slug-reused-across-projects.md` | P2, P3 (5) |
 | A2 rule violations | `docs/bugs/2026-11-25-ci-copilot-cli-installed-unpinned-latest.md` (A08), `docs/bugs/2026-11-18-hub-recovery-root-token-in-jq-argv.md` (A02) | P3 |
-| A3 ops tooling | `docs/bugs/2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md`, `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`, `docs/bugs/2026-11-19-prometheus-auth-proxy-has-no-standalone-installer.md` | P2 |
+| A3 ops tooling | `docs/bugs/2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md`, `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`, `docs/bugs/2026-11-19-prometheus-auth-proxy-has-no-standalone-installer.md`, `docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md` (evening triage; Argon P2, costs ~15 min per drill) | P2 |
 | A4 Hermes | `docs/bugs/2026-11-18-hermes-approve-repropose-voids-digest-and-expiry-checks.md` (fix before v1.46.0 plan 1's approval gate depends on the Hermes approval path) | P3 |
 | B small | `docs/bugs/2026-11-21-host-disk-free-panel-always-red.md`, `docs/bugs/2026-11-21-hub-deploy-bats-catch-up-test-races-git-index-lock.md` | P3 |
 
@@ -661,7 +661,15 @@ The same triage sent 6 bugs to the next `/release-groom` as v1.47.0 candidates, 
 already touches its file) and `docs/bugs/2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md` (P2) upstream to
 lib-foundation.
 
+The evening triage (operator, 2026-11-25: "go with your recommendation";
+[proposal](grooming/2026-11-25-triage-proposal.md)) added the 6 bugs above, which brings v1.46.1 to the 10-P3 cap, carried 14 bugs to v1.47.0 and
+closed 6 P3s passed over at two groomings. The 27 backlog bugs keep their backlog lines.
+
 ### Candidate milestone — v1.47.0
+
+**Bugs carried here (2026-11-25 evening triage, not counted toward the 5-plan cap):** 14 docs with
+`**Triage:** carry → v1.47.0`, including `docs/bugs/2026-11-23-promote-mover-trusts-any-pushed-ref.md` (Argon P2:
+all-skipped check runs count as green, a gate bypass; first in line at the v1.47.0 groom).
 
 **Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.47.0`, cut from
 `main` after v1.46.0 merges. Split out because v1.43.4 is bug-fix-only, v1.43.5 and v1.46.0 are at

@@ -3,10 +3,12 @@
 **Status:** OPEN — capture
 **Priority:** P3 (the request itself is unaffected and its response still lands; only the waiting helper gives up)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — concurrent `k3dm-cloud-request --wait` runs in the same checkout fail on a ref-lock race, with serializing invocations or re-running wait as a workaround
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation")
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** pre-existing (`bin/k3dm-cloud-request` fetches into a fixed `refs/remotes/origin/cloud-requests`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** `docs/bugs/2026-11-25-cloud-request-helper-push-runs-fast-gate-and-times-out.md` (same helper) — read, different root cause
 **Filed:** 2026-11-25
 **Detected by:** Claude, v1.46.0 plan 1 E-P1-live step c (m4)

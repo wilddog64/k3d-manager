@@ -3,8 +3,9 @@
 **Status:** OPEN — captured 2026-11-14 by Claude
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Dashboard status visibility is degraded by up to 20 minutes of stacked polling latency, with the workaround of checking the pushed doc status in git directly or waiting for the next sync and refresh cycle.)
-**Triage:** carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-14
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
+**Branch:** `k3d-manager-v1.47.0`
+**Waiting on:** dispatch — since 2026-11-25
 **Introduced by:** unknown
 **Should have been caught by:** none
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); idea row 2026-11-14 in `docs/ideas.md` (dashboard tracks the dispatch ledger) is the related, different gap

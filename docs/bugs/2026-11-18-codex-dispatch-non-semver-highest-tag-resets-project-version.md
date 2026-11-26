@@ -2,12 +2,13 @@
 
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — latent; dirused has no pre-release tags
-**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Triage:** patch → v1.46.1 — triage 2026-11-25, operator ("go with your recommendation"); was: backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1`
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon, missed)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Latent tag-parsing edge case where a pre-release highest tag resets the computed project dispatch version to `v0.0.1`.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18
 

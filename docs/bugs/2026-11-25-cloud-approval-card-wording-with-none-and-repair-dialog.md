@@ -3,10 +3,12 @@
 **Status:** OPEN — capture
 **Priority:** P3 (cosmetic; the card and buttons carry the right request)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — Cosmetic wording glitches ("with none", "Approve repair?", "Run Run") in the cloud approval card and confirmation dialog
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation")
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** v1.46.0 plan 1 a (`358f10b9`, card text) and c (`4e3f3c81`, relay confirm dialog)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** none above threshold (vector store unavailable; exact-slug pass found nothing)
 **Filed:** 2026-11-25
 **Detected by:** operator screenshots, v1.46.0 plan 1 E-P1-live

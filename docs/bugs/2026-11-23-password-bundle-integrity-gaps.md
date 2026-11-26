@@ -3,11 +3,12 @@
 **Status:** OPEN — captured 2026-11-23
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — Hardening against same-uid local attacks and false freshness where a same-uid process can already read the passwords directly
-**Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation"); was: next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** v1.45.0 travel-bundle plan
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unavailable: cluster context missing); grep of docs/bugs for the key terms found no match
 **Detected by:** v1.45.0 red-team gate, 2026-11-22, on `7dfb7238` — see [docs/issues/2026-11-23-v1.45.0-red-team.md](../issues/2026-11-23-v1.45.0-red-team.md)
 **Severity:** hardening. A same-uid process on the hub can already read the passwords; these give persistence, phishing or false freshness.

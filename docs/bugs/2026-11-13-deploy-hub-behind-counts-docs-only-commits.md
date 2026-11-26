@@ -1,13 +1,12 @@
 # deploy/hub behind counts docs-only commits and asks for promotes that change nothing
 
-**Status:** OPEN — captured 2026-11-13 (operator asked what "backlog 9" meant, then "move this to P3 bug doc")
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (triage 2026-11-25, operator ("go with your recommendation")); was: OPEN — captured 2026-11-13 (operator asked what "backlog 9" meant, then "move this to P3 bug doc")
 **Priority:** P3 (proposed: misleading tile and a nagging warning; no wrong deploy, the hub is unaffected)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (Counting documentation-only commits in the `deploy/hub` backlog is a dashboard and alert hygiene issue that causes no functional impact to the hub.)
-**Triage:** carry → v1.45.0 — triage 2026-11-14, operator
+**Triage:** close — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 — triage 2026-11-14, operator
 **Introduced by:** c763e239 (plan 3 `deploy-hub-behind-alert`)
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob, none (closest by name `2026-11-13-deploy-hub-behind-alert-r2-test-gaps-and-detached-head.md`, read, different root cause); `make find-similar-docs` not run (vector store unavailable on m4-air)
-**Waiting on:** operator decision
 
 ## Symptom
 
