@@ -1,7 +1,8 @@
 # hoverfocus v0.0.3 U1 — visible errors: red status line, one notification per error, Accessibility loss detected
 
-**Status:** spec rev 2 — Argon reviewed rev 1 (2026-11-25, NEEDS FIXES: 4 should-fix, 1 nit; all applied); Neon blind
-review pending; not dispatched
+**Status:** spec rev 3 — Argon reviewed rev 1 (2026-11-25, NEEDS FIXES: 4 should-fix, 1 nit; all applied); Neon blind
+review of rev 1 (2026-11-25, NEEDS FIXES: 4 blockers, 5 should-fix, 2 nits; all applied, incl. a stuck-Running state
+confirmed in `AppCoordinator.swift:29-35`); not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch U1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` **after L3 lands** (both edit
@@ -38,7 +39,8 @@ read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "
 ## Before You Start
 
 1. `git log --oneline -1` shows the `v0.0.3` head with L3 landed; `swift build --disable-sandbox` and
-   `swift run --disable-sandbox hoverfocus-selftest` pass. Every `swift` command carries `--disable-sandbox`.
+   `swift run --disable-sandbox hoverfocus-selftest` pass. Every `swift` command carries `--disable-sandbox` and runs
+   with `CLANG_MODULE_CACHE_PATH="$PWD/.build/clang-mc"` (the worker sandbox denies writes to `~/.cache/clang`).
 2. Read `Sources/HoverFocusCore/AppCoordinator.swift`, `Sources/hoverfocus/AppDelegate.swift`,
    `Sources/hoverfocus/MenuModel.swift` (its `AppStatus` and `statusLine` functions) and the L1 rows in
    `Sources/hoverfocus-selftest/main.swift` (`FakeController`).
@@ -65,15 +67,20 @@ read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "
 
    `ok → configError(a)` announces; `configError(a)` again → nil; `configError(a) → configError(b)` (different reason)
    announces; `configError(b) → startError(.accessibilityNotTrusted)` announces; `→ startError(.eventTapFailed)`
-   announces; `startError(.eventTapFailed)` again → nil; `→ ok` → nil, and the next error announces again. Comparison is
+   announces; `startError(.eventTapFailed)` again → nil; `→ ok` → nil; then `startError(.eventTapFailed)` (the **same** error as
+   before `ok`) announces again. Comparison is
    full `Equatable` equality of `Health`, including associated values.
 
 2. **`AppCoordinator`:**
-   - `public var health: Health`: `configError` if set; else `startError` if set and the controller is not running;
-     else `.ok`.
-   - `trustTick()` gains a loss branch, checked first: if `!watchingTrust`, the controller is running and
-     `!isTrusted()` → `controller.stop()`, `startError = .accessibilityNotTrusted`, `watchingTrust = true`. If
-     `!watchingTrust` and none of that holds, return. The existing watching branch is unchanged (re-grant restarts it).
+   - `public var health: Health`, with v0.0.2's `updateUI` precedence: `configError` if set; else `.ok` if
+     `!config.enabled` or `controller.isPaused`; else `startError` if set and the controller is not running; else `.ok`.
+     (Off and Paused never show red and never notify, even with a stored start error.)
+   - `trustTick()` gains a loss branch, checked first and **not** gated on `watchingTrust`: if the controller is
+     running and `!isTrusted()` → `controller.stop()`, `startError = .accessibilityNotTrusted`, `watchingTrust = true`,
+     return. Then the existing `guard watchingTrust` path runs unchanged (re-grant restarts it). Not gating matters:
+     `load(.success)` while running and untrusted leaves `watchingTrust == true` with the controller still running
+     (`start()` is a no-op when running, `AppCoordinator.swift:29`, `Controller.swift:46`), and a gated branch would
+     never fire.
 3. **`AppDelegate`:**
    - The single repeating 2 s timer is created once in `applicationDidFinishLaunching` (guarded by
      `accessibilityTimer == nil`) and runs for the app's lifetime; each tick calls `coordinator.trustTick()` then
@@ -84,22 +91,35 @@ read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "
      `MenuModel.statusLine` text with `.foregroundColor: NSColor.systemRed` and `.font: NSFont.menuFont(ofSize: 0)`;
      `target = self`, `isEnabled = true`, and `action`: `configError` → `openConfig`,
      `startError(.accessibilityNotTrusted)` → `grantAccessibility`, other start errors → `reloadConfig`. On `.ok`:
-     `attributedTitle = nil`, plain `title`, `target = nil`, `action = nil`, `isEnabled = false` (today's look).
-   - `updateUI()` passes `health` to an `ErrorNotifier`; when it returns an error and the bundle guard holds, call
-     `UNUserNotificationCenter.current().requestAuthorization(options: [.alert])` every time (it prompts only while
-     `.notDetermined` and otherwise returns the stored answer at once; no "already asked" flag). In the completion
-     (arbitrary queue; Swift 6 strict concurrency), capture the body string by value and, if `granted`, add a
-     `UNNotificationRequest` (identifier `UUID().uuidString`, title `HoverFocus`, body = the status line); hop with
-     `Task { @MainActor in … }` only if main-actor state is touched. Denied or unavailable: nothing more (the red line
-     remains). Every `UNUserNotificationCenter` use is inside one helper behind the bundle guard.
+     `attributedTitle = nil` first, then the plain `title`, `target = nil`, `action = nil`, `isEnabled = false` (today's look).
+   - `AppDelegate` holds `private var errorNotifier = ErrorNotifier()` (a stored property, never a local).
+     `updateUI()` passes `health` to it; when it returns an error and the bundle guard holds, one helper
+     `postErrorNotification(body:)` starts `Task { @MainActor in … }` that does
+     `try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])` and, if that returns true,
+     `try? await center.add(request)` (identifier `UUID().uuidString`, title `HoverFocus`, body = the status line).
+     It requests on every announcement (macOS prompts only while `.notDetermined` and otherwise answers at once from
+     the stored setting; no "already asked" flag). No `UNUserNotificationCenterDelegate` is added (a banner may be
+     suppressed while the app is frontmost; HoverFocus is an accessory app, so this is accepted). Denied or
+     unavailable: nothing more (the red line remains).
+   - "No authorization request at launch" means no eager request when healthy: a launch that lands in an error
+     (broken config, no grant) announces and requests like any other transition.
+   - Log with `Logger(subsystem: "com.wilddog64.hoverfocus", category: "health")`, `privacy: .public`: each announced
+     transition (`health <case>`), the loss branch firing (`trust lost`), and the notification outcome
+     (`notify granted=<bool> posted=<bool>`).
 4. **Selftest:** named `check` rows, each with a fresh coordinator and `FakeController` (reuse L1's):
    - **Notifier:** the transition table in Behaviour 1, as one row per arrow.
    - **Loss detected:** trusted, valid load → running; set untrusted; `trustTick()` → `stop` recorded, not running,
      `startError == .accessibilityNotTrusted`, `watchingTrust`, `health == .startError(.accessibilityNotTrusted)`.
-   - **Loss recovers:** then trusted + one `trustTick()` → one more `start`, running, `health == .ok`.
+   - **Loss recovers:** repeat the loss setup on its fresh coordinator, then trusted + one `trustTick()` → one more
+     `start`, running, `health == .ok`.
+   - **Reload while lost:** trusted, valid load → running; set untrusted; valid `load(.success)` (fake `start` is a
+     no-op while running) → `watchingTrust` true and still running; one `trustTick()` → `stop` recorded,
+     `health == .startError(.accessibilityNotTrusted)`.
+   - **Off/Paused stay quiet:** untrusted, fake `start` throws `.accessibilityNotTrusted`, load valid
+     `Config(enabled: false)` → `health == .ok`; same with `enabled: true` and `isPaused = true` → `.ok`.
    - **No false loss (positive control):** trusted, running; 100 × `trustTick()` → no `stop`, no extra `start`.
    - **Health precedence:** config error and a start error together → `configError`; start error while the fake
-     reports running → `.ok`.
+     reports running → `.ok` (set up by a failed load, then clearing the fake's throw and calling `try? fake.start()`).
    - Existing L1 rows keep passing unchanged.
 
 ## Files
@@ -116,8 +136,9 @@ read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "
 - `AppCoordinator.trustTick` / `watchingTrust` (L1): readers `AppDelegate` (timer) and the L1 selftest rows; L1-M2
   ("no attempt cap; first tick after grant starts exactly once") still holds and its rows must stay green.
 - `MenuModel.statusLine(for:)`: read, unchanged; now also the notification body.
-- README "Menu Bar Interface" describes the grey status line; the README is F2's file in this release, so Claude
-  updates that paragraph at release (noted in the parent plan), not the worker.
+- README "Menu Bar Interface" (`README.md:73-89`) lists the status strings; the README is F2's file in this release,
+  so Claude adds the red clickable error line and the notification there at release (noted in the parent plan), not
+  the worker.
 
 ## What NOT to Do
 
@@ -146,17 +167,17 @@ evidence:
   - id: U1-E1
     proves: [U1-M1, U1-N1]
     kind: offline
-    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with every notifier row passing. Red controls, each restored byte-identical: (a) announce on every error observation — the same-error row fails; (b) compare only the case, not the associated value — the different-reason row fails; (c) never reset on ok — the error-after-ok row fails"
+    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with every notifier row passing. Red controls, each restored byte-identical: (a) announce on every error observation — the same-error row fails; (b) compare only the case, not the associated value — the different-reason row fails; (c) never reset on ok — the same-error-after-ok row fails"
     intent: "You get one notification when HoverFocus breaks (bad config, permission lost, event tap failure), not a stream of them while it stays broken, and a new one if it breaks again later."
   - id: U1-E2
     proves: [U1-M2, U1-N2]
     kind: offline
-    command: "same run: loss detected, loss recovers, no false loss, health precedence and all L1 rows pass. Red controls, restored: (a) delete the loss branch — loss-detected fails; (b) drop the isTrusted check in the loss branch — no-false-loss fails"
+    command: "same run: loss detected, loss recovers, no false loss, health precedence and all L1 rows pass. Red controls, restored: (a) delete the loss branch — loss-detected fails; (b) drop the isTrusted check in the loss branch — no-false-loss fails; (c) gate the loss branch on !watchingTrust — reload-while-lost fails; (d) put startError before the Off/Paused check in health — off/paused-stay-quiet fails"
     intent: "If the Accessibility permission is removed while HoverFocus runs, the menu stops saying Running and shows the error; granting it again resumes focus."
   - id: U1-E3
     proves: [U1-M3]
     kind: offline
-    command: "git grep -n 'UNUserNotificationCenter' -- Sources/hoverfocus/AppDelegate.swift: every line is inside the bundle-guarded function (quote it); git grep -n 'systemRed' -- Sources/hoverfocus/AppDelegate.swift prints at least one line; git grep -n 'syncTrustTimer' -- Sources prints nothing; code reading of updateUI and the timer setup quoted with line numbers against Behaviour 3"
+    command: "git grep -n 'UNUserNotificationCenter' -- Sources/hoverfocus/AppDelegate.swift: every line is inside postErrorNotification, which is only called behind the bundle guard (quote both); the stored errorNotifier declaration and the statusMenuItem target/action/isEnabled lines quoted; git grep -n 'systemRed' -- Sources/hoverfocus/AppDelegate.swift prints at least one line; git grep -n 'syncTrustTimer' -- Sources prints nothing; code reading of updateUI and the timer setup quoted with line numbers against Behaviour 3"
     intent: "The error line is red and clickable, notifications only happen in the installed app, and there is a single background check."
   - id: U1-EL
     proves: [U1-M1, U1-M2, U1-M3]

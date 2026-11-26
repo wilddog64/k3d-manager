@@ -1,7 +1,7 @@
 # hoverfocus v0.0.3 L3 — focus correctness: yabai make-key sequence, Electron AX tree, bounded caches
 
-**Status:** spec rev 2 — Fable reviewed rev 1 (2026-11-25, NEEDS FIXES: 5 should-fix, 6 nits; all applied); Neon blind
-review pending; not dispatched
+**Status:** spec rev 3 — Fable reviewed rev 1 (2026-11-25, NEEDS FIXES: 5 should-fix, 6 nits; all applied); Neon blind
+review of rev 2 (2026-11-25, NEEDS FIXES: 4 blockers, 5 should-fix, 2 nits; all applied); not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch L3)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3`, which Claude cuts from `main` at `d2cdb00` (the
@@ -46,7 +46,8 @@ Recorded in the parent plan, `## Probe results`; summarised here so the worker d
 
 1. `git log --oneline -1` shows the `v0.0.3` head (`d2cdb00` unless a later commit is named at dispatch);
    `swift build --disable-sandbox` and `swift run --disable-sandbox hoverfocus-selftest` pass. Every `swift` command
-   carries `--disable-sandbox` (SwiftPM's sandbox cannot nest inside `sandbox-exec`).
+   carries `--disable-sandbox` (SwiftPM's sandbox cannot nest inside `sandbox-exec`) and runs with
+   `CLANG_MODULE_CACHE_PATH="$PWD/.build/clang-mc"` (the worker sandbox denies writes to `~/.cache/clang`).
 2. Read `Sources/HoverFocusPlatform/Controller.swift`, `Sources/CSkyLight/CSkyLight.c`,
    `Sources/CSkyLight/include/CSkyLight.h`, `Sources/HoverFocusCore/Engine.swift`, `Sources/HoverFocusCore/Interface.swift`
    and `Sources/hoverfocus-selftest/main.swift`.
@@ -81,7 +82,8 @@ int hf_focus_sequence(const hf_focus_ops *ops, int32_t pid, uint32_t window_id,
 int hf_focus_without_raise(int32_t pid, uint32_t window_id, int32_t front_pid, uint32_t front_window_id);
 ```
 
-Undefined inputs: `hf_record_make_key` writes the `phase` byte at 0x08 as given (callers pass 1 or 2);
+Both record builders return at once on a NULL `record`, and otherwise `memset` all `HF_RECORD_SIZE` bytes to 0 before
+writing. Undefined inputs: `hf_record_make_key` writes the `phase` byte at 0x08 as given (callers pass 1 or 2);
 `hf_focus_sequence` returns -1 without calling anything if any `ops` member is NULL.
 
 Record layouts (all bytes not listed are 0; `window_id` is written little-endian as 4 bytes at 0x3c):
@@ -106,8 +108,9 @@ Record layouts (all bytes not listed are 0; `window_id` is written little-endian
 
 `hf_focus_without_raise` resolves the symbols (unavailable → -1) and calls `hf_focus_sequence` with real ops: static
 wrapper functions in `CSkyLight.c` around `GetProcessForPID`, `_SLPSSetFrontProcessWithOptions`,
-`SLPSPostEventRecordTo` and `usleep` that do the type casts (`hf_psn *` ↔ `ProcessSerialNumber *`, `useconds_t`), with
-`_Static_assert(sizeof(hf_psn) == sizeof(ProcessSerialNumber), "psn layout")` in the `.c` file. The 40 ms sleep runs on the
+`SLPSPostEventRecordTo` and `usleep` that convert by explicit field copy, not pointer casts (`ProcessSerialNumber native = { psn->high, psn->low };` and
+back via `highLongOfPSN`/`lowLongOfPSN`), plus a `useconds_t` cast for `usleep`; add `#include <unistd.h>`. No
+`0x400` or `kCPSNoWindows` remains anywhere under `Sources/CSkyLight` (code or comments). The 40 ms sleep runs on the
 main thread inside the tap callback, as in yabai; the tap is listen-only, so input is not delayed.
 
 ### 2. Controller: pass the frontmost window into the sequence
@@ -115,8 +118,10 @@ main thread inside the tap callback, as in yabai; the tap is listen-only, so inp
 `applyDecision`'s no-raise branch calls `hf_focus_without_raise(target.pid, target.windowID, frontPid, frontWid)`, where
 `frontPid` is `NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0` and `frontWid` is that app's
 `kAXFocusedWindowAttribute` window ID (0 when unavailable). Factor the existing lookup in `systemState()`
-(`Controller.swift:167-182`) into one private helper used by both; `systemState()` behaviour is unchanged. The raise
-branch (`raiseApps`) is unchanged.
+(`Controller.swift:167-182`) into one private helper used by both; `systemState()` behaviour is unchanged. The raise branch's AX actions (`kAXFrontmostAttribute` and `kAXRaiseAction`)
+are unchanged; its element read becomes `elements.value(for: target.windowID)` (Behaviour 4) and the
+`enableAccessibilityTree` call precedes both branches (Behaviour 3). Write the call on one line exactly as
+`hf_focus_without_raise(target.pid, target.windowID, frontPid, frontWid)`.
 
 ### 3. Electron: enable the Chromium AX tree for every app HoverFocus targets or cannot resolve
 
@@ -127,14 +132,15 @@ The probe set `AXManualAccessibility` before every Electron trial, and whether t
   create `AXUIElementCreateApplication(pid)`, call `AXUIElementSetMessagingTimeout(app, 0.2)` (the same bound `lookup`
   uses at `Controller.swift:131`; the call runs on the main thread inside the tap callback), set
   `AXManualAccessibility = true`, record the pid whatever the rc, and log `ax-enable pid <pid> rc <rc>` at `.info` with
-  `privacy: .public`.
+  `privacy: .public`, using `rc.rawValue`.
 - **Called from two places:**
   1. `applyDecision`, for `target.pid`, **before** the focus call (both the no-raise and raise branches). This covers
      an Electron window whose hit-test already resolves.
   2. `lookup(x:y:)`, when the hit-test does not end in a window ID (copy-element fails, or `hf_ax_window_id` is
-     non-zero), for the owning pid: `AXUIElementGetPid` on the **original hit element** if copy-element succeeded;
-     otherwise the owner pid of the front-most on-screen layer-0 window containing the point
-     (`CGWindowListCopyWindowInfo(.optionOnScreenOnly, …)`, list order is front to back). The lookup still returns
+     non-zero), for the owning pid: `AXUIElementGetPid` on the **original hit element** if copy-element succeeded and it
+     yields a pid > 0; otherwise the owner pid of the front-most window containing the point with layer 0 and
+     alpha > 0 (`CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)`, list
+     order is front to back). The lookup still returns
      `nil`; the next lookup (≥16 ms later, `TapState`) retries the hit-test. The extra window-list call on a failed
      lookup is accepted (at most one per 16 ms, by `TapState`).
 - Never set `AXEnhancedUserInterface` (known to break window animation and positioning in other apps; Chrome refuses
@@ -156,7 +162,8 @@ public struct RecentCache<Key: Hashable, Value> {
 }
 ```
 
-`Controller.elements` becomes `RecentCache<UInt32, AXUIElement>(capacity: 32)`; the raise branch reads it with
+`Controller.elements` is declared on one line exactly as
+`private var elements = RecentCache<UInt32, AXUIElement>(capacity: 32)`; the raise branch reads it with
 `value(for:)`. O(capacity) eviction is fine at these sizes.
 
 ### 5. Engine: no change, but prove the same-app path
@@ -170,8 +177,9 @@ and gets its own bug doc; it is not patched blind here.
 ### 6. Selftest (`Sources/hoverfocus-selftest/main.swift`)
 
 Add named `check` rows. Fakes for `hf_focus_ops` are non-capturing `@convention(c)` closures. Swift 6 mode (tools 6.0)
-makes top-level `var`s in `main.swift` main-actor isolated, so the log lives in a global `let` of a lock-protected
-`final class OpsLog: @unchecked Sendable` (the `CheckRecorder` pattern, `main.swift:161`) holding the call log
+makes top-level `var`s in `main.swift` main-actor isolated, so the log is a lock-protected `final class OpsLog: @unchecked Sendable` (the `CheckRecorder` pattern,
+`main.swift:161`) held as `enum OpsFixture { static let log = OpsLog() }` (a static in a non-actor type is
+nonisolated, unlike a top-level `let`) holding the call log
 (`get_psn`, `set_front(wid, mode)`, `post(record bytes)`, `sleep(us)`) and settable return codes per call kind and per
 call index. The `post` fake copies the `HF_RECORD_SIZE` bytes during the call.
 
@@ -182,14 +190,19 @@ call index. The `post` fake copies the `HF_RECORD_SIZE` bytes during the call.
 - **Same app:** `(pid 10, wid 7, front_pid 10, front_wid 3)` → `get_psn`, `post(deactivate 3)`, `sleep(40000)`,
   `post(activate 7)`, `set_front(7, 0x200)`, `post(make-key 1 for 7)`, `post(make-key 2 for 7)`.
 - **Same app, no front window:** `front_wid 0` → same log as different app.
-- **Guards:** pid 0 → -1 and empty log; `get_psn` returns -1 → -1 and log is `get_psn` only.
+- **Same app, same window:** `(pid 10, wid 7, front_pid 10, front_wid 7)` → same log as different app.
+- **PSN plumbing:** `get_psn` receives `pid` 10 and writes `{0x1234, 0x5678}`; `set_front` and every `post` receive
+  exactly that `hf_psn`.
+- **Zeroing:** each record builder, given a buffer pre-filled with 0xaa, produces exactly the table bytes; a NULL
+  record does not crash.
+- **Guards:** pid 0 and pid -1 → -1 and empty log; `ops == NULL` → -1; `get_psn` returns -1 → -1 and log is `get_psn` only.
 - **Errors do not stop the sequence:** `set_front` returns 1002 → all later posts still logged; rc 1002.
 - **First rc wins:** same app, the deactivate `post` returns 5 and `set_front` returns 1002 → the full 7-call log; rc 5.
 - **NULL op:** an `ops` with `sleep_us` NULL → -1 and empty log.
-- **Symbols:** `hf_skylight_resolve_with_symbol_override("SLPSPostEventRecordTo")` reports it missing (inside the
-  existing `skipSkyLight` guard); the existing guard row becomes `hf_focus_without_raise(-1, 0, 0, 0) != 0`.
+- **Symbols:** `hf_skylight_resolve_with_symbol_override("SLPSPostEventRecordTo")` reports exactly that name
+  (`String(cString: overridden.missing_symbol!) == "SLPSPostEventRecordTo"`, inside the existing `skipSkyLight` guard); the existing guard row becomes `hf_focus_without_raise(-1, 0, 0, 0) != 0`.
 - **RecentCache:** capacity 2: set a, b; read a; set c → b evicted, a and c present, count 2; replacing a key does not
-  grow count; capacity 1 keeps only the last set.
+  grow count; at capacity 2, set a=1, b=2, set a=10, set c=3 → b evicted, a == 10, c == 3, count 2; capacity 1 keeps only the last set.
 - **Engine same-app (characterisation, Behaviour 5):** `state.focusedWindowID = 3`, target window 7 of the same pid,
   dwell elapsed → `.focus(target)`; paired control: target window 3 → `.none`.
 
@@ -207,15 +220,15 @@ call index. The `post` fake copies the `HF_RECORD_SIZE` bytes during the call.
 
 - `hf_focus_without_raise` (signature change): callers `Controller.swift:249` and selftest `main.swift:159`; no other
   reader (`git grep -n hf_focus_without_raise` on `d2cdb00`). Both updated here.
-- `hf_skylight_resolve` / `missing_symbol` text: `Controller.liveChecks` (`Controller.swift:272-275`) and
+- `hf_skylight_resolve` / `missing_symbol` text: `Controller.liveChecks` (`Controller.swift:272-276`) and
   `MenuModel.statusLine(for: .privateAPIUnavailable)`: a 4th possible symbol name, no format change.
 - `Interface.swift` types (`WindowTarget`, `SystemState`, `Decision`): unchanged.
 - U2 (focus indicator) will hook `applyDecision`; it is specified after L3 lands.
 
 ## What NOT to Do
 
-- No edit outside `## Files`; no change to `Engine.swift`, the raise branch, the event mask or dwell logic.
-- Do not set `AXEnhancedUserInterface`. Do not use AX read-back of typed text in any test.
+- No edit outside `## Files`; no change to `Engine.swift`, the raise branch's AX actions, the event mask or dwell logic.
+- Do not set `AXEnhancedUserInterface`, and do not name it in comments (the grep in L3-E3 must print nothing). Do not use AX read-back of typed text in any test.
 - Do not run the app against the window server; use `swift run --disable-sandbox hoverfocus-selftest`.
 - Run every command under
   `sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/sudo") (literal "/bin/launchctl"))'`.
@@ -243,7 +256,7 @@ evidence:
   - id: L3-E1
     proves: [L3-M1, L3-M2, L3-N1, L3-N2]
     kind: offline
-    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with the records, different-app, same-app, same-app-no-front-window, guards and errors-do-not-stop rows passing. Red controls, each restored byte-identical: (a) mode 0x400 in step 3 — different-app and same-app rows fail; (b) drop make-key phase 2 — both rows fail; (c) remove the same-app branch — same-app row fails, different-app still passes; (d) send the pair whenever front_pid == pid even with front_window_id 0 — no-front-window row fails; (e) write 0x3a = 0x10 into activation records — records row fails; (f) return after the first non-zero rc — errors-do-not-stop and first-rc-wins rows fail; (g) return the last non-zero rc — first-rc-wins row fails. Pre-fix code does not compile against these rows (the symbols are new), so the must_nots are shown red by the controls, not by running the rows on d2cdb00"
+    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with the records, zeroing, PSN plumbing, different-app, same-app, same-app-no-front-window, same-app-same-window, guards, null-op, errors-do-not-stop and first-rc-wins rows passing; git grep -nE '0x400|kCPSNoWindows' -- Sources/CSkyLight prints nothing (red on d2cdb00, CSkyLight.c:86-87); code reading of names[]/symbols[], the four real-ops wrappers and hf_focus_without_raise quoted with line numbers, showing delegation to hf_focus_sequence. Red controls, each restored byte-identical: (a) mode 0x400 in step 3 — different-app and same-app rows fail; (b) drop make-key phase 2 — both rows fail; (c) remove the same-app branch — same-app row fails, different-app still passes; (d) send the pair whenever front_pid == pid even with front_window_id 0 — no-front-window row fails; (e) write 0x3a = 0x10 into activation records — records row fails; (f) return after the first non-zero rc — errors-do-not-stop and first-rc-wins rows fail; (g) return the last non-zero rc — first-rc-wins row fails; (h) drop `front_window_id != window_id` from the same-app test — same-app-same-window row fails. Pre-fix code does not compile against these rows (the symbols are new), so the must_nots are shown red by the controls, not by running the rows on d2cdb00"
     intent: "The exact keyboard-focus sequence that worked in every app on m2 is what the app sends, step for step, and a change to any step is caught before it ships."
   - id: L3-E2
     proves: [L3-M4, L3-N3]
