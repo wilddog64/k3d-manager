@@ -1,4 +1,5 @@
 ## Handoff — 2026-11-25 21:15 PST — v1.46.0 plan 1 live-verified — START HERE
+- **2026-11-25 night — Tailscale plan 7 rev 3 dispatched:** Fable + Neon reviews applied, D1-D5 decided (D5 (a) device approval), intents approved; `4387194c`. 7a `v1460-p7a` (Luna: policy.hujson + test_tailscale_policy.py) and 7b `v1460-p7b` (Flash: runbook + cloud-bridge paragraph) running. Operator live test 2026-11-26 morning (P1, P2, L-E1, L-E2; separate go).
 
 - **Operator:** at the office 2026-11-26 (jump box reachable only there), home in the evening. Only the operator can: collect
   the dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, CI green first), run a
