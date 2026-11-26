@@ -1,6 +1,6 @@
 # hoverfocus v0.0.3 F2b — `make bundle` fails closed when signing fails
 
-**Status:** spec rev 1 — from blind reviews of the bug doc by Argon (dispatch `hf003-p2sign-review-argon`) and Fable
+**Status:** spec rev 1, dispatched to Luna 2026-11-26 — from blind reviews of the bug doc by Argon (dispatch `hf003-p2sign-review-argon`) and Fable
 (2026-11-26): both confirmed the diagnosis, agreed P2 and option 1 (fail closed), no silent ad-hoc fallback.
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md); fixes
@@ -11,7 +11,7 @@
 **Implementer:** Luna (codex, `gpt-6-luna`).
 **Verifier:** Claude, from `## Acceptance` only.
 **Filed:** 2026-11-26
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-26 ("intents approved")
 **Approval:** operator 2026-11-26 "let's have Argon/Fable review P2 bug" then "dispatch to Luna after review complete"
 
 ## Problem (self-contained; the worker cannot read the bug doc)
