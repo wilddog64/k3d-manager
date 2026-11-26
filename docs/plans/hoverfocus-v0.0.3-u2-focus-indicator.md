@@ -3,7 +3,7 @@
 **Status:** spec rev 2 — Fable and Neon reviewed rev 1 independently (2026-11-26, both NEEDS FIXES; shared findings: stale
 border after keyboard focus changes, `enabled: false` left it on screen, vacuous row preconditions and config-reason check,
 headless panel creation, missing contract readers, live-step errors; Fable: one panel over the window could capture
-hit-testing; all applied). LANDED `4a3940f` on `v0.0.3` (Flash `hf003-u2`, 2026-11-26); E1 Claude-verified (128/0, mutants a-k red, static checks); E2 live pending
+hit-testing; all applied). LANDED `4a3940f` on `v0.0.3` (Flash `hf003-u2`, 2026-11-26); E1 Claude-verified (128/0, mutants a-k red, static checks); E2 live PASS on m2 (macOS 26.5.1, 2026-11-26, operator + Claude watcher sampling front app, topmost window and HF strips): steps 1-7, 9a, 10, 11 PASS; 8 PASS (Slack in raiseApps: raised, no border; hover back to iTerm2: border, Slack stays on top; 3 hover-only rounds 12:33-12:34 clean); 9b close covered by the shared offscreen path; 12 not run (no Samsung monitor); 13 not tested. Notes for the PR: border clears on a menu-bar click (click-elsewhere rule); clicking the bordered window keeps the border (by design, read as "stuck" in the first step 8 try); ~500 ms linger during the minimize animation; one sample of the old border resized for <1 s after a raise; the config parser (JSONSerialization, macOS 26.5.1) accepted a trailing comma in raiseApps
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch U2, decision D2 option 1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` at `2e30655` (L3 `3951b67`, U1 `4e66919`, F2 `7b42f63`, L4 `11e0e7c`)
