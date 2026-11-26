@@ -32,7 +32,8 @@ PR review.
 | **L3** | Luna | Focus correctness from P2's winning variant: B1, B2, Electron, Safari Cmd+W, A2 eviction; selftest rows per app class | `Sources/HoverFocusPlatform/Controller.swift`, `Sources/CSkyLight/*`, selftest | P2 |
 | **F2** | Flash | `make signing-identity` (operator-run, creates the identity) and `CODESIGN_IDENTITY` defaulting to it when present, else ad-hoc + the reset hint; README install section and a "Tested apps" table from P1/P2 | `Makefile`, `tests/install_test.sh`, `README.md` | P3 |
 | **U1** | Luna | Visible errors: status line in red (attributed title); one Notification Center message on each transition into an error (config invalid, event tap, Accessibility lost), none while it persists | `Sources/hoverfocus/AppDelegate.swift`, `Sources/HoverFocusCore/Health.swift` (new), `Sources/HoverFocusCore/AppCoordinator.swift`, selftest (`MenuModel.swift` read-only, per the child spec) | P3 (notification permission needs the stable identity) |
-| **U2** | Luna | Focus indicator per D2 | new `Sources/hoverfocus/FocusIndicator.swift`, one hook in `Controller.swift` | L3 (shares `Controller.swift`) |
+| **L4** | Flash | Electron recurrence found at the L3 live check (2026-11-25): resolve the hovered window through `kAXWindowAttribute`, not the 8-level parent walk whose stop element's subrole drops Slack content (probe `hf-p4`) | `Sources/HoverFocusCore/WindowResolver.swift` (new), `Controller.swift` `lookup`, selftest | L3 live check (done) |
+| **U2** | Luna | Focus indicator per D2 | new `Sources/hoverfocus/FocusIndicator.swift`, one hook in `Controller.swift` | L4 lands (shares `Controller.swift` and the selftest file) |
 
 Order: P2 and P3 together (one m2 session) → L3 and F2 in parallel → U1 after L3 lands (both edit
 `Sources/hoverfocus-selftest/main.swift`; one dispatch per file, found while writing the child specs 2026-11-25) → U2
@@ -40,7 +41,7 @@ after L3 lands. Child specs: [`L3`](hoverfocus-v0.0.3-l3-focus-correctness.md),
 [`F2`](hoverfocus-v0.0.3-f2-signing-identity.md), [`U1`](hoverfocus-v0.0.3-u1-visible-errors.md). U1 adds
 `Sources/HoverFocusCore/AppCoordinator.swift` (Accessibility-loss detection) and L3 adds `RecentCache.swift`; the
 README's Known Limitations and Menu Bar paragraphs are Claude's edits at release, after the live checks.
-Five dispatches plus two probes. A fix that depends on macOS behaviour carries the probe result before dispatch.
+L4 (added 2026-11-25, [`L4`](hoverfocus-v0.0.3-l4-lookup-window-resolve.md)) dispatches before U2. Six dispatches plus three probes. A fix that depends on macOS behaviour carries the probe result before dispatch.
 
 ## Probe results
 
