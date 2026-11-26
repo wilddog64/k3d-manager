@@ -1,12 +1,11 @@
 # Bug: HoverFocus does not focus Safari windows
 
-**Status:** OPEN
+**Status:** LIVE-VERIFIED — L3 `3951b67` + L4 `11e0e7c` on hoverfocus `v0.0.3`; operator on m2 2026-11-25: Safari takes typed text on hover and Cmd+L acts on it (Safari raises its own window on Cmd+L and page-content hover; README Known Limitations)
 **Priority:** P2 (operator, 2026-11-24, D3: "yes, and other command hotkeys") — Cmd-key shortcuts do not reach the hover-focused app until a click
 **Introduced by:** `4cbd377` (M1a focus core: `Controller.swift` `lookup(x:y:)`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (both)
 **Triage:** hoverfocus v0.0.3 batch L3 (operator, 2026-11-24, D1/D3)
-**Waiting on:** investigation — P1 app matrix on m2
 **Prior art:** not run (find-similar-docs vector store unavailable; exact-slug glob found nothing)
 **Filed:** 2026-11-23
 **Detected by:** operator, 2026-11-23 ("hoverfocus does not work for Safari")

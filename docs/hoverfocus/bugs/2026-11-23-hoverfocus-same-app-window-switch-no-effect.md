@@ -1,11 +1,10 @@
 # Bug: HoverFocus — hovering another window of the already-front app does not move focus
 
-**Status:** OPEN
+**Status:** LIVE-VERIFIED — L3 `3951b67` on hoverfocus `v0.0.3`; operator on m2 2026-11-25: two overlapping TextEdit windows switch focus on hover
 **Priority:** P2 (proposed) — degraded: cross-app hover works, same-app needs a click (the workaround)
 **Introduced by:** `4cbd377` (hoverfocus M1a, variant B no-raise focus; documented known limitation)
 **Should have been caught by:** spec (the probe skipped same-app targets; `docs/plans/hoverfocus-m1a-focus-core.md:33-35`)
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** dispatch
 **Triage:** carry → hoverfocus v0.0.3 (operator, 2026-11-24, D1: v0.0.2 = L1 + F1; deferred focus work moves to v0.0.3 batch L3)
 **Prior art:** `docs/hoverfocus/bugs/2026-11-23-hoverfocus-iterm-hollow-cursor-after-no-raise-focus.md` (filed same day, no score run) — read, related mechanism (key-window state), different symptom
 **Filed:** 2026-11-23
