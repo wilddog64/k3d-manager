@@ -53,8 +53,16 @@ Paste `docs/howto/tailscale/policy.hujson` with the real login substituted for `
 ## Enroll the Macs and the iPad
 
 - Enroll devices one at a time in the Decision D2 order: `m2` (operator desk, lowest operational risk), then `m5` (the hub cluster and webhook host), then `m4` (worker and agent runner).
-- Install only the Standalone variant from Tailscale's download site (`/Applications/Tailscale.app`) on all three Macs.
-  - On `m4`: remove the App Store copy of `Tailscale.app` and any Homebrew `tailscale` CLI formula (`brew uninstall tailscale`) first so only one network extension exists.
+- Install only the Standalone variant on each Mac, from a login shell in the k3d-manager checkout:
+  ```bash
+  make install-tailscale
+  ```
+  It installs the Standalone app (`brew install --cask tailscale-app`, bundle ID `io.tailscale.ipn.macsys`), checks the
+  result, and does nothing if it is already there. It refuses, with instructions, when the Homebrew `tailscale` formula
+  or the App Store variant is present, so only one network extension ever exists. Homebrew's installer asks for your
+  macOS password; then open Tailscale from Applications and allow its system extension.
+  - On `m4`: it refuses until you remove the Homebrew formula (`brew services stop tailscale; brew uninstall tailscale`)
+    and the App Store copy (quit Tailscale, delete `/Applications/Tailscale.app`); run it again afterwards.
 - Apply `tag:k3dm-mac` immediately during enrollment so no Mac ever sits untagged.
 - Leave "Use Tailscale DNS settings" off in Tailscale preferences on the Macs to prevent MagicDNS from interfering with the hub's local DNS resolvers (`k3d`, `cloudflared`).
 - Confirm in the admin console that key expiry shows disabled for each tagged Mac node (`tag:k3dm-mac`).

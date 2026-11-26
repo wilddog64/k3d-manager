@@ -646,6 +646,11 @@ provision: ssm
 install-sudoers:
 	bin/install-sudoers.sh
 
+## Install the Tailscale Standalone app (refuses the Homebrew formula and App Store variants; run from a login shell)
+.PHONY: install-tailscale
+install-tailscale:
+	@./scripts/k3d-manager _install_tailscale_app
+
 ## Install the fixed system launchd socket relays for browser listeners
 install-browser-relays:
 	bin/install-browser-relays.sh
@@ -2415,6 +2420,7 @@ help:
 	@echo "    make fleet-plan            Create a no-execute ACG fleet change set"
 	@echo "    make fleet-up              Provision/join the ACG fleet (node-join rung)"
 	@echo "    make install-sudoers       Install passwordless sudo rules (one-time macOS setup)"
+	@echo "    make install-tailscale     Install the Tailscale Standalone app (refuses formula/App Store copies)"
 	@echo ""
 	@echo "  Observability / credentials:"
 	@echo "    make observability              Deploy Prometheus+Grafana+Trivy to Hub k3d"
