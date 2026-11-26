@@ -245,3 +245,113 @@ expires 2026-11-26 (operator may delete).
   rebuild loop may not converge (base image?). (6) Triage due: several P3 captures from 2026-11-23..25.
 - **Gotchas learned:** verified-stage needs the full 40-hex commit and `--ref deploy/hub` before a release reaches main;
   dr-drill needs a TTY (`ssh -tt`); check CI on the exact SHA before giving promote commands.
+
+<!-- archived 2026-11-25 evening handoff -->
+
+## Handoff 2026-11-25 (evening) — v1.46.0 plan 1 complete — START HERE
+
+**Objective:** cloud-runner request approval gate (plan 1) — DONE, LIVE-VERIFIED `a49e3a99`.
+**Evidence:** Deny `c1-3aaa75de` -> rejected rc 3; Approve `c1-e3c802ec` -> job `853b827f` once; cluster-status ok in 21 s
+during the open card; final result published via validated watch (`d68bdab0`). Hub `deploy/hub` = `cf653419`.
+**Also landed today:** v1460-prepush (Neon, LIVE-VERIFIED `52d0719b`), v1460-spawn (Neon, LANDED; E-S4 needs one cloud-session
+cluster-status), v1460-gnudf (Luna, LANDED; live after next promote: read-only `e2e_runner_preflight m2`, next Hermes slot).
+**Bugs:** watch-ledger P2 LIVE-VERIFIED `63748cf0`; sandbox-lifecycle crash P2 LANDED, live only via a sandbox-up/down request
+(operator call, AWS cost; suggested: verify at the next planned sandbox run). New P3 captures for triage: helper concurrent-wait
+race, approval card wording, gnudf test gaps, e2e order 429 (`flows/order-management.spec.ts`).
+**Decisions:** Neon trial — reviewer (spec C, found 2 real gaps Fable missed) and implementer (prepush/spawn, thorough, ~2x Luna
+time); scorecard in memory `project_neon_reviewer_trial.md`; next specs get a Neon blind review next to Argon/Fable.
+Idea added: approver attribution on approved cloud requests.
+**HoverFocus:** P2 done (Y passes 8 apps); next L3/F2/U1 specs (+ Neon/Argon reviews). **dirused:** jump-box probe 2026-11-26.
+**Next session:** promote (gnudf live), E-S4 from a cloud session, HoverFocus L3/F2/U1 specs, P3 triage, remaining v1.46.0 plans.
+
+- **Session 2026-11-25 afternoon (operator home, said go):**
+  - dirused M10b4 rev 3 `52bbe180`: split into M10b4a docs (Flash) + M10b4b DocsDriftTests (Luna). Fable blind review READY WITH
+    FIXES; Argon READY WITH FIXES (overlapping). All findings verified, rev 4 `2dd4cb70`. Next: operator intent approval, then
+    dispatch a (Flash) + b (Luna) in parallel; land a first, b with the full portable suite.
+  - **M10b4 LANDED + pushed:** a `24dffb5` (Flash docs), b `eaa51be` (Luna DocsDriftTests; round 2 fixed my spec's Markdown-padding
+    defect). Verified: drift test 3 red on old docs / 7 green on new; mutants (a)-(e) each kill the named fact ((e) respecced: deleting
+    PlanRunner.cs does not compile). CI 24dffb5 green; eaa51be CI watching. E-B4a evidence flaw: 'not available yet' also matches an
+    older unrelated bullet. Remaining dirused: probe collect 11-26 (operator), E-B3L1, PR.
+  - **v1.46.0 plan 1 rev 2 `677cb16e`**: parent + children a store (Luna), b bridge (Luna, after a), c relay prefix (Luna),
+    d helper wait (Luna), e docs (Flash, after b). Ruleset dropped: all cloud-requests commits authored as operator (git log -200).
+    Fable + Astra both NOT READY on rev 2; all findings verified. **Rev 3 `c89589f5`**: single-instance flock, per-decision save +
+    expiry recheck before token read, pending notice outside outbox, StoreError reason, relay records c Deny + first decision wins,
+    5-min minimum, 30 s drain throttle, requested_by validation, lazy path/config, named mutants. New child **b1** (watch fixes) carries
+    two pre-existing P2s Astra found: `docs/bugs/2026-11-25-cloud-bridge-watch-entry-crashes-on-sandbox-lifecycle.md` (TypeError, sandbox
+    responses lost) and `...-trusts-public-watch-ledger-entries.md` (one bad line freezes the bridge). Next: operator intent approval,
+    then dispatch a + b1 + c (3 WIP), then d, b, e.
+  - **Docs review (operator ask 16:30) DONE `af3b96c2`:** 119 docs mechanical pass + Flash audit of 31 drifted docs;
+    13 stale statements verified and fixed in 11 docs (webhook :7443 / `make setup-worker`, copilot auth, cve-pins/hub, Trivy
+    metric, confirm targets, log path, Pushgateway wording, Hermes R5/R6/R10 note, dr-drill ldap_resync, doctor Slack checks).
+  - Plan 1 intents approved (`91d88a47`); **a `358f10b9`, b1 `ee277703`, c `4e3f3c81` LANDED** (verified: tests, red on base, mutants; a had one correction
+    — drop decisions carry approval_id). Two P2 bridge bugs LANDED. **d LANDED `2e90b8c6`** (11 tests, 4 red on base, 4 mutants). **b LANDED `58821022`, e LANDED `1f87c6f0` — plan 1 all six children landed, offline verified.** Next: CI green on head, then E-P1-live (operator: hub promote, make deploy-worker, make install-cloud-bridge; Deny then Approve one gated request, cluster-status meanwhile). Note: `resume` returns at once; watch `status`. Next:
+    verify/land d, b; then e (Flash); GNU-df fix needs operator intent approval + slot. Note: land does not push — push between lands.
+  - **e2e M2 skip (P2)** `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md`: M2 ~/.zshenv puts gnubin first,
+    `df -g` fails, probe reports 0 GiB (real 307). Spec rev 2 `80a59ad6` after Fable NOT READY (12 findings applied). Waits on
+    operator intent approval + a free slot. Ideas added: iPad password-show via console; rotation advance notice. Split work tip `2022216d`,
+    `2720e262`. CI red on `88d86c23` = machine-secrets 1-in-256 CBC flake, captured P3
+    `docs/bugs/2026-11-25-machine-secrets-wrong-passphrase-decrypts-1-in-256.md`. K3dmPromoteWaiting alert = operator promote.
+  - v1.46.0 plan 1 started. Operator decision: **approval gate** threat model, not per-agent keys. Reader actions stay unsigned;
+    cloud-runner requests (sandbox-up/down aws, make-e2e[-remote]) wait for operator approval (reuse Hermes/Slack approve);
+    GitHub ruleset limits pushes to `cloud-requests`. Spec rewrite next (Fable + Astra review: shared contract).
+  - Triage: 63 untriaged OPEN bugs (2 P2, 61 P3; oldest batch 11-17). Operator: Argon classifies blind, Claude verifies and
+    proposes, operator approves in one pass. Argon done: real count 61 (2 were LIVE-VERIFIED docs with a stale lower Status
+    subsection; my filter bug). **Applied `b19970dd`:** operator "go with patch release v1.46.1" — 12 bugs to v1.46.1
+    (batches A1 codex-dispatch, A2 rule violations, A3 ops, A4 Hermes, B small; roadmap section + milestones json), 6 next-minor,
+    42 backlog, 1 upstream (lib-foundation file locks). 8 priorities raised to P2. Batch specs not written yet.
+  - Plan 1 mechanism map done (Explore): Hermes relay/drain with a new id prefix + bridge-local pending state is the
+    reuse candidate; hub_approval is promote-only and blocked by the request-spam bug. Draft remote-promote-3a already
+    designs `approval-pending`. Bridge needs a persisted pending set, revisit path, non-job watch entries, --wait semantics.
+
+- **Operator:** home today; at the office tomorrow (jump box reachable only there). Only the operator can: collect the
+  dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, check CI first), m5
+  console steps, merges, approvals and live-check waivers.
+
+1. **dirused (OOB, branch `m10b-scheduled-purge`, worktrees under `~/.local/share/k3d-manager/worktrees/v0.0.28/`).**
+   Done: b3c `a224279`, b3d `009fb14` (10/10 in-runner mutants, windows CI 114/114). Next, in order: (a) 2026-11-26 the
+   operator runs the probe `collect` on the jump box and sends `report.txt`, then `cleanup`; Claude records the result
+   in `docs/plans/dirused-m10b3-runplan-windows.md` and `docs/plans/dirused-m10b-scheduled-purge.md` (gates E-B3L1 and
+   E-B3L2). (b) E-B3L1 attended small-file purge (operator). (c) M10b4 docs (intents pending operator approval).
+   (d) dirused PR. E-B3L2 waits on log growth (team cleaned the logs). Claude can draft M10b4 now.
+0. **Plan 1 LIVE-VERIFIED 2026-11-25** (`a49e3a99`). Open live checks: watch-ledger P2 (final.json of job 853b827f), lifecycle-crash
+   P2 (needs a sandbox-up/down request; operator call, AWS cost), spawn fix E-S4 (cloud session cluster-status),
+   gnudf (read-only m2 preflight + next Hermes slot, after next promote). P3s captured for triage.
+2. **k3d-manager v1.46.0 (branch `k3d-manager-v1.46.0`, groomed 5/5 on 2026-11-22; see `docs/roadmap.md`).** Not started
+   this session. Claude can begin per the dispatch queue once the operator says go.
+3. **v1.45.1 carry-overs, LANDED, live check pending (P2/P3, non-blocking):** console TOTP A1 decay/rotate and gate
+   lockout (`docs/bugs/2026-11-23-console-totp-*`), CVE pins at-home steps
+   (`docs/bugs/2026-11-23-cve-pins-branch-trusted-without-verification.md`), `make sync-branch` round trip, next sandbox
+   preflight. Each bug's Waiting-on line says who acts.
+4. **HoverFocus:** make-key layout proven against yabai v7.1.25 / AutoRaise v5.7; the old rc 1002 was
+   kCGErrorInvalidConnection (probe never initialised AppKit), recorded in the v0.0.3 plan. P2 DONE 2026-11-25 (P2b + P2c):
+   variant Y passes all 8 apps, no raise; B fails VS Code, raises Slack. Next: L3/F2/U1 child specs (L3 = Y; check
+   Engine.swift:59 skip; no AX read-back selftests for Chromium/Mail/Electron), then Fable review.
+5. **Triage due:** P3 captures from 2026-11-23..25 under `docs/bugs/` with `OPEN — capture` (incl. unpinned Copilot CLI
+   in CI, 15-minute drill preflight clone). Captures still owed: first-install host-key warning; lib-foundation
+   `timeout` missing on macOS in install_istioctl.bats; QR how-to note (scan from inside the authenticator app); flaky
+   dirused ProgramPurgeTests; hub_data export-path intermittent failure.
+
+**Dispatches:** 0 open of WIP 3 (`bin/k3dm-codex-dispatch open` empty; Argon review run abandoned after triage).
+**Open PRs:** #158 Dependabot wrangler-action v3→v4, deferred by operator (needs a v4 changes look).
+
+**Owed / decisions:** ideas for next grooming: drill failure-path hook, OOB client onboarding checklist (pilot dirused).
+product-catalog 82 HIGH/CRIT with candidate still 62: remediation rebuilds may not converge (base image?), look after
+v1.46.0 starts. Copilot capped until 2026-12-01: release PRs get a blind Argon review.
+
+**Standing facts:**
+- Handoff guard: `.claude/hooks/handoff-on-clear.sh` reports STALE if commits land after this header; bump the time on edit.
+- Older handoffs and logs, verbatim: `memory-bank/archive/activeContext-2026-11-25.md` (then `-2026-11-23.md`, `-2026-11-22.md`).
+- Source of truth for open work: `docs/bugs/` Waiting-on lines, `bin/k3dm-codex-dispatch open`, plan Status lines.
+- Push via `SSH_AUTH_SOCK=/var/run/com.apple.launchd.uw3bpQR945/Listeners`; each push restarts CI; hub-promote refuses a
+  SHA whose check runs are not all green; check CI on the exact SHA before giving promote commands.
+- verified-stage needs the full 40-hex commit and `--ref deploy/hub` until a release reaches `main`; dr-drill needs a
+  TTY (`ssh -tt`); m2/m5 reachable as `m2-air.local` / `m5-air.local`.
+- Never ask for or accept secrets in chat.
+- Known agent failure modes: Codex sandbox cannot commit; agents report suites they did not run; workers bend production
+  code to pass a wrong test (check the spec's design rule); tests can pass on leftover runner state (isolate state).
+- Carried small items: ask-bash linked-worktree P3 unfiled; revoke the zshenv GitHub token; SHA-256 pin nit in
+  agent_dispatch_dashboard.bats test 54; locked-Keychain WARNs in hub-deploy; m2 `~/.ssh/config` is a copy (ask first);
+  old local tags v0.1.0-v1.0.3 differ from origin (`fetch --tags` refuses; harmless).
+
+## Handoff — 2026-11-25 16:40 PST — v1.45.1 released; v1.46.0 open
+
