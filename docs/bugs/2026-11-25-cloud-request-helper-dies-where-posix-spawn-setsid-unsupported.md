@@ -91,3 +91,9 @@ interface:
   files: [scripts/lib/webhook/proc.py, scripts/tests/bin/test_proc_spawn_fallback.py]
   red_on_base: [S-N1]
 ```
+
+## Review log
+
+| Rev | Reviewer | Verdict | Applied |
+|---|---|---|---|
+| 1 (`d7d0ce69`) | Argon (blind, 2026-11-25, 116 s) | READY AFTER SHOULD-FIX — 2 should-fix, 1 nit | Both verified by Claude and sent to the running Neon worker as a resume correction: tests wrap the real `posix_spawn` (raise on setsid, delegate otherwise, target assertion, no fake PID); keep one CodeQL-annotated sink. Nit: hub-only raw `posix_spawn` calls stay out of scope. |

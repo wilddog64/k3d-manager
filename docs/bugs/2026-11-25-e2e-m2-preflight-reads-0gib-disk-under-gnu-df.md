@@ -141,6 +141,7 @@ interface:
 | Rev | Reviewer | Verdict | Applied |
 |---|---|---|---|
 | 1 (`6134933a`) | Fable (blind, 2026-11-25) | NOT READY — 12 findings, all verified by Claude | rev 2: end-to-end no-retry test (mutant 3 did not bite), Slack allowlist sanitising, exact-line asserts, concrete probe harness (stub docker/top/memory_pressure, tmp lock and report dir), no newline-in-reason test, Hermes retry stated as accepted, contract readers + guide, gate placement, claim pre-write, live wording, `$(NF-2)` and non-multiple stub value |
+| post-land (`7bd1a7c4`) | Neon (`gemini-4-neon-high`, blind, review log and Fable mentions removed, 2026-11-25, 377 s) | NEEDS REWORK — 2 blockers, 5 should-fix, 4 nits | Adjudicated against the landed tests with mutants: **confirmed** `[:200]` cap untested (mutant survives; the hostile input's `\r\n` moves the tail to another line) and `$HOME` fallback untested (mutant survives); **wrong**: `$4` mutant is caught (7-field stub); hostile test is red on base as implemented (spec wording was ambiguous only); truncated-line finding was Claude's redaction. Both confirmed gaps are test-only, captured as a P3 follow-up. Neither was found by Fable or by Claude's verify. |
 
 ## Original fix notes (capture)
 

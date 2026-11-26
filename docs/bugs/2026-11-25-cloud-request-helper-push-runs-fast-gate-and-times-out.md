@@ -98,3 +98,9 @@ interface:
   files: [.githooks/pre-push, scripts/tests/lib/fast_gate.bats]
   red_on_base: [N-N1]
 ```
+
+## Review log
+
+| Rev | Reviewer | Verdict | Applied |
+|---|---|---|---|
+| 1 (`d7d0ce69`) | Argon (blind, 2026-11-25, 105 s) | READY AFTER SHOULD-FIX — 3 should-fix, 1 nit | All three verified by Claude and sent to the running Neon worker as a resume correction: skip only when every ref is `cloud-requests` (a new code branch alone or alongside keeps the no-base gate), new-branch tests, skip line printed once after the loop. Nit (line ranges) noted. |
