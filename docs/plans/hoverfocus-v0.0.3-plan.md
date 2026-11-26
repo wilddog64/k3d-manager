@@ -1,7 +1,7 @@
 # HoverFocus v0.0.3 — plan
 
 **Filed:** 2026-11-24
-**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); P2b done (BK/Y pass TextEdit x2, Safari, Slack, Terminal); next: P2c (Chrome, Mail, VS Code), then child specs and Fable spec review
+**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); P2 DONE: variant Y passes all 8 apps (P2b + P2c); next: then child specs and Fable spec review
 **Repo:** `hoverfocus`, branch `v0.0.3` cut from `main` after v0.0.2 merges
 **Approval:** "let's plan to work on hoverfocus v0.0.3" (operator, 2026-11-24); Electron + indicator → v0.0.3 and local
 signing identity approved the same day
@@ -115,6 +115,25 @@ the M1a rc 1002 was the probe, not the platform. Two repeats per variant; raise 
 - Same-app B passed in the probe but failed live (E-L1 step 3). Candidate cause for L3: `Sources/HoverFocusCore/Engine.swift:59`
   skips when `target.windowID == state.focusedWindowID`, and AX focused-window state was shown in P2 to report the target
   while keys went elsewhere. L3 must prove which (selftest row plus live recheck).
+
+### P2c — Chrome, Mail, VS Code by operator sight (m2-air, 2026-11-25 16:31 PST, log m2 `~/hf-p2b-20261125T163145.txt`)
+
+`HF_P2B_ASK_ALL=1`: no read-back, no erase; the operator listed the tokens visible in each app. All records rc 0, none
+raised.
+
+| App | B | BK | Y |
+|---|---|---|---|
+| Chrome probe page | pass (2/2 seen) | pass | pass |
+| Mail new message | pass (2/2 seen) | pass | pass |
+| VS Code (Electron) | **fail** (0/2 seen) | pass | pass |
+
+So the P2b "read-back no" rows for these apps were read-back false negatives (the AX focused element is not the text
+the keys reach), and the log's `→ probe terminal` labels here are false positives (token names restart per run and the
+first run had printed them into the same iTerm scrollback). L3 selftests must not rely on AX read-back for Chromium,
+Mail or Electron.
+
+**P2 conclusion:** **Y passes all 8 apps** (TextEdit, TextEdit same-app, Safari, Slack, Terminal.app, Chrome, Mail,
+VS Code) with no raise; B fails VS Code and raises Slack. L3 adopts Y (yabai v7.1.25 `focus_window_without_raise`).
 
 ## Decisions (operator, 2026-11-24: "go with your recommendation"; D3 "yes, and other command hotkeys")
 

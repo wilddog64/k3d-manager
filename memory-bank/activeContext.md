@@ -56,9 +56,9 @@
    (`docs/bugs/2026-11-23-cve-pins-branch-trusted-without-verification.md`), `make sync-branch` round trip, next sandbox
    preflight. Each bug's Waiting-on line says who acts.
 4. **HoverFocus:** make-key layout proven against yabai v7.1.25 / AutoRaise v5.7; the old rc 1002 was
-   kCGErrorInvalidConnection (probe never initialised AppKit), recorded in the v0.0.3 plan. P2b ran 2026-11-25: BK/Y pass
-   TextEdit (both), Safari, Slack (B raised it), Terminal; Chrome/Mail/VS Code inconclusive -> P2c run with
-   HF_P2B_ASK_ALL=1 (scenarios 3, 5, 6), then L3/F2/U1 child specs (L3 uses Y; check Engine.swift:59 skip).
+   kCGErrorInvalidConnection (probe never initialised AppKit), recorded in the v0.0.3 plan. P2 DONE 2026-11-25 (P2b + P2c):
+   variant Y passes all 8 apps, no raise; B fails VS Code, raises Slack. Next: L3/F2/U1 child specs (L3 = Y; check
+   Engine.swift:59 skip; no AX read-back selftests for Chromium/Mail/Electron), then Fable review.
 5. **Triage due:** P3 captures from 2026-11-23..25 under `docs/bugs/` with `OPEN — capture` (incl. unpinned Copilot CLI
    in CI, 15-minute drill preflight clone). Captures still owed: first-install host-key warning; lib-foundation
    `timeout` missing on macOS in install_istioctl.bats; QR how-to note (scan from inside the authenticator app); flaky
