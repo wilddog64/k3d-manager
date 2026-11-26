@@ -68,3 +68,37 @@ Failed jobs also leave a short redacted `failure.md`. Run
 `make harvest-job-failures` to copy waiting notes into `docs/job-failures/` for
 review and commit; repeated signatures become recurrence entries, and
 harvested folders are marked so reruns are no-ops.
+
+## Notification routes
+
+Cloud sessions can route job notices for `make-*`, `sandbox-up`, and `sandbox-down`
+requests to an approved Slack channel alias via `notify_route` / `--notify-route`.
+
+- **Set the route map:** Store `alias:CHANNEL_ID,...` (at most 8 aliases, 512 bytes
+  max, `default` reserved) in Keychain item `k3dm-slack-notification-routes`
+  (account `k3dm`, listed in `scripts/etc/machine/secrets.hub.list`) or export
+  `K3DM_SLACK_NOTIFICATION_ROUTES`:
+
+  ```bash
+  K3DM_SLACK_NOTIFICATION_ROUTES="testing:C0123456789" make update-webhook-slack-routes
+  ```
+
+  `make update-webhook-slack-routes` validates the map, saves it to Keychain, and
+  runs `make restart-webhook`, which restarts both `k3dm-webhook` and
+  `k3dm-cloud-bridge`.
+- **Check the configuration:** Run `bin/k3dm-webhook-doctor --check` and inspect
+  the `slack_notification_routes` field (`configured`, `absent`, or `invalid`).
+- **Channel membership:** Public channels need no invite: the bot token has
+  `chat:write.public` (captured 2026-11-26, see
+  [`v1.46.0-p2b-webhook-notify-route.md`](../plans/v1.46.0-p2b-webhook-notify-route.md)).
+  For a private channel, invite the bot first; otherwise Slack answers
+  `channel_not_found` and the job's notices are recorded as undelivered.
+- **Low-audience rule and accepted risk:** Only alias low-audience channels
+  (never incident or announcement channels). Anyone who can push to
+  `cloud-requests` can route an ungated action (such as `make-test-all`) without
+  operator approval; limiting aliases to low-audience channels contains that risk.
+- **No-spill behaviour:** A routed job's notices stay in the aliased channel and
+  never fall back to `SLACK_CHANNEL_ID` or `SLACK_WEBHOOK_URL`. If Slack refuses
+  delivery (for example, a private channel the bot is not in, or an archived or wrong ID), the webhook records
+  `"delivered": false` in that job's `delivery.jsonl` and does not send the
+  notice elsewhere.

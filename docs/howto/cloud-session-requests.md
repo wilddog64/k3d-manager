@@ -253,10 +253,22 @@ The id is `<utc-iso-compact>-<slug>`, e.g. `20260925T201403Z-cluster-status`.
 }
 ```
 
-All six fields are required. `schema` is compared with `==` — an unrecognized value is rejected
-rather than coerced, so an old bridge can never silently reinterpret a new format. Give
-`expires_at` a short window (the helper uses 30 minutes); a request the bridge picks up after it
-expires is rejected, and its id is still consumed.
+All six fields above are required, and `notify_route` is an optional seventh field naming a Slack channel alias configured on the bridge (for example, `"notify_route": "testing"`). You can pass it from the helper with `--notify-route`:
+
+```bash
+bin/k3dm-cloud-request make-test-pytest --notify-route testing
+```
+
+`schema` is compared with `==` — an unrecognized value is rejected rather than coerced, so an old bridge can never silently reinterpret a new format. Give `expires_at` a short window (the helper uses 30 minutes); a request the bridge picks up after it expires is rejected, and its id is still consumed.
+
+### Routing notices to another channel
+
+Routable actions are all `make-*` actions (whose allowlist path is `/api/v1/make`) plus `sandbox-up` and `sandbox-down`. For gated actions, the approval card displays the requested alias and still goes to the usual approval channel.
+
+If routing validation fails, the bridge rejects the request before any approval card with one of these exact `reason` strings:
+
+- `notification route not supported for this action`: `notify_route` was set on a non-routable action (such as `cluster-status`, `health`, `job-status`, or `diagnose-*`).
+- `invalid notification route`: the alias is unknown or malformed, or no valid route map is configured on the host.
 
 Commit and push to `cloud-requests` only. Never open a PR from it and never merge it.
 
@@ -341,7 +353,7 @@ are polling `health` with a short `--timeout`, raise it rather than assuming the
 
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design. The accepted actions and their arguments
-are the twenty-seven listed in the table above; the helper derives its choices and validation from the
+are the twenty-nine listed in the table above; the helper derives its choices and validation from the
 same shared table as the bridge.
 
 A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and

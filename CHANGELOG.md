@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Cloud-request Slack notification routing.** Routable cloud requests (`make-*`, `sandbox-up`, `sandbox-down`) can pass an optional `notify_route` alias (`--notify-route ALIAS`) mapped via `K3DM_SLACK_NOTIFICATION_ROUTES` / Keychain `k3dm-slack-notification-routes` (`make update-webhook-slack-routes`) so job notices stay in the aliased low-audience channel without spilling to default channels. See [`docs/howto/cloud-session-requests.md`](docs/howto/cloud-session-requests.md) and [`docs/howto/webhook-operations.md`](docs/howto/webhook-operations.md).
 - **Cloud bridge operator approval gate.** Cloud-runner requests (`sandbox-up`, `sandbox-down`, `make-e2e`, and `make-e2e-remote`) now wait for operator approval via an interactive Slack card before the bridge runs them. The bridge posts an interactive card to Slack, commits an interim `responses/<id>.pending.json` notice, and drains Approve or Deny decisions from the Slack relay. Single-instance flock (`bridge.lock`) prevents multiple bridges from running concurrently. See [`docs/howto/cloud-session-requests.md`](docs/howto/cloud-session-requests.md) and [`docs/architecture/cloud-bridge.md`](docs/architecture/cloud-bridge.md).
 
 ### Fixed

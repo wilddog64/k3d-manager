@@ -34,8 +34,10 @@ flowchart LR
     Bridge -->|"response commit"| Branch
 ```
 
-`bin/k3dm-cloud-bridge` reads request JSON from the bare clone, validates the exact six-field
-contract and the action-specific argument patterns, then calls `http://127.0.0.1:7443`. The
+`bin/k3dm-cloud-bridge` reads request JSON from the bare clone, validates the six required fields
+(plus optional `notify_route`) and the action-specific argument patterns, then calls `http://127.0.0.1:7443`.
+The bridge checks the `notify_route` alias by name before approval and at execute, and never forwards
+Slack context fields (`channel_id`, `thread_ts`, or `response_url`). The
 reader token is resolved from Keychain item `k3dm-webhook-token-reader`; the scoped cloud-runner
 token is resolved from `k3dm-webhook-token-cloud-runner` and is used only for `make-e2e-remote`,
 `make-e2e`, `sandbox-up` and `sandbox-down`; the latter two are fixed to provider `aws`. The bridge
