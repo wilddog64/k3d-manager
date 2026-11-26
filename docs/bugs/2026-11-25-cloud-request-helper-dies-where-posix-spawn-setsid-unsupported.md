@@ -5,11 +5,11 @@
 **Introduced by:** cloud session image change after 2026-11-05 (last successful cloud request `393bebf3`) meeting `scripts/lib/webhook/proc.py:44` (`925c43e7`, v1.37.0)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-25 (intent approval)
+**Waiting on:** dispatch — since 2026-11-25
 **Triage:** fix now in v1.46.0 with the pre-push fix (blocks plan 1's live check)
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Gemini 4 Neon (`--agent agy --model gemini-4-neon-high`), model trial (operator, 2026-11-25)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25
 **Prior art:** `make find-similar-docs` not run (vector store unavailable); exact-slug pass found nothing; `docs/bugs/2026-11-25-cloud-request-helper-push-runs-fast-gate-and-times-out.md` read — same helper, different root cause
 **Filed:** 2026-11-25
 **Detected by:** cloud session run for v1.46.0 plan 1 E-P1-live (operator relayed the output, 2026-11-25)

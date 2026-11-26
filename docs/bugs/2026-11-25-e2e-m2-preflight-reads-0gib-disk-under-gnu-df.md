@@ -9,7 +9,7 @@
 **Triage:** fix now in v1.46.0 (operator, 2026-11-25: "go ahead to have Fable review and dispatch to Luna")
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Luna (`--agent codex --model gpt-6-luna`)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25
 **Prior art:** not run (`make find-similar-docs` vector store unreachable from M4; exact-slug glob found nothing; `ls docs/bugs | grep -i m2` read: no disk-probe doc)
 
 ## Symptom

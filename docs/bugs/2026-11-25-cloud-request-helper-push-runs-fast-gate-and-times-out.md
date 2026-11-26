@@ -5,11 +5,11 @@
 **Introduced by:** unknown (pre-push fast gate `abcde772`/`aa1196ed` applied to every pushed ref; the helper's data-branch push was never exempted)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-25 (intent approval)
+**Waiting on:** dispatch — since 2026-11-25
 **Triage:** fix now in v1.46.0 (operator, 2026-11-25: "can we do 1, and 2")
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Gemini 4 Neon (`--agent agy --model gemini-4-neon-high`), model trial (operator, 2026-11-25)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-25
 **Prior art:** `make find-similar-docs` not run (vector store unavailable: context `k3d-k3d-cluster` missing); exact-slug pass found nothing; `docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md` read — different root cause
 **Filed:** 2026-11-25
 **Detected by:** Claude, v1.46.0 plan 1 live check (E-P1-live step a/b from m4)
