@@ -166,10 +166,11 @@ def card(pending):
     args = request.get("args", {})
     pairs = [f"`{_safe(key)}={_safe(value)}`" for key, value in args.items()] if isinstance(args, dict) else []
     rendered_args = ", ".join(pairs) if pairs else "none"
+    route = f" Notifications go to `{_safe(request['notify_route'])}`." if "notify_route" in request else ""
     requested_by = request.get("requested_by")
     submitter = str(requested_by) if isinstance(requested_by, str) and REQUESTED_BY_RE.fullmatch(requested_by) else "(invalid)"
     expiry = datetime.fromtimestamp(pending.expires_at, timezone.utc).strftime("%H:%M")
-    text = (f"Cloud request `{_safe(pending.request_id)}` asks to run `{_safe(action)}` with {rendered_args}. "
+    text = (f"Cloud request `{_safe(pending.request_id)}` asks to run `{_safe(action)}` with {rendered_args}.{route} "
             f"Submitter not verified (requested_by: `{_safe(submitter)}`). Expires {expiry} UTC. Deny or ignore to do nothing.")
     item = {"action_id": pending.approval_id, "name": f"Run cloud request {action}", "blast_radius": blast}
     return text, interactive_blocks(text, [item], pending.nonce)

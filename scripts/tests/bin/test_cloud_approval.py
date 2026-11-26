@@ -220,3 +220,14 @@ def test_decide_drop_carries_drained_action_id(branch):
     result = approval.decide(store, [item], 1795636810)
     drop = next(entry for entry in result if entry.kind == "drop")
     assert drop.approval_id == item["action_id"]
+
+
+def test_card_route_after_args():
+    _, record = admitted(now=1795636800)
+    old, _ = approval.card(record)
+    assert old == ("Cloud request `c2-abcdef12` asks to run `make-e2e` with none. "
+                   "Submitter not verified (requested_by: `operator`). Expires 20:30 UTC. Deny or ignore to do nothing.")
+    record.request["notify_route"] = "testing"
+    text, blocks = approval.card(record)
+    assert text == old.replace("with none.", "with none. Notifications go to `testing`.")
+    assert text in str(blocks)

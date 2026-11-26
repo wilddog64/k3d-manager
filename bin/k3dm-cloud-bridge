@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from webhook import config as webhook_config
+from webhook import notify_routes
 from webhook.auth import _get_cloud_runner_token, _get_reader_token
 from webhook.cloud_actions import ACTION_ALLOWLIST, JOB_ID_RE
 from webhook.make_targets import MAKE_TARGETS
@@ -100,7 +101,7 @@ def validate_request(raw, now=None):
     """Return (request, reason), with validation in the contract's order."""
     if not isinstance(raw, dict):
         return None, "request is not a JSON object"
-    if set(raw) != REQUIRED_FIELDS:
+    if raw.keys() not in (REQUIRED_FIELDS, REQUIRED_FIELDS | {"notify_route"}):
         return None, "request fields are not exactly the required six"
     if raw["schema"] != 1:
         return None, "unsupported schema"
@@ -118,6 +119,12 @@ def validate_request(raw, now=None):
     for key, value in args.items():
         if not isinstance(value, str) or not allowed[key].fullmatch(value):
             return None, f"invalid {key}"
+    if "notify_route" in raw:
+        alias = raw["notify_route"]
+        if not isinstance(alias, str) or not notify_routes.ALIAS_RE.fullmatch(alias):
+            return None, notify_routes.INVALID_REASON
+        if not notify_routes.routable(action):
+            return None, notify_routes.UNSUPPORTED_REASON
     try:
         expires_at = _parse_timestamp(raw["expires_at"])
     except (TypeError, ValueError, OverflowError):
@@ -125,6 +132,12 @@ def validate_request(raw, now=None):
     if expires_at <= (now or _now()):
         return None, "request expired"
     return raw, None
+
+
+def _check_route(request):
+    if "notify_route" in request and request["notify_route"] not in notify_routes.route_names():
+        return notify_routes.INVALID_REASON
+    return None
 
 
 def validate_request_bytes(data, now=None):
@@ -343,9 +356,12 @@ def _request_body(request):
     if fixed is None:
         return b"{}"
     if isinstance(fixed, dict):
-        return json.dumps({**request["args"], **fixed}, sort_keys=True).encode()
-    return json.dumps(
-        {"target": fixed, "args": request["args"]}, sort_keys=True).encode()
+        body = {**request["args"], **fixed}
+    else:
+        body = {"target": fixed, "args": request["args"]}
+    if "notify_route" in request:
+        body["notify_route"] = request["notify_route"]
+    return json.dumps(body, sort_keys=True).encode()
 
 
 def _call_webhook(request):
@@ -370,6 +386,10 @@ def _call_webhook(request):
             body = json.loads(error.read())
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             body = {"error": "webhook HTTP error"}
+        reason = body.get("error") if isinstance(body, dict) else None
+        if error.code == 400 and reason in (notify_routes.INVALID_REASON, notify_routes.UNSUPPORTED_REASON,
+                                            "notify_route cannot be combined with Slack context"):
+            return _response("", action, "rejected", error.code, reason=reason)
         return _response("", action, "error", error.code, body=body)
     except (OSError, TimeoutError, ValueError):
         return _response("", action, "error", 0, body={"error": "webhook request failed"})
@@ -634,7 +654,11 @@ def _write_commit(repo, parent, request_id, response, artifacts=None, watch_add=
 
 
 def _run_request_tail(repo, ref, request_id, request):
-    response = _call_webhook(request)
+    reason = _check_route(request)
+    if reason:
+        response = _response(request_id, request["action"], "rejected", 0, reason=reason)
+    else:
+        response = _call_webhook(request)
     response["id"] = request_id
     body = response.get("body")
     if request["action"] == "job-status" and isinstance(body, dict) and "output" in body:
@@ -764,7 +788,10 @@ def process_tick(repo, root, last_tip=None):
         else:
             request, response = prepare_request(request_id, raw, processed)
             if response is None:
-                if gated(request["action"]):
+                reason = _check_route(request)
+                if reason:
+                    response = _response(request_id, request["action"], "rejected", 0, reason=reason)
+                elif gated(request["action"]):
                     if approval_store_error:
                         response = _response(request_id, request["action"], "rejected", 0,
                                              reason="approval state is unreadable on the bridge")

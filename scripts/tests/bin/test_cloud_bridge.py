@@ -1641,3 +1641,162 @@ def test_diagnose_bodies_pass_the_webhooks_own_validator(action):
     _webhook_action, args = DIAGNOSE_ACTIONS[action]
     value, _reason = bridge.validate_request(request(action, args), now=NOW)
     assert webhook._validate_diagnostics_request(json.loads(bridge._request_body(value))) is None
+
+
+@pytest.fixture
+def route_names(monkeypatch):
+    from unittest.mock import Mock
+    from webhook import notify_routes
+
+    names = Mock(return_value=frozenset({"testing", "private-alias"}))
+    monkeypatch.setattr(notify_routes, "route_names", names)
+    assert notify_routes.route_names is names
+    return names
+
+
+@pytest.mark.parametrize("routed", [False, True])
+def test_reader_route_body_and_response(approval_bridge, route_names, routed):
+    h = approval_bridge
+    req = request("make-test-all")
+    expected = b'{"args": {}, "target": "test-all"}'
+    if routed:
+        req["notify_route"] = "testing"
+        expected = b'{"args": {}, "notify_route": "testing", "target": "test-all"}'
+    rid = "20260925T201403Z-make-test-all"
+    h["submit"](rid, req)
+    sent, = h["webhook_calls"]
+    assert bridge._request_body(sent) == expected
+    assert route_names.call_count == (2 if routed else 0)
+    assert _last_approval_response(h) == bridge._response(
+        rid, req["action"], "ok", 200, body={"status": "complete"})
+
+
+@pytest.mark.parametrize("alias, names, reads", [
+    ("BAD!", {"private-alias"}, 0), (None, {"private-alias"}, 0),
+    ("unknown", {"private-alias"}, 1), ("testing", set(), 1),
+])
+def test_bad_route_before_admit(approval_bridge, route_names, monkeypatch, alias, names, reads):
+    from unittest.mock import Mock
+    admit = Mock(wraps=bridge.admit)
+    monkeypatch.setattr(bridge, "admit", admit)
+    route_names.return_value = names
+    h = approval_bridge
+    h["submit"](value=dict(request("make-e2e"), notify_route=alias))
+    response = _last_approval_response(h)
+    assert "private-alias" not in json.dumps(response)
+    assert (response["status"], response["reason"]) == ("rejected", "invalid notification route")
+    assert route_names.call_count == reads
+    admit.assert_not_called()
+    assert not bridge.load_approvals(bridge._approvals_path()).cards
+    assert not h["cards"] and not h["webhook_calls"]
+
+
+@pytest.mark.parametrize("action, args", [
+    ("cluster-status", {}), ("diagnose-pods", {"provider": "hub", "namespace": "test"}),
+    ("job-status", {"job_id": "abcdef12"}),
+])
+def test_unsupported_route(approval_bridge, route_names, action, args):
+    h = approval_bridge
+    h["submit"](value=dict(request(action, args), notify_route="testing"))
+    response = _last_approval_response(h)
+    assert (response["status"], response["reason"]) == ("rejected", "notification route not supported for this action")
+    route_names.assert_not_called()
+    assert not h["cards"] and not h["webhook_calls"]
+
+
+@pytest.mark.parametrize("removed", [False, True])
+def test_approved_route_rechecked(approval_bridge, route_names, removed):
+    h = approval_bridge
+    h["submit"](value=dict(request("sandbox-up"), notify_route="testing"))
+    url, text, _ = h["cards"][0]
+    assert url == "secret" and "Notifications go to `testing`." in text
+    pending = _pending_approval(h)
+    assert pending.request["notify_route"] == "testing"
+    assert "private-alias" not in bridge._approvals_path().read_text()
+    if removed:
+        route_names.return_value = {"private-alias"}
+    h["drain_items"].append([_drain_item(pending)])
+    h["clock"][0] += 31
+    h["tick"]()
+    response = _last_approval_response(h)
+    assert "private-alias" not in json.dumps(response)
+    if removed:
+        assert (response["status"], response["reason"]) == ("rejected", "invalid notification route")
+        assert not h["webhook_calls"] and not h["token_reads"]
+    else:
+        sent, = h["webhook_calls"]
+        assert json.loads(bridge._request_body(sent)) == {"action": "up", "provider": "aws", "notify_route": "testing"}
+        assert h["token_reads"] == ["cloud"]
+    assert route_names.call_count == 2
+
+
+def test_route_fields_and_slack_context():
+    req = request("make-test-all", {"channel_id": "C12345678"})
+    assert bridge.validate_request(req, now=NOW) == (None, "unexpected argument")
+    # Exercise the serializer independently of the admission allowlist.
+    body = json.loads(bridge._request_body(req))
+    assert not {"channel_id", "response_url", "thread_ts"}.intersection(body)
+    req.update(notify_route="testing", extra=True)
+    assert bridge.validate_request(req, now=NOW) == (None, "request fields are not exactly the required six")
+
+
+@pytest.mark.parametrize("code, error, status", [
+    (400, "invalid notification route", "rejected"),
+    (400, "notification route not supported for this action", "rejected"),
+    (400, "notify_route cannot be combined with Slack context", "rejected"),
+    (400, "other", "error"), (403, "invalid notification route", "error"),
+])
+def test_route_http_error(monkeypatch, code, error, status):
+    import io
+    def fail(req, timeout):
+        assert req.full_url == "http://127.0.0.1:7443/api/v1/make"
+        raise bridge.urllib.error.HTTPError(req.full_url, code, "", {}, io.BytesIO(json.dumps({"error": error}).encode()))
+    monkeypatch.setattr(bridge.urllib.request, "urlopen", fail)
+    monkeypatch.setattr(bridge, "_get_reader_token", lambda: "test")
+    response = bridge._call_webhook(dict(request("make-test-all"), notify_route="testing"))
+    assert response["status"] == status and response["http_status"] == code
+    if status == "rejected":
+        assert response["reason"] == error and "body" not in response
+    else:
+        assert response["body"] == {"error": error}
+
+
+def test_route_privacy_in_published_records(approval_bridge, route_names, monkeypatch, tmp_path):
+    h = approval_bridge
+    routes = {"testing": "C12345678", "private-alias": "G87654321"}
+    route_names.return_value = frozenset(routes)
+    rid = "20260925T201403Z-make-e2e"
+    h["submit"](rid, dict(request("make-e2e"), notify_route="testing"))
+    pending = _pending_approval(h, rid)
+    records = [bridge._approvals_path().read_text()]
+    job = "abcdef12"
+    (tmp_path / "status").write_text("success")
+    monkeypatch.setattr(bridge.webhook_config, "_safe_job_dir", lambda job_id: tmp_path if job_id == job else pytest.fail())
+    monkeypatch.setattr(bridge, "_published_artifacts", lambda *_: [])
+
+    def webhook(req):
+        if req["action"] == "job-status":
+            body = {"status": "success"}
+        else:
+            assert req == pending.request
+            body = {"status": "queued", "job_id": job}
+        return bridge._response("", req["action"], "ok", 200, body=body)
+
+    monkeypatch.setattr(bridge, "_call_webhook", webhook)
+    h["drain_items"].append([_drain_item(pending)])
+    h["clock"][0] += 31
+    h["tick"]()
+    watch = h["commits"][-1][1]["watch_add"]
+    monkeypatch.setattr(bridge, "_read_watching", lambda *_: [watch])
+    h["tick"]()
+    args, kwargs = h["commits"][-1]
+    assert kwargs["final"] and args[3]["body"]["status"] == "success"
+    records.append(args[4][f"artifacts/{rid}/summary.json"].decode())
+    monkeypatch.setattr(bridge, "_read_watching", lambda *_: [])
+    h["submit"]("20260925T201404Z-make-e2e", dict(request("make-e2e"), notify_route="unknown"))
+    assert _last_approval_response(h)["status"] == "rejected"
+    records.extend(json.dumps(args[3]) for args, _ in h["commits"])
+    for record in records:
+        for private in ("private-alias", *routes.values()):
+            assert private not in record
+    assert route_names.call_count == 3
