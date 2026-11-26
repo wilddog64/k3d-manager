@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# shellcheck shell=bash disable=SC1091,SC2329
+# shellcheck shell=bash disable=SC1090,SC1091,SC2016,SC2030,SC2031,SC2086,SC2155,SC2329
 
 setup() {
   SYSTEM_LIB="${SYSTEM_LIB:-${BATS_TEST_DIRNAME}/../../lib/system.sh}"
@@ -933,6 +933,190 @@ STUB
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"Homebrew is required to install Vagrant"* ]]
   [ ! -s "${VM_CASK_LOG}" ]
+}
+
+tailscale_fixture() {
+  export TAILSCALE_APP_DIR="${BATS_TEST_TMPDIR}/Tailscale.app"
+  export TAILSCALE_STUB_BIN="${BATS_TEST_TMPDIR}/tailscale-bin"
+  export TAILSCALE_STUB_LOG="${BATS_TEST_TMPDIR}/tailscale.log"
+  export TAILSCALE_FORMULA="${TAILSCALE_FORMULA:-0}"
+  export TAILSCALE_INSTALL_ID="${TAILSCALE_INSTALL_ID:-io.tailscale.ipn.macsys}"
+  export TAILSCALE_INSTALL_MODE="${TAILSCALE_INSTALL_MODE:-app}"
+  export TAILSCALE_INSTALL_STATUS="${TAILSCALE_INSTALL_STATUS:-0}"
+  mkdir -p "$TAILSCALE_STUB_BIN"
+  : > "$TAILSCALE_STUB_LOG"
+  cat > "$TAILSCALE_STUB_BIN/brew" <<'STUB'
+#!/usr/bin/env bash
+printf 'brew %s\n' "$*" >> "$TAILSCALE_STUB_LOG"
+case "$*" in
+  'list --formula tailscale')
+    if [[ "$TAILSCALE_FORMULA" == 1 ]]; then printf '%s\n' /opt/homebrew/Cellar/tailscale; exit 0; fi
+    printf '%s\n' 'Error: No such keg: /opt/homebrew/Cellar/tailscale' >&2
+    exit 1
+    ;;
+  'install --cask tailscale-app')
+    [[ "$TAILSCALE_INSTALL_STATUS" -eq 0 ]] || exit "$TAILSCALE_INSTALL_STATUS"
+    if [[ "$TAILSCALE_INSTALL_MODE" == app ]]; then
+      mkdir -p "$TAILSCALE_APP_DIR/Contents"
+      printf '%s\n' "$TAILSCALE_INSTALL_ID" > "$TAILSCALE_APP_DIR/Contents/Info.plist"
+    fi
+    ;;
+  *) exit 99 ;;
+esac
+STUB
+  cat > "$TAILSCALE_STUB_BIN/plutil" <<'STUB'
+#!/usr/bin/env bash
+printf 'plutil %s\n' "$*" >> "$TAILSCALE_STUB_LOG"
+[[ "$#" -eq 5 && "$1" == -extract && "$2" == CFBundleIdentifier && "$3" == raw && "$4" == -- && "$5" == "$TAILSCALE_APP_DIR/Contents/Info.plist" ]] || exit 1
+[[ -f "$5" ]] || { printf '%s\n' 'plutil: file missing' >&2; exit 1; }
+IFS= read -r bundle_id < "$5"
+[[ -n "$bundle_id" ]] || { printf '%s\n' 'plutil: key missing' >&2; exit 1; }
+printf '%s\n' "$bundle_id"
+STUB
+  for command_name in sudo open tailscale; do
+    cat > "$TAILSCALE_STUB_BIN/$command_name" <<'STUB'
+#!/usr/bin/env bash
+printf '%s %s\n' "${0##*/}" "$*" >> "$TAILSCALE_STUB_LOG"
+exit 0
+STUB
+  done
+  chmod +x "$TAILSCALE_STUB_BIN"/*
+  export PATH="$TAILSCALE_STUB_BIN:/usr/bin:/bin"
+  [ "$(command -v brew)" = "$TAILSCALE_STUB_BIN/brew" ]
+  [ "$(command -v plutil)" = "$TAILSCALE_STUB_BIN/plutil" ]
+  [ "$(command -v sudo)" = "$TAILSCALE_STUB_BIN/sudo" ]
+  [ "$(command -v open)" = "$TAILSCALE_STUB_BIN/open" ]
+  [[ "$TAILSCALE_APP_DIR" == "$BATS_TEST_TMPDIR"/* ]]
+  _is_mac() { return 0; }
+}
+
+@test "Tailscale fixture stubs log their calls" {
+  tailscale_fixture
+  [ "$(command -v tailscale)" = "$TAILSCALE_STUB_BIN/tailscale" ]
+  TAILSCALE_FORMULA=1 brew list --formula tailscale >/dev/null
+  plutil -extract CFBundleIdentifier raw -- "$TAILSCALE_APP_DIR/Contents/Info.plist" >/dev/null 2>&1 || true
+  sudo probe
+  open probe
+  "$TAILSCALE_STUB_BIN/tailscale" probe
+  expected="$(printf 'brew list --formula tailscale\nplutil -extract CFBundleIdentifier raw -- %s/Contents/Info.plist\nsudo probe\nopen probe\ntailscale probe' "$TAILSCALE_APP_DIR")"
+  [ "$(cat "$TAILSCALE_STUB_LOG")" = "$expected" ]
+}
+
+@test "_install_tailscale_app installs only the Standalone cask and hides formula probe output" {
+  tailscale_fixture
+  run _install_tailscale_app
+  [ "$status" -eq 0 ]
+  expected="$(printf 'brew list --formula tailscale\nbrew install --cask tailscale-app\nplutil -extract CFBundleIdentifier raw -- %s/Contents/Info.plist' "$TAILSCALE_APP_DIR")"
+  [ "$(cat "$TAILSCALE_STUB_LOG")" = "$expected" ]
+  [[ "$output" != *"No such keg"* ]]
+  [ "$(cat "$TAILSCALE_APP_DIR/Contents/Info.plist")" = io.tailscale.ipn.macsys ]
+}
+
+@test "_install_tailscale_app is quiet and idempotent for Standalone" {
+  tailscale_fixture
+  mkdir -p "$TAILSCALE_APP_DIR/Contents"
+  printf '%s\n' io.tailscale.ipn.macsys > "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  run _install_tailscale_app
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  expected="$(printf 'brew list --formula tailscale\nplutil -extract CFBundleIdentifier raw -- %s/Contents/Info.plist' "$TAILSCALE_APP_DIR")"
+  [ "$(cat "$TAILSCALE_STUB_LOG")" = "$expected" ]
+}
+
+@test "_install_tailscale_app refuses App Store app without changing it" {
+  tailscale_fixture
+  mkdir -p "$TAILSCALE_APP_DIR/Contents"
+  printf '%s\n' io.tailscale.ipn.macos > "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  cp "$TAILSCALE_APP_DIR/Contents/Info.plist" "$BATS_TEST_TMPDIR/before"
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"App Store variant"* ]]
+  cmp -s "$BATS_TEST_TMPDIR/before" "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  expected="$(printf 'brew list --formula tailscale\nplutil -extract CFBundleIdentifier raw -- %s/Contents/Info.plist' "$TAILSCALE_APP_DIR")"
+  [ "$(cat "$TAILSCALE_STUB_LOG")" = "$expected" ]
+}
+
+@test "_install_tailscale_app formula guard takes precedence and preserves Standalone app" {
+  export TAILSCALE_FORMULA=1
+  tailscale_fixture
+  mkdir -p "$TAILSCALE_APP_DIR/Contents"
+  printf '%s\n' io.tailscale.ipn.macsys > "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  cp "$TAILSCALE_APP_DIR/Contents/Info.plist" "$BATS_TEST_TMPDIR/before"
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"brew services stop tailscale; brew uninstall tailscale"* ]]
+  cmp -s "$BATS_TEST_TMPDIR/before" "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  [ "$(cat "$TAILSCALE_STUB_LOG")" = 'brew list --formula tailscale' ]
+}
+
+@test "_install_tailscale_app passes install status 17 and caller continues" {
+  export TAILSCALE_INSTALL_STATUS=17
+  tailscale_fixture
+  if _install_tailscale_app; then status=0; else status=$?; fi
+  [ "$status" -eq 17 ]
+  [ "$(cat "$TAILSCALE_STUB_LOG")" = $'brew list --formula tailscale\nbrew install --cask tailscale-app' ]
+  printf '%s\n' continued
+}
+
+@test "_install_tailscale_app succeeds under strict shell options" {
+  tailscale_fixture
+  run bash -c 'set -euo pipefail; source "$1"; _is_mac() { return 0; }; _install_tailscale_app' _ "$SYSTEM_LIB"
+  [ "$status" -eq 0 ]
+}
+
+@test "_install_tailscale_app refuses missing or wrong post-install app" {
+  tailscale_fixture
+  export TAILSCALE_INSTALL_MODE=missing
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"did not produce the expected bundle"* ]]
+  rm -rf "$TAILSCALE_APP_DIR"
+  export TAILSCALE_INSTALL_MODE=app TAILSCALE_INSTALL_ID=unexpected.bundle
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+}
+
+@test "_install_tailscale_app refuses unreadable and unknown existing bundle IDs" {
+  tailscale_fixture
+  mkdir -p "$TAILSCALE_APP_DIR/Contents"
+  : > "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unreadable bundle ID"* ]]
+  printf '%s\n' unknown.bundle > "$TAILSCALE_APP_DIR/Contents/Info.plist"
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown.bundle"* ]]
+  [[ "$(cat "$TAILSCALE_STUB_LOG")" != *"brew install"* ]]
+}
+
+@test "_install_tailscale_app rejects Linux and missing Homebrew without side effects" {
+  tailscale_fixture
+  _is_mac() { return 1; }
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [ ! -s "$TAILSCALE_STUB_LOG" ]
+  rm "$TAILSCALE_STUB_BIN/brew"
+  _is_mac() { return 0; }
+  run _install_tailscale_app
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Homebrew is required"* ]]
+  [ ! -s "$TAILSCALE_STUB_LOG" ]
+}
+
+@test "_install_tailscale_app never calls privileged or interactive commands" {
+  export TAILSCALE_FORMULA=1
+  tailscale_fixture
+  cat > "$TAILSCALE_STUB_BIN/tailscale" <<'STUB'
+#!/usr/bin/env bash
+printf 'tailscale %s\n' "$*" >> "$TAILSCALE_STUB_LOG"
+exit 0
+STUB
+  chmod +x "$TAILSCALE_STUB_BIN/tailscale"
+  _install_tailscale_app >/dev/null 2>&1 || true
+  [[ "$(cat "$TAILSCALE_STUB_LOG")" != *"sudo "* ]]
+  [[ "$(cat "$TAILSCALE_STUB_LOG")" != *"open "* ]]
+  [[ "$(cat "$TAILSCALE_STUB_LOG")" != *"tailscale "* ]]
 }
 
 bash32_or_skip() {

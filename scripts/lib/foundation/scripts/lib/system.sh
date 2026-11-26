@@ -792,6 +792,52 @@ function _install_vagrant() {
   _install_mac_cask Vagrant vagrant vagrant
 }
 
+# Print the Tailscale app bundle identifier when it can be read.
+function _tailscale_app_bundle_id() {
+  plutil -extract CFBundleIdentifier raw -- "$1/Contents/Info.plist" 2>/dev/null || true
+}
+
+# Install the Tailscale Standalone app without accepting conflicting variants.
+function _install_tailscale_app() {
+  local app_dir="${TAILSCALE_APP_DIR:-/Applications/Tailscale.app}" bundle_id
+  if ! _is_mac; then
+    _warn "Tailscale app installation is supported only on macOS"
+    return 1
+  fi
+  if _command_exist brew && brew list --formula tailscale >/dev/null 2>&1; then
+    _warn "Homebrew tailscale formula is installed; remove it first with: brew services stop tailscale; brew uninstall tailscale"
+    return 1
+  fi
+  if [[ -e "$app_dir" || -L "$app_dir" ]]; then
+    bundle_id="$(_tailscale_app_bundle_id "$app_dir")"
+    case "$bundle_id" in
+      io.tailscale.ipn.macsys) return 0 ;;
+      io.tailscale.ipn.macos)
+        _warn "Tailscale App Store variant is installed; quit Tailscale and delete /Applications/Tailscale.app first"
+        return 1
+        ;;
+      "")
+        _warn "unreadable bundle ID at $app_dir"
+        return 1
+        ;;
+      *)
+        _warn "unexpected Tailscale bundle ID '$bundle_id' at $app_dir"
+        return 1
+        ;;
+    esac
+  fi
+  if ! _command_exist brew; then
+    _warn "Homebrew is required to install the Tailscale app"
+    return 1
+  fi
+  _run_command --soft -- brew install --cask tailscale-app || return $?
+  if [[ ! -d "$app_dir" ]] || [[ "$(_tailscale_app_bundle_id "$app_dir")" != "io.tailscale.ipn.macsys" ]]; then
+    _warn "Tailscale Standalone app installation did not produce the expected bundle at $app_dir"
+    return 1
+  fi
+  _info "Tailscale (Standalone) installed; open it from Applications to allow its system extension and log in"
+}
+
 function _promtool_pinned_sha256() {
   local version="$1" os="$2" arch="$3"
   [[ "$version" == "3.1.0" ]] || return 1
