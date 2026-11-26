@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 20:45 PST — v1.46.0 plan 1 live-verified — START HERE
+## Handoff — 2026-11-25 21:15 PST — v1.46.0 plan 1 live-verified — START HERE
 
 - **Operator:** at the office 2026-11-26 (jump box reachable only there), home in the evening. Only the operator can: collect
   the dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, CI green first), run a
@@ -12,7 +12,7 @@
    LIVE-VERIFIED (`52d0719b`). `...-dies-where-posix-spawn-setsid-unsupported.md` LANDED; E-S4 = one `cluster-status --wait`
    from a cloud session (operator relays). `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md` LANDED
    `7bd1a7c4`; after the next promote Claude runs read-only `./scripts/k3d-manager e2e_runner_preflight m2`, then the next
-   Hermes slot must post a result, not a skip. Next promote target = branch head once CI is green (Claude checks CI first).
+   Hermes slot must post a result, not a skip. Hub promoted to `5d680788` 2026-11-25 21:05; preflight m2 passed (305 GiB); Hermes slot pending.
 3. **HoverFocus v0.0.3.** Child specs rev 3 (`6b74bdf5`): L3, F2, U1 under `docs/plans/hoverfocus-v0.0.3-*`. Reviews done:
    L3 Fable + Neon, F2/U1 Argon + Neon, all findings applied (Neon found a stuck-Running state in U1 and several
    harness traps in F2). Next: operator approves intents (L3, F2, U1), then Claude cuts `v0.0.3` from `main` `d2cdb00`,
@@ -31,7 +31,7 @@
    first-install host-key warning; lib-foundation `timeout` on macOS in install_istioctl.bats; QR how-to note; flaky dirused
    ProgramPurgeTests; hub_data export-path intermittent failure.
 
-**Dispatches:** 0 open of WIP 3 (`bin/k3dm-codex-dispatch open` empty).
+**Dispatches:** 2 open of WIP 3: `hf003-l3` (Luna) and `hf003-f2` (Flash), hoverfocus `v0.0.3`, started 2026-11-25 ~20:55 PST; U1 after L3 lands.
 **Open PRs:** #158 Dependabot wrangler-action v3→v4, deferred by operator (needs a v4 changes look).
 
 **Owed / decisions:** sandbox-lifecycle live check timing (operator). Ideas for grooming: approver attribution on approved

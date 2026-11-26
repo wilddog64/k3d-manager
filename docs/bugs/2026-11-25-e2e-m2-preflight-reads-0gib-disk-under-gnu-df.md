@@ -5,7 +5,7 @@
 **Introduced by:** `62c9ff27` (v1.27.0, the `df -g` disk probe) meeting a `gnubin` entry in M2's `~/.zshenv` (date unknown)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-25
+**Waiting on:** scheduled run — since 2026-11-25 (next Hermes e2e slot must post a result, not a skip)
 **Triage:** fix now in v1.46.0 (operator, 2026-11-25: "go ahead to have Fable review and dispatch to Luna")
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Luna (`--agent codex --model gpt-6-luna`)
@@ -135,6 +135,13 @@ interface:
   - "scripts/plugins/e2e_remote.sh: e2e_runner_preflight status=probe_failed"
   - "Hermes e2e skip message and slot record reason"
 ```
+
+## Live check log
+
+- 2026-11-25 ~21:10 PST, after `make hub-deploy REF=5d6807880d98916de5810a681c8f2642e3790efb` (operator, m5;
+  `deploy/hub` confirmed at `5d680788`): Claude ran read-only `./scripts/k3d-manager e2e_runner_preflight m2` from m4 →
+  `disk_gb=305`, `mem_free=28`, `cpu_idle=62.2`, `status=available` (was 0 GiB → refused before the fix). proves fix
+  (preflight half). **Fix commit:** `7bd1a7c4`. Pending: the next scheduled Hermes e2e slot posts a result.
 
 ## Review log
 
