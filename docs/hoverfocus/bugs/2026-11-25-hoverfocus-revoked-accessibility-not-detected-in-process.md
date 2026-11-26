@@ -5,7 +5,7 @@
 **Introduced by:** `4e66919` (U1 trust-loss detection relies on `AXIsProcessTrustedWithOptions` flipping in-process)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (both)
-**Waiting on:** operator decision — since 2026-11-25
+**Waiting on:** investigation — since 2026-11-25
 **Classified:** P2 — Argon (`gemini-4-argon-medium`, blind), 2026-11-25: running-process trust loss not surfaced; quit and reopen restores detection.
 **Prior art:** exact-slug glob over `docs/hoverfocus/bugs/` (no trust/permission/stale match); `make find-similar-docs` not run (vector store unavailable earlier today)
 **Filed:** 2026-11-25
@@ -28,6 +28,12 @@ HoverFocus log (`log stream`, subsystem `com.wilddog64.hoverfocus`, Claude over 
 `-25211` is `kAXErrorAPIDisabled`: after the reset the running process's AX calls are refused. No `[health] trust lost`
 line was logged, so `AppCoordinator.trustTick` (`Sources/HoverFocusCore/AppCoordinator.swift:43`) saw
 `isTrusted()` return true while the AX API was disabled for the same process.
+
+Follow-up the same evening (operator, ~20:00 PST) weakens the capture: after the reset, hover focus still typed into
+TextEdit, and a quit-and-reopen of HoverFocus came up **Running** (a fresh process reported trusted). So the grant was
+either absent only briefly (the -25211 window) or restored (the Settings panel crash had re-enabled the switch once
+already). Open: did the operator re-grant, and is HoverFocus listed and on in Accessibility now. Do not triage as
+confirmed until a clean revoke (stays revoked for a fresh process) is shown.
 
 ## Suspected cause (to prove before a fix)
 
