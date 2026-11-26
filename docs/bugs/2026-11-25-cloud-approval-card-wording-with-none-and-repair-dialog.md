@@ -1,0 +1,22 @@
+# Bug: approval card says "with none" and its confirm dialog says "Approve repair?" / "Run Run"
+
+**Status:** OPEN — capture
+**Priority:** P3 (cosmetic; the card and buttons carry the right request)
+**Introduced by:** v1.46.0 plan 1 a (`358f10b9`, card text) and c (`4e3f3c81`, relay confirm dialog)
+**Should have been caught by:** live check
+**Introducing change reviewed:** yes (Fable)
+**Waiting on:** operator decision
+**Prior art:** none above threshold (vector store unavailable; exact-slug pass found nothing)
+**Filed:** 2026-11-25
+**Detected by:** operator screenshots, v1.46.0 plan 1 E-P1-live
+
+## Observed
+
+- Card: "Cloud request `20261126T014053Z-make-e2e` asks to run `make-e2e` with none." for a request with no args.
+- Confirm dialog on Approve: title "Approve repair?", body "Run Run cloud request make-e2e? Blast radius: …" (the repair
+  dialog title is reused and the action label already starts with "Run").
+
+## Fix direction
+
+Card: say "with no arguments" (or drop the clause) when args are empty. Dialog: a cloud-request title ("Approve cloud
+request?") and no doubled verb. Tests on the card text and the relay's confirm object.
