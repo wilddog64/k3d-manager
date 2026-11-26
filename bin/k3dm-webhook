@@ -57,6 +57,7 @@ from webhook.agent import (  # noqa: E402
 )
 from webhook.untrusted import fence, filter_suggestion, validate_failure_reply  # noqa: E402
 from webhook import ask_docs  # noqa: E402
+from webhook import notify_routes  # noqa: E402
 from webhook.lifecycle import (  # noqa: E402
     _run_make_target, _run_upgrade, _run_cluster,
     _run_cluster_resume, _run_cluster_refresh, _run_hostinger_refresh,
@@ -751,12 +752,31 @@ def _copy_thread_context(parent_job_id, child_job_id, channel_id=""):
             (child_dir / name).write_text(value)
 
 
+_NOTIFY_ROUTE_CONFLICT_ERROR = "notify_route cannot be combined with Slack context"
+
+
+def _resolve_notify_route(body):
+    """Validate and resolve a request's notify_route alias to (alias, channel_id, error)."""
+    for key in ("channel_id", "response_url", "thread_ts"):
+        value = body.get(key)
+        if value is not None and (value.strip() if isinstance(value, str) else bool(value)):
+            return "", "", _NOTIFY_ROUTE_CONFLICT_ERROR
+    alias = body.get("notify_route")
+    if not isinstance(alias, str) or not notify_routes.ALIAS_RE.fullmatch(alias):
+        return "", "", notify_routes.INVALID_REASON
+    routes, status = notify_routes.load_routes()
+    if status != "ok" or alias not in routes:
+        return "", "", notify_routes.INVALID_REASON
+    return alias, routes[alias], None
+
+
 def _persist_notification_context(job_id, *, channel_id="", thread_ts="",
-                                 thread_source="", response_url=""):
+                                 thread_source="", response_url="", notify_route=""):
     """Save only the Slack delivery fields supplied by a trusted route."""
     job_dir = JOB_DIR / job_id
     for name, value in (("channel_id", channel_id), ("thread_ts", thread_ts),
-                        ("thread_source", thread_source), ("response_url", response_url)):
+                        ("thread_source", thread_source), ("response_url", response_url),
+                        ("notify_route", notify_route)):
         if value:
             (job_dir / name).write_text(str(value).strip())
 
@@ -1307,6 +1327,9 @@ def _notify_job(job_id, text):
     channel_id = channel_id_file.read_text().strip() if channel_id_file.exists() else None
     response_url_file = JOB_DIR / job_id / "response_url"
     response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
+    notify_route_file = JOB_DIR / job_id / "notify_route"
+    is_routed = notify_route_file.exists()
+    notify_route = (notify_route_file.read_text(encoding="utf-8").strip() or None) if is_routed else None
     posted = False
     route = "none"
     intended_channel = channel_id or ""
@@ -1333,7 +1356,7 @@ def _notify_job(job_id, text):
         # Starting a thread in the configured default channel would create an
         # unrelated parent timestamp that later response_url posts cannot use.
         if not posted and SLACK_BOT_TOKEN and (
-            channel_id or (not thread_ts and not response_url and SLACK_CHANNEL_ID)
+            channel_id or (not is_routed and not thread_ts and not response_url and SLACK_CHANNEL_ID)
         ):
             route = "bot_fallback"
             ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id or SLACK_CHANNEL_ID)
@@ -1344,7 +1367,7 @@ def _notify_job(job_id, text):
             posted = bool(ts)
         # Incoming webhooks cannot preserve a reply thread, so they are only a
         # fallback for notifications that were not addressed to a thread.
-        if not posted and SLACK_WEBHOOK_URL and not thread_ts:
+        if not posted and not is_routed and SLACK_WEBHOOK_URL and not thread_ts:
             route = "webhook_fallback"
             posted = bool(_slack_post(SLACK_WEBHOOK_URL, text))
             if not posted:
@@ -1353,7 +1376,9 @@ def _notify_job(job_id, text):
         failure = type(exc).__name__
         _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
                      job_id, route, intended_channel or "missing", thread_ts or "missing", failure)
-        _record_notification_delivery(job_id, route, intended_channel, thread_ts, False, failure)
+        _record_notification_delivery(
+            job_id, route, intended_channel, thread_ts, False, failure, notify_route=notify_route,
+        )
         return False
     if not posted:
         _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
@@ -1361,17 +1386,20 @@ def _notify_job(job_id, text):
     _record_notification_delivery(
         job_id, route, intended_channel, thread_ts, posted,
         failure if failure != "not_delivered" else "",
+        notify_route=notify_route,
     )
     return posted
 
 
-def _record_notification_delivery(job_id, route, channel_id, thread_ts, delivered, reason):
+def _record_notification_delivery(job_id, route, channel_id, thread_ts, delivered, reason,
+                                  notify_route=None):
     """Persist redacted delivery metadata so event acknowledgment is not mistaken for delivery."""
     record = {
         "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "job_id": job_id,
         "event_id": _read_job_value(job_id, "event_id") or None,
         "route": route,
+        "notify_route": notify_route or None,
         "channel_id": channel_id or None,
         "thread_ts": thread_ts or None,
         "delivered": delivered,
@@ -2630,7 +2658,18 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if route["handler"] == "cluster":
-            action = body.get("action", "")
+            raw_action = body.get("action", "")
+            notify_route = ""
+            routed_channel_id = ""
+            if "notify_route" in body:
+                if raw_action not in ("up", "down"):
+                    self._json(400, {"error": notify_routes.UNSUPPORTED_REASON})
+                    return
+                notify_route, routed_channel_id, route_error = _resolve_notify_route(body)
+                if route_error:
+                    self._json(400, {"error": route_error})
+                    return
+            action = raw_action
             trust_vault_ca = bool(body.get("trust_vault_ca"))
             if action == "trust-vault-ca":
                 action = "up"
@@ -2665,13 +2704,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if provider not in ("aws", "gcp", "az", "hostinger"):
                 provider = "aws"
             response_url = body.get("response_url", "")
+            channel_id = routed_channel_id or body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("running")
             (JOB_DIR / job_id / "action").write_text(action)
             _persist_notification_context(
-                job_id, channel_id=body.get("channel_id", ""),
+                job_id, channel_id=channel_id,
                 thread_ts=body.get("thread_ts", ""), response_url=response_url,
+                notify_route=notify_route,
             )
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
@@ -2685,6 +2726,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if route["handler"] == "cluster_status":
+            if "notify_route" in body:
+                self._json(400, {"error": notify_routes.UNSUPPORTED_REASON})
+                return
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
@@ -2702,6 +2746,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if route["handler"] == "diagnostics":
+            if "notify_route" in body:
+                self._json(400, {"error": notify_routes.UNSUPPORTED_REASON})
+                return
             validation_error = _validate_diagnostics_request(body)
             if validation_error:
                 self._json(400, {"error": validation_error})
@@ -2722,6 +2769,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if route["handler"] == "hostinger_status":
+            if "notify_route" in body:
+                self._json(400, {"error": notify_routes.UNSUPPORTED_REASON})
+                return
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
             job_id = str(uuid.uuid4())[:8]
@@ -2811,12 +2861,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if error:
                 self._json(400, {"error": error})
                 return
+            notify_route = ""
+            routed_channel_id = ""
+            if "notify_route" in body:
+                notify_route, routed_channel_id, route_error = _resolve_notify_route(body)
+                if route_error:
+                    self._json(400, {"error": route_error})
+                    return
             if not _MAKE_JOB_LOCK.acquire(blocking=False):
                 self._json(409, {"error": "a /k3dm job is already running"})
                 return
             response_url = body.get("response_url", "")
             thread_ts = str(body.get("thread_ts", "")).strip()
-            channel_id = str(body.get("channel_id", "")).strip()
+            channel_id = routed_channel_id or str(body.get("channel_id", "")).strip()
             thread_source = ""
             job_id = str(uuid.uuid4())[:8]
             if not thread_ts and channel_id and SLACK_BOT_TOKEN:
@@ -2834,6 +2891,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 (JOB_DIR / job_id / "thread_ts").write_text(thread_ts)
             if channel_id:
                 (JOB_DIR / job_id / "channel_id").write_text(channel_id)
+            if notify_route:
+                (JOB_DIR / job_id / "notify_route").write_text(notify_route)
             if thread_source:
                 (JOB_DIR / job_id / "thread_source").write_text(thread_source)
             threading.Thread(

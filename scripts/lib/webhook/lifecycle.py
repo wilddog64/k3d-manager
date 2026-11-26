@@ -14,6 +14,7 @@ from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
 from webhook.log import get_logger
 from webhook.failure_notes import write_failure_note
+from webhook import notify_routes
 from webhook.redact import mask_env_values, scrub_credentials, tildify_home
 
 __all__ = [
@@ -163,6 +164,8 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
     """Run one allowlisted /k3dm make target and post the tail of its output."""
     label = " ".join(argv_tail)
     job_dir = JOB_DIR / job_id
+    if (job_dir / "notify_route").exists():
+        label = notify_routes.escape_label(label)
     log_file = job_dir / "make.log"
     start = time.monotonic()
     progress_timer = None
