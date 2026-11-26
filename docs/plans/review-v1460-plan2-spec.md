@@ -27,6 +27,17 @@ Answer:
   on the current code; say how), `evidence` items with what each proves and whether it is offline or live.
 - Risk level (low / medium / high) and why.
 
+## Files
+
+| File | Change |
+|---|---|
+| `docs/plans/v1.46.0-cloud-request-slack-notification-routing.md` | read only (start here; read anything else you need) |
+| `bin/k3dm-cloud-request` | read only (start here; read anything else you need) |
+
+## What NOT to Do
+
+- Do not edit, create, stage or commit any file.
+
 ## Output
 
 A list of findings, most severe first, each tagged BLOCKER / MAJOR / MINOR, with file:line evidence and a concrete fix.
