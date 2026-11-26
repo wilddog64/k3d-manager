@@ -1,11 +1,11 @@
 # Bug: `k3dm-cloud-request` dies in cloud sessions because their Python lacks `posix_spawn(setsid=True)`
 
-**Status:** OPEN — capture
+**Status:** LANDED — 2026-11-25 (Neon, verified by Claude: new tests red on base, named mutants caught)
 **Priority:** P1 (proposed) — the cloud request path is broken from cloud sessions, its only intended submitter; workaround unproven (a different Python in the image might support the option)
 **Introduced by:** cloud session image change after 2026-11-05 (last successful cloud request `393bebf3`) meeting `scripts/lib/webhook/proc.py:44` (`925c43e7`, v1.37.0)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-25
+**Waiting on:** live check — since 2026-11-25
 **Triage:** fix now in v1.46.0 with the pre-push fix (blocks plan 1's live check)
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Gemini 4 Neon (`--agent agy --model gemini-4-neon-high`), model trial (operator, 2026-11-25)

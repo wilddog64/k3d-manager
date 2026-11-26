@@ -1,11 +1,11 @@
 # Bug: `k3dm-cloud-request` from a host with the repo hooks times out in the pre-push fast gate
 
-**Status:** OPEN — capture
+**Status:** LANDED — 2026-11-25 (Neon, verified by Claude: new tests red on base, named mutants caught)
 **Priority:** P2 (proposed) — the helper cannot submit from m4 (or any checkout with `core.hooksPath=.githooks`); workaround: submit from a cloud session, which has no hooks
 **Introduced by:** unknown (pre-push fast gate `abcde772`/`aa1196ed` applied to every pushed ref; the helper's data-branch push was never exempted)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-25
+**Waiting on:** live check — since 2026-11-25
 **Triage:** fix now in v1.46.0 (operator, 2026-11-25: "can we do 1, and 2")
 **Branch:** `k3d-manager-v1.46.0`
 **Implementer:** Gemini 4 Neon (`--agent agy --model gemini-4-neon-high`), model trial (operator, 2026-11-25)

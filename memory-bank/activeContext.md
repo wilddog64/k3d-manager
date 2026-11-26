@@ -50,7 +50,7 @@
    E-B3L2). (b) E-B3L1 attended small-file purge (operator). (c) M10b4 docs (intents pending operator approval).
    (d) dirused PR. E-B3L2 waits on log growth (team cleaned the logs). Claude can draft M10b4 now.
 0. **Plan 1 live check blocked (2026-11-25):** helper cannot submit from m4 (pre-push fast gate, v1460-prepush) or from
-   cloud sessions (posix_spawn setsid, v1460-spawn); both dispatched to Neon with v1460-gnudf (Luna). Hub already promoted to
+   cloud sessions (posix_spawn setsid, v1460-spawn); both LANDED 2026-11-25 (Neon); v1460-gnudf LANDED (Luna). Hub already promoted to
    cf653419 with relay + bridge installed. After land: rerun Deny/cluster-status/Approve; record Neon vs Luna/Flash trial row.
 2. **k3d-manager v1.46.0 (branch `k3d-manager-v1.46.0`, groomed 5/5 on 2026-11-22; see `docs/roadmap.md`).** Not started
    this session. Claude can begin per the dispatch queue once the operator says go.
