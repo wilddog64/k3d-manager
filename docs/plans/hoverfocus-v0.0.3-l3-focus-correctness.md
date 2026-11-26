@@ -1,9 +1,11 @@
 # hoverfocus v0.0.3 L3 — focus correctness: yabai make-key sequence, Electron AX tree, bounded caches
 
-**Status:** spec rev 1 — not reviewed; reviews due: Fable + Argon, plus a Neon blind review (operator rule); not dispatched
+**Status:** spec rev 2 — Fable reviewed rev 1 (2026-11-25, NEEDS FIXES: 5 should-fix, 6 nits; all applied); Neon blind
+review pending; not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch L3)
-**Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` (cut from `main` at `d2cdb00`, the v0.0.2 merge)
+**Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3`, which Claude cuts from `main` at `d2cdb00` (the
+v0.0.2 merge) and pushes before dispatch
 **Risk:** medium (private SkyLight event records on the focus path; a wrong record silently sends keys nowhere)
 **Implementer:** Luna (`codex`, `gpt-6-luna`, logic). Runs in parallel with F2 (no shared file). U1 waits for L3 to land
 (both edit `Sources/hoverfocus-selftest/main.swift`). **Verifier:** Claude, from `## Acceptance` only.
@@ -79,6 +81,9 @@ int hf_focus_sequence(const hf_focus_ops *ops, int32_t pid, uint32_t window_id,
 int hf_focus_without_raise(int32_t pid, uint32_t window_id, int32_t front_pid, uint32_t front_window_id);
 ```
 
+Undefined inputs: `hf_record_make_key` writes the `phase` byte at 0x08 as given (callers pass 1 or 2);
+`hf_focus_sequence` returns -1 without calling anything if any `ops` member is NULL.
+
 Record layouts (all bytes not listed are 0; `window_id` is written little-endian as 4 bytes at 0x3c):
 
 | Record | 0x04 | 0x08 | 0x3a | 0x20..0x2f | 0x8a |
@@ -99,8 +104,10 @@ Record layouts (all bytes not listed are 0; `window_id` is written little-endian
 5. Every step in 2-4 runs even if an earlier one returned non-zero (yabai does the same). Return 0 if every rc was 0,
    else the first non-zero rc.
 
-`hf_focus_without_raise` resolves the symbols (unavailable → -1) and calls `hf_focus_sequence` with real ops
-(`GetProcessForPID`, `_SLPSSetFrontProcessWithOptions`, `SLPSPostEventRecordTo`, `usleep`). The 40 ms sleep runs on the
+`hf_focus_without_raise` resolves the symbols (unavailable → -1) and calls `hf_focus_sequence` with real ops: static
+wrapper functions in `CSkyLight.c` around `GetProcessForPID`, `_SLPSSetFrontProcessWithOptions`,
+`SLPSPostEventRecordTo` and `usleep` that do the type casts (`hf_psn *` ↔ `ProcessSerialNumber *`, `useconds_t`), with
+`_Static_assert(sizeof(hf_psn) == sizeof(ProcessSerialNumber), "psn layout")` in the `.c` file. The 40 ms sleep runs on the
 main thread inside the tap callback, as in yabai; the tap is listen-only, so input is not delayed.
 
 ### 2. Controller: pass the frontmost window into the sequence
@@ -111,19 +118,29 @@ main thread inside the tap callback, as in yabai; the tap is listen-only, so inp
 (`Controller.swift:167-182`) into one private helper used by both; `systemState()` behaviour is unchanged. The raise
 branch (`raiseApps`) is unchanged.
 
-### 3. Electron: enable the AX tree when the hit-test does not reach a window
+### 3. Electron: enable the Chromium AX tree for every app HoverFocus targets or cannot resolve
 
-In `lookup(x:y:)`, when the hit-test does not end in a window ID (copy-element fails, or `hf_ax_window_id` is non-zero):
+The probe set `AXManualAccessibility` before every Electron trial, and whether the app's hit-test reaches an Electron
+`AXWindow` with the tree off is not proven. So the app reproduces the probe's precondition rather than guessing:
 
-- Find the owning pid: `AXUIElementGetPid` on the returned element if the hit-test succeeded; otherwise the owner pid of
-  the front-most on-screen window at layer 0 containing the point (`CGWindowListCopyWindowInfo(.optionOnScreenOnly, …)`,
-  list order is front to back).
-- If that pid is > 0 and not yet recorded, set `AXManualAccessibility = true` on `AXUIElementCreateApplication(pid)`
-  once, record the pid whatever the rc, and log `ax-enable pid <pid> rc <rc>` at `.info` with `privacy: .public`.
-  Never set `AXEnhancedUserInterface` (known to break window animation and positioning in other apps; Chrome focuses
-  without either flag per P2c).
-- Return `nil` for this lookup; the next lookup (≥16 ms later, `TapState`) retries the hit-test.
-- The recorded-pid set is a `RecentCache<Int32, Bool>` (Behaviour 4) with capacity 256.
+- **One helper**, `enableAccessibilityTree(pid:)`: if `pid > 0`, `pid != getpid()` and the pid is not yet recorded,
+  create `AXUIElementCreateApplication(pid)`, call `AXUIElementSetMessagingTimeout(app, 0.2)` (the same bound `lookup`
+  uses at `Controller.swift:131`; the call runs on the main thread inside the tap callback), set
+  `AXManualAccessibility = true`, record the pid whatever the rc, and log `ax-enable pid <pid> rc <rc>` at `.info` with
+  `privacy: .public`.
+- **Called from two places:**
+  1. `applyDecision`, for `target.pid`, **before** the focus call (both the no-raise and raise branches). This covers
+     an Electron window whose hit-test already resolves.
+  2. `lookup(x:y:)`, when the hit-test does not end in a window ID (copy-element fails, or `hf_ax_window_id` is
+     non-zero), for the owning pid: `AXUIElementGetPid` on the **original hit element** if copy-element succeeded;
+     otherwise the owner pid of the front-most on-screen layer-0 window containing the point
+     (`CGWindowListCopyWindowInfo(.optionOnScreenOnly, …)`, list order is front to back). The lookup still returns
+     `nil`; the next lookup (≥16 ms later, `TapState`) retries the hit-test. The extra window-list call on a failed
+     lookup is accepted (at most one per 16 ms, by `TapState`).
+- Never set `AXEnhancedUserInterface` (known to break window animation and positioning in other apps; Chrome refuses
+  both flags and still focuses under Y, per P2c).
+- The recorded-pid set is a `RecentCache<Int32, Bool>` (Behaviour 4) with capacity 256. Setting the flag on a
+  non-Electron app is a no-op attribute write (Chrome returned -25205 and was unaffected).
 
 ### 4. A2: bounded element cache
 
@@ -146,14 +163,17 @@ public struct RecentCache<Key: Hashable, Value> {
 
 `Engine.swift:59` skips when `target.windowID == state.focusedWindowID`. P2b passed same-app B in the probe while live
 E-L1 step 3 failed, and P2 showed AX focused-window state reporting the target while keys went elsewhere. L3 does not
-change the Engine; it adds a selftest row proving that a different window of the frontmost app fires, and the live
-matrix (L3-EL) re-checks same-app TextEdit. If L3-EL same-app still fails with Y, the Engine skip is the next suspect
+change the Engine; it adds a characterisation row (a different window of the frontmost app fires; green on pre-fix code
+already, so it guards the Engine rather than proving the fix), and the live matrix (L3-EL) re-checks same-app TextEdit. If L3-EL same-app still fails with Y, the Engine skip is the next suspect
 and gets its own bug doc; it is not patched blind here.
 
 ### 6. Selftest (`Sources/hoverfocus-selftest/main.swift`)
 
-Add named `check` rows; fakes for `hf_focus_ops` are `@convention(c)` functions that append to a global call log
-(`get_psn`, `set_front(wid, mode)`, `post(record bytes)`, `sleep(us)`), with settable return codes.
+Add named `check` rows. Fakes for `hf_focus_ops` are non-capturing `@convention(c)` closures. Swift 6 mode (tools 6.0)
+makes top-level `var`s in `main.swift` main-actor isolated, so the log lives in a global `let` of a lock-protected
+`final class OpsLog: @unchecked Sendable` (the `CheckRecorder` pattern, `main.swift:161`) holding the call log
+(`get_psn`, `set_front(wid, mode)`, `post(record bytes)`, `sleep(us)`) and settable return codes per call kind and per
+call index. The `post` fake copies the `HF_RECORD_SIZE` bytes during the call.
 
 - **Records:** `hf_record_make_key` phases 1 and 2 and both activation records equal the table above byte for byte
   (build the expected 0xf8-byte array in Swift from the table; compare the whole array).
@@ -164,12 +184,14 @@ Add named `check` rows; fakes for `hf_focus_ops` are `@convention(c)` functions 
 - **Same app, no front window:** `front_wid 0` → same log as different app.
 - **Guards:** pid 0 → -1 and empty log; `get_psn` returns -1 → -1 and log is `get_psn` only.
 - **Errors do not stop the sequence:** `set_front` returns 1002 → all later posts still logged; rc 1002.
+- **First rc wins:** same app, the deactivate `post` returns 5 and `set_front` returns 1002 → the full 7-call log; rc 5.
+- **NULL op:** an `ops` with `sleep_us` NULL → -1 and empty log.
 - **Symbols:** `hf_skylight_resolve_with_symbol_override("SLPSPostEventRecordTo")` reports it missing (inside the
   existing `skipSkyLight` guard); the existing guard row becomes `hf_focus_without_raise(-1, 0, 0, 0) != 0`.
 - **RecentCache:** capacity 2: set a, b; read a; set c → b evicted, a and c present, count 2; replacing a key does not
   grow count; capacity 1 keeps only the last set.
-- **Engine same-app:** `state.focusedWindowID = 3`, target window 7 of the same pid, dwell elapsed → `.focus(target)`;
-  paired control: target window 3 → `.none`.
+- **Engine same-app (characterisation, Behaviour 5):** `state.focusedWindowID = 3`, target window 7 of the same pid,
+  dwell elapsed → `.focus(target)`; paired control: target window 3 → `.none`.
 
 ## Files
 
@@ -207,7 +229,7 @@ must:
   - id: L3-M2
     text: "the make-key and activation records match the layout table byte for byte (0xf8 bytes, window id little-endian at 0x3c)"
   - id: L3-M3
-    text: "Controller passes the frontmost app's pid and AX focused window id into hf_focus_without_raise; when a hit-test does not reach a window id it sets AXManualAccessibility once per owning pid (never AXEnhancedUserInterface) and logs ax-enable"
+    text: "Controller passes the frontmost app's pid and AX focused window id into hf_focus_without_raise; it sets AXManualAccessibility (0.2 s messaging timeout, never AXEnhancedUserInterface, never its own pid) once per pid for every focus target before the focus call and for the owner of an unresolved hit-test, and logs ax-enable"
   - id: L3-M4
     text: "Controller.elements is a RecentCache of capacity 32; RecentCache evicts the least recently used entry and a hit refreshes recency"
 must_not:
@@ -221,7 +243,7 @@ evidence:
   - id: L3-E1
     proves: [L3-M1, L3-M2, L3-N1, L3-N2]
     kind: offline
-    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with the records, different-app, same-app, same-app-no-front-window, guards and errors-do-not-stop rows passing. Red controls, each restored byte-identical: (a) mode 0x400 in step 3 — different-app and same-app rows fail; (b) drop make-key phase 2 — both rows fail; (c) remove the same-app branch — same-app row fails, different-app still passes; (d) send the pair whenever front_pid == pid even with front_window_id 0 — no-front-window row fails; (e) write 0x3a = 0x10 into activation records — records row fails; (f) return after the first non-zero rc — errors-do-not-stop row fails"
+    command: "swift build --disable-sandbox; swift run --disable-sandbox hoverfocus-selftest rc 0 with the records, different-app, same-app, same-app-no-front-window, guards and errors-do-not-stop rows passing. Red controls, each restored byte-identical: (a) mode 0x400 in step 3 — different-app and same-app rows fail; (b) drop make-key phase 2 — both rows fail; (c) remove the same-app branch — same-app row fails, different-app still passes; (d) send the pair whenever front_pid == pid even with front_window_id 0 — no-front-window row fails; (e) write 0x3a = 0x10 into activation records — records row fails; (f) return after the first non-zero rc — errors-do-not-stop and first-rc-wins rows fail; (g) return the last non-zero rc — first-rc-wins row fails. Pre-fix code does not compile against these rows (the symbols are new), so the must_nots are shown red by the controls, not by running the rows on d2cdb00"
     intent: "The exact keyboard-focus sequence that worked in every app on m2 is what the app sends, step for step, and a change to any step is caught before it ships."
   - id: L3-E2
     proves: [L3-M4, L3-N3]
@@ -231,12 +253,12 @@ evidence:
   - id: L3-E3
     proves: [L3-M3]
     kind: offline
-    command: "same selftest run: Engine same-app row and its control pass, and the SLPSPostEventRecordTo override row passes; code reading of applyDecision and lookup quoted with line numbers against Behaviours 2 and 3; git grep -n 'AXEnhancedUserInterface' -- Sources prints nothing; git grep -n 'ax-enable' -- Sources/HoverFocusPlatform/Controller.swift prints one line"
+    command: "evidence is code reading plus greps (the AX calls need a window server): applyDecision, enableAccessibilityTree and lookup quoted with line numbers against Behaviours 2 and 3; git grep -n 'hf_focus_without_raise(target.pid, target.windowID, ' -- Sources/HoverFocusPlatform/Controller.swift prints one line; git grep -n 'AXUIElementSetMessagingTimeout' -- Sources/HoverFocusPlatform/Controller.swift prints at least two lines; the SLPSPostEventRecordTo override row and the Engine characterisation row pass; git grep -n 'AXEnhancedUserInterface' -- Sources prints nothing; git grep -n 'ax-enable' -- Sources/HoverFocusPlatform/Controller.swift prints one line"
     intent: "Hovering over another window of the app you are already in is treated as a focus change, and Slack or VS Code windows are made visible to HoverFocus without side effects on other apps."
   - id: L3-EL
     proves: [L3-M1, L3-M3]
     kind: live
-    command: "operator on m2, v0.0.3 build with L3 (Claude reads the unified log over SSH): for TextEdit, TextEdit second window (same app), Safari, Chrome, Mail, Terminal.app, iTerm2, Slack and VS Code (Slack and VS Code freshly relaunched), each behind another app's window: rest the pointer on it, type a word — the word lands there and the window does not come to the front; then one Cmd shortcut that only works in a key window (Cmd+W on a scratch tab or document, Cmd+F, or Cmd+L in a browser) acts on the hovered app; on hovering back to iTerm2 and Terminal.app the cursor is solid. Claude records any ax-enable log lines and focus-failed errors"
+    command: "operator on m2, v0.0.3 build with L3 (Claude reads the unified log over SSH): for TextEdit, TextEdit second window (same app), Safari, Chrome, Mail, Terminal.app, iTerm2, Slack and VS Code (Slack and VS Code freshly relaunched), each behind another app's window: rest the pointer on it, type a word — the word lands there and the window does not come to the front; then one Cmd shortcut that only works in a key window (Cmd+W on a scratch tab or document, Cmd+F, or Cmd+L in a browser) acts on the hovered app; on hovering back to iTerm2 and Terminal.app the cursor is solid. Claude records the ax-enable log lines (one per VS Code and Slack pid is expected) and any focus-failed errors"
     intent: "On m2, resting the pointer on a window behind others lets you type and use Cmd shortcuts in it, without bringing it to the front, in the nine everyday apps tested, including two windows of the same app and Slack and VS Code."
 interface: "CSkyLight: hf_focus_without_raise gains front_pid and front_window_id; adds hf_psn, hf_focus_ops, hf_record_make_key, hf_record_activation, hf_focus_sequence; HoverFocusCore adds public RecentCache. No change to Interface.swift, config keys or CLI flags."
 ```

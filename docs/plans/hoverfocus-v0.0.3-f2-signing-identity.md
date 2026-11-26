@@ -1,6 +1,7 @@
 # hoverfocus v0.0.3 F2 — local signing identity so the Accessibility grant survives rebuilds; tested-apps docs
 
-**Status:** spec rev 1 — not reviewed; reviews due: Fable + Argon, plus a Neon blind review (operator rule); not dispatched
+**Status:** spec rev 2 — Argon reviewed rev 1 (2026-11-25, NEEDS FIXES: 3 blockers (sandbox flag, real Keychain at
+test line 5, snapshot logs), 3 should-fix, 1 nit; all applied); Neon blind review pending; not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch F2)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` (cut from `main` at `d2cdb00`)
@@ -38,7 +39,8 @@ P3, m2-air, macOS 26.5.1, 2026-11-25, logs m2 `~/hf-p3-20261125T042212.txt` (run
 ## Before You Start
 
 1. `git log --oneline -1` shows the `v0.0.3` head; `make selftest` is not needed (no Swift change);
-   `bash tests/install_test.sh` passes (it runs `make bundle` with the real ad-hoc `codesign`).
+   `SWIFT_BUILD_FLAGS=--disable-sandbox bash tests/install_test.sh` passes (it runs `make bundle` with the real ad-hoc
+   `codesign`; SwiftPM's sandbox cannot nest inside `sandbox-exec`, as in v0.0.2 F1).
 2. Read `Makefile`, `tests/install_test.sh` (stub pattern: `$root/HF_TEST_ROOT` marker, stubs in `$root/bin`, a log
    per stub) and `README.md`.
 3. Do not edit any file outside `## Files`. Never run `make signing-identity` or touch the real login Keychain: tests
@@ -49,10 +51,12 @@ P3, m2-air, macOS 26.5.1, 2026-11-25, logs m2 `~/hf-p3-20261125T042212.txt` (run
 1. **Makefile variables:** `SECURITY ?= security`, `CODESIGN ?= codesign`, `OPENSSL ?= /usr/bin/openssl`,
    `SIGNING_NAME ?= HoverFocus Local Signing`, all exported. `bundle` signs with `"$$CODESIGN" --force --sign
    "$$CODESIGN_IDENTITY" build/HoverFocus.app`.
-2. **Default identity:** `CODESIGN_IDENTITY` is no longer `?= -`. When not set by the caller, `bundle` resolves it at
+2. **Default identity:** `CODESIGN_IDENTITY` becomes `CODESIGN_IDENTITY ?=` (empty) and stays exported; in `bundle`,
+   `[ -z "$$CODESIGN_IDENTITY" ]` means "not set by the caller". When not set, `bundle` resolves it at
    recipe time (shell, not `$(shell)` at parse time): if `"$$SECURITY" find-identity -p codesigning` output contains
    the quoted `"$$SIGNING_NAME"`, use `$$SIGNING_NAME`; otherwise `-`. An explicit `CODESIGN_IDENTITY=…` (including `-`)
-   always wins. `bundle` prints one line: `hoverfocus: signing with <identity>` (or `ad-hoc (-)`).
+   always wins. `bundle` prints exactly one of `hoverfocus: signing with HoverFocus Local Signing` (the resolved name) or
+   `hoverfocus: signing with ad-hoc (-)`.
 3. **Hint:** `install` prints the existing ad-hoc hint only when the identity used was `-`, extended with:
    `run "make signing-identity" once at this Mac's keyboard so later builds keep the grant`. With the local identity
    the hint is not printed. (Today `install` reads `CODESIGN_IDENTITY` directly; it must read the identity `bundle`
@@ -61,28 +65,54 @@ P3, m2-air, macOS 26.5.1, 2026-11-25, logs m2 `~/hf-p3-20261125T042212.txt` (run
    - Refuses with rc 2 and a one-line reason when `SSH_CONNECTION` is set (Keychain prompt needs the keyboard).
    - If `"$SECURITY" find-certificate -c "$SIGNING_NAME" "$keychain"` succeeds (keychain =
      `$HOME/Library/Keychains/login.keychain-db`), prints `already present` and exits 0 (idempotent).
-   - Otherwise, in `tmp=$(mktemp -d)` (mode 0700, removed by an EXIT trap): write the request config above, run
-     `"$OPENSSL" req -x509 -newkey rsa:2048 -nodes -days 3650 -config …`, export PKCS#12 with a one-time random
+   - Otherwise, in `tmp=$(mktemp -d)` (honours `TMPDIR`; mode 0700, removed by an EXIT trap): write this config (the
+     P3 kit's, verbatim apart from the variable name) to `$tmp/req.cnf`:
+
+     ```
+     [req]
+     distinguished_name = dn
+     x509_extensions = ext
+     prompt = no
+     [dn]
+     CN = $SIGNING_NAME
+     [ext]
+     basicConstraints = critical,CA:false
+     keyUsage = critical,digitalSignature
+     extendedKeyUsage = critical,codeSigning
+     subjectKeyIdentifier = hash
+     ```
+
+     then run `"$OPENSSL" req -x509 -newkey rsa:2048 -nodes -days 3650 -config "$tmp/req.cnf" -keyout "$tmp/key.pem"
+     -out "$tmp/cert.pem"`, export PKCS#12 with a one-time random
      passphrase passed to `openssl pkcs12` through `-passout env:` (never argv), `security import "$tmp/id.p12" -k
      "$keychain" -f pkcs12 -P "$P12_PASS" -T "$CODESIGN_PATH"` (`CODESIGN_PATH` = `command -v "$CODESIGN"`), `unset
-     P12_PASS`, delete the key and p12. Then `find-identity -p codesigning` must list the name, else rc 1.
+     P12_PASS`, delete the key and p12. Then `"$SECURITY" find-identity -p codesigning "$keychain"` must list the quoted name, else rc 1.
    - `security import` takes the passphrase only as `-P`; this is the one argv exposure, accepted because the
      passphrase is random, used once, and protects a file deleted seconds later in a 0700 directory; the private key
      itself is never on argv or in the log. The script never echoes the passphrase and runs without `set -x`.
-5. **Tests (`tests/install_test.sh`):** add stubs `security`, `codesign`, `openssl` in `$root/bin` (each checks the
-   `HF_TEST_ROOT` marker first and appends its argv to a log, never printing a passphrase value), and cases:
-   - The `security find-identity` stub mirrors the real tool for an untrusted identity: it prints nothing when its
-     argv contains `-v`.
+5. **Tests (`tests/install_test.sh`):**
+   - **Line 5** (the initial real build, before any stub exists) becomes `make bundle CODESIGN_IDENTITY=-`, so it never
+     calls the real `security` against the real Keychain (on m2 the P3 identity exists there). The real
+     `codesign -v build/HoverFocus.app` check (today line ~354) moves to directly after line 5 and calls
+     `/usr/bin/codesign`; stubbed cases later rebuild `build/HoverFocus.app` unsigned, so the check cannot stay at the end.
+   - Add stubs `security`, `codesign`, `openssl` in `$root/bin`, each checking the `HF_TEST_ROOT` marker first and
+     appending its argv to `$root/<name>.log`. The `security` stub replaces the argument after `-P` with `<redacted>`
+     before logging; the `openssl` stub logs its raw argv (so a `pass:` value would show and be caught). The `security`
+     stub keeps state in `$root/security.state`: `find-certificate` succeeds and `find-identity` prints the identity
+     line only when the state says present; `import` sets present. Case setup writes the initial state.
+   - `reset_scratch()` removes `security.log`, `codesign.log`, `openssl.log` and `security.state`, and every
+     `find "$root"` snapshot (cases 1, 4, 5 and the empty-`APPDIR` refusal check, which runs `bundle` first as a
+     prerequisite) also excludes those four names.
    - **Case 7, identity present:** `security find-identity` stub prints a line containing
      `"HoverFocus Local Signing"` → `make bundle` (no `CODESIGN_IDENTITY`) calls the `codesign` stub with `--sign
      HoverFocus Local Signing`; `make install` output has no `tccutil` hint.
    - **Case 8, identity absent (positive control):** stub prints no such line → `codesign --sign -`; hint printed,
      including `make signing-identity`.
    - **Case 9, explicit override:** identity present but `CODESIGN_IDENTITY=-` → `--sign -`.
-   - **Case 10, signing-identity script:** with `SSH_CONNECTION` set → rc 2, no `openssl` call. Without it, cert
-     absent → `openssl req`, `openssl pkcs12` (argv has `-passout env:`, not `pass:`), `security import … -T` in that
-     order, and no file left in the script's temp dir; cert present → `already present`, no `openssl` call.
-   - Existing cases 1-6 keep passing; the real ad-hoc `codesign -v build/HoverFocus.app` check (line ~354) stays real.
+   - **Case 10, signing-identity script** (run with `TMPDIR="$root/tmp"`, an empty directory): with `SSH_CONNECTION`
+     set → rc 2, no `openssl` call. Without it, cert absent → `openssl req`, `openssl pkcs12` (argv has `-passout env:`, not `pass:`), `security import … -T` in that
+     order, the final `find-identity` passes (stub state flipped by `import`), and `$root/tmp` is empty after exit; cert present → `already present`, no `openssl` call.
+   - Existing cases 1-6 keep passing.
 6. **README:**
    - **Installation:** run `make signing-identity` once at the Mac (Keychain prompt: enter the login password, click
      **Always Allow**), then `make install`; later builds keep the Accessibility grant. Without it builds are ad-hoc
@@ -106,7 +136,7 @@ P3, m2-air, macOS 26.5.1, 2026-11-25, logs m2 `~/hf-p3-20261125T042212.txt` (run
 
 ## Contract readers
 
-- `CODESIGN_IDENTITY` (Makefile variable, exported): readers `bundle` and `install` (Makefile:4, 31, 43-48); README:22-26
+- `CODESIGN_IDENTITY` (Makefile variable, exported): readers `bundle` and `install` (Makefile:4, 32, 44-49); README:22-26
   documents it; `tests/install_test.sh:308` sets it to `-`. Meaning changes from "always `-` unless set" to "local
   identity when present, else `-`, unless set".
 - New `build/.codesign-identity`: writer `bundle`, reader `install`; removed by `clean` (`rm -rf build`).
@@ -148,7 +178,7 @@ evidence:
   - id: F2-E1
     proves: [F2-M1, F2-M2, F2-N1, F2-N2]
     kind: offline
-    command: "bash tests/install_test.sh rc 0 with cases 1-10 reported. The find-identity stub output is the P3 capture line format (m2-air, 2026-11-25): '  1) <40-hex> \"HoverFocus Local Signing\" (CSSMERR_TP_NOT_TRUSTED)'. Red controls, each restored byte-identical: (a) restore CODESIGN_IDENTITY ?= - — case 7 fails, case 8 passes; (b) add -v to the find-identity call and make the stub print nothing for -v (as the real tool does for an untrusted identity) — case 7 fails; (c) print the hint unconditionally — case 7 fails"
+    command: "SWIFT_BUILD_FLAGS=--disable-sandbox bash tests/install_test.sh rc 0 with cases 1-10 reported; security.log never contains the passphrase (the -P value is <redacted>). The find-identity stub output is the P3 capture line format (m2-air, 2026-11-25): '  1) <40-hex> \"HoverFocus Local Signing\" (CSSMERR_TP_NOT_TRUSTED)'. Red controls, each restored byte-identical: (a) restore CODESIGN_IDENTITY ?= - — case 7 fails, case 8 passes; (b) add -v to the find-identity call and make the stub print nothing for -v (as the real tool does for an untrusted identity) — case 7 fails; (c) print the hint unconditionally — case 7 fails"
     intent: "After a one-time setup, rebuilding and reinstalling HoverFocus keeps its Accessibility permission, so you no longer re-grant it after every install; Macs without the setup still work as before."
   - id: F2-E2
     proves: [F2-M3, F2-N3]

@@ -1,6 +1,7 @@
 # hoverfocus v0.0.3 U1 — visible errors: red status line, one notification per error, Accessibility loss detected
 
-**Status:** spec rev 1 — not reviewed; reviews due: Fable + Argon, plus a Neon blind review (operator rule); not dispatched
+**Status:** spec rev 2 — Argon reviewed rev 1 (2026-11-25, NEEDS FIXES: 4 should-fix, 1 nit; all applied); Neon blind
+review pending; not dispatched
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch U1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` **after L3 lands** (both edit
@@ -63,7 +64,9 @@ read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "
    ```
 
    `ok → configError(a)` announces; `configError(a)` again → nil; `configError(a) → configError(b)` (different reason)
-   announces; `configError(b) → startError(x)` announces; `→ ok` → nil, and the next error announces again.
+   announces; `configError(b) → startError(.accessibilityNotTrusted)` announces; `→ startError(.eventTapFailed)`
+   announces; `startError(.eventTapFailed)` again → nil; `→ ok` → nil, and the next error announces again. Comparison is
+   full `Equatable` equality of `Health`, including associated values.
 
 2. **`AppCoordinator`:**
    - `public var health: Health`: `configError` if set; else `startError` if set and the controller is not running;
@@ -72,18 +75,23 @@ read"), taken into v0.0.3 by the plan approved 2026-11-24; operator 2026-11-25 "
      `!isTrusted()` → `controller.stop()`, `startError = .accessibilityNotTrusted`, `watchingTrust = true`. If
      `!watchingTrust` and none of that holds, return. The existing watching branch is unchanged (re-grant restarts it).
 3. **`AppDelegate`:**
-   - The 2 s timer runs for the app's lifetime (started at launch, not tied to `watchingTrust`); each tick calls
-     `coordinator.trustTick()` then `updateUI()`. `syncTrustTimer()` is replaced by this single timer; there is still
-     at most one.
-   - `updateUI()` computes `coordinator.health`. On an error: the status item gets an `attributedTitle` with
-     `NSColor.systemRed` and the existing `MenuModel.statusLine` text, and is **enabled** with an action:
-     `configError` → **Open Config**, `startError(.accessibilityNotTrusted)` → **Grant Accessibility…**, other start
-     errors → **Reload Config**. On `.ok`: plain `title`, `attributedTitle = nil`, disabled, no action (today's look).
-   - `updateUI()` passes `health` to an `ErrorNotifier`; when it returns an error, post one notification: title
-     `HoverFocus`, body = the same status line text. Authorization is requested (alert only) the first time a
-     notification is due, and the notification is posted from the completion only if granted. Denied or unavailable:
-     nothing more (the red line remains). All `UNUserNotificationCenter` use is behind the bundle guard and on the main
-     actor.
+   - The single repeating 2 s timer is created once in `applicationDidFinishLaunching` (guarded by
+     `accessibilityTimer == nil`) and runs for the app's lifetime; each tick calls `coordinator.trustTick()` then
+     `updateUI()`. `syncTrustTimer()` and every call to it (`loadConfiguration`, `toggleEnabled`, `selectIconStyle`,
+     `grantAccessibility`) are removed. The second `updateUI()` in `applicationDidFinishLaunching` may stay (the
+     notifier deduplicates it).
+   - `updateUI()` computes `coordinator.health`. On an error: `statusMenuItem.attributedTitle` = the existing
+     `MenuModel.statusLine` text with `.foregroundColor: NSColor.systemRed` and `.font: NSFont.menuFont(ofSize: 0)`;
+     `target = self`, `isEnabled = true`, and `action`: `configError` → `openConfig`,
+     `startError(.accessibilityNotTrusted)` → `grantAccessibility`, other start errors → `reloadConfig`. On `.ok`:
+     `attributedTitle = nil`, plain `title`, `target = nil`, `action = nil`, `isEnabled = false` (today's look).
+   - `updateUI()` passes `health` to an `ErrorNotifier`; when it returns an error and the bundle guard holds, call
+     `UNUserNotificationCenter.current().requestAuthorization(options: [.alert])` every time (it prompts only while
+     `.notDetermined` and otherwise returns the stored answer at once; no "already asked" flag). In the completion
+     (arbitrary queue; Swift 6 strict concurrency), capture the body string by value and, if `granted`, add a
+     `UNNotificationRequest` (identifier `UUID().uuidString`, title `HoverFocus`, body = the status line); hop with
+     `Task { @MainActor in … }` only if main-actor state is touched. Denied or unavailable: nothing more (the red line
+     remains). Every `UNUserNotificationCenter` use is inside one helper behind the bundle guard.
 4. **Selftest:** named `check` rows, each with a fresh coordinator and `FakeController` (reuse L1's):
    - **Notifier:** the transition table in Behaviour 1, as one row per arrow.
    - **Loss detected:** trusted, valid load → running; set untrusted; `trustTick()` → `stop` recorded, not running,
