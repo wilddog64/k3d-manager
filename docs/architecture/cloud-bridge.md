@@ -107,6 +107,10 @@ lifecycle actions are fixed `sandbox-up` and `sandbox-down` calls to the disposa
 `sandbox-down` keeps the hub. A response commit is data returned to the branch; it is not permission
 to execute a second action.
 
+An optional operator-only break-glass tailnet provides emergency SSH (port 22) and Screen Sharing (port 5900) directly from the operator's devices to the Macs. This path is completely independent of the GitHub request bridge and cloudflared, and is closed to agents and cloud sessions: no agent receives a Tailscale identity, credentials or access. For operational procedures, see the [Tailscale break-glass runbook](../howto/tailscale-break-glass.md).
+
+- **Operator break-glass tailnet:** Out-of-band point-to-point tunnel (SSH and Screen Sharing) strictly between operator personal devices and tagged Macs, independent of the GitHub bridge and cloudflared, and never exposed to agents or cloud sessions.
+
 ## Operations
 
 Bootstrap the orphan branch, then install the user LaunchAgent:
