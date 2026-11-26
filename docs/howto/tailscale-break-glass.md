@@ -104,7 +104,16 @@ Paste `docs/howto/tailscale/policy.hujson` with the real login substituted for `
   `Permission denied (publickey)`. Undo: `sudo rm /etc/ssh/sshd_config.d/100-k3dm-key-only.conf`.
 - Generate a dedicated SSH key pair inside the iPad SSH application (using the Secure Enclave or iOS Keychain).
 - Append the public key to `~/.ssh/authorized_keys` on each Mac (`m2`, `m5`, `m4`), adding an explicit comment naming the iPad (for example, `operator-ipad-break-glass`).
-- Compare each Mac's host-key fingerprint on the home LAN (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`) before the first tailnet connection, and verify the host-key fingerprint matches when connecting from the iPad.
+- Compare each Mac's host-key fingerprint on the home LAN before the first tailnet connection. The iPad client may pick
+  any of the Mac's host keys (Termius showed the ECDSA one on `m2`, 2026-11-26), so read all three on the Mac and match
+  the one whose type the client displays:
+  ```bash
+  for t in ecdsa ed25519 rsa; do ssh-keygen -lf /etc/ssh/ssh_host_${t}_key.pub; done
+  ```
+- In Termius, use a Secure Enclave key ("New Touch ID key"; public key `ecdsa-sha2-nistp256 ...`), attach it to the host,
+  set the username to the Mac's short account name, and leave the password empty. A password prompt means the key was
+  not offered or the username is wrong; do not type a password (the Macs are key-only).
+- Move the public key to the Mac by email to yourself if Universal Clipboard or iCloud Notes do not carry it.
 
 ## Turn on Screen Sharing
 
