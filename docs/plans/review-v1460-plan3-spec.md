@@ -31,3 +31,24 @@ Answer:
 
 A list of findings, most severe first, each tagged BLOCKER / MAJOR / MINOR, with file:line evidence and a concrete fix.
 Then a verdict: READY, NEEDS FIXES, or REWRITE.
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: every finding cites file:line and a concrete fix; the report ends with a verdict and a proposed Acceptance block
+must_not:
+  - id: N1
+    text: the reviewer changes any file
+evidence:
+  - id: E1
+    proves: [M1, N1]
+    kind: offline
+    command: git status --short in the review worktree is empty; report has findings, a proposed Acceptance block and a verdict
+    intent: A second model checks this plan against today's code before it is rewritten for dispatch, so the plan you approve fixes what is really broken.
+interface: none
+```
+
+**Intent approved:** operator, 2026-11-26
+**Approval words and scope:** "can you have Fable/Neon review Plan2/Plan3 then have me review intents"
