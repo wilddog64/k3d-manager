@@ -65,6 +65,21 @@ Paste `docs/howto/tailscale/policy.hujson` with the real login substituted for `
     and the App Store copy (quit Tailscale, delete `/Applications/Tailscale.app`); run it again afterwards.
 - Apply `tag:k3dm-mac` immediately during enrollment so no Mac ever sits untagged.
 - Leave "Use Tailscale DNS settings" off in Tailscale preferences on the Macs to prevent MagicDNS from interfering with the hub's local DNS resolvers (`k3d`, `cloudflared`).
+- Sign in from a terminal on the Mac, which tags the device, turns Tailscale DNS off and sets its name in one step
+  (use the Mac's own short name):
+  ```bash
+  /Applications/Tailscale.app/Contents/MacOS/Tailscale up --advertise-tags=tag:k3dm-mac --accept-dns=false --hostname=<mac>
+  ```
+  Open the printed login link, sign in, then approve the device in the admin console. On `m2` (2026-11-26) the app's
+  own "Sign in to your network" button did nothing, which is why this is the documented path.
+- After a terminal sign-in, the menu-bar app can keep showing "Not Connected / Please log in" and hang on Quit, while
+  the tunnel is up. Force Quit it (Option-Command-Escape, "Tailscale") and open it again; the tunnel is unaffected.
+- The app's "Start at login" / "Launch Tailscale at login" toggle can fail with "Start on Login could not be set".
+  Add `/Applications/Tailscale.app` under System Settings -> General -> Login Items & Extensions -> Open at Login
+  instead, and prove it with a logout and login. Do not run `sfltool resetbtm`: it resets every app's background
+  permissions.
+- After the Mac's checks pass, turn on VPN On Demand (Settings -> VPN On Demand -> Manage...): Wi-Fi and Ethernet
+  "Always", "Detect MagicDNS hostnames" off. Not on the iPad.
 - Confirm in the admin console that key expiry shows disabled for each tagged Mac node (`tag:k3dm-mac`).
 - On the iPad:
   - Install the Tailscale app from the iOS App Store and sign in with the operator login.
@@ -73,7 +88,8 @@ Paste `docs/howto/tailscale/policy.hujson` with the real login substituted for `
 - After enrolling `m5`:
   - Run the hub health check (webhook health endpoint) and one end-to-end read-only Slack request.
   - Run `scutil --dns` on `m5` and confirm no Tailscale resolver is present.
-  - If any check fails, immediately disconnect Tailscale on `m5` as the rollback trigger (per L-E1).
+  - If any check fails, immediately turn VPN On Demand off and then disconnect Tailscale on `m5` as the rollback
+    trigger (per L-E1); with On Demand on, a plain Disconnect is undone by macOS.
 
 ## Set up SSH from the iPad
 
@@ -156,6 +172,7 @@ To completely remove the break-glass path:
 2. Delete all enrolled devices (`m2`, `m5`, `m4` and the iPad) from the Tailscale admin console.
 3. Uninstall the Tailscale client application from all Macs (`/Applications/Tailscale.app`) and the iPad.
 4. Turn Screen Sharing off in System Settings on each Mac.
+   Turn VPN On Demand off on each Mac before uninstalling, and remove Tailscale from Open at Login.
 5. Remove the iPad's SSH public key entry from `~/.ssh/authorized_keys` on each Mac.
 
 ## Limits

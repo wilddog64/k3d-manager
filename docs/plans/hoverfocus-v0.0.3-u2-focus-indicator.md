@@ -3,7 +3,7 @@
 **Status:** spec rev 2 — Fable and Neon reviewed rev 1 independently (2026-11-26, both NEEDS FIXES; shared findings: stale
 border after keyboard focus changes, `enabled: false` left it on screen, vacuous row preconditions and config-reason check,
 headless panel creation, missing contract readers, live-step errors; Fable: one panel over the window could capture
-hit-testing; all applied); not dispatched
+hit-testing; all applied). LANDED `4a3940f` on `v0.0.3` (Flash `hf003-u2`, 2026-11-26); E1 Claude-verified (128/0, mutants a-k red, static checks); E2 live pending
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md) (batch U2, decision D2 option 1)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` at `2e30655` (L3 `3951b67`, U1 `4e66919`, F2 `7b42f63`, L4 `11e0e7c`)
