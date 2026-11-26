@@ -213,3 +213,4 @@
 - 2026-11-25: plan 1 rev 3 `c89589f5` (both reviews NOT READY on rev 2; 2 pre-existing P2 bridge bugs filed, fixed in new child b1). Docs audit started.
 - 2026-11-25: plan 1 intents approved; docs audit done (13 fixes `af3b96c2`); machine-secrets CBC flake captured P3.
 - 2026-11-25: hoverfocus P2 make-key re-diagnosed: byte layout matches yabai v7.1.25 / AutoRaise v5.7; rc 1002 = kCGErrorInvalidConnection (bare swift script, no NSApplication). Recorded in hoverfocus-v0.0.3-plan.md; P2b probe next.
+- 2026-11-25: hoverfocus P2b probe written (self-checking; variants B/BK/Y) and copied to m2 ~/hf-probe/, type-checked on m2 (Swift 6.3.3). Waiting on operator run.

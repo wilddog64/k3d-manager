@@ -83,6 +83,13 @@ terminal to the front itself between variants, and checks typed-text delivery it
 focused text element; the operator answers only "did it come to the front?". Pass for L3 = record rc 0 and text lands
 with no raise in TextEdit (two windows), Chrome, Safari and Mail.
 
+P2b kit written 2026-11-25 and on m2 at `~/hf-probe/hf-p2b.sh` + `hf-p2b-probe.swift` (type-checks with Swift 6.3.3
+on m2). Variants B, BK (B + make-key) and Y (yabai v7.1.25 `focus_window_without_raise` exactly: same-app
+deactivate/activate records, `kCPSUserGenerated`, make-key), two repeats each. It stops with "probe defect" if
+`SLSMainConnectionID()` is 0 or a self make-key on its own terminal window is refused, so a repeat of rc 1002 cannot
+pass as a result. Typing is checked by a synthetic token read back through `AXFocusedUIElement`/`AXValue` (operator
+asked only when an app's text is unreadable); raise is measured by window order. Log: `~/hf-p2b-<timestamp>.txt`.
+
 ## Decisions (operator, 2026-11-24: "go with your recommendation"; D3 "yes, and other command hotkeys")
 
 - **D1 — v0.0.2 scope (decided: as proposed).** L2 (B1, B2, A2) was in the v0.0.2 batch plan but is blocked on probes. Proposed: v0.0.2 =
