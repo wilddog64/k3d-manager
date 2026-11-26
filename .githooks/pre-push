@@ -4,7 +4,10 @@ set -euo pipefail
 remote="$1"
 
 bases=()
+saw_cloud_requests=0
+saw_other_ref=0
 while IFS=' ' read -r local_ref _ remote_ref remote_sha; do
+  [[ -n "${remote_ref:-}" ]] || continue
   if [[ "$remote_ref" == "refs/heads/main" ]] && \
      [[ "$local_ref" != "refs/heads/main" ]]; then
     if [[ "${ALLOW_MAIN_PUSH:-0}" == "1" ]]; then
@@ -16,10 +19,17 @@ while IFS=' ' read -r local_ref _ remote_ref remote_sha; do
       exit 1
     fi
   fi
+  if [[ "$remote_ref" == "refs/heads/cloud-requests" ]]; then
+    saw_cloud_requests=1
+    continue
+  fi
+  saw_other_ref=1
   if [[ "$local_ref" != "(delete)" && ! "$remote_sha" =~ ^0+$ ]]; then bases+=("$remote_sha"); fi
 done
 if [[ "${K3DM_SKIP_FAST_GATE:-0}" == 1 ]]; then
   echo "pre-push: fast gate skipped (K3DM_SKIP_FAST_GATE=1)"
+elif (( saw_cloud_requests && ! saw_other_ref )); then
+  echo "pre-push: fast gate skipped for refs/heads/cloud-requests (data branch)"
 elif (( ${#bases[@]} )); then
   for base in "${bases[@]}"; do scripts/ci/fast_gate.sh "$base"; done
 else

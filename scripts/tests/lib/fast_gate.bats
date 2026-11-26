@@ -200,6 +200,133 @@ BATS
   [[ "$output" == *'fast gate skipped'* ]]
 }
 
+_setup_pre_push_cloud_requests_fixture() {
+  [ "$fixture" != "$root" ]
+  mkdir -p "$fixture/.githooks"
+  cp "$root/.githooks/pre-push" "$fixture/.githooks/pre-push"
+  git -C "$fixture" checkout -qb topic
+  printf '#!/usr/bin/env bats\n@test "unrelated" { false; }\n' > "$fixture/scripts/tests/lib/unrelated.bats"
+  git -C "$fixture" add .githooks/pre-push scripts/tests/lib/unrelated.bats
+  git -C "$fixture" commit -qm hook-and-unrelated
+  git init --bare -q "$BATS_TEST_TMPDIR/remote.git"
+  git -C "$fixture" remote add origin "$BATS_TEST_TMPDIR/remote.git"
+  [ "$(git -C "$fixture" remote get-url origin)" = "$BATS_TEST_TMPDIR/remote.git" ]
+  git -C "$fixture" -c core.hooksPath=/dev/null push -q origin HEAD:refs/heads/topic
+  git -C "$fixture" config core.hooksPath .githooks
+  printf '#!/usr/bin/env bats\n# thing.txt\n@test "one" { false; }\n' > "$fixture/scripts/tests/lib/one.bats"
+  git -C "$fixture" commit -qam broken-one
+}
+
+_make_cloud_request_commit() {
+  local parent="${1:-}" name="$2"
+  local idx="$BATS_TEST_TMPDIR/cloud-index-$name"
+  local blob tree
+  blob=$(printf '{"id":"%s"}\n' "$name" | git -C "$fixture" hash-object -w --stdin)
+  rm -f "$idx"
+  if [[ -n "$parent" ]]; then
+    GIT_INDEX_FILE="$idx" git -C "$fixture" read-tree "$parent"
+  else
+    GIT_INDEX_FILE="$idx" git -C "$fixture" read-tree --empty
+  fi
+  GIT_INDEX_FILE="$idx" git -C "$fixture" update-index --add --cacheinfo "100644,$blob,requests/$name.json"
+  tree=$(GIT_INDEX_FILE="$idx" git -C "$fixture" write-tree)
+  rm -f "$idx"
+  if [[ -n "$parent" ]]; then
+    git -C "$fixture" commit-tree "$tree" -p "$parent" -m "cloud request $name"
+  else
+    git -C "$fixture" commit-tree "$tree" -m "cloud request $name"
+  fi
+}
+
+@test "fast gate: pre-push skips fast gate for cloud-requests with unrelated remote tip" {
+  _setup_pre_push_cloud_requests_fixture
+  local req1 req2
+  req1=$(_make_cloud_request_commit "" req1)
+  git -C "$fixture" -c core.hooksPath=/dev/null push -q origin "$req1:refs/heads/cloud-requests"
+  run git -C "$fixture" merge-base HEAD "$req1"
+  [ "$status" -ne 0 ]
+  req2=$(_make_cloud_request_commit "$req1" req2)
+
+  # Positive control: pushing the code branch still runs fast_gate.sh and fails on broken one.bats.
+  run git -C "$fixture" push origin HEAD:refs/heads/topic
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'FAIL scripts/tests/lib/one.bats'* ]]
+
+  run git -C "$fixture" push origin "$req2:refs/heads/cloud-requests"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'pre-push: fast gate skipped for refs/heads/cloud-requests (data branch)'* ]]
+  [[ "$output" != *'PASS scripts/tests/'* ]]
+  [[ "$output" != *'FAIL scripts/tests/'* ]]
+  [[ "$output" != *'TOTAL'* ]]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/cloud-requests)" = "$req2" ]
+}
+
+@test "fast gate: pre-push skips fast gate for new cloud-requests remote ref" {
+  _setup_pre_push_cloud_requests_fixture
+  run git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse --verify refs/heads/cloud-requests
+  [ "$status" -ne 0 ]
+  local req1
+  req1=$(_make_cloud_request_commit "" req1)
+
+  # Positive control: pushing the code branch runs fast_gate.sh and fails on broken one.bats.
+  run git -C "$fixture" push origin HEAD:refs/heads/topic
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'FAIL scripts/tests/lib/one.bats'* ]]
+
+  run git -C "$fixture" push origin "$req1:refs/heads/cloud-requests"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'pre-push: fast gate skipped for refs/heads/cloud-requests (data branch)'* ]]
+  [[ "$output" != *'PASS scripts/tests/'* ]]
+  [[ "$output" != *'FAIL scripts/tests/'* ]]
+  [[ "$output" != *'TOTAL'* ]]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/cloud-requests)" = "$req1" ]
+}
+
+@test "fast gate: pre-push runs gate for code branch with cloud-requests and keeps main guard" {
+  _setup_pre_push_cloud_requests_fixture
+  local topic_base req1 req2
+  topic_base=$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/topic)
+  req1=$(_make_cloud_request_commit "" req1)
+  git -C "$fixture" -c core.hooksPath=/dev/null push -q origin "$req1:refs/heads/cloud-requests"
+  req2=$(_make_cloud_request_commit "$req1" req2)
+
+  # Combined push with broken one.bats still runs fast_gate.sh and fails.
+  run git -C "$fixture" push origin "$req2:refs/heads/cloud-requests" HEAD:refs/heads/topic
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'FAIL scripts/tests/lib/one.bats'* ]]
+  [[ "$output" != *'fast gate skipped for refs/heads/cloud-requests'* ]]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/topic)" = "$topic_base" ]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/cloud-requests)" = "$req1" ]
+
+  # Combined push with a new code branch (all-zero remote SHA) still runs fast_gate.sh and fails.
+  run git -C "$fixture" push origin "$req2:refs/heads/cloud-requests" HEAD:refs/heads/new-topic
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'FAIL scripts/tests/lib/one.bats'* ]]
+  [[ "$output" != *'fast gate skipped for refs/heads/cloud-requests'* ]]
+
+  # Main guard refuses non-main ref to main alone and alongside cloud-requests.
+  run git -C "$fixture" push origin HEAD:refs/heads/main
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'refusing to push'* ]]
+  run git -C "$fixture" push origin "$req2:refs/heads/cloud-requests" HEAD:refs/heads/main
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'refusing to push'* ]]
+  run git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse --verify refs/heads/main
+  [ "$status" -ne 0 ]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/cloud-requests)" = "$req1" ]
+
+  # Fixing one.bats lets the combined push pass with topic's remote tip as base (unrelated.bats is not run).
+  printf '#!/usr/bin/env bats\n# thing.txt\n@test "one fixed" { true; }\n' > "$fixture/scripts/tests/lib/one.bats"
+  git -C "$fixture" commit -qam fix-one
+  run git -C "$fixture" push origin "$req2:refs/heads/cloud-requests" HEAD:refs/heads/topic
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS scripts/tests/lib/one.bats'* ]]
+  [[ "$output" != *'unrelated.bats'* ]]
+  [[ "$output" != *'fast gate skipped for refs/heads/cloud-requests'* ]]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/topic)" = "$(git -C "$fixture" rev-parse HEAD)" ]
+  [ "$(git -C "$BATS_TEST_TMPDIR/remote.git" rev-parse refs/heads/cloud-requests)" = "$req2" ]
+}
+
 @test "fast gate: reports a missing yamllint" {
   mkdir -p "$fixture/.github/workflows" "$BATS_TEST_TMPDIR/path"
   printf '#!/bin/sh\nexit 0\n' > "$BATS_TEST_TMPDIR/path/bats"
