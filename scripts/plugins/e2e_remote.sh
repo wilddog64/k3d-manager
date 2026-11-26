@@ -186,9 +186,13 @@ for v in \$(top -l 6 -n 0 -s 1 2>/dev/null | awk '/^CPU usage/{gsub(/%/,"",\$7);
 done
 mem=\$(memory_pressure 2>/dev/null | awk -F': ' '/free percentage/{gsub(/%/,"",\$2); print \$2}')
 echo "mem_free=\${mem:-0}"
-disk=\$(df -g "${E2E_M2_REMOTE_REPORT_DIR}" 2>/dev/null | awk 'NR==2{print \$4}')
-[ -z "\${disk:-}" ] && disk=\$(df -g "\$HOME" 2>/dev/null | awk 'NR==2{print \$4}')
-echo "disk_gb=\${disk:-0}"
+disk_kib=\$(df -Pk "${E2E_M2_REMOTE_REPORT_DIR}" 2>/dev/null | awk 'NR==2{print \$(NF-2)}')
+[[ "\$disk_kib" =~ ^[0-9]+\$ ]] || disk_kib=\$(df -Pk "\$HOME" 2>/dev/null | awk 'NR==2{print \$(NF-2)}')
+if [[ "\$disk_kib" =~ ^[0-9]+\$ ]]; then
+  echo "disk_gb=\$((disk_kib / 1048576))"
+else
+  echo "disk_gb="
+fi
 PROBE
 )"
   _e2e_remote_ssh "bash -s" <<<"$script"
@@ -222,6 +226,10 @@ function _e2e_remote_eval_gates() {
   fi
   if _e2e_num_lt "$mem" "$E2E_M2_MIN_MEM_FREE"; then
     printf 'reason=%s\nstatus=capacity_mem\n' "memory free ${mem:-?}% below floor ${E2E_M2_MIN_MEM_FREE}%"
+    return 1
+  fi
+  if [[ ! "$disk" =~ ^[0-9]+$ ]]; then
+    printf 'reason=%s\nstatus=probe_failed\n' "cannot read free disk on runner ${E2E_M2_SSH_HOST}"
     return 1
   fi
   if _e2e_num_lt "$disk" "$E2E_M2_MIN_DISK_GB"; then

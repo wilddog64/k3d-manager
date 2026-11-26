@@ -83,3 +83,54 @@ def test_run_e2e_records_null_counts_and_posts_once(tmp_path, monkeypatch):
     assert record["counts"] == {"passed": 0, "failed": 0, "total": 0}
     assert len(posted) == 1
     assert "FAIL — before tests (phase deploying-substrate)" in posted[0][1]
+
+
+@pytest.mark.parametrize("output, expected", [
+    ("noise\nreason=disk free 0GiB below floor 40GiB\nstatus=capacity_disk\n",
+     "disk free 0GiB below floor 40GiB"),
+    ("reason=<!channel> <https://x|y> @here\r\n\x1b[31m\t" + "x" * 500,
+     None),
+])
+def test_run_e2e_preflight_reason_is_recorded_and_sanitized(tmp_path, monkeypatch, output, expected):
+    home = tmp_path / "scratch-home"
+    e2e_dir = tmp_path / "hermes-e2e"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("K3DM_HERMES_E2E_DIR", str(e2e_dir))
+    assert Path.home() == home
+    posted = []
+    monkeypatch.setattr(hermes, "_keychain_secret", lambda _key: "stub-relay")
+    monkeypatch.setattr(hermes, "post_summary", lambda relay, text: posted.append((relay, text)))
+    claim = e2e_dir / "slot.claim"
+    claim.parent.mkdir(parents=True)
+    claim.write_text(json.dumps({"attempts": 5}))
+    assert hermes._run_e2e("slot", runner=lambda *_args: (1, output), now=1794051590) == 0
+    record = json.loads((e2e_dir / "slot.json").read_text())
+    assert record["outcome"] == "runner-unavailable"
+    assert not claim.exists()
+    assert len(posted) == 1
+    if expected is not None:
+        assert record == {"outcome": "runner-unavailable", "reason": expected}
+        assert posted[0][1].endswith(f"({expected})")
+    else:
+        reason = record["reason"]
+        assert 0 < len(reason) <= 200
+        assert all(char.isascii() and (char.isalnum() or char in "? .,:%/()_-") for char in reason)
+        assert not any(char in posted[0][1] for char in "<>|@\r\x1b\t")
+
+
+def test_run_e2e_without_preflight_reason_keeps_message_and_omits_key(tmp_path, monkeypatch):
+    home = tmp_path / "scratch-home"
+    e2e_dir = tmp_path / "hermes-e2e"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("K3DM_HERMES_E2E_DIR", str(e2e_dir))
+    posted = []
+    monkeypatch.setattr(hermes, "_keychain_secret", lambda _key: "stub-relay")
+    monkeypatch.setattr(hermes, "post_summary", lambda relay, text: posted.append(text))
+    claim = e2e_dir / "slot.claim"
+    claim.parent.mkdir(parents=True)
+    claim.write_text(json.dumps({"attempts": 5}))
+    hermes._run_e2e("slot", runner=lambda *_args: (1, "noise\nstatus=busy\n"), now=1794051590)
+    assert posted == ["Hermes e2e slot: skipped — M2 runner unavailable after 6 attempts"]
+    assert json.loads((e2e_dir / "slot.json").read_text()) == {"outcome": "runner-unavailable"}

@@ -449,7 +449,8 @@ regression set, and it is far too small to validate a probabilistic or confidenc
 ## M2 runner capacity gate
 
 The M2 runner can refuse a dispatch with `docker_down`, `busy`,
-`capacity_cpu` / `capacity_mem` / `capacity_disk`, or `unreachable`. The CPU floor
+`capacity_cpu` / `capacity_mem` / `capacity_disk`, `probe_failed` (free disk
+could not be read; not retried), or `unreachable`. The CPU floor
 `E2E_M2_MIN_CPU_IDLE` (35) is compared with the mean of 5 one-second samples.
 Only `capacity_*` refusals are retried, `E2E_M2_CAPACITY_RETRIES` (2) times,
 `E2E_M2_CAPACITY_RETRY_INTERVAL` (120) seconds apart. See the
