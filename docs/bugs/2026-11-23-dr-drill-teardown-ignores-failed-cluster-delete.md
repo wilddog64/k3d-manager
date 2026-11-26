@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-23 by Claude from the m2-air drill runs
 **Priority:** P2 (operator, 2026-11-23) (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — `dr-drill` teardown silently ignores partial cluster deletion and blocks the next drill, with manual `k3d cluster delete dr-drill` as a documented workaround
 **Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
 **Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** 38fbf3ab (v1.43.1, clean-room DR drill)

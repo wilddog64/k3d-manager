@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-22
 **Priority:** P3
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — test-only race condition where TOTP unit tests connect before the socket enters listen state
 **Triage:** backlog — pull into a release that already touches `scripts/tests/python/test_console_totpd.py` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** `1026dbe2` (web-console part C TOTP gate, tests `test_N1_and_M2_lockout_and_hmac_calls` and `test_N1_and_E1_wire_rejections`)
 **Should have been caught by:** review

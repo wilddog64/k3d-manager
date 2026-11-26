@@ -2,6 +2,7 @@
 
 **Status:** OPEN — capture
 **Priority:** P3 (cosmetic; the card and buttons carry the right request)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — Cosmetic wording glitches ("with none", "Approve repair?", "Run Run") in the cloud approval card and confirmation dialog
 **Introduced by:** v1.46.0 plan 1 a (`358f10b9`, card text) and c (`4e3f3c81`, relay confirm dialog)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)

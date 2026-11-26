@@ -2,6 +2,7 @@
 
 **Status:** OPEN — capture
 **Priority:** P3 (the request itself is unaffected and its response still lands; only the waiting helper gives up)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — concurrent `k3dm-cloud-request --wait` runs in the same checkout fail on a ref-lock race, with serializing invocations or re-running wait as a workaround
 **Introduced by:** pre-existing (`bin/k3dm-cloud-request` fetches into a fixed `refs/remotes/origin/cloud-requests`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown

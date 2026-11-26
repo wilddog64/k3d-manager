@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-23
 **Priority:** P3
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — same-uid request spam can exhaust the approval rate limit and leave final records unpruned, with local process termination or store cleanup as workarounds
 **Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.45.0 plan 2a (approval store)
 **Should have been caught by:** review

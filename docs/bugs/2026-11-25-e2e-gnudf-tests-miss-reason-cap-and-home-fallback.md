@@ -2,6 +2,7 @@
 
 **Status:** OPEN — capture
 **Priority:** P3 (test-only; the landed code is correct, two behaviours have no test)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — Test-only coverage gap for the 200-character reason cap and `$HOME` disk fallback with no production defect
 **Introduced by:** `7bd1a7c4` (v1460-gnudf)
 **Should have been caught by:** review
 **Introducing change reviewed:** yes (Fable)

@@ -1,4 +1,4 @@
-## Handoff — 2026-11-25 18:10 PST — v1.46.0 plan 1 live-verified — START HERE
+## Handoff — 2026-11-25 19:30 PST — v1.46.0 plan 1 live-verified — START HERE
 
 - **Operator:** at the office 2026-11-26 (jump box reachable only there), home in the evening. Only the operator can: collect
   the dirused jump-box probe, run attended E-B3L1, hub promotes (`make hub-deploy REF=<sha>` on m5, CI green first), run a
@@ -13,17 +13,20 @@
    from a cloud session (operator relays). `docs/bugs/2026-11-25-e2e-m2-preflight-reads-0gib-disk-under-gnu-df.md` LANDED
    `7bd1a7c4`; after the next promote Claude runs read-only `./scripts/k3d-manager e2e_runner_preflight m2`, then the next
    Hermes slot must post a result, not a skip. Next promote target = branch head once CI is green (Claude checks CI first).
-3. **HoverFocus v0.0.3.** P2 probes DONE: variant Y (yabai v7.1.25 sequence) passes all 8 apps without raise; results and
-   citations in `docs/plans/hoverfocus-v0.0.3-plan.md` (Probe results). Next (Claude, no operator needed): write L3 (focus =
-   Y; check `Engine.swift:59` skip; no AX read-back selftests for Chromium/Mail/Electron), F2, U1 child specs; reviews =
-   Fable/Argon **plus a Neon blind review** (operator rule), then intents to the operator, then dispatch.
+3. **HoverFocus v0.0.3.** Child specs rev 1 written 2026-11-25 19:xx: `docs/plans/hoverfocus-v0.0.3-l3-focus-correctness.md`
+   (Y sequence via injectable `hf_focus_ops`, Electron `AXManualAccessibility` on hit-test miss, `RecentCache`),
+   `...-f2-signing-identity.md`, `...-u1-visible-errors.md`. Blind reviews running: L3 Fable + Neon; F2, U1 Argon + Neon
+   (outputs in session scratchpad `reviews/`). Order: L3 ∥ F2, U1 after L3 (shared selftest file). Next: apply review
+   findings, then intents to the operator, then cut `v0.0.3` from `main` `d2cdb00` and dispatch L3 + F2.
 4. **dirused (OOB, branch `m10b-scheduled-purge`, head `eaa51be`, M10b4 landed).** Next: (a) 2026-11-26 operator runs the
    probe `collect` on the jump box, sends `report.txt`, then `cleanup`; Claude records it in
    `docs/plans/dirused-m10b3-runplan-windows.md` and `docs/plans/dirused-m10b-scheduled-purge.md`; (b) E-B3L1 attended
    purge (operator); (c) Claude opens the dirused PR. E-B3L2 waits on log growth.
 5. **v1.46.0 remaining plans** (`docs/roadmap.md`, groomed 5/5): plan 1 done; Claude proposes the next per the dispatch queue
    once the operator says go. v1.46.1 patch batch specs (12 bugs, batches A1–A4, B) still to write.
-6. **Triage due.** P3 captures 2026-11-23..25 (`OPEN — capture`), incl. today's: helper concurrent-wait race, approval card
+6. **Triage prepared 2026-11-25 (operator decides).** 66 `OPEN — capture` docs; 14 lacked `**Classified:**`, now classified
+   by Argon (lines added). Recommendations: 6 patch → v1.46.1, 14 carry → v1.47.0, 27 backlog carry, 7 close, 12 already
+   mapped; flags: promote-mover gate bypass (Argon P2), 10 Argon-higher docs. Report: `docs/grooming/2026-11-25-triage-proposal.md`. Older text: P3 captures 2026-11-23..25 (`OPEN — capture`), incl. today's: helper concurrent-wait race, approval card
    wording ("with none", "Approve repair?", "Run Run"), gnudf test gaps (`[:200]`, `$HOME` fallback), e2e order 429
    (`docs/bugs/2026-11-25-e2e-order-cancel-flow-hits-order-rate-limit-429.md`, investigation). Captures still owed:
    first-install host-key warning; lib-foundation `timeout` on macOS in install_istioctl.bats; QR how-to note; flaky dirused

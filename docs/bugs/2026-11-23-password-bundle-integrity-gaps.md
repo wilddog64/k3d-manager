@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-23
 **Priority:** P3
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — Hardening against same-uid local attacks and false freshness where a same-uid process can already read the passwords directly
 **Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.45.0 travel-bundle plan
 **Should have been caught by:** review

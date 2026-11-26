@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-25, not triaged
 **Priority:** P3 (operator, 2026-11-25: "yes" to filing) — hygiene / supply chain: CI red with no code cause; a rerun works.
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — CI-only supply-chain hygiene and flakiness issue from installing an unpinned `VERSION=latest` Copilot CLI in test workflows
 **Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
 **Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** `0dfa5361` (2026-03-23, "Copilot CLI install + _copilot_auth_check integration test", #47)

@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-25
 **Priority:** P3 (test-only flake about 0.4% per run; the import still fails safe)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — Unauthenticated CBC decryption causes 1-in-256 flaky test failures and relies on payload format rejection rather than cryptographic integrity to catch wrong keys or tampering
 **Introduced by:** pre-existing (`bin/k3dm-machine-secrets` import, unauthenticated `openssl enc -aes-256-cbc`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

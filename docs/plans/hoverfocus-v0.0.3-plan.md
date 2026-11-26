@@ -1,7 +1,7 @@
 # HoverFocus v0.0.3 — plan
 
 **Filed:** 2026-11-24
-**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); P2 DONE: variant Y passes all 8 apps (P2b + P2c); next: then child specs and Fable spec review
+**Status:** plan — D1-D3 decided (operator, 2026-11-24); P3 PASS (2026-11-25); P2 rc 1002 re-diagnosed (no AppKit connection); P2 DONE: variant Y passes all 8 apps (P2b + P2c); child specs L3/F2/U1 rev 1 written 2026-11-25, blind reviews running (L3 Fable + Neon; F2, U1 Argon + Neon)
 **Repo:** `hoverfocus`, branch `v0.0.3` cut from `main` after v0.0.2 merges
 **Approval:** "let's plan to work on hoverfocus v0.0.3" (operator, 2026-11-24); Electron + indicator → v0.0.3 and local
 signing identity approved the same day
@@ -34,7 +34,12 @@ PR review.
 | **U1** | Luna | Visible errors: status line in red (attributed title); one Notification Center message on each transition into an error (config invalid, event tap, Accessibility lost), none while it persists | `Sources/hoverfocus/AppDelegate.swift`, `Sources/hoverfocus/MenuModel.swift`, selftest | P3 (notification permission needs the stable identity) |
 | **U2** | Luna | Focus indicator per D2 | new `Sources/hoverfocus/FocusIndicator.swift`, one hook in `Controller.swift` | L3 (shares `Controller.swift`) |
 
-Order: P2 and P3 together (one m2 session) → L3, F2, U1 in parallel (no shared file, WIP 3) → U2 after L3 lands.
+Order: P2 and P3 together (one m2 session) → L3 and F2 in parallel → U1 after L3 lands (both edit
+`Sources/hoverfocus-selftest/main.swift`; one dispatch per file, found while writing the child specs 2026-11-25) → U2
+after L3 lands. Child specs: [`L3`](hoverfocus-v0.0.3-l3-focus-correctness.md),
+[`F2`](hoverfocus-v0.0.3-f2-signing-identity.md), [`U1`](hoverfocus-v0.0.3-u1-visible-errors.md). U1 adds
+`Sources/HoverFocusCore/AppCoordinator.swift` (Accessibility-loss detection) and L3 adds `RecentCache.swift`; the
+README's Known Limitations and Menu Bar paragraphs are Claude's edits at release, after the live checks.
 Five dispatches plus two probes. A fix that depends on macOS behaviour carries the probe result before dispatch.
 
 ## Probe results
