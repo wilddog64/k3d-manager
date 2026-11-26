@@ -140,8 +140,11 @@ interface:
 
 - 2026-11-25 ~21:10 PST, after `make hub-deploy REF=5d6807880d98916de5810a681c8f2642e3790efb` (operator, m5;
   `deploy/hub` confirmed at `5d680788`): Claude ran read-only `./scripts/k3d-manager e2e_runner_preflight m2` from m4 →
-  `disk_gb=305`, `mem_free=28`, `cpu_idle=62.2`, `status=available` (was 0 GiB → refused before the fix). proves fix
-  (preflight half). **Fix commit:** `7bd1a7c4`. Pending: the next scheduled Hermes e2e slot posts a result.
+  `disk_gb=305`, `mem_free=28`, `cpu_idle=62.2`, `status=available` (was 0 GiB → refused before the fix). This ran
+  from m4's checkout, not the hub: it proves the fixed code reads m2's GNU `df` correctly, not that the hub runs it.
+  The promote stopped after moving `deploy/hub` (tag push lost the connection), so `platform-ops` had not run; the
+  operator re-runs `make hub-deploy` (see `docs/bugs/2026-11-25-hub-promote-tag-push-drops-connection-after-ref-moved.md`).
+  **Fix commit:** `7bd1a7c4`. Pending (hub proof): the next scheduled Hermes e2e slot posts a result.
 
 ## Review log
 
