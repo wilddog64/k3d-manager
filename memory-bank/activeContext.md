@@ -1,5 +1,21 @@
 ## Handoff — 2026-11-25 16:40 PST — v1.45.1 released; v1.46.0 open — START HERE
 
+## Handoff 2026-11-25 (evening) — v1.46.0 plan 1 complete
+
+**Objective:** cloud-runner request approval gate (plan 1) — DONE, LIVE-VERIFIED `a49e3a99`.
+**Evidence:** Deny `c1-3aaa75de` -> rejected rc 3; Approve `c1-e3c802ec` -> job `853b827f` once; cluster-status ok in 21 s
+during the open card; final result published via validated watch (`d68bdab0`). Hub `deploy/hub` = `cf653419`.
+**Also landed today:** v1460-prepush (Neon, LIVE-VERIFIED `52d0719b`), v1460-spawn (Neon, LANDED; E-S4 needs one cloud-session
+cluster-status), v1460-gnudf (Luna, LANDED; live after next promote: read-only `e2e_runner_preflight m2`, next Hermes slot).
+**Bugs:** watch-ledger P2 LIVE-VERIFIED `63748cf0`; sandbox-lifecycle crash P2 LANDED, live only via a sandbox-up/down request
+(operator call, AWS cost; suggested: verify at the next planned sandbox run). New P3 captures for triage: helper concurrent-wait
+race, approval card wording, gnudf test gaps, e2e order 429 (`flows/order-management.spec.ts`).
+**Decisions:** Neon trial — reviewer (spec C, found 2 real gaps Fable missed) and implementer (prepush/spawn, thorough, ~2x Luna
+time); scorecard in memory `project_neon_reviewer_trial.md`; next specs get a Neon blind review next to Argon/Fable.
+Idea added: approver attribution on approved cloud requests.
+**HoverFocus:** P2 done (Y passes 8 apps); next L3/F2/U1 specs (+ Neon/Argon reviews). **dirused:** jump-box probe 2026-11-26.
+**Next session:** promote (gnudf live), E-S4 from a cloud session, HoverFocus L3/F2/U1 specs, P3 triage, remaining v1.46.0 plans.
+
 - **Session 2026-11-25 afternoon (operator home, said go):**
   - dirused M10b4 rev 3 `52bbe180`: split into M10b4a docs (Flash) + M10b4b DocsDriftTests (Luna). Fable blind review READY WITH
     FIXES; Argon READY WITH FIXES (overlapping). All findings verified, rev 4 `2dd4cb70`. Next: operator intent approval, then
