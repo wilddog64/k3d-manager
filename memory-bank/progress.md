@@ -1,7 +1,7 @@
 # Progress — v1.45.0 (older entries: `memory-bank/archive/progress-2026-11-22.md`, then `-2026-11-21.md`, `-2026-11-20.md`; open work lives in `docs/bugs/` Waiting-on lines and the dispatch ledger)
 - 2026-11-25 18:10: session handoff (v1.46.0 plan 1 live-verified); prior activeContext sections archived to memory-bank/archive/activeContext-2026-11-25.md.
 - 2026-11-25 11:25: session handoff written (START HERE: v1.45.1 released, now on k3d-manager-v1.46.0; dirused probe collect 11-26 first); prior top sections archived to `memory-bank/archive/activeContext-2026-11-25.md`.
-- 2026-11-26: hoverfocus U2 E2 live PASS on m2 (incl. step 8 raiseApps re-test 12:29-12:34); config restored. Next: F2b live B-EL1/B-EL2, then v0.0.3 PR.
+- 2026-11-26: hoverfocus U2 E2 live PASS on m2 (incl. step 8 raiseApps re-test 12:29-12:34); config restored; F2b live B-EL1/B-EL2 PASS, P2 LIVE-VERIFIED, Keychain-prompt P3 filed. Next: v0.0.3 PR.
 - 2026-11-25: session handoff written (START HERE in activeContext: gate-recovery-paste dispatched to Flash, v1.45.1 live checks done, V4 probe + HoverFocus P2 on m2 pending); prior top sections archived to `memory-bank/archive/activeContext-2026-11-25.md`.
 - 2026-11-23: session handoff rewritten (START HERE in activeContext; previous sections archived to `memory-bank/archive/activeContext-2026-11-23.md`).
 - 2026-11-24: hoverfocus live on m2 (42273f0): L1-EL grant half pass (trust watcher started controller, no click), F1-EL first install pass; pending L1 config-reload, F1 second install + SSH path.

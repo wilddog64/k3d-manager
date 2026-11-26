@@ -1,12 +1,13 @@
 # Bug: HoverFocus `make bundle` ignores a failed `codesign` and records the local identity anyway
 
-**Status:** LANDED — fix `a4244b6` on HoverFocus v0.0.3 (F2b, Luna), Claude-verified offline; live check pending
+**Status:** LIVE-VERIFIED — fix `a4244b6` on HoverFocus v0.0.3 (F2b, Luna), Claude-verified offline; live B-EL1 + B-EL2 PASS on m2 2026-11-26 (SSH install refuses at [bundle]; two keyboard installs keep the grant)
 **Priority:** P2
 **Introduced by:** HoverFocus v0.0.3 F2 (`7b42f63`, unreleased)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon)
-**Waiting on:** live check — since 2026-11-26
 **Classified:** Argon + Fable blind reviews 2026-11-26: confirmed, P2
+**Live evidence:** 2026-11-26 · run operator-m2-make-install-ssh-and-keyboard · env m2 · scenario ssh-install-refuses-keyboard-install-keeps-grant · commit a4244b6 · proves fix
+**Fix commit:** a4244b6 (wilddog64/hoverfocus, branch v0.0.3)
 **Prior art:** none (exact-slug glob: no `docs/bugs/*hoverfocus*`; `docs/issues/2026-11-23-argon-hoverfocus-pr1-review-findings.md` is unrelated; `make find-similar-docs` retrieval unavailable, cluster context missing)
 **Severity:** medium — defeats F2's purpose: every install from SSH silently produces an ad-hoc build, the Accessibility grant stops matching, HoverFocus stops working, and the reset hint is suppressed
 **Filed:** 2026-11-26, operator: "I consider these are bugs. the installation should handle application smoothly" (U2 E2 setup on m2)
