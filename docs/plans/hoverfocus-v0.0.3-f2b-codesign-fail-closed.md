@@ -1,6 +1,6 @@
 # hoverfocus v0.0.3 F2b — `make bundle` fails closed when signing fails
 
-**Status:** spec rev 1, dispatched to Luna 2026-11-26 — from blind reviews of the bug doc by Argon (dispatch `hf003-p2sign-review-argon`) and Fable
+**Status:** LANDED `a4244b6` on v0.0.3 (Luna `hf003-f2b`, 2026-11-26), Claude-verified offline (cases 1-12 green; red controls run by Claude: old Makefile fails 11a, old script fails 12); live B-EL1/B-EL2 pending on m2. Spec rev 1 — from blind reviews of the bug doc by Argon (dispatch `hf003-p2sign-review-argon`) and Fable
 (2026-11-26): both confirmed the diagnosis, agreed P2 and option 1 (fail closed), no silent ad-hoc fallback.
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md); fixes

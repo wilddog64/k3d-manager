@@ -1,12 +1,12 @@
 # Bug: HoverFocus `make bundle` ignores a failed `codesign` and records the local identity anyway
 
-**Status:** OPEN — captured, not triaged
+**Status:** LANDED — fix `a4244b6` on HoverFocus v0.0.3 (F2b, Luna), Claude-verified offline; live check pending
 **Priority:** P2
 **Introduced by:** HoverFocus v0.0.3 F2 (`7b42f63`, unreleased)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Argon)
-**Waiting on:** operator decision — since 2026-11-26
-**Classified:** pending (Argon, from this doc alone)
+**Waiting on:** live check — since 2026-11-26
+**Classified:** Argon + Fable blind reviews 2026-11-26: confirmed, P2
 **Prior art:** none (exact-slug glob: no `docs/bugs/*hoverfocus*`; `docs/issues/2026-11-23-argon-hoverfocus-pr1-review-findings.md` is unrelated; `make find-similar-docs` retrieval unavailable, cluster context missing)
 **Severity:** medium — defeats F2's purpose: every install from SSH silently produces an ad-hoc build, the Accessibility grant stops matching, HoverFocus stops working, and the reset hint is suppressed
 **Filed:** 2026-11-26, operator: "I consider these are bugs. the installation should handle application smoothly" (U2 E2 setup on m2)
