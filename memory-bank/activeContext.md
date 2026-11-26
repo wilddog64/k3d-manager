@@ -35,7 +35,8 @@
 **Open PRs:** #158 Dependabot wrangler-action v3→v4, deferred by operator (needs a v4 changes look).
 
 **CodeQL:** python analysis on `main` `19d396ed` shows GitHub-side "failed to process" (Unknown Error; run green, upload ok); default-setup jobs cannot be re-run; operator 2026-11-25: wait for the v1.46.0 merge to rescan, then confirm the Security tab is clean.
-**Dispatches now:** `hf003-l3` LANDED `3951b67` (verified; live L3-EL pending), `hf003-f2` running (Flash), `hf003-u1` running (Luna, from `3951b67`).
+**Hub:** `deploy/hub` = `5d680788`, fully deployed after a re-run (first run lost the SSH connection on the tag push; P2 captured `docs/bugs/2026-11-25-hub-promote-tag-push-drops-connection-after-ref-moved.md`; promote tag missing). gnudf hub proof = next Hermes e2e slot.
+**Dispatches now:** `hf003-l3` LANDED `3951b67`, `hf003-u1` LANDED `4e66919` (both Claude-verified with red controls; live L3-EL/U1-EL pending on m2), `hf003-f2` LANDED (verified, 6 red controls). All three on hoverfocus `v0.0.3`; next: operator m2 live session (L3-EL, F2-EL, U1-EL), then U2 spec.
 
 **Owed / decisions:** sandbox-lifecycle live check timing (operator). Ideas for grooming: approver attribution on approved
 cloud requests (new), drill failure-path hook, OOB client onboarding checklist, iPad password-show, rotation advance notice.

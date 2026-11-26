@@ -37,6 +37,10 @@ Re-run `make hub-deploy REF=<same sha>`: promote prints "deploy/hub is already a
 (`bin/k3dm-hub-promote:409-411`), then the remaining steps run. The missing tag stays missing (rollback history gap)
 unless created by hand with the same message format.
 
+Applied 2026-11-25 ~21:40 PST (operator, m5): the re-run printed `hub-deploy: deploy/hub 5d68078..5d68078; reapply
+skipped; appsets-check ok; platform-ops ok; exporter rolled out; launchd skipped 0` and `[platform-ops] applied
+deploy/hub 5d6807880d98916de5810a681c8f2642e3790efb`. The promote tag is still missing.
+
 ## Fix direction (for triage)
 
 Skip the fast gate in pre-push for `refs/heads/deploy/hub` and `refs/tags/hub-promote/*` (the commit was already gated
