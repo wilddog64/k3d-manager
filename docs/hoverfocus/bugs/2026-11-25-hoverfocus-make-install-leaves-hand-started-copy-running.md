@@ -1,11 +1,12 @@
 # Bug: `make install` leaves a hand-started HoverFocus running the old build
 
 **Status:** OPEN — capture
-**Priority:** P3 (proposed, Claude) — test-time confusion: the new build is on disk but not running; workaround is quit and `launchctl kickstart -k`
+**Priority:** P2 (Argon; Claude proposed P3 — triage decides) — test-time confusion: the new build is on disk but not running; workaround is quit and `launchctl kickstart -k`
 **Introduced by:** pre-existing (`make install` manages only the LaunchAgent since v0.0.1)
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-25
+**Classified:** P2 — Argon (`gemini-4-argon-medium`, blind), 2026-11-25: `make install` silently leaves the old binary running until quit and kickstarted.
 **Prior art:** exact-slug glob over `docs/hoverfocus/bugs/` (no match); `make find-similar-docs` not run
 **Filed:** 2026-11-25
 **Detected by:** Claude, L4 live check on m2-air, 2026-11-25
