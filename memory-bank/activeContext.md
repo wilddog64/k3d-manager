@@ -34,6 +34,9 @@
 **Dispatches:** 2 open of WIP 3: `hf003-l3` (Luna) and `hf003-f2` (Flash), hoverfocus `v0.0.3`, started 2026-11-25 ~20:55 PST; U1 after L3 lands.
 **Open PRs:** #158 Dependabot wrangler-action v3→v4, deferred by operator (needs a v4 changes look).
 
+**CodeQL:** python analysis on `main` `19d396ed` shows GitHub-side "failed to process" (Unknown Error; run green, upload ok); default-setup jobs cannot be re-run; operator 2026-11-25: wait for the v1.46.0 merge to rescan, then confirm the Security tab is clean.
+**Dispatches now:** `hf003-l3` LANDED `3951b67` (verified; live L3-EL pending), `hf003-f2` running (Flash), `hf003-u1` running (Luna, from `3951b67`).
+
 **Owed / decisions:** sandbox-lifecycle live check timing (operator). Ideas for grooming: approver attribution on approved
 cloud requests (new), drill failure-path hook, OOB client onboarding checklist, iPad password-show, rotation advance notice.
 product-catalog HIGH/CRIT remediation may not converge (look during v1.46.0). Copilot capped until 2026-12-01: release PRs
