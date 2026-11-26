@@ -61,7 +61,7 @@
 - **2026-11-24 E6 run on m2 HUNG** 1h47m on `istioctl version --short` (drill KUBECONFIG names missing cluster; --remote=false returns instantly; reproduced). P1 filed docs/bugs/2026-11-24-istioctl-version-probe-hangs-on-unreachable-kubeconfig.md (operator: file, Fable review, dispatch Luna). lib-foundation release/v0.5.10 created from main 083c249. Fable review running. CI green on 5086e886 (run 45533552756) → promote REF given to operator for web-console retry. b3c mutant push blocked by classifier (public repo, weakened security code); options 1/2/3 put to operator, rec 3.
 
 ## v1.45.0 status (compressed 2026-11-22)
-- [ ] v1.46.0 plan 7 Tailscale break-glass — rev 3 `4387194c`; 7a LANDED `77d4e814`, 7b LANDED `8e7afe56`, both verified 2026-11-25; live test 2026-11-26 morning
+- [ ] v1.46.0 plan 7 Tailscale break-glass — rev 3 `4387194c`; 7a LANDED `77d4e814`, 7b LANDED `8e7afe56`, both verified 2026-11-25; P1+P2 PASS 2026-11-26; L-E1 waits on lib-foundation v0.5.11 `_install_tailscale_app`; live test 2026-11-26 morning
 
 - **LIVE-VERIFIED:** remote-promote Part 1 (E9); 2e CVE-pin branch writer (E9); web-console part A (E11-E14);
   priv_open fix (E4); plan-quotas-beside-fable (E2); codex-row float-up (E2); dispatch-stall A and D; m5 PATH bug;
