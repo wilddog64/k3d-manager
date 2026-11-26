@@ -68,9 +68,11 @@ Paste `docs/howto/tailscale/policy.hujson` with the real login substituted for `
 - Sign in from a terminal on the Mac, which tags the device, turns Tailscale DNS off and sets its name in one step
   (use the Mac's own short name):
   ```bash
-  /Applications/Tailscale.app/Contents/MacOS/Tailscale up --advertise-tags=tag:k3dm-mac --accept-dns=false --hostname=<mac>
+  /Applications/Tailscale.app/Contents/MacOS/Tailscale up --advertise-tags=tag:k3dm-mac --accept-dns=false --accept-routes=false --hostname=<mac>
   ```
-  Open the printed login link, sign in, then approve the device in the admin console. On `m2` (2026-11-26) the app's
+  Open the printed login link, sign in, then approve the device in the admin console. `--accept-routes=false` keeps a
+  future subnet route from capturing the hub's Docker or k3d networks (`m5` came up with it on, 2026-11-26). Then
+  disable key expiry for the Mac in the admin console (`m5` had it enabled after approval). On `m2` (2026-11-26) the app's
   own "Sign in to your network" button did nothing, which is why this is the documented path.
 - After a terminal sign-in, the menu-bar app can keep showing "Not Connected / Please log in" and hang on Quit, while
   the tunnel is up. Force Quit it (Option-Command-Escape, "Tailscale") and open it again; the tunnel is unaffected.
