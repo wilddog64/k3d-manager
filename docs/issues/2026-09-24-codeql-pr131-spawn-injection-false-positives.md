@@ -170,3 +170,19 @@ through the code-scanning API, and the comments exist for the next reader.
 Precedent followed: v1.34.0's alerts 19/20 were documented rather than dismissed because they
 did not block a merge. These four block the PR's required check, so they are dismissed **and**
 documented.
+
+## Recurrence — 2026-11-27, PR #166 (v1.46.0): alerts 40 and 41
+
+| Alert | Rule | Severity | Location |
+|---|---|---|---|
+| 40 | `py/command-line-injection` | critical | `scripts/lib/webhook/proc.py:45` |
+| 41 | `py/path-injection` | high | `scripts/lib/webhook/proc.py:45` |
+
+Same sink as alerts 26 and 23 (dismissed at line 44). Commit `5625527b` (posix_spawn `setsid` fallback, 2026-11-25)
+wrapped the existing `os.posix_spawn(exe, cmd, _env, file_actions=...)` call in a nested `_spawn(**kwargs)` so it can
+retry with `setpgroup=0`; `exe`, `cmd` and `_env` are built exactly as before, so the analysis above holds unchanged.
+CodeQL keys a dismissal to location, so the moved line re-fired. **Disposition:** dismissed as `false positive` with
+this section as the rationale (operator, 2026-11-27: "let's take 1 as you recommended").
+
+Process note: the alerts were red on every PR #166 head from the PR's opening; Claude read only test jobs when
+reporting the head ready. Check every check-run on the head SHA, CodeQL included, before announcing a promote REF.
