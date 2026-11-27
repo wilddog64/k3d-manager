@@ -80,3 +80,12 @@ continuously.
 - Run the tick only after pointer events (or slow it to ~4 Hz when the pointer has not moved).
 - Acceptance should include an idle CPU/wakeup budget measured with `top -stats cpu,idlew` (before/after), with
   `focusIndicator` on and off as the control.
+
+## Live evidence (after C1 `6bd845c`, m4, operator installed 2026-11-26 20:09 PST, pid 15541)
+
+- `top -l 7 -s 10 -c d` (04:17Z, operator active, not hands-off): 2.9, 3.7, 5.7, 1.9, 1.1, 3.7% CPU (before: 51–58%).
+- `sample 15541 5`: **no** `_updateReplicants` or appearance-observer frames; the remaining main-thread time is in
+  `handle()` (`Controller.swift:156`, `lookup` on pointer events) — active-use cost, not idle.
+- macOS battery menu (operator screenshot, ~20:20 PST): "No Apps Using Significant Energy" (before: HoverFocus listed).
+- Owed: a hands-off 60 s measurement against the C-M3 budget, and the operator behaviour checks (C-E3).
+- Side note: the m4 build is ad-hoc signed (no "HoverFocus Local Signing" identity on m4; Makefile falls back by design).
