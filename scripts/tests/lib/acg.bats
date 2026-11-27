@@ -5,6 +5,8 @@ bats_require_minimum_version 1.5.0
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
   mkdir -p "${HOME}"
+  [[ "${HOME}" == "${BATS_TEST_TMPDIR}"/* ]]
+  [[ "$(printf '%s' "${K3DM_SSH_SANDBOX_FRAGMENT:-${HOME}/.ssh/k3dm-sandbox.conf}")" == "${HOME}"/* ]]
   # shellcheck source=/dev/null
   source "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
 }
@@ -116,59 +118,84 @@ EOF
   [ "${#_ACG_AGENT_IPS[@]}" -eq 2 ]
 }
 
-@test "_acg_update_ssh_config creates missing SSH config and server target idempotently" {
+@test "_acg_update_ssh_config writes only the isolated fragment idempotently" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
   _acg_update_ssh_config "44.247.81.210"
-  [ -f "${HOME}/.ssh/config" ]
-  run cat "${HOME}/.ssh/config"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Host ubuntu"* ]]
-  [[ "$output" == *"HostName 44.247.81.210"* ]]
-
+  [ ! -e "${HOME}/.ssh/config" ]
+  [ "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))[2:])' "$(_ssh_fragment_path)")" = 600 ]
   _acg_update_ssh_config "44.247.81.210"
-  run grep -c '^Host ubuntu$' "${HOME}/.ssh/config"
-  [ "$output" -eq 1 ]
+  [ "$(grep -c '^Host ubuntu$' "$(_ssh_fragment_path)")" -eq 1 ]
 }
 
-@test "_acg_update_ssh_config adds server stanza without changing agent aliases" {
+@test "_acg_update_ssh_config preserves agent aliases and updates only fragment tunnel" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
   mkdir -p "${HOME}/.ssh"
-  cat > "${HOME}/.ssh/config" <<'EOF'
-Host ubuntu-1
-  HostName 10.0.0.1
-Host ubuntu-2
-  HostName 10.0.0.2
+  cat >"${HOME}/.ssh/config" <<'EOF'
+Host ubuntu-tunnel
+  HostName 192.0.2.99
 EOF
-
-  _acg_update_ssh_config "44.247.81.210"
-  run cat "${HOME}/.ssh/config"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Host ubuntu-1
-  HostName 10.0.0.1"* ]]
-  [[ "$output" == *"Host ubuntu-2
-  HostName 10.0.0.2"* ]]
-  [[ "$output" == *"Host ubuntu
-  HostName 44.247.81.210"* ]]
-}
-
-@test "_acg_update_ssh_config updates existing server and tunnel stanzas" {
-  mkdir -p "${HOME}/.ssh"
-  cat > "${HOME}/.ssh/config" <<'EOF'
-Host ubuntu
-  HostName 192.0.2.10
+  local main_hash main_mode
+  main_hash=$(shasum -a 256 "${HOME}/.ssh/config")
+  main_mode=$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))[2:])' "${HOME}/.ssh/config")
+  cat >"$(_ssh_fragment_path)" <<'EOF'
 Host ubuntu-tunnel
   HostName 192.0.2.10
 Host ubuntu-1
   HostName 10.0.0.1
 EOF
-
   _acg_update_ssh_config "44.247.81.210"
-  run cat "${HOME}/.ssh/config"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Host ubuntu
-  HostName 44.247.81.210"* ]]
-  [[ "$output" == *"Host ubuntu-tunnel
-  HostName 44.247.81.210"* ]]
-  [[ "$output" == *"Host ubuntu-1
-  HostName 10.0.0.1"* ]]
+  grep -A1 '^Host ubuntu-tunnel$' "$(_ssh_fragment_path)" | grep -q '44.247.81.210'
+  grep -A1 '^Host ubuntu-1$' "$(_ssh_fragment_path)" | grep -q '10.0.0.1'
+  grep -q '192.0.2.99' "${HOME}/.ssh/config"
+  [ "$(shasum -a 256 "${HOME}/.ssh/config")" = "$main_hash" ]
+  [ "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))[2:])' "${HOME}/.ssh/config")" = "$main_mode" ]
+}
+
+@test "ACG writer leaves a symlinked main SSH config and its target unchanged" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
+  local target before
+  mkdir -p "${HOME}/.ssh"
+  target="${BATS_TEST_TMPDIR}/external-config"
+  printf 'Host ubuntu\n  HostName 192.0.2.9\n' >"$target"
+  ln -s "$target" "${HOME}/.ssh/config"
+  before=$(shasum -a 256 "$target")
+  _acg_update_ssh_config 44.247.81.210
+  [ -L "${HOME}/.ssh/config" ]
+  [ "$(shasum -a 256 "$target")" = "$before" ]
+}
+
+@test "SSH alias and IP values are never evaluated as code" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
+  local sentinel="${BATS_TEST_TMPDIR}/injected" payload
+  payload="touch ${sentinel}; echo \$(touch ${sentinel}); echo 'single'"
+  run _acg_upsert_ssh_host "$payload" "$payload"
+  [ ! -e "$sentinel" ]
+  if [ "$status" -eq 0 ]; then
+    grep -F "Host $payload" "$(_ssh_fragment_path)"
+    grep -F "HostName $payload" "$(_ssh_fragment_path)"
+  fi
+}
+
+@test "provision preflight stops before CloudFormation when Include is absent" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
+  mkdir -p "${HOME}/.ssh"
+  touch "${_ACG_KEY_PEM}"
+  printf 'Host keep\n' >"${HOME}/.ssh/config"
+  export ACG_CALLS_FILE="${BATS_TEST_TMPDIR}/aws.calls"
+  _acg_check_credentials() { :; }
+  _run_command() {
+    while [[ "$1" == --* ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done
+    if [[ "$1" == python3 ]]; then "$@"; else printf '%s\n' "$*" >>"${ACG_CALLS_FILE}"; fi
+  }
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'before any Host block'* ]]
+  [ ! -e "$ACG_CALLS_FILE" ]
 }
 
 @test "acg rejects malformed or zero agent counts before any aws call" {
@@ -442,10 +469,14 @@ EOF
 }
 
 @test "acg_teardown treats a missing stack as success" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
   local fixture_dir calls
   fixture_dir=$(_acg_teardown_fixture)
   calls="${BATS_TEST_TMPDIR}/teardown-calls"
   : >"${calls}"
+  mkdir -p "${HOME}/.ssh"
+  printf 'Host ubuntu\n  HostName 192.0.2.1\nHost ubuntu-gcp\n  HostName 192.0.2.2\n' >"$(_ssh_fragment_path)"
 
   run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=missing \
     bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
@@ -454,14 +485,20 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"nothing to tear down"* ]]
   [[ "${output}" != *"ValidationError"* ]]
+  run ! grep -q '^Host ubuntu$' "$(_ssh_fragment_path)"
+  grep -q '^Host ubuntu-gcp$' "$(_ssh_fragment_path)"
   run ! grep -F 'cloudformation delete-stack' "${calls}"
 }
 
 @test "acg_teardown returns 2 on a throttled lookup without deleting" {
+  [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]]
+  [[ "$(_ssh_fragment_path)" == "$HOME"/* ]]
   local fixture_dir calls
   fixture_dir=$(_acg_teardown_fixture)
   calls="${BATS_TEST_TMPDIR}/teardown-calls"
   : >"${calls}"
+  mkdir -p "${HOME}/.ssh"
+  printf 'Host ubuntu\n  HostName 192.0.2.1\n' >"$(_ssh_fragment_path)"
 
   run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=throttled \
     bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
@@ -469,6 +506,7 @@ EOF
 
   [ "${status}" -eq 2 ]
   [[ "${output}" != *"Throttling"* ]]
+  [ -f "$(_ssh_fragment_path)" ]
   run ! grep -F 'cloudformation delete-stack' "${calls}"
   run ! grep -F 'kubectl config delete-context' "${calls}"
 }
@@ -522,6 +560,7 @@ EOF
 _acg_key_fixture() {
   [ "${HOME}" = "${BATS_TEST_TMPDIR}/home" ]
   mkdir -p "${HOME}/.ssh" "${BATS_TEST_TMPDIR}/key-bin"
+  printf 'Include %s\n' "${HOME}/.ssh/k3dm-sandbox.conf" >"${HOME}/.ssh/config"
   export ACG_CALLS_FILE="${BATS_TEST_TMPDIR}/key-calls" ACG_KEY_SCENARIO="${1}"
   cat >"${BATS_TEST_TMPDIR}/key-bin/aws" <<'STUB'
 #!/usr/bin/env bash
@@ -684,4 +723,16 @@ STUB
   printf 'ssh-rsa invalid\n' > "$public"
   run _acg_imported_key_fingerprint "$public"
   [ "$status" -ne 0 ]
+}
+
+@test "failed fragment write propagates and cleans the block temp file" {
+  local target
+  mkdir -p "${HOME}/.ssh"
+  target="${BATS_TEST_TMPDIR}/fragment-target"
+  printf 'keep\n' >"$target"
+  ln -s "$target" "$(_ssh_fragment_path)"
+  run bash -c 'source "${1}"; _info() { printf "%s\n" "$*"; }; _run_command() { while [[ "$1" == --* ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }; _acg_update_ssh_config 192.0.2.1' _ "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *'Updated SSH fragment'* ]]
+  [ -z "$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'k3dm-block.*' -print -quit)" ]
 }

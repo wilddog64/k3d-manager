@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v0.5.12] — 2026-11-27
+
+### Changed
+- ACG sandbox SSH hosts now live in `~/.ssh/k3dm-sandbox.conf`; provisioning requires its Include before any Host block, and teardown removes the sandbox aliases.
+
 ## [v0.5.11] — 2026-11-26
 
 ### Added

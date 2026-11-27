@@ -8,6 +8,8 @@ _LIB_ACG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=/dev/null
 source "${_LIB_ACG_ROOT}/cdp.sh"
+# shellcheck source=/dev/null
+source "${_LIB_ACG_ROOT}/../ssh_fragment.sh"
 
 : "${ACG_REGION:=us-west-2}"
 : "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
@@ -15,7 +17,6 @@ _ACG_INSTANCE_NAME="k3d-manager-ubuntu"
 _ACG_INSTANCE_TYPE="t3.medium"
 _ACG_KEY_NAME="k3d-manager-key"
 _ACG_KEY_PEM="${HOME}/.ssh/k3d-manager-key.pem"
-_ACG_SSH_CONFIG="${HOME}/.ssh/config"
 _ACG_AMI_OWNER="099720109477"
 _ACG_AMI_FILTER="ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
 _ACG_VPC_CIDR="10.0.0.0/16"
@@ -68,52 +69,29 @@ _acg_get_instance_attr() {
 }
 
 # Update the provisioned server and tunnel HostName entries, creating the server alias when absent.
-_acg_update_ssh_config() {
+function _acg_update_ssh_config() {
   local new_ip="$1"
-  mkdir -p "$(dirname "${_ACG_SSH_CONFIG}")"
-  touch "${_ACG_SSH_CONFIG}"
-  _info "[acg] Updating SSH config with IP ${new_ip}"
-  local python_cmd
-  python_cmd=$(cat <<PY
-import re
-path = r"${_ACG_SSH_CONFIG}"
-with open(path, 'r') as f:
-    content = f.read()
-for host in ('ubuntu', 'ubuntu-tunnel'):
-    pattern = rf"(^Host {host}\$.*?^\\s+HostName\\s+)\\S+"
-    content = re.sub(pattern, rf"\\g<1>${new_ip}", content, flags=re.MULTILINE | re.DOTALL)
-with open(path, 'w') as f:
-    f.write(content)
-PY
-)
-  _run_command -- python3 -c "$python_cmd"
-  _acg_upsert_ssh_host ubuntu "${new_ip}"
+  _info "[acg] Updating sandbox SSH fragment with IP ${new_ip}"
+  _ssh_fragment_set_hostname ubuntu-tunnel "$new_ip" || return $?
+  _acg_upsert_ssh_host ubuntu "$new_ip" || return $?
+  _ssh_fragment_check_resolves ubuntu "$new_ip"
 }
 
-_acg_upsert_ssh_host() {
-  local alias="$1" ip="$2"
-  [[ -f "${_ACG_SSH_CONFIG}" ]] || return 0
-  _info "[acg] Updating SSH config: Host ${alias} → ${ip}"
-  local python_cmd
-  python_cmd=$(cat <<PY
-import re
-alias = "${alias}"
-ip    = "${ip}"
-path  = "${_ACG_SSH_CONFIG}"
-with open(path, 'r') as f:
-    content = f.read()
-pattern = r"(^Host " + re.escape(alias) + r"\$.*?^\s+HostName\s+)\S+"
-m = re.search(pattern, content, re.MULTILINE | re.DOTALL)
-if m:
-    content = re.sub(pattern, r"\g<1>" + ip, content, flags=re.MULTILINE | re.DOTALL)
-else:
-    block = "\nHost ${alias}\n  HostName ${ip}\n  User ubuntu\n  IdentityFile ~/.ssh/k3d-manager-key.pem\n  StrictHostKeyChecking no\n"
-    content = content.rstrip("\n") + block
-with open(path, 'w') as f:
-    f.write(content)
-PY
-)
-  _run_command -- python3 -c "$python_cmd"
+function _acg_upsert_ssh_host() {
+  local alias="$1" ip="$2" block rc
+  block=$(mktemp "${TMPDIR:-/tmp}/k3dm-block.XXXXXX") || return 1
+  printf 'Host %s\n  HostName %s\n  User ubuntu\n  IdentityFile ~/.ssh/k3d-manager-key.pem\n  StrictHostKeyChecking no\n' \
+    "$alias" "$ip" > "$block" || { rm -f "$block"; return 1; }
+  if _ssh_fragment_upsert "$alias" "$block"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  rm -f "$block"
+  if (( rc == 0 )); then
+    _info "[acg] Updated SSH fragment: Host ${alias} → ${ip}"
+  fi
+  return "$rc"
 }
 
 _acg_validate_agent_count() {
@@ -317,11 +295,11 @@ _acg_cf_deploy() {
     --query "Stacks[0].Outputs[?OutputKey==\`ServerPublicIP\`].OutputValue" --output text)
   _acg_discover_agent_ips
 
-  _acg_update_ssh_config "${server_ip}"
+  _acg_update_ssh_config "${server_ip}" || return $?
   local _agent_index=0
   for _agent_ip in "${_ACG_AGENT_IPS[@]}"; do
     _agent_index=$((_agent_index + 1))
-    _acg_upsert_ssh_host "ubuntu-${_agent_index}" "${_agent_ip}"
+    _acg_upsert_ssh_host "ubuntu-${_agent_index}" "${_agent_ip}" || return $?
   done
 
   _info "[acg] Server:  ${server_ip}"
@@ -519,8 +497,9 @@ Usage: acg_provision --confirm [--recreate]
 Provision a k3s cluster on ACG AWS sandbox via CloudFormation.
 Creates a VPC + subnet + IGW + SG + key pair + 1 server EC2 + N agent EC2
 instances (t3.medium), where N is ACG_AGENT_COUNT (default 2). Updates
-~/.ssh/config with Host entries for ubuntu (server) and ubuntu-<i> for each
-agent (ubuntu-1 .. ubuntu-N).
+~/.ssh/k3dm-sandbox.conf with Host entries for ubuntu (server) and ubuntu-<i>
+for each agent. Add Include ~/.ssh/k3dm-sandbox.conf before any Host block in
+~/.ssh/config once.
 
 Flags:
   --confirm    Required — prevents accidental provisioning
@@ -535,7 +514,7 @@ Config (env overrides):
 Requirements:
   - aws CLI configured (~/.aws/credentials with ACG sandbox creds)
   - ~/.ssh/k3d-manager-key.pem  (private key for EC2 access)
-  - SSH config entries: Host ubuntu, Host ubuntu-tunnel
+  - Include ~/.ssh/k3dm-sandbox.conf before any Host block in ~/.ssh/config
 HELP
     return 0
   fi
@@ -568,6 +547,7 @@ HELP
       --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}" 2>/dev/null || true
   fi
 
+  _ssh_fragment_include_preflight || return 1
   _acg_cf_deploy
 }
 
@@ -593,7 +573,7 @@ HELP
   local state public_ip
   state=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].State.Name')
   public_ip=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].PublicIpAddress')
-  _acg_update_ssh_config "$public_ip"
+  _acg_update_ssh_config "$public_ip" || return $?
   _info "[acg] Instance ${instance_id} is ${state} at ${public_ip}"
   _acg_check_k3s
 }
@@ -896,13 +876,19 @@ function acg_chrome_cdp_uninstall() {
   fi
 }
 
+function _acg_remove_ssh_hosts() {
+  _ssh_fragment_remove acg ubuntu ubuntu-tunnel
+}
+
 function acg_teardown() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
 Usage: acg_teardown [--confirm]
 
-Delete the ACG CloudFormation stack (VPC + SG + all EC2 instances) and
-remove the ubuntu-k3s context from ~/.kube/config. The imported key pair
+Delete the ACG CloudFormation stack (VPC + SG + all EC2 instances), remove
+the ubuntu-k3s context, and remove ubuntu/ubuntu-tunnel/ubuntu-<n> from
+~/.ssh/k3dm-sandbox.conf. Add Include ~/.ssh/k3dm-sandbox.conf before any
+Host block in ~/.ssh/config once. The imported key pair
 persists and is reused by subsequent acg_provision calls.
 
 Requires --confirm to prevent accidental teardown.
@@ -960,5 +946,6 @@ HELP
     _info "[acg] Context ubuntu-k3s removed"
   fi
 
+  _acg_remove_ssh_hosts || _warn "[acg] could not clean SSH aliases from $(_ssh_fragment_path)"
   _info "[acg] Teardown complete"
 }
