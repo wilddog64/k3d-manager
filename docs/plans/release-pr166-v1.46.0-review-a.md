@@ -25,7 +25,7 @@ touch the real `$HOME`, the real hub, network, sudo or launchctl.
 
 ## Before You Start
 
-1. `git log --oneline -1` and confirm HEAD is 8bca3613.
+1. Confirm `git merge-base --is-ancestor 8bca3613 HEAD` succeeds (later commits are docs only); review the 8bca3613 diff.
 2. Read the diff file by file, then the tests that cover each file.
 
 ## Files
