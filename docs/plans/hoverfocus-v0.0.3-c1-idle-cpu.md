@@ -1,6 +1,6 @@
 # hoverfocus v0.0.3 C1 — stop the idle CPU drain (menu-bar icon redraw loop; adaptive tick)
 
-**Status:** SPEC rev 1 — from blind reviews of the bug doc by Fable and Neon (dispatch `hf003-cpu-review-neon`), both
+**Status:** LANDED `6bd845c` on v0.0.3 (Luna `hf003-c1`, 2 rounds; Claude-verified offline: selftest 148, three mutants red; landed with `--allow-out-of-scope` for `TickPolicy.swift`, operator "go ahead"); live C-E2/C-E3 owed after install on m4. Spec rev 1 — from blind reviews of the bug doc by Fable and Neon (dispatch `hf003-cpu-review-neon`), both
 NEEDS FIXES, folded in below, plus Claude's control and profiles (2026-11-27). Intents approved; dispatched to Luna (`hf003-c1`).
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md); fixes

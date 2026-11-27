@@ -1,11 +1,11 @@
 # Bug: HoverFocus uses ~55% CPU while idle — the menu-bar icon's appearance observer and its redraw feed each other
 
-**Status:** OPEN — captured, not triaged
+**Status:** LANDED — hoverfocus `6bd845c` (C1, Claude-verified offline); live idle-budget check owed on m4
 **Priority:** P1 (proposed after control; reviews Fable + Neon: release blocker — degraded battery/heat; no workaround except quitting HoverFocus — `focusIndicator` off and a relaunch do not help)
 **Introduced by:** hoverfocus `87322d6` (M1b app shell, 2026-11-22: `effectiveAppearance` observer → `updateIcon`), shipped in v0.0.1 and v0.0.2; secondary cost from the M1a 50 ms tick `4cbd377`
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-27
+**Waiting on:** live check — since 2026-11-27
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run
 **Filed:** 2026-11-27, Claude, from operator report (macOS battery menu lists HoverFocus under "Using Significant Energy")
 **Component:** `hoverfocus` `Sources/HoverFocusPlatform/Controller.swift` `onTick` (:100), `FocusIndicatorPanel.swift`
