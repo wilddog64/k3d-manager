@@ -1,11 +1,11 @@
 # Bug: `make test-all` run by the hub webhook is killed at its 1800 s limit before finishing
 
-**Status:** OPEN — rev 2 (2026-11-27): rewritten from Fable's REWRITE review and a timed run on m5; intents approved
+**Status:** LANDED — `85a1285b` (Flash `v1460-testall-flash`; Claude-verified: 201 pytest + 55 BATS hub PATH, pre-fix red, T-N2/T-N4 mutants red; scope exception approved by operator 2026-11-27); T-E2 live owed
 **Priority:** P2
 **Introduced by:** unknown (test-bin suite growth against fixed limits; last hub success 2026-11-14)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-27 (after the pending hub promote)
+**Waiting on:** live check — since 2026-11-27 (after a hub promote that includes the fix; idle window; pytest bug limits test-python)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (fell back to glob)
 **Severity:** medium — every cloud `make-test-all` and `make-test-bin` request fails (exit 124); the k3dm Tests
 dashboard is stale; v1.46.0 p3b's `--with-test-all` leg cannot pass.
