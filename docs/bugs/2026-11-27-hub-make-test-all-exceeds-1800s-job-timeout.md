@@ -1,16 +1,18 @@
 # Bug: `make test-all` run by the hub webhook is killed at its 1800 s limit before finishing
 
-**Status:** OPEN — rev 2 (2026-11-27): rewritten from Fable's REWRITE review and a timed run on m5; intents pending
+**Status:** OPEN — rev 2 (2026-11-27): rewritten from Fable's REWRITE review and a timed run on m5; intents approved
 **Priority:** P2
 **Introduced by:** unknown (test-bin suite growth against fixed limits; last hub success 2026-11-14)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-27 (rev 2 intents), then dispatch to Flash
+**Waiting on:** dispatch — since 2026-11-27 (after the pending hub promote)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (fell back to glob)
 **Severity:** medium — every cloud `make-test-all` and `make-test-bin` request fails (exit 124); the k3dm Tests
 dashboard is stale; v1.46.0 p3b's `--with-test-all` leg cannot pass.
 **Filed:** 2026-11-27, Claude, from the v1.46.0 p2b live check (operator: "go ahead to file those two P2 bugs")
 **Approval:** operator, 2026-11-27 ("go ahead to file those two P2 bugs and have Fable and Neon to review them. after that dispatch to Flash and Luna"); rev 2 scope: operator, 2026-11-27 ("can you check the test-all review spec then timed run on m5? after maybe you want to send me intents for approval then dispatch to Flash?")
+**Intent approved:** operator, 2026-11-27
+**Intent approval words:** "intents approved" (T-E1, T-E2 as written in rev 2)
 **Component:** `scripts/lib/webhook/make_targets.py:33,37`; `Makefile` `test-all` recipe; `bin/k3dm-test-metrics`
 
 ## Evidence
