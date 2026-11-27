@@ -1,7 +1,7 @@
 # Bug: HoverFocus uses ~55% CPU while idle — the menu-bar icon's appearance observer and its redraw feed each other
 
 **Status:** OPEN — captured, not triaged
-**Priority:** P2 (proposed: degraded battery/heat; no reliable workaround — `focusIndicator` off does not help; quitting HoverFocus does)
+**Priority:** P2 (proposed: degraded battery/heat; no workaround except quitting HoverFocus — `focusIndicator` off and a relaunch do not help)
 **Introduced by:** hoverfocus `87322d6` (M1b app shell, 2026-11-22: `effectiveAppearance` observer → `updateIcon`), shipped in v0.0.1 and v0.0.2; secondary cost from the M1a 50 ms tick `4cbd377`
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
@@ -33,6 +33,10 @@ Loop: setting `button.image` makes AppKit rebuild the status item's replicants; 
 whether anything changed. The earlier border-on sample at 3.9% CPU (03:14Z) had only the 2 s trust-timer path
 (`AppDelegate.swift:42` → `updateUI` `:187` → `updateIcon`, 47 samples) and no KVO frames, so the loop is intermittent:
 once started it persists. That explains the 57 / 26 / 3.9 / steady-54% readings.
+
+**Relaunch (operator, 19:44 PST):** new pid 36809, `top -c d` 56.0 / 58.6 / 56.4% within a minute of launch; `sample 3`:
+1777 samples in `_updateReplicants`, 125 in the `AppDelegate.swift:51` observer. The loop starts at launch on m4; the
+3.9% reading was a lull, not a loop-free state.
 
 Fix direction: `updateIcon` computes the `(style, darkBar, dimmed)` key and returns early when it equals the last one it
 applied (never re-assign `button.image` for an unchanged key); the 2 s `updateUI` must not touch the icon unless that
