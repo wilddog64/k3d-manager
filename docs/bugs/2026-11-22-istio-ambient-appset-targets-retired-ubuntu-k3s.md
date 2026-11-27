@@ -7,6 +7,7 @@
 **Introducing change reviewed:** unknown
 **Waiting on:** dispatch — since 2026-11-22
 **Triage:** carry → v1.46.0 (operator 2026-11-22: schedule the fix)
+**Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Branch:** k3d-manager-v1.46.0
 **Prior art:** docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md (exact-slug pass; vector pass unavailable: no `k3d-k3d-cluster` context on M4) — read, different root cause (that was four stale Applications on a dead endpoint; the ApplicationSet then rendered `ubuntu-hostinger`)
 

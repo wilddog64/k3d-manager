@@ -3,6 +3,7 @@
 **Status:** OPEN — captured 2026-11-21, not triaged.
 **Priority:** P2 (Argon P2 accepted, grooming 2026-11-22, operator; was: P3)
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** dd54b653 (2026-06-26, `_acg_upsert_ssh_host`)
 **Should have been caught by:** spec

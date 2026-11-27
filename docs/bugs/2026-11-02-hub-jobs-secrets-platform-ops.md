@@ -4,6 +4,7 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Alerting and ACG expiry Slack notifications are degraded by a stale retained Job object and intermittent `acg-expiry-check` webhook failures, while manual job deletion and webhook rotation/email alerts serve as workar…); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (live check, no code) — grooming 2026-11-12, operator.
+**Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Waiting on:** live check — since 2026-11-12
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)

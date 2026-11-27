@@ -4,6 +4,7 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unattended LaunchAgent snapshot failed once on SSH auth, but SSH from a login shell succeeds and `hub-data-export` continues to work); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (next scheduled run, no code) — grooming 2026-11-12, operator.
+**Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Waiting on:** scheduled run — since 2026-11-12
 **Approval:** pending
 **Branch:** `k3d-manager-v1.46.0`

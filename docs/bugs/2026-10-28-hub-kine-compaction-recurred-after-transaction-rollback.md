@@ -4,10 +4,11 @@
 **Priority:** P2 — retention is stalled with a controlled rebuild workaround; API remains ready
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Kine compaction and retention are degraded while the cluster API and nodes remain ready (no current outage), and a documented recovery workaround exists via rebuilding the hub from backup/snapshot); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (investigation) — grooming 2026-11-12, operator.
+**Re-triage:** 2026-11-27 — move → v1.46.1 patch (unrelated to the v1.46.0 goal; operator 2026-11-27)
 **Waiting on:** investigation — since 2026-11-12
 **Filed:** 2026-10-28
 **Release:** v1.43.9 bug; no new enhancement plan
-**Branch:** `k3d-manager-v1.46.0`
+**Branch:** `k3d-manager-v1.46.1`
 **Approval:** explicit operator 2026-10-28: "then you may file a proper bug for the recurrence kine issue". Filing/investigation only; no restart, rebuild or remediation authorization.
 **Component:** hub K3s/Kine datastore, `k3d-k3d-cluster-server-0` on M4
 **Related:** [earlier compaction incidents](2026-09-09-hub-kine-compaction-stall.md), [sensor/alert fix](2026-10-11-hermes-kine-sensor-misses-dead-compaction.md), [rebuild orchestration fix](2026-10-11-hub-recover-all-never-rebuilds-the-hub.md), [rebuild runbook](../howto/hub-rebuild-from-gitops-vault.md)
