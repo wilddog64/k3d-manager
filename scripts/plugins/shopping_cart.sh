@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/foundation/scripts/lib/ssh_fragment.sh"
+
 : "${_vault_local_port:=}"
 
 # --- Tier 3 P3: seed target / canonical source / backup targets ----------------------
@@ -1223,11 +1226,7 @@ function _k3sup_join_agent() {
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
   local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
   local agent_ip
-  if _command_exist awk; then
-    agent_ip=$(awk -v host="${agent_host}" \
-      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
-      "${HOME}/.ssh/config" 2>/dev/null)
-  fi
+  command -v python3 >/dev/null 2>&1 && agent_ip="$(_ssh_fragment_hostname "${agent_host}")"
   : "${agent_ip:=${agent_host}}"
   _info "[shopping_cart] Joining agent ${agent_host} (${agent_ip}) to server ${server_ip}..."
   _ubuntu_k3s_trust_host "${agent_ip}"
@@ -1246,11 +1245,7 @@ function _k3sup_join_agent() {
 function _k3s_agent_address() {
   local agent_host="$1"
   local agent_ip=""
-  if _command_exist awk; then
-    agent_ip=$(awk -v host="${agent_host}" \
-      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
-      "${HOME}/.ssh/config" 2>/dev/null || true)
-  fi
+  command -v python3 >/dev/null 2>&1 && agent_ip="$(_ssh_fragment_hostname "${agent_host}")"
   printf '%s\n' "${agent_ip:-${agent_host}}"
 }
 
@@ -1462,10 +1457,8 @@ HELP
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
   local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
-  [[ -z "${external_ip}" ]] && _command_exist awk && \
-    external_ip=$(awk -v host="${ssh_host}" \
-      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
-      "${HOME}/.ssh/config" 2>/dev/null)
+  [[ -z "${external_ip}" ]] && command -v python3 >/dev/null 2>&1 && \
+    external_ip="$(_ssh_fragment_hostname "${ssh_host}")"
   : "${external_ip:=${ssh_host}}"
   local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
   local kube_context="ubuntu-k3s"

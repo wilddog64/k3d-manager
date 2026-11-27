@@ -13,7 +13,8 @@ setup() {
   export -f _info _run_command
   export -f _write_sensitive_file
 
-  export HOME="${BATS_TEST_TMPDIR}"
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  mkdir -p "${HOME}/.ssh"
   source "scripts/plugins/acg.sh"
 }
 
@@ -93,20 +94,33 @@ export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG"
 
 @test "_acg_update_ssh_config creates missing SSH config and server target idempotently" {
   _acg_update_ssh_config "44.247.81.210"
-  [ -f "${HOME}/.ssh/config" ]
-  run cat "${HOME}/.ssh/config"
+  [ -f "${HOME}/.ssh/k3dm-sandbox.conf" ]
+  run cat "${HOME}/.ssh/k3dm-sandbox.conf"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Host ubuntu"* ]]
   [[ "$output" == *"HostName 44.247.81.210"* ]]
 
   _acg_update_ssh_config "44.247.81.210"
-  run grep -c '^Host ubuntu$' "${HOME}/.ssh/config"
+  run grep -c '^Host ubuntu$' "${HOME}/.ssh/k3dm-sandbox.conf"
   [ "$output" -eq 1 ]
+}
+
+@test "_acg_update_ssh_config leaves a symlinked main config unchanged" {
+  local target="${BATS_TEST_TMPDIR}/operator-config"
+  printf 'Include ~/.ssh/config.d/operator\n' > "$target"
+  local before
+  before="$(shasum -a 256 "$target")"
+  rm -f "${HOME}/.ssh/config"
+  ln -s "$target" "${HOME}/.ssh/config"
+  _acg_update_ssh_config "44.247.81.210"
+  _acg_update_ssh_config "44.247.81.210"
+  [[ -L "${HOME}/.ssh/config" ]]
+  [[ "$(shasum -a 256 "$target")" == "$before" ]]
 }
 
 @test "_acg_update_ssh_config adds server stanza without changing agent aliases" {
   mkdir -p "${HOME}/.ssh"
-  cat > "${HOME}/.ssh/config" <<'EOF'
+  cat > "${HOME}/.ssh/k3dm-sandbox.conf" <<'EOF'
 Host ubuntu-1
   HostName 10.0.0.1
 Host ubuntu-2
@@ -114,7 +128,7 @@ Host ubuntu-2
 EOF
 
   _acg_update_ssh_config "44.247.81.210"
-  run cat "${HOME}/.ssh/config"
+  run cat "${HOME}/.ssh/k3dm-sandbox.conf"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Host ubuntu-1
   HostName 10.0.0.1"* ]]
@@ -126,7 +140,7 @@ EOF
 
 @test "_acg_update_ssh_config updates existing server and tunnel stanzas" {
   mkdir -p "${HOME}/.ssh"
-  cat > "${HOME}/.ssh/config" <<'EOF'
+  cat > "${HOME}/.ssh/k3dm-sandbox.conf" <<'EOF'
 Host ubuntu
   HostName 192.0.2.10
 Host ubuntu-tunnel
@@ -136,7 +150,7 @@ Host ubuntu-1
 EOF
 
   _acg_update_ssh_config "44.247.81.210"
-  run cat "${HOME}/.ssh/config"
+  run cat "${HOME}/.ssh/k3dm-sandbox.conf"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Host ubuntu
   HostName 44.247.81.210"* ]]

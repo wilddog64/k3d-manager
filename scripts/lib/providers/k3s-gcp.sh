@@ -15,6 +15,8 @@
 source "${SCRIPT_DIR}/plugins/gcp.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/foundation/scripts/lib/ssh_fragment.sh"
 
 _GCP_INSTANCE_NAME="k3d-manager-gcp-node"
 _GCP_FIREWALL_RULE="k3d-manager-k3s-api"
@@ -83,17 +85,9 @@ function _gcp_get_external_ip() {
 
 function _gcp_update_ssh_config() {
   local external_ip="$1" ssh_user="$2" ssh_key="$3"
-  local ssh_config="${HOME}/.ssh/config"
-  # Remove any existing ubuntu-gcp block
-  if grep -q "^Host ${_GCP_SSH_CONFIG_HOST}$" "${ssh_config}" 2>/dev/null; then
-    local tmp
-    tmp=$(mktemp)
-    awk "/^Host ${_GCP_SSH_CONFIG_HOST}$/{found=1} found && /^Host / && !/^Host ${_GCP_SSH_CONFIG_HOST}$/{found=0} !found{print}" \
-      "${ssh_config}" > "${tmp}"
-    mv "${tmp}" "${ssh_config}"
-    chmod 600 "${ssh_config}"
-  fi
-  cat >> "${ssh_config}" <<EOF
+  local tmp
+  tmp=$(mktemp) || return 1
+  cat > "${tmp}" <<EOF
 
 Host ${_GCP_SSH_CONFIG_HOST}
   HostName ${external_ip}
@@ -102,7 +96,14 @@ Host ${_GCP_SSH_CONFIG_HOST}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 EOF
+  _ssh_fragment_upsert "${_GCP_SSH_CONFIG_HOST}" "${tmp}" || { rm -f "${tmp}"; return 1; }
+  rm -f "${tmp}"
+  _ssh_fragment_check_resolves "${_GCP_SSH_CONFIG_HOST}" "${external_ip}"
   _info "[k3s-gcp] SSH config updated: Host ${_GCP_SSH_CONFIG_HOST} → ${external_ip}"
+}
+
+function _gcp_remove_ssh_config() {
+  _ssh_fragment_remove exact "${_GCP_SSH_CONFIG_HOST}" || _warn "[k3s-gcp] Could not remove SSH alias"
 }
 
 function _gcp_wait_for_ssh() {
@@ -193,6 +194,8 @@ HELP
   ssh_user="$(_gcp_ssh_user)"
   local ssh_key_pub="${ssh_key}.pub"
 
+  _ssh_fragment_include_preflight || return 1
+
   if [[ ! -f "${ssh_key}" ]]; then
     printf 'ERROR: %s\n' "[k3s-gcp] SSH key not found: ${ssh_key}" >&2
     return 1
@@ -282,17 +285,7 @@ HELP
     --quiet 2>/dev/null || \
     _info "[k3s-gcp] Firewall rule not found — skipping"
 
-  # Remove SSH config entry
-  local ssh_config="${HOME}/.ssh/config"
-  if grep -q "^Host ${_GCP_SSH_CONFIG_HOST}$" "${ssh_config}" 2>/dev/null; then
-    local tmp
-    tmp=$(mktemp)
-    awk "/^Host ${_GCP_SSH_CONFIG_HOST}$/{found=1} found && /^Host / && !/^Host ${_GCP_SSH_CONFIG_HOST}$/{found=0} !found{print}" \
-      "${ssh_config}" > "${tmp}"
-    mv "${tmp}" "${ssh_config}"
-    chmod 600 "${ssh_config}"
-    _info "[k3s-gcp] Removed SSH config entry for ${_GCP_SSH_CONFIG_HOST}"
-  fi
+  _dry_guard "remove GCP SSH alias" _gcp_remove_ssh_config
 
   # Remove kubeconfig context
   if kubectl config get-contexts "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1; then

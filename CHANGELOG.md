@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- **Cloud sandbox SSH aliases use `~/.ssh/k3dm-sandbox.conf`.** AWS, GCP and Azure no longer edit the operator's main SSH config; GCP/Azure check for its Include before creating a VM.
 - **Repo sync ignores CI-green commits whose content is already in `deploy/hub`.** Squash-merged release branches no longer keep `K3dmPromoteWaiting` active; new or reverted content remains promotable.
 - **Hub deploy restarts changed webhook and cloud-bridge code.** Active queued or running webhook jobs defer the restart with exit 3 and a rerun hint; unchanged code does not interrupt the agents.
 - **Stale sandbox cleanup removes only its dead ArgoCD ApplicationSet, and ambient reapply is opt-in.** The cleanup requires an explicit `--confirm` for ArgoCD deletion, checks sandbox reachability and Application ownership, and never deletes Applications or cluster secrets. Reapply paths skip `istio-ambient` by default; set `ISTIO_AMBIENT_APPSET_ENABLE=1` to opt in.

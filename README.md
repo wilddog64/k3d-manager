@@ -35,13 +35,14 @@ ACME_EMAIL=you@example.com \
 ./scripts/k3d-manager acg_get_credentials              # Playwright auto-extract via Chrome CDP
 pbpaste | ./scripts/k3d-manager acg_import_credentials # fallback: paste from clipboard
 
-acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; updates ~/.ssh/config
+acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; writes ~/.ssh/k3dm-sandbox.conf
 acg_status                        # verify instance state + k3s health
 acg_extend                        # open browser to extend sandbox TTL (+4h)
 acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeconfig context
 ```
 
 > Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
+> Add `Include ~/.ssh/k3dm-sandbox.conf` near the top of `~/.ssh/config` once. GCP/Azure preflight stops before VM creation if it is missing; `K3DM_SSH_SANDBOX_PREFLIGHT=warn` downgrades the check.
 >
 > **First run:** `acg_extend_playwright` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the browser session check.
 
