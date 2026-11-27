@@ -80,11 +80,11 @@ is rejected by the bridge without being executed.
 | `make-e2e-remote` | `RUNNER` | Tier 1 e2e on the named remote runner |
 | `make-e2e` | none | Tier 1 e2e in a disposable vCluster |
 | `make-test` | none | the BATS dispatcher suites (`./scripts/k3d-manager test all`), ~15 min |
-| `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~1 min |
+| `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~50 min |
 | `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`), ~1.5 min; publishes `junit.xml` |
 | `make-test-python-unit` | none | the offline stdlib-unittest suites |
 | `make-test-python` | none | both Python groups above |
-| `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
+| `make-test-all` | none | every offline suite (BATS + Python), about 70 minutes |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
 `make-vuln-scan-report` reads existing Kubernetes/Trivy `VulnerabilityReport` resources without triggering a scan; `make-vuln-scan` remains a deprecated read-only alias. The actual `app-cve-scan` trigger is not exposed as a reader action and remains operator-only.
@@ -109,7 +109,7 @@ After either failure, the agent can request `sandbox-down`.
 be red on the machine the tool ships on, and only the host can tell you. Each test target runs
 behind `scripts/tests/tripwire.sh`, so it cannot reach a real cluster, cloud API or keychain even
 on the operator's machine — see `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`. Only one
-`/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 20 minutes, and a
+`/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 70 minutes, and a
 second make request is answered `409` until it finishes. Automated live verification and dashboard checks against `make-test-all` are documented in the [live profile section of the operator acceptance guide](../guides/operator-acceptance.md#5-live-profile).
 
 **Every `make-*` and `diagnose-*` action is asynchronous.** The response carries `body.job_id`

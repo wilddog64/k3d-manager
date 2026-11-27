@@ -1803,6 +1803,7 @@ test-all:
 	    done; \
 	    local _stage_dir="$$_parallel_out/$$_stage"; \
 	    mkdir -p "$$_stage_dir"; \
+	    local _stage_start=$$(date -u +%s); \
 	    local _order_opt=(); \
 	    if [ -s "$$_order_file" ]; then \
 	      _order_opt=(--order-by "$$_order_file"); \
@@ -1881,7 +1882,8 @@ test-all:
 	      fi; \
 	    done; \
 	    if [ "$$_completed_count" -eq "$$_total_files" ]; then \
-	      echo "[test-all] stage-complete $$_stage"; \
+	      local _stage_dur=$$(( $$(date -u +%s) - _stage_start )); \
+	      echo "[test-all] stage-complete $$_stage seconds=$$_stage_dur"; \
 	    else \
 	      _stage_failed=1; \
 	    fi; \
@@ -2018,6 +2020,7 @@ test-all:
 	  fi; \
 	  rm -rf "$$_parallel_out"; \
 	else \
+	  _stage1_start=$$(date -u +%s); \
 	  _stage1_override=0; \
 	  [ -n "$${STAGE_TEST_FILES+x}" ] && _stage1_override=1; \
 	  if [ "$$_stage1_override" -eq 1 ]; then \
@@ -2043,7 +2046,8 @@ test-all:
 	          _s_rc=0; \
 	          CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}" scripts/tests/tripwire.sh bats "$${_files[@]}" || _s_rc=$$?; \
 	          if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	            echo "[test-all] stage-complete test"; \
+	            _stage1_dur=$$(( $$(date -u +%s) - _stage1_start )); \
+	            echo "[test-all] stage-complete test seconds=$$_stage1_dur"; \
 	          fi; \
 	          if [ "$$_s_rc" -ne 0 ]; then \
 	            _stage_failed=1; \
@@ -2055,12 +2059,14 @@ test-all:
 	    _s_rc=0; \
 	    scripts/tests/tripwire.sh ./scripts/k3d-manager test all || _s_rc=$$?; \
 	    if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	      echo "[test-all] stage-complete test"; \
+	      _stage1_dur=$$(( $$(date -u +%s) - _stage1_start )); \
+	      echo "[test-all] stage-complete test seconds=$$_stage1_dur"; \
 	    fi; \
 	    if [ "$$_s_rc" -ne 0 ]; then \
 	      _stage_failed=1; \
 	    fi; \
 	  fi; \
+	  _stage2_start=$$(date -u +%s); \
 	  _stage2_override=0; \
 	  [ -n "$${STAGE_TEST_BIN_FILES+x}" ] && _stage2_override=1; \
 	  if [ "$$_stage2_override" -eq 1 ]; then \
@@ -2086,7 +2092,8 @@ test-all:
 	          _s_rc=0; \
 	          CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}" scripts/tests/tripwire.sh bats "$${_files[@]}" || _s_rc=$$?; \
 	          if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	            echo "[test-all] stage-complete test-bin"; \
+	            _stage2_dur=$$(( $$(date -u +%s) - _stage2_start )); \
+	            echo "[test-all] stage-complete test-bin seconds=$$_stage2_dur"; \
 	          fi; \
 	          if [ "$$_s_rc" -ne 0 ]; then \
 	            _stage_failed=1; \
@@ -2102,13 +2109,15 @@ test-all:
 	      _s_rc=0; \
 	      scripts/tests/tripwire.sh bats scripts/tests/bin || _s_rc=$$?; \
 	      if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	        echo "[test-all] stage-complete test-bin"; \
+	        _stage2_dur=$$(( $$(date -u +%s) - _stage2_start )); \
+	        echo "[test-all] stage-complete test-bin seconds=$$_stage2_dur"; \
 	      fi; \
 	      if [ "$$_s_rc" -ne 0 ]; then \
 	        _stage_failed=1; \
 	      fi; \
 	    fi; \
 	  fi; \
+	  _stage3_start=$$(date -u +%s); \
 	  _unit_files=(); \
 	  _pytest_files=(); \
 	  _has_py_override=0; \
@@ -2251,7 +2260,8 @@ test-all:
 	      fi; \
 	    fi; \
 	  if [ "$$_stage3_killed" -eq 0 ] && [ "$$_stage3_err" -eq 0 ]; then \
-	    echo "[test-all] stage-complete test-python"; \
+	    _stage3_dur=$$(( $$(date -u +%s) - _stage3_start )); \
+	    echo "[test-all] stage-complete test-python seconds=$$_stage3_dur"; \
 	  fi; \
 	fi; \
 	if [ "$$_stage_failed" -ne 0 ]; then \

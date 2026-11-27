@@ -273,9 +273,9 @@ teardown() {
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -eq 0 ]
-  idx1=$(echo "$output" | grep -nFx "[test-all] stage-complete test" | cut -d: -f1)
-  idx2=$(echo "$output" | grep -nFx "[test-all] stage-complete test-bin" | cut -d: -f1)
-  idx3=$(echo "$output" | grep -nFx "[test-all] stage-complete test-python" | cut -d: -f1)
+  idx1=$(echo "$output" | grep -nE '^\[test-all\] stage-complete test seconds=[0-9]+$' | cut -d: -f1)
+  idx2=$(echo "$output" | grep -nE '^\[test-all\] stage-complete test-bin seconds=[0-9]+$' | cut -d: -f1)
+  idx3=$(echo "$output" | grep -nE '^\[test-all\] stage-complete test-python seconds=[0-9]+$' | cut -d: -f1)
   [ -n "$idx1" ] && [ -n "$idx2" ] && [ -n "$idx3" ]
   [ "$idx1" -lt "$idx2" ] && [ "$idx2" -lt "$idx3" ]
 }
@@ -284,9 +284,9 @@ teardown() {
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED FAKE_TEST_STATUS="fail" make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0
   [ "$status" -ne 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "N5, E5: serial does not print stage-complete for a stage whose child is killed by a signal, but runs later stages" {
@@ -294,10 +294,10 @@ teardown() {
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED FAKE_TEST_STATUS="kill" make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0
   [ "$status" -ne 0 ]
   local out="$output"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "N5: serial does not print stage-complete when stage aborts with exit 2 before runner, but runs later stages" {
@@ -328,11 +328,11 @@ teardown() {
   [ "$status" -ne 0 ]
   local out="$output"
   echo "$out" | grep -q "bats not found"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-bin" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test-bin( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "M7, E5: parallel runs every stage even when an earlier stage fails, and exits non-zero" {
@@ -342,9 +342,9 @@ teardown() {
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "N5: a killed parallel job does not print stage-complete, later stages run and print theirs" {
@@ -355,10 +355,10 @@ teardown() {
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 1: parallel pytest resolves command once via exact chain" {
@@ -384,7 +384,7 @@ EOF
   [ "$status" -eq 0 ]
   [ -s "$WORK/pytest_stub.log" ]
   grep -q "resolved pytest stub ran" "$WORK/pytest_stub.log"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 1: test-all runs metrics step in serial and parallel with expected exit code" {
@@ -448,9 +448,9 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$out"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
 }
 
@@ -463,7 +463,7 @@ EOF
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/bare_test.py"
   [ "$status" -eq 2 ]
   echo "$output" | grep -q "defines bare test functions but has no main hook"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -504,9 +504,9 @@ EOF
   [ "$status" -eq 2 ]
   local out="$output"
   echo "$out" | grep -q "no pytest found"
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$out"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
   echo "$out" | grep -Fx "[test-all] failed:"
 }
@@ -530,7 +530,7 @@ EOF
     STAGE_TEST_BIN_FILES="" \
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-bin" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-bin( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -544,9 +544,9 @@ EOF
   local out="$output"
   run grep -q "SLOWEST" <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 12: partial run does not update times cache" {
@@ -590,7 +590,7 @@ EOF
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -eq 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
 
   # Parallel
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1 \
@@ -598,7 +598,7 @@ EOF
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -eq 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
 }
 
 @test "Mutant killer: FLAKY test retry passes and is reported in end summary" {
@@ -686,9 +686,9 @@ EOF
   [ "$status" -eq 0 ]
   echo "$output" | grep -q "ok 1 pass1"
   echo "$output" | grep -q "ok 1 pass2"
-  echo "$output" | grep -Fx "[test-all] stage-complete test"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 1: test-python serial failing unittest runs pytest, prints stage-complete, exits non-zero" {
@@ -702,21 +702,21 @@ EOF
   run make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/fail_unit.py $FAKE_TESTS/test_marker_pytest.py"
   [ "$status" -ne 0 ]
   [ -f "$PYTEST_MARKER" ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 1: test-python parallel failing unittest prints stage-complete, exits non-zero" {
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/fail_unit.py $FAKE_TESTS/test_pytest_pass.py"
   [ "$status" -ne 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 1: test-python serial killed unittest prints no stage-complete, exits non-zero" {
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/kill_unit.py $FAKE_TESTS/test_pytest_pass.py"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -724,7 +724,7 @@ EOF
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run make -k --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/kill_unit.py $FAKE_TESTS/test_pytest_pass.py"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -732,7 +732,7 @@ EOF
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/kill_unit.py $FAKE_TESTS/test_pytest_pass.py"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -740,14 +740,14 @@ EOF
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py $FAKE_TESTS/test_pytest_fail.py"
   [ "$status" -ne 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 1: test-python parallel failing pytest prints stage-complete, exits non-zero" {
   [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1     STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py $FAKE_TESTS/test_pytest_fail.py"
   [ "$status" -ne 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 2: missing bats in parallel prints no marker for stages 1 and 2" {
@@ -777,11 +777,11 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-bin" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test-bin( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 3: serial killed test stage prints no stage-complete test" {
@@ -797,10 +797,10 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 3: serial killed test-pytest prints no stage-complete test-python" {
@@ -811,9 +811,9 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/test_pytest_kill.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$out"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
 }
 
@@ -887,10 +887,10 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 
   # Parallel
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1 \
@@ -899,10 +899,10 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
   out="$output"
-  run grep -Fx "[test-all] stage-complete test" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Parity: missing test file fails stage with no marker in serial and parallel" {
@@ -910,13 +910,13 @@ EOF
   # Serial
   run make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0     STAGE_TEST_FILES="$FAKE_TESTS/nonexistent.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 
   # Parallel
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1     STAGE_TEST_FILES="$FAKE_TESTS/nonexistent.bats"     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats"     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/pass_py.py"
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -944,7 +944,7 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/unit_one.py $SUB_DIR/test_two.py"
   [ "$status" -eq 0 ]
   echo "$output" | grep -q "\[make\] python3 .*unit_one\.py"
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
   grep "stub-python3:" "$CALLS" | grep -q "unit_one\.py"
   grep "stub-pytest:" "$CALLS" | grep -q "test_two\.py"
 
@@ -955,7 +955,7 @@ EOF
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/unit_one.py $SUB_DIR/test_two.py"
   [ "$status" -eq 0 ]
-  echo "$output" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$output" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
   grep "stub-python3:" "$CALLS" | grep -q "unit_one\.py"
   grep "stub-pytest:" "$CALLS" | grep -q "test_two\.py"
 }
@@ -968,7 +968,7 @@ EOF
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTEST_FILES=""
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 
   # Parallel
@@ -977,7 +977,7 @@ EOF
     STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
     STAGE_TEST_PYTEST_FILES=""
   [ "$status" -ne 0 ]
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$output"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$output"
   [ "$status" -ne 0 ]
 }
 
@@ -1039,7 +1039,7 @@ EOF
   run env -u K3DM_MAKEFILE_TEST_ALL_NESTED FAKE_CHECK_AGENT_DOCS_RC=2 make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=0
   [ "$status" -ne 0 ]
   local out="$output"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$out"
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
 }
 
@@ -1075,7 +1075,7 @@ EOF
   wait "$STREAM_MAKE_PID"
   unset STREAM_MAKE_PID
   grep -q "STREAM_LINE_BETA" "$OUT_LOG"
-  grep -Fxq "[test-all] stage-complete test-python" "$OUT_LOG"
+  grep -Eq '^\[test-all\] stage-complete test-python seconds=[0-9]+$' "$OUT_LOG"
 }
 
 @test "M3: per-job TMPDIRs are cleaned up and do not leak under scratch TMPDIR" {
@@ -1139,9 +1139,9 @@ EOF
   local out="$output"
   run grep -i "command not found" <<< "$out"
   [ "$status" -ne 0 ]
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-python"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-python seconds=[0-9]+$'
 }
 
 @test "Item 2: log name matches k3dm-test-all-<pid>-<epoch>" {
@@ -1170,9 +1170,9 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/test_rc2.py"
   [ "$status" -ne 0 ]
   local out="$output"
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$out"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
 
   # Parallel
@@ -1182,9 +1182,9 @@ EOF
     STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/test_rc2.py"
   [ "$status" -ne 0 ]
   out="$output"
-  echo "$out" | grep -Fx "[test-all] stage-complete test"
-  echo "$out" | grep -Fx "[test-all] stage-complete test-bin"
-  run grep -Fx "[test-all] stage-complete test-python" <<< "$out"
+  echo "$out" | grep -E '^\[test-all\] stage-complete test seconds=[0-9]+$'
+  echo "$out" | grep -E '^\[test-all\] stage-complete test-bin seconds=[0-9]+$'
+  run grep -E '^\[test-all\] stage-complete test-python( seconds=[0-9]+)?$' <<< "$out"
   [ "$status" -ne 0 ]
 }
 

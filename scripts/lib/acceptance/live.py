@@ -467,7 +467,7 @@ def build_k3dm_tests_legs(
         rc, responses, stdout_text, stderr_text = submit(
             ctx,
             "make-test-all",
-            1200,
+            6000,
             artifact_label="make-test-all.json",
         )
         final = responses[-1] if responses else {}
@@ -628,7 +628,7 @@ def build_k3dm_tests_legs(
     ]
     if with_test_all:
         legs.extend([
-            LiveLeg("make-test-all", "make-test-all", 1200, run_test_all),
+            LiveLeg("make-test-all", "make-test-all", 6000, run_test_all),
             LiveLeg("grafana-k3dm-tests", None, 60, run_grafana),
         ])
     return legs

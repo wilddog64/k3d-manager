@@ -21,6 +21,7 @@ cannot overwrite each other.
 | Failed cases | `k3dm_test_cases_failed` |
 | Failing cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` (empty on a clean run) |
 | Run duration over time | `k3dm_test_run_duration_seconds`, `k3dm_test_suite_duration_seconds` |
+| Stage duration over time | `k3dm_test_stage_duration_seconds` |
 | Total cases | `k3dm_test_cases_total` |
 | Run completion | `k3dm_test_run_complete` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
@@ -29,8 +30,10 @@ cannot overwrite each other.
 `k3dm_test_run_duration_seconds{target="test-all"}`. Per-suite duration is published only for
 suites whose runner prints its own time: pytest's `in X.XXs` summary and unittest's
 `Ran N tests in X s`. BATS prints no per-file time, so BATS suites have no duration series
-rather than a fake `0`. A run pushed by an older exporter still shows the old `0`/millisecond
-values until the next `make test-metrics`.
+rather than a fake `0`. Stage duration is published for each completed stage in
+`make test-all` (`test`, `test-bin`, `test-python`) as
+`k3dm_test_stage_duration_seconds{stage="<stage>"}`. A run pushed by an older exporter still
+shows the old `0`/millisecond values until the next `make test-metrics`.
 
 **Where the alerts live.** The six `k3dm-tests.alerts` rules are in
 `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`, labelled

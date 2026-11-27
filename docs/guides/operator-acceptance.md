@@ -47,7 +47,7 @@ The CLI supports the following options:
 - `--scenario`: Run specific scenarios by ID (can be repeated). Cannot be combined with `--live`.
 - `--run-root`: Set a custom run directory root.
 - `--live`: Run the opt-in live profile instead of offline scenarios.
-- `--with-test-all`: Include the ~15-minute `make-test-all` leg and Grafana dashboard verification (requires `--live`).
+- `--with-test-all`: Include the ~70-minute `make-test-all` leg and Grafana dashboard verification (requires `--live`).
 - `--with-prior-art`: Query `prior_art.search` for advisory candidate bug docs on contract failures.
 
 ### Run root and retention
@@ -149,7 +149,7 @@ The live profile enforces strict safety constraints:
    - `cluster-status` (waits for terminal status, deadline 120s)
    - `job-status` (reads status for submitted jobs)
    - `make-test-python-unit` (waits for final response, deadline 600s)
-   - `make-test-all` (only with `--with-test-all`, deadline 1200s)
+   - `make-test-all` (only with `--with-test-all`, deadline 6000s)
    Before submitting any action, the profile verifies that the action is in this closed list and that `gated(action)` is false. Gated actions (`make-e2e`, `sandbox-up`, `sandbox-down`) are never submitted by acceptance.
 
 ### Grafana Viewer token

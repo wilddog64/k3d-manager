@@ -106,6 +106,7 @@ def panel_queries(ctx):
         "k3dm_test_cases_failed": [{"labels": '{__name__="k3dm_test_cases_failed", target="test-all"}', "value": 0}],
         "k3dm_test_failure": [],
         "k3dm_test_run_duration_seconds": [{"labels": '{__name__="k3dm_test_run_duration_seconds", target="test-all"}', "value": 1}],
+        "k3dm_test_stage_duration_seconds": [],
         "k3dm_test_suite_duration_seconds": [],
         "k3dm_test_cases_total": [{"labels": '{__name__="k3dm_test_cases_total", target="test-all"}', "value": 4}],
         "k3dm_test_run_complete{target=" + '"test-all"' + "}": [{"labels": '{__name__="k3dm_test_run_complete", target="test-all"}', "value": 1}],

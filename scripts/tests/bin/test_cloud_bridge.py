@@ -1500,11 +1500,11 @@ def test_make_body_and_empty_post_body():
 
 TEST_SUITE_ACTIONS = {
     "make-test": ("test", 1200),
-    "make-test-bin": ("test-bin", 300),
+    "make-test-bin": ("test-bin", 4200),
     "make-test-pytest": ("test-pytest", 600),
     "make-test-python-unit": ("test-python-unit", None),
     "make-test-python": ("test-python", 900),
-    "make-test-all": ("test-all", 1800),
+    "make-test-all": ("test-all", 5400),
 }
 NEVER_EXPOSED = {
     "test-host",

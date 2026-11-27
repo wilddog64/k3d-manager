@@ -142,6 +142,17 @@ data:
               "indexByName": { "case": 0, "name": 1, "reason": 2, "suite": 3 }
             } }
           ]
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Stage duration over time",
+          "description": "Wall-clock duration of each completed test-all stage (test, test-bin, test-python).",
+          "gridPos": { "x": 0, "y": 34, "w": 24, "h": 8 },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
+          "targets": [
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_stage_duration_seconds", "legendFormat": "{{stage}}" }
+          ]
         }
       ]
     }

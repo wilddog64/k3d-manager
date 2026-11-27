@@ -46,12 +46,17 @@ def parse_log(text):
     failures = []
     total = 0
     failed = 0
+    stage_durations = {}
     completed_stages = set()
 
     for line in text.splitlines():
-        stage_complete = re.search(r"^\s*\[test-all\] stage-complete ([^\s]+)\s*$", line)
+        stage_complete = re.search(r"^\s*\[test-all\] stage-complete\s+([^\s]+)(?:\s+seconds=([0-9]+(?:\.[0-9]+)?))?\s*$", line)
         if stage_complete:
-            completed_stages.add(stage_complete.group(1))
+            stage = stage_complete.group(1)
+            completed_stages.add(stage)
+            if stage_complete.group(2) is not None:
+                val = stage_complete.group(2)
+                stage_durations[stage] = float(val) if "." in val else int(val)
         step_match = re.search(r"\[make\]\s+(test(?:-all|-bin|-python(?:-unit|-pytest)?)?)\b", line)
         if step_match:
             last_step = step_match.group(1)
@@ -144,6 +149,7 @@ def parse_log(text):
     return {
         "suites": dict(suites),
         "durations": durations,
+        "stage_durations": stage_durations,
         "total": total,
         "failed": failed,
         "failures": failures,
@@ -183,6 +189,13 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None, expect
     ]
     for suite in sorted(parsed["durations"]):
         lines.append(f'k3dm_test_suite_duration_seconds{{suite="{suite}"}} {parsed["durations"][suite]}')
+    if parsed.get("stage_durations"):
+        lines += [
+            "# HELP k3dm_test_stage_duration_seconds Wall-clock duration of one completed test-all stage",
+            "# TYPE k3dm_test_stage_duration_seconds gauge",
+        ]
+        for stage in sorted(parsed["stage_durations"]):
+            lines.append(f'k3dm_test_stage_duration_seconds{{stage="{_metric_label(stage)}"}} {parsed["stage_durations"][stage]}')
     lines += [
         "# HELP k3dm_test_cases_total Total cases in the run",
         "# TYPE k3dm_test_cases_total gauge",

@@ -895,3 +895,14 @@ def test_prior_art_unavailable_preserves_outcomes_and_records_unavailability(iso
     adv_draft = next((dir_adv / "drafts").glob("*.md")).read_text(encoding="utf-8")
     assert "docs/bugs/a.md" in adv_draft and "docs/bugs/c.md" in adv_draft and "docs/bugs/d.md" not in adv_draft
     assert drafts.normalise_field("  A  B ") == "a b"
+
+
+def test_test_all_live_leg_timeout_exceeds_job_limit_plus_bridge_slack():
+    from webhook import make_targets
+    state = {}
+    legs = live.build_k3dm_tests_legs(state, with_test_all=True)
+    test_all_leg = next(l for l in legs if l.action == "make-test-all")
+    job_timeout = make_targets.MAKE_TARGETS["test-all"]["timeout"]
+    bridge_slack = 600
+    assert test_all_leg.deadline_s >= job_timeout + bridge_slack
+    assert test_all_leg.deadline_s >= 6000
