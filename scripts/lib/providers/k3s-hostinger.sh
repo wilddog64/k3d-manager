@@ -960,7 +960,7 @@ function _hostinger_reapply_gitops_applicationsets() {
   done
 
   (( pin_guard_failed == 0 )) || return 1
-  _info "[k3s-hostinger] reapplied data-git, services-git, platform-helm, and istio-ambient ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
+  _info "[k3s-hostinger] reapplied data-git, services-git and platform-helm ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT} (istio-ambient only with ISTIO_AMBIENT_APPSET_ENABLE=1)"
   return 0
 }
 

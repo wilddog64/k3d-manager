@@ -273,7 +273,7 @@ _prepare_agent_change() {
   printf 'changed agent code\n' > "$WORK/scripts/lib/webhook/agent.py"
   "$REAL_GIT" -C "$WORK" add scripts/lib/webhook/agent.py
   "$REAL_GIT" -C "$WORK" commit -qm 'fixture webhook code change'
-  CHANGED_SHA="$($REAL_GIT -C "$WORK" rev-parse HEAD)"
+  CHANGED_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
   export CHANGED_SHA
   "$REAL_GIT" -C "$WORK" push --quiet origin "$CHANGED_SHA:refs/heads/agent-change"
   "$REAL_GIT" -C "$WORK" branch -f agent-change "$CHANGED_SHA"
@@ -289,7 +289,7 @@ _prepare_agent_docs_change() {
   printf 'docs only\n' > "$WORK/agent-docs.md"
   "$REAL_GIT" -C "$WORK" add agent-docs.md
   "$REAL_GIT" -C "$WORK" commit -qm 'fixture docs only'
-  CHANGED_SHA="$($REAL_GIT -C "$WORK" rev-parse HEAD)"
+  CHANGED_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"
   export CHANGED_SHA
   "$REAL_GIT" -C "$WORK" push --quiet origin "+$CHANGED_SHA:refs/heads/agent-docs"
   "$REAL_GIT" -C "$WORK" branch -f agent-docs "$CHANGED_SHA"
@@ -489,7 +489,7 @@ _write_agent_state() {
   printf 'unknown\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.unwired-fixture.plist.tmpl"
   "$REAL_GIT" -C "$WORK" add scripts/etc/launchd/com.k3d-manager.unwired-fixture.plist.tmpl
   "$REAL_GIT" -C "$WORK" commit -qm 'fixture unwired agent template'
-  CHANGED_SHA="$($REAL_GIT -C "$WORK" rev-parse HEAD)"; export CHANGED_SHA
+  CHANGED_SHA="$("$REAL_GIT" -C "$WORK" rev-parse HEAD)"; export CHANGED_SHA
   "$REAL_GIT" -C "$WORK" push --quiet origin "+$CHANGED_SHA:refs/heads/agent-docs"
   : > "$HOME/Library/LaunchAgents/com.k3d-manager.unwired-fixture.plist"
   : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
