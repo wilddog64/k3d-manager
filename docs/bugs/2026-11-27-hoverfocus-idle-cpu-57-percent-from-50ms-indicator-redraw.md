@@ -38,6 +38,13 @@ once started it persists. That explains the 57 / 26 / 3.9 / steady-54% readings.
 1777 samples in `_updateReplicants`, 125 in the `AppDelegate.swift:51` observer. The loop starts at launch on m4; the
 3.9% reading was a lull, not a loop-free state.
 
+**m2 comparison (Claude over SSH, 2026-11-27 ~03:50Z, macOS 26.5.1, same v0.0.3 build, pid 74669 up since 12:45 PST):**
+`top -c d` 5.6 / 5.7% CPU, 0–1 idle wakeups; 33:45 CPU time over ~7 h (≈8% average); `sample 3`: main thread 317 in
+`onTick` and **no** `_updateReplicants` or `AppDelegate.swift:51` frames. So m2 has only the tick cost (Part B), not the
+icon loop. Both Macs have one display, so a multi-display menu bar is not the trigger; m4 runs macOS 26.5.2, m2 26.5.1
+(not proven to be the trigger). The Part A fix (never re-assign an unchanged icon) does not depend on what triggers
+the appearance churn.
+
 Fix direction: `updateIcon` computes the `(style, darkBar, dimmed)` key and returns early when it equals the last one it
 applied (never re-assign `button.image` for an unchanged key); the 2 s `updateUI` must not touch the icon unless that
 key changed. Secondary (separate child or same spec): one window-list snapshot per tick and a slower idle tick (Fable).
