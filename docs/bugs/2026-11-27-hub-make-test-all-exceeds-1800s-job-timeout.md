@@ -1,96 +1,123 @@
 # Bug: `make test-all` run by the hub webhook is killed at its 1800 s limit before finishing
 
-**Status:** OPEN — filed, under review (Fable + Neon) before dispatch
+**Status:** OPEN — rev 2 (2026-11-27): rewritten from Fable's REWRITE review and a timed run on m5; intents pending
 **Priority:** P2
-**Introduced by:** unknown (test suite growth against a fixed limit; last hub success 2026-11-14)
+**Introduced by:** unknown (test-bin suite growth against fixed limits; last hub success 2026-11-14)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** investigation — since 2026-11-27 (spec review), then dispatch to Flash
+**Waiting on:** operator decision — since 2026-11-27 (rev 2 intents), then dispatch to Flash
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (fell back to glob)
-**Severity:** medium — every cloud `make-test-all` request fails (exit 124); the k3dm Tests dashboard goes stale;
-v1.46.0 p3b's `--with-test-all` leg cannot pass. Local `make test-all` on a workstation is a workaround for the result,
-not for the cloud path.
+**Severity:** medium — every cloud `make-test-all` and `make-test-bin` request fails (exit 124); the k3dm Tests
+dashboard is stale; v1.46.0 p3b's `--with-test-all` leg cannot pass.
 **Filed:** 2026-11-27, Claude, from the v1.46.0 p2b live check (operator: "go ahead to file those two P2 bugs")
-**Approval:** operator, 2026-11-27 ("go ahead to file those two P2 bugs and have Fable and Neon to review them. after that dispatch to Flash and Luna")
-**Intent approved:** operator, 2026-11-27
-**Component:** `scripts/lib/webhook/make_targets.py:37` (`"test-all": {"timeout": 1800}`); bridge watch timeout follows
-it (`bin/k3dm-cloud-bridge` `_watch_entry` uses `MAKE_TARGETS[target]["timeout"]`)
+**Approval:** operator, 2026-11-27 ("go ahead to file those two P2 bugs and have Fable and Neon to review them. after that dispatch to Flash and Luna"); rev 2 scope: operator, 2026-11-27 ("can you check the test-all review spec then timed run on m5? after maybe you want to send me intents for approval then dispatch to Flash?")
+**Component:** `scripts/lib/webhook/make_targets.py:33,37`; `Makefile` `test-all` recipe; `bin/k3dm-test-metrics`
 
 ## Evidence
 
-- **Live, 2026-11-27, hub m5 on `deploy/hub` `54a13982`:** `bin/k3dm-cloud-request make-test-all --notify-route testing
-  --wait-final --timeout 1800` from m4 → job `16aadbe5`, started 01:08:52Z. Final response
-  `responses/20261127T010823Z-make-test-all.final.json`: `body.status` `failed`, `body.exit_code` 124, output tail ends
-  `ok 757 E1 approval never pushes, …` then `make: *** [test-all] Terminated: 15`. Slack (operator screenshot, 17:38
-  PST): "make test-all timed out after 1800s — job 16aadbe5".
-- The BATS run reached test 757; m4's `make test` TAP plan is `1..2256` (p3a hand-back, 2026-11-26).
-- **Grafana (Viewer token, 2026-11-27 01:48Z):** `k3dm_test_last_success_timestamp_seconds{instance="test-all-local-last-success"}`
-  = 1794615110 (2026-11-14T00:11:50Z) — no hub `test-all` success in 13 days. `k3dm_test_suite_duration_seconds` has no
-  series, so per-suite wall time is not recorded anywhere.
-- Earlier cloud `make-test-all` finals on `cloud-requests`: 2026-10-07 and 2026-10-20 failed with exit 2 (test failures,
-  not timeouts).
+- **Live, 2026-11-27, hub m5 on `deploy/hub` `54a13982`:** cloud request `make-test-all` → job `16aadbe5`, final
+  `body.exit_code` 124, output tail `ok 757 E1 approval never pushes, …` then `make: *** [test-all] Terminated: 15`.
+- **Timed run, m5, 2026-11-27 18:36–19:35Z (Claude, read-only scratch clone `/tmp/k3dm-timing` at `deploy/hub`
+  `1c74deb3`, webhook PATH `/Users/cliang/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`, over SSH):**
 
-## What is not known (prove before choosing a limit)
+  | Stage | Wall time | TAP lines | Current cloud limit |
+  |---|---|---|---|
+  | `make test` | **517 s** | 2256 | 1200 s |
+  | `make test-bin` | **2983 s** | 1555 | **300 s** (docs: "~1 min") |
+  | `make test-python` | 40 s, exit 2: **no pytest** for the webhook's `python3` (Homebrew 3.15) | 0 | 900 s |
 
-- How long `make test-all` takes on m5 under the webhook (launchd environment, no TTY) versus interactively on m5 and
-  on m4 (~15 min for `make test`, 442 s for `make test-pytest`, Luna 2026-11-26). If the hub is several times slower
-  than m4, raising the limit hides a hub-side cause (throttling, a hung test waiting on a timeout, network fallbacks).
-- Which suite or file consumes the time.
+  The webhook's test 757 is test-bin's 757th test: 517 s + test-bin tests 1–757 ≈ 1720 s, which matches the 1800 s kill.
+  So the hub is **not** slower under launchd than over SSH; the suite outgrew the limits. Fable's "hub-side slowness"
+  hypothesis is ruled out for this run.
+- **Where test-bin spends its time:** 52 tests take ≥ 10 s each (1039 s together). Tests 1401–1555 alone take 889 s;
+  the slowest are web-console install/recovery tests (`[M2] journal survives crashes…` 126 s, `[M4] C7 discovers process
+  configs…` 65 s).
+- **pytest missing on the hub** is a separate root cause and is filed separately
+  (`docs/bugs/2026-11-27-hub-webhook-python-has-no-pytest.md`); this spec does not fix it.
+- Grafana: `k3dm_test_last_success_timestamp_seconds{instance="test-all-local-last-success"}` = 2026-11-14T00:11:50Z.
 
-## Proposed fix (two parts; the reviewers should challenge the split)
+## Scope (rev 2)
 
-1. **Measure:** make the `test-all` recipe print a wall-clock line per suite (`test`, `test-bin`, `test-python`) to
-   the job log, and have `bin/k3dm-test-metrics` export them as `k3dm_test_suite_duration_seconds{suite=…}` (the gauge
-   is declared but empty).
-2. **Limit:** raise `make_targets.py` `test-all` timeout to 3600 s as a stopgap so a full run can finish and report
-   the durations from part 1; the final limit is chosen from that measurement.
+Child **A (Flash)**, one dispatch:
+
+1. **Stage durations as each stage finishes.** Every `[test-all] stage-complete <stage>` line in the `test-all` recipe
+   (serial and `PARALLEL=1` paths) also carries `seconds=<n>`. A run killed mid-way still has lines for the stages that
+   finished.
+2. **New metric, not the existing one.** `bin/k3dm-test-metrics` parses `seconds=` and exports
+   `k3dm_test_stage_duration_seconds{stage}`. `k3dm_test_suite_duration_seconds{suite=<file|pytest>}` is unchanged
+   (Fable: reusing it mixes stage and file names on the existing panel). The partial-log publish fallback
+   (`scripts/lib/webhook/lifecycle.py:223-229`) publishes the stage durations it finds.
+3. **Limits from the measurement** (about 1.4× measured, rounded):
+   - `test-bin`: 300 → **4200** s (measured 2983 s).
+   - `test-all`: 1800 → **5400** s (517 + 2983 + about 450 s pytest from m4 ≈ 3950 s).
+   - `test` stays 1200 s (measured 517 s).
+4. **Consumers follow the limit.** `scripts/lib/acceptance/live.py:470` (submit timeout) and `:631` (`LiveLeg`
+   deadline) become at least the job limit plus the bridge's poll slack; the bridge watch is derived from
+   `MAKE_TARGETS` (`bin/k3dm-cloud-bridge:566-567`, expiry `timeout + 600` at `:710`) and only its pin changes.
+5. **Docs say the truth:** test-bin "~50 min", test-all "about 70 minutes" and that it holds the single make slot.
+
+Out of scope: making test-bin faster (ideas row: profile the web-console suites; `PARALLEL=1` needs GNU `parallel`,
+absent on m5); pytest on the hub (separate bug).
 
 ## Files
 
-- `scripts/lib/webhook/make_targets.py`
-- `Makefile` (`test-all` recipe only)
+- `Makefile` (`test-all` recipe: `stage-complete` lines only)
 - `bin/k3dm-test-metrics`
-- `scripts/tests/bin/test_k3dm_test_metrics.py`
-- `scripts/tests/bin/test_webhook_make_targets.py` (or the existing make-targets test file)
+- `scripts/lib/webhook/make_targets.py`
+- `scripts/lib/webhook/lifecycle.py` (partial-log publish includes stage durations, only if it needs a change)
+- `scripts/lib/acceptance/live.py`
+- `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` (one panel for the new metric)
+- `docs/guides/grafana-dashboards/k3dm-tests.md`, `docs/guides/operator-acceptance.md`, `docs/howto/cloud-session-requests.md`
+- Tests: `scripts/tests/bin/test_k3dm_test_metrics.py`, `scripts/tests/bin/webhook_make_targets.py`,
+  `scripts/tests/bin/test_cloud_bridge.py`, `scripts/tests/bin/makefile_test_all.bats`, the live.py test file
 
 ## Contract readers
 
-- `MAKE_TARGETS["test-all"]["timeout"]`: readers `scripts/lib/webhook/lifecycle.py` (`_run_make_target` kill timer),
-  `bin/k3dm-cloud-bridge` `_watch_entry` (final-response watch), `docs/howto/cloud-session-requests.md` (states
-  timeouts, if it does), `scripts/lib/acceptance/live.py` (p3b `make-test-all` leg deadline 1200 s — must be ≥ the new
-  limit or the leg times out first).
-- Metric `k3dm_test_suite_duration_seconds`: readers the k3dm Tests dashboard (if a panel uses it), alert rules (grep).
+- `MAKE_TARGETS["test-all"]["timeout"]` and `["test-bin"]["timeout"]`: `scripts/lib/webhook/lifecycle.py` (kill timer);
+  `bin/k3dm-cloud-bridge:566-567,710` (watch, derived); pins `scripts/tests/bin/test_cloud_bridge.py:1503,1507`;
+  `scripts/lib/acceptance/live.py:470,631`; `docs/howto/cloud-session-requests.md:83,87,112`;
+  `docs/guides/operator-acceptance.md:50,152`.
+- `[test-all] stage-complete` line: writer `Makefile:1884,2046,2058,2089` (and the other stages); reader
+  `bin/k3dm-test-metrics:52` (regex must accept the new `seconds=` suffix and old lines without it).
+- New metric `k3dm_test_stage_duration_seconds`: writer `bin/k3dm-test-metrics`; readers the k3dm Tests dashboard
+  configmap and its guide. No alert rule reads either duration metric (grep of `scripts/etc/prometheus/` empty).
 
 ## Acceptance
 
 ```yaml
 must:
   - id: T-M1
-    text: "a test-all job log contains one wall-clock duration line per suite, and the exporter publishes k3dm_test_suite_duration_seconds for each suite"
+    text: "each stage-complete line in the test-all log carries seconds=<n>, written when that stage finishes"
   - id: T-M2
-    text: "the hub test-all job and the bridge's final-response watch both allow 3600 s"
+    text: "k3dm-test-metrics exports k3dm_test_stage_duration_seconds{stage} for every completed stage, including from a log cut off mid-run"
+  - id: T-M3
+    text: "the hub allows test-bin 4200 s and test-all 5400 s; the acceptance live leg waits at least as long as the job plus bridge slack"
 must_not:
   - id: T-N1
-    text: "the webhook kills a test-all run before 3600 s"
-    red_on_current: "red: MAKE_TARGETS['test-all']['timeout'] is 1800 on the current code; the test asserts 3600"
+    text: "a stage that finished is missing its duration because a later stage was killed"
+    red_on_current: "red: today's recipe prints no durations and the push runs only at the end"
   - id: T-N2
-    text: "a suite duration line or metric is missing when that suite ran"
-    red_on_current: "red: the current recipe prints no durations and the gauge has no series"
+    text: "the existing k3dm_test_suite_duration_seconds series change name, labels or values"
+    red_on_current: "green on current; mutant 'emit stage durations into suite_duration' turns it red"
   - id: T-N3
-    text: "a consumer of the limit (bridge watch, p3b live leg deadline) still expires before the job limit"
-    red_on_current: "red: live.py make-test-all leg deadline is 1200 s, below both the current and new limit"
+    text: "the acceptance live leg gives up before the job's own limit"
+    red_on_current: "red: live.py deadline is 1200 s, below the 1800 s job limit"
+  - id: T-N4
+    text: "an old stage-complete line without seconds= breaks the metrics parser"
+    red_on_current: "green on current; mutant 'require seconds=' turns it red"
 evidence:
   - id: T-E1
-    proves: [T-M1, T-M2, T-N1, T-N2, T-N3]
+    proves: [T-M1, T-M2, T-M3, T-N1, T-N2, T-N3, T-N4]
     kind: offline
-    command: "python3 -m pytest on the touched test files passes; on the current code plus only the new tests, T-N1, T-N2 and T-N3 fail"
-    intent: "A cloud test-all run gets enough time to finish, and every run records how long each part took."
+    command: "pytest on the touched Python tests and bats makefile_test_all.bats pass under PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin; on pre-fix code T-N1 and T-N3 fail; the T-N2 and T-N4 mutants fail"
+    intent: "Each part of the test run reports how long it took, even when a later part is cut off, and the cloud limits match how long the suites really take."
   - id: T-E2
-    proves: [T-M1, T-M2]
+    proves: [T-M1, T-M2, T-M3]
     kind: live
-    command: "after a hub promote: bin/k3dm-cloud-request make-test-all --wait-final --timeout 3700 finishes with exit 0 or a real test failure (not 124); its job log shows the three suite durations; Grafana shows k3dm_test_suite_duration_seconds for the run"
-    intent: "You can run the full test suite from a cloud session again, and see on the dashboard which suite is slow."
+    command: "after a hub promote, in an idle window: make-test-bin then make-test-all from a cloud request finish without exit 124 (a real test failure or the pytest bug is acceptable); the job log shows seconds= for each completed stage; Grafana shows k3dm_test_stage_duration_seconds for them"
+    intent: "You can run the test suites from a cloud session again without them being killed, and the dashboard shows how long each part takes."
 interface:
-  - "MAKE_TARGETS['test-all']['timeout'] = 3600"
-  - "k3dm_test_suite_duration_seconds{suite} populated"
+  - "MAKE_TARGETS['test-bin']['timeout'] = 4200; MAKE_TARGETS['test-all']['timeout'] = 5400"
+  - "[test-all] stage-complete <stage> seconds=<n>"
+  - "k3dm_test_stage_duration_seconds{stage}"
 ```
