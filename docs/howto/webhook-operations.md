@@ -49,6 +49,16 @@ The webhook and cloud bridge LaunchAgents use the pinned Homebrew interpreter
 If an installer reports that Python is missing, run `brew install python@3.14` before rendering
 or loading either plist.
 
+### Hub test prerequisites
+
+Running make test targets (such as `make test-python`, `make test-pytest`, or `make test-all`) on the hub requires pytest and PyYAML. Because the hub's Homebrew Python may not contain these in its site-packages, set up the dedicated test virtual environment:
+
+```bash
+make install-pytest-venv
+```
+
+Run `make install-pytest-venv` once per hub, and after any Homebrew Python minor upgrade.
+
 The helper edits both LaunchAgent plists and restarts the agents. It does not
 log request bodies, headers, bearer tokens, Keychain values, Slack response
 URLs, or make output. Status routes are logged as `/api/v1/status/{job_id}`.

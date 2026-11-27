@@ -48,3 +48,4 @@ web-console-totp|system LaunchDaemon installed once by make install-web-console-
 promote-authority-install|operator-run: root LaunchDaemon, installed by the operator with sudo, never by machine setup
 promote-authority|operator-run: system LaunchDaemon installed by promote-authority-install
 install-tailscale|operator-run per Mac for break-glass access: the system extension approval and tailnet login are GUI steps (docs/howto/tailscale-break-glass.md)
+install-pytest-venv|operator-run on the hub: make install-pytest-venv installs pytest and PyYAML into a dedicated venv for test targets (docs/howto/webhook-operations.md)

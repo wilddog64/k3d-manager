@@ -40,6 +40,7 @@ worker() {
       elif command -v pytest >/dev/null 2>&1; then pytest_cmd=(pytest)
       elif python3 -m pytest --version >/dev/null 2>&1; then pytest_cmd=(python3 -m pytest)
       elif [[ -x "$HOME/.pyenv/shims/python3" ]] && "$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then pytest_cmd=("$HOME/.pyenv/shims/python3" -m pytest)
+      elif [[ -x "$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ]] && "$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then pytest_cmd=("$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest)
       fi
       if (( ${#pytest_cmd[@]} == 0 )); then
         printf 'SKIP pytest 0s (not installed)\n' > "$work/result.$index"

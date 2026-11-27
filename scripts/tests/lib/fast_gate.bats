@@ -515,3 +515,86 @@ BATS
   [ "$status" -eq 0 ]
   [[ "$output" == *'PASS scripts/tests/lib/static.bats'* ]]
 }
+
+@test "Y-N2/Y-M1: fast gate falls back to pytest-venv when earlier lookups fail" {
+  local venv_home="$BATS_TEST_TMPDIR/venv_home"
+  local venv_bin="$venv_home/.local/share/k3d-manager/pytest-venv/bin"
+  local path_bin="$BATS_TEST_TMPDIR/no_pytest_path"
+  mkdir -p "$venv_bin" "$path_bin" "$fixture/scripts/tests/bin"
+
+  cat > "$path_bin/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "-m" ] && [ "$2" = "pytest" ]; then
+  exit 1
+fi
+exec /usr/bin/python3 "$@"
+EOF
+  chmod +x "$path_bin/python3"
+
+  cat > "$venv_bin/python" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "-m" ] && [ "$2" = "pytest" ] && [ "$3" = "--version" ]; then
+  echo "pytest 9.1.1"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$venv_bin/python"
+
+  printf '#!/bin/sh\nexit 0\n' > "$path_bin/bats"
+  chmod +x "$path_bin/bats"
+
+  cat > "$fixture/scripts/tests/bin/test_venv_lookup.py" <<'PYTEST'
+def test_passes():
+    assert True
+PYTEST
+  git -C "$fixture" add scripts/tests/bin/test_venv_lookup.py
+  git -C "$fixture" commit -qm "add test_venv_lookup.py"
+
+  run bash -c 'cd "$1" && HOME="$3" PATH="$4:/usr/bin:/bin:/usr/sbin:/sbin" /bin/bash scripts/ci/fast_gate.sh "$2"' _ \
+    "$fixture" "$base" "$venv_home" "$path_bin"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"SKIP pytest 0s (not installed)"* ]]
+  [[ "$output" == *"PASS scripts/tests/bin/test_venv_lookup.py"* ]]
+}
+
+@test "Y-N1: fast gate earlier lookup takes precedence over pytest-venv" {
+  local venv_home="$BATS_TEST_TMPDIR/venv_home_prec"
+  local venv_bin="$venv_home/.local/share/k3d-manager/pytest-venv/bin"
+  local path_bin="$BATS_TEST_TMPDIR/path_prec"
+  mkdir -p "$venv_bin" "$path_bin" "$fixture/scripts/tests/bin"
+
+  cat > "$path_bin/pytest" <<EOF
+#!/usr/bin/env bash
+: > "$BATS_TEST_TMPDIR/path-pytest-used"
+exit 0
+EOF
+  chmod +x "$path_bin/pytest"
+
+  cat > "$venv_bin/python" <<EOF
+#!/usr/bin/env bash
+: > "$BATS_TEST_TMPDIR/venv-python-used"
+if [ "\$1" = "-m" ] && [ "\$2" = "pytest" ] && [ "\$3" = "--version" ]; then
+  echo "pytest 9.1.1"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$venv_bin/python"
+
+  printf '#!/bin/sh\nexit 0\n' > "$path_bin/bats"
+  chmod +x "$path_bin/bats"
+
+  cat > "$fixture/scripts/tests/bin/test_venv_lookup.py" <<'PYTEST'
+def test_passes():
+    assert True
+PYTEST
+  git -C "$fixture" add scripts/tests/bin/test_venv_lookup.py
+  git -C "$fixture" commit -qm "add test_venv_lookup.py"
+
+  run bash -c 'cd "$1" && HOME="$3" PATH="$4:/usr/bin:/bin:/usr/sbin:/sbin" /bin/bash scripts/ci/fast_gate.sh "$2"' _ \
+    "$fixture" "$base" "$venv_home" "$path_bin"
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/path-pytest-used" ]
+  [ ! -e "$BATS_TEST_TMPDIR/venv-python-used" ]
+}

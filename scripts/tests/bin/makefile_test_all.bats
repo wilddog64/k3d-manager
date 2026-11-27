@@ -1235,3 +1235,110 @@ EOF
   [ "$status" -eq 0 ]
   grep -q "^custom-pytest-override " "$TRIPWIRE_LOG"
 }
+
+@test "Y-N2/Y-M1: test-all resolves pytest via pytest-venv fallback when earlier lookups fail" {
+  [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
+  rm -f "$STUB_DIR/pytest"
+
+  VENV_PYTEST_DIR="$WORK/venv_pytest_bin"
+  mkdir -p "$VENV_PYTEST_DIR"
+  cat > "$VENV_PYTEST_DIR/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "-m" ] && [ "$2" = "pytest" ]; then
+  exit 1
+fi
+exec /usr/bin/python3 "$@"
+EOF
+  chmod +x "$VENV_PYTEST_DIR/python3"
+
+  # Setup working pytest-venv in SCRATCH_HOME
+  VENV_DIR="$SCRATCH_HOME/.local/share/k3d-manager/pytest-venv/bin"
+  mkdir -p "$VENV_DIR"
+  cat > "$VENV_DIR/python" <<EOF
+#!/usr/bin/env bash
+echo "venv python ran with args: \$*" >> "$WORK/venv_pytest.log"
+if [ "\$1" = "-m" ] && [ "\$2" = "pytest" ] && [ "\$3" = "--version" ]; then
+  echo "pytest 9.1.1"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$VENV_DIR/python"
+
+  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | paste -sd ':' -)"
+
+  # Run test-all parallel with no PYTEST, no pytest on PATH, python3 failing pytest, no pyenv
+  run env PATH="$VENV_PYTEST_DIR:$clean_path" HOME="$SCRATCH_HOME" \
+    make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1 \
+    STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats" \
+    STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
+    STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/test_pytest_pass.py"
+  [ "$status" -eq 0 ]
+  [ -s "$WORK/venv_pytest.log" ]
+  grep -q "venv python ran with args:" "$WORK/venv_pytest.log"
+  [[ "$output" != *"no pytest found"* ]]
+}
+
+@test "Y-N1: earlier lookup takes precedence over pytest-venv" {
+  [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
+  PRECEDENCE_BIN="$WORK/precedence_bin"
+  mkdir -p "$PRECEDENCE_BIN"
+  cat > "$PRECEDENCE_BIN/pytest" <<EOF
+#!/usr/bin/env bash
+echo "path pytest ran with args: \$*" >> "$WORK/path_pytest.log"
+exit 0
+EOF
+  chmod +x "$PRECEDENCE_BIN/pytest"
+
+  # Setup working pytest-venv in SCRATCH_HOME
+  VENV_DIR="$SCRATCH_HOME/.local/share/k3d-manager/pytest-venv/bin"
+  mkdir -p "$VENV_DIR"
+  cat > "$VENV_DIR/python" <<EOF
+#!/usr/bin/env bash
+echo "venv python ran with args: \$*" >> "$WORK/venv_precedence.log"
+if [ "\$1" = "-m" ] && [ "\$2" = "pytest" ] && [ "\$3" = "--version" ]; then
+  echo "pytest 9.1.1"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$VENV_DIR/python"
+
+  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | paste -sd ':' -)"
+
+  run env PATH="$PRECEDENCE_BIN:$clean_path" HOME="$SCRATCH_HOME" \
+    make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1 \
+    STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats" \
+    STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
+    STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/test_pytest_pass.py"
+  [ "$status" -eq 0 ]
+  [ -s "$WORK/path_pytest.log" ]
+  [ ! -f "$WORK/venv_precedence.log" ]
+}
+
+@test "Y-M3: missing pytest error names make install-pytest-venv" {
+  [ "$HOME" = "$SCRATCH_HOME" ] && [[ "$PATH" == "$STUB_DIR:"* ]]
+  rm -f "$STUB_DIR/pytest"
+
+  NO_PYTEST_DIR="$WORK/no_pytest_venv_bin"
+  mkdir -p "$NO_PYTEST_DIR"
+  cat > "$NO_PYTEST_DIR/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "-m" ] && [ "$2" = "pytest" ]; then
+  exit 1
+fi
+exec /usr/bin/python3 "$@"
+EOF
+  chmod +x "$NO_PYTEST_DIR/python3"
+
+  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | paste -sd ':' -)"
+
+  run env PATH="$NO_PYTEST_DIR:$clean_path" HOME="$SCRATCH_HOME" \
+    make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1 \
+    STAGE_TEST_FILES="$FAKE_TESTS/pass1.bats" \
+    STAGE_TEST_BIN_FILES="$FAKE_TESTS/pass2.bats" \
+    STAGE_TEST_PYTHON_FILES="$FAKE_TESTS/test_pytest_pass.py"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"no pytest found"* ]]
+  [[ "$output" == *"make install-pytest-venv"* ]]
+}

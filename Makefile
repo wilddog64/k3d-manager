@@ -683,6 +683,20 @@ web-console-totp-rotate:
 web-console-totp-status:
 	bin/k3dm-web-console-totp status
 
+## Install dedicated pytest virtual environment for test suites on the hub
+.PHONY: install-pytest-venv
+install-pytest-venv:
+	@set -euo pipefail; \
+	 venv="$$HOME/.local/share/k3d-manager/pytest-venv"; \
+	 if [ ! -d "$$venv" ]; then \
+	   python3 -m venv "$$venv"; \
+	 elif ! "$$venv/bin/python" -c '' >/dev/null 2>&1; then \
+	   echo "[make] $$venv has a broken interpreter (Python upgraded?); rebuilding" >&2; \
+	   python3 -m venv --clear "$$venv"; \
+	 fi; \
+	 "$$venv/bin/python" -m pip install pytest==9.1.1 PyYAML==6.0.3; \
+	 "$$venv/bin/python" -m pytest --version
+
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
 	@bin/k3dm-webhook-doctor $(if $(filter 1,$(DRY_RUN)),--dry-run,--check)
@@ -1631,8 +1645,11 @@ check-release-milestones:
 	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	      && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest; \
 	 else \
-	   echo "[make] no pytest found. Install pytest or set PYTEST." >&2; \
+	   echo "[make] no pytest found. Install with make install-pytest-venv or set PYTEST." >&2; \
 	   exit 2; \
 	 fi; \
 	 "$$@" -q scripts/tests/bin/test_release_milestones_drift.py::test_release_milestones_stay_in_sync_with_roadmap
@@ -1715,11 +1732,15 @@ test-pytest:
 	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	      && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest; \
 	 else \
 	   echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
-	   echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
-	   echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
-	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	   echo "[make] \$$HOME/.pyenv/shims/python3 -m pytest, and" >&2; \
+	   echo "[make] \$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest." >&2; \
+	   echo "[make] This target runs from the webhook too, whose PATH excludes the pyenv shims." >&2; \
+	   echo "[make] install with: make install-pytest-venv" >&2; \
 	   exit 2; \
 	 fi; \
 	 if [ -n "$${K3DM_JUNIT_XML:-}" ]; then set -- "$$@" --junitxml "$$K3DM_JUNIT_XML" -o junit_logging=no; fi; \
@@ -1988,11 +2009,15 @@ test-all:
 	      elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	           && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	        _pytest_cmd="$$HOME/.pyenv/shims/python3 -m pytest"; \
+	      elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	           && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest"; \
 	      else \
 	        echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
-	        echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
-	        echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
-	        echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	        echo "[make] \$$HOME/.pyenv/shims/python3 -m pytest, and" >&2; \
+	        echo "[make] \$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest." >&2; \
+	        echo "[make] This target runs from the webhook too, whose PATH excludes the pyenv shims." >&2; \
+	        echo "[make] install with: make install-pytest-venv" >&2; \
 	        _stage_failed=1; \
 	        _stage3_failed=1; \
 	      fi; \
@@ -2233,11 +2258,15 @@ test-all:
 	      elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	           && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	        _pytest_cmd="$$HOME/.pyenv/shims/python3 -m pytest"; \
+	      elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	           && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest"; \
 	      else \
 	        echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
-	        echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
-	        echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
-	        echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	        echo "[make] \$$HOME/.pyenv/shims/python3 -m pytest, and" >&2; \
+	        echo "[make] \$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest." >&2; \
+	        echo "[make] This target runs from the webhook too, whose PATH excludes the pyenv shims." >&2; \
+	        echo "[make] install with: make install-pytest-venv" >&2; \
 	        _stage_failed=1; \
 	        _stage3_err=1; \
 	      fi; \
