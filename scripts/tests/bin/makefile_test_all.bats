@@ -1265,7 +1265,8 @@ exit 0
 EOF
   chmod +x "$VENV_DIR/python"
 
-  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | paste -sd ':' -)"
+  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | while IFS= read -r d; do [ -x "$d/pytest" ] || printf '%s\n' "$d"; done | paste -sd ':' -)"
+  run ! env PATH="$clean_path" sh -c 'command -v pytest'
 
   # Run test-all parallel with no PYTEST, no pytest on PATH, python3 failing pytest, no pyenv
   run env PATH="$VENV_PYTEST_DIR:$clean_path" HOME="$SCRATCH_HOME" \
@@ -1331,7 +1332,8 @@ exec /usr/bin/python3 "$@"
 EOF
   chmod +x "$NO_PYTEST_DIR/python3"
 
-  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | paste -sd ':' -)"
+  clean_path="$(echo "$PATH" | tr ':' '\n' | grep -v 'pyenv' | while IFS= read -r d; do [ -x "$d/pytest" ] || printf '%s\n' "$d"; done | paste -sd ':' -)"
+  run ! env PATH="$clean_path" sh -c 'command -v pytest'
 
   run env PATH="$NO_PYTEST_DIR:$clean_path" HOME="$SCRATCH_HOME" \
     make --no-print-directory -C "$FAKE_REPO" test-all PARALLEL=1 \
