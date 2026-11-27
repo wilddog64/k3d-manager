@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/foundation/scripts/lib/ssh_fragment.sh"
+source "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/foundation/scripts/lib/ssh_fragment.sh"
 
 : "${_vault_local_port:=}"
 

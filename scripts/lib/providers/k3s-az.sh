@@ -10,7 +10,7 @@ source "${SCRIPT_DIR}/plugins/azure.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/foundation/scripts/lib/ssh_fragment.sh"
+source "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/lib/foundation/scripts/lib/ssh_fragment.sh"
 
 _AZ_VM_NAME="${AZ_VM_NAME:-k3d-azure-node}"
 _AZ_VM_SIZE="${AZ_VM_SIZE:-Standard_B2s}"

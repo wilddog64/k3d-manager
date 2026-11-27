@@ -16,7 +16,7 @@ source "${SCRIPT_DIR}/plugins/gcp.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/foundation/scripts/lib/ssh_fragment.sh"
+source "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/lib/foundation/scripts/lib/ssh_fragment.sh"
 
 _GCP_INSTANCE_NAME="k3d-manager-gcp-node"
 _GCP_FIREWALL_RULE="k3d-manager-k3s-api"
