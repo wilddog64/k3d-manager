@@ -1,11 +1,12 @@
 # Bug: a job with no Slack context posts only its first Slack notice; every later notice is dropped
 
-**Status:** LANDED — `35d42bc8` (Luna; Claude-verified offline); live U-E2 owed after a hub promote
+**Status:** LIVE-VERIFIED — `35d42bc8` (Luna; Claude-verified offline); U-E2 PASS on the hub 2026-11-27 (job `497709c4`)
 **Priority:** P2
+**Live evidence:** 2026-11-27 · run 497709c4 · env hub-m5 · scenario unrouted-cloud-make-job · commit 1c74deb3 · proves fix
+**Fix commit:** 35d42bc8
 **Introduced by:** v1.43.5 `401e4eca` (fallback guard `not thread_ts and not response_url and SLACK_CHANNEL_ID`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-27
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (fell back to glob). Read
 `2026-11-01-slack-relay-cluster-up-down-omit-channel-id.md` — related shape (job without `channel_id` loses later
 notices), different entry point (Slack relay); `2026-10-23-api-cluster-status-posts-to-command-channel.md` — routing of
@@ -119,3 +120,15 @@ evidence:
 interface:
   - "job-directory file channel_id now also written by _notify_job bot_fallback for a thread it started"
 ```
+
+## Live evidence
+
+- **U-E2 PASS — 2026-11-27 03:52Z, hub m5 on `deploy/hub` `1c74deb3`, after `make restart-webhook`** (operator): Claude
+  `bin/k3dm-cloud-request make-find-similar-docs --arg "Q=unrouted thread live check after restart" --wait-final` →
+  job `497709c4`, exit 0. `delivery.jsonl` (operator `cat` on m5): record 1 `bot_fallback`, delivered true,
+  `channel_id` null; record 2 `bot_thread`, delivered true, `channel_id` `C0B7ZHG2LR4` (default channel),
+  `thread_ts` `1795751540.503239`. Slack (operator screenshot, 19:52 PST): "succeeded — job 497709c4" as the one reply
+  under the started message in #acg-automation; the pre-fix control `ecadcf06` (17:42) has no reply.
+- First attempt `d812d065` (03:12Z) failed with the pre-fix shape because `make hub-deploy` had not restarted the
+  webhook — see the recurrence in
+  [`2026-11-22-hub-deploy-leaves-webhook-on-stale-code.md`](2026-11-22-hub-deploy-leaves-webhook-on-stale-code.md).
