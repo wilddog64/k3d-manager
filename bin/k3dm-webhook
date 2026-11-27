@@ -1364,6 +1364,8 @@ def _notify_job(job_id, text):
                 failure = "thread_post_rejected" if thread_ts else "delivery_rejected"
             if ts and not thread_ts:
                 thread_ts_file.write_text(ts)
+                if not channel_id:
+                    channel_id_file.write_text(SLACK_CHANNEL_ID)
             posted = bool(ts)
         # Incoming webhooks cannot preserve a reply thread, so they are only a
         # fallback for notifications that were not addressed to a thread.
