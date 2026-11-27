@@ -1,0 +1,32 @@
+# Bug: HoverFocus under Universal Control draws the focus border on the second Mac but keys do not follow, and the border stays after the cursor leaves
+
+**Status:** OPEN — captured, not triaged
+**Priority:** P3 (proposed; Argon classifies)
+**Introduced by:** pre-existing (cross-Mac use never designed for)
+**Should have been caught by:** none
+**Introducing change reviewed:** unknown
+**Waiting on:** operator decision — since 2026-11-27
+**Prior art:** exact-slug glob: none; `make find-similar-docs` not run
+**Filed:** 2026-11-27, Claude, from operator report (HoverFocus v0.0.3 branch `a4244b6`, installed on m4 and m2)
+**Component:** `hoverfocus` `Sources/HoverFocusPlatform/Controller.swift` (`handle` :141, `applyDecision` :322, indicator)
+
+## Report (operator, 2026-11-27)
+
+m2 and m4 share one keyboard and pointer through Apple Universal Control. Moving the cursor from m2 onto m4: HoverFocus
+on m4 turns the hovered window's border blue, but typed text does not arrive there. Moving the cursor back to m2: the
+blue border on m4 stays.
+
+## What is known
+
+- HoverFocus on m4 receives the pointer events (the border is drawn, so the tap saw `mouseMoved` and the engine
+  decided). Pointer position comes only from tapped events (`lastPointer = event.location`, `Controller.swift:148`).
+- Default focus path is `hf_focus_without_raise` (no app activation); the raise path sets `kAXFrontmostAttribute`.
+- Not yet known: whether the keys stay on m2 (Universal Control keeps the keyboard on the Mac that last had a click)
+  or are lost on m4 (activation did not take). Operator test: with the border showing and no click, type and see where
+  the letters go.
+- Stale border: after the cursor leaves m4, m4's HoverFocus gets no more events, so the indicator keeps its last state.
+
+## Possible directions (for triage, not a spec)
+
+- Hide or dim the indicator when no pointer event has arrived for N seconds and the last pointer was at a display edge.
+- If keys stay on m2: document as a Universal Control limit (hover cannot move the keyboard between Macs).
