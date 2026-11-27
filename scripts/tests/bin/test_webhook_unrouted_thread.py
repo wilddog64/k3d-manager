@@ -1,6 +1,5 @@
 """Regressions for threads started by default-channel notification fallback."""
 
-import importlib.util
 from pathlib import Path
 import sys
 
