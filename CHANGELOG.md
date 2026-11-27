@@ -2,12 +2,15 @@
 
 ## [Unreleased]
 
+## [1.46.0] - 2026-11-27
+
 ### Added
 
 - **Automated operator acceptance test harness.** Runs isolated offline acceptance scenarios covering metrics publication, the `k3dm-tests` dashboard, webhook job output, and cleanup isolation (`make test-operator-acceptance`, `bin/k3dm-operator-acceptance`). Evaluated in pytest via `make test-pytest` under a 30-second budget on macOS. See [`docs/guides/operator-acceptance.md`](docs/guides/operator-acceptance.md).
 - **Opt-in live acceptance profile.** Validates the cloud request execution pipeline and live hub Grafana panel freshness with a read-only Grafana Viewer token and single-instance serialization (`make test-operator-acceptance-live PROFILE=k3dm-tests`). Generates local deduplicated bug drafts for contract failures. See [`docs/guides/operator-acceptance.md`](docs/guides/operator-acceptance.md).
 - **Cloud-request Slack notification routing.** Routable cloud requests (`make-*`, `sandbox-up`, `sandbox-down`) can pass an optional `notify_route` alias (`--notify-route ALIAS`) mapped via `K3DM_SLACK_NOTIFICATION_ROUTES` / Keychain `k3dm-slack-notification-routes` (`make update-webhook-slack-routes`) so job notices stay in the aliased low-audience channel without spilling to default channels. See [`docs/howto/cloud-session-requests.md`](docs/howto/cloud-session-requests.md) and [`docs/howto/webhook-operations.md`](docs/howto/webhook-operations.md).
 - **Cloud bridge operator approval gate.** Cloud-runner requests (`sandbox-up`, `sandbox-down`, `make-e2e`, and `make-e2e-remote`) now wait for operator approval via an interactive Slack card before the bridge runs them. The bridge posts an interactive card to Slack, commits an interim `responses/<id>.pending.json` notice, and drains Approve or Deny decisions from the Slack relay. Single-instance flock (`bridge.lock`) prevents multiple bridges from running concurrently. See [`docs/howto/cloud-session-requests.md`](docs/howto/cloud-session-requests.md) and [`docs/architecture/cloud-bridge.md`](docs/architecture/cloud-bridge.md).
+- **Tailscale break-glass access (operator-run).** A literal tailnet policy file ships with an offline test that pins its groups, tag owners, grants and tests exactly and rejects wildcards, CIDRs, auth keys, tailnet names or addresses and real logins (17 red fixtures). `make install-tailscale` wraps lib-foundation's `_install_tailscale_app` (v0.5.11) so the runbook installs the standalone app the same way on every Mac.
 
 ### Fixed
 
@@ -16,6 +19,11 @@
 - **Hub deploy restarts changed webhook and cloud-bridge code.** Active queued or running webhook jobs defer the restart with exit 3 and a rerun hint; unchanged code does not interrupt the agents.
 - **Stale sandbox cleanup removes only its dead ArgoCD ApplicationSet, and ambient reapply is opt-in.** The cleanup requires an explicit `--confirm` for ArgoCD deletion, checks sandbox reachability and Application ownership, and never deletes Applications or cluster secrets. Reapply paths skip `istio-ambient` by default; set `ISTIO_AMBIENT_APPSET_ENABLE=1` to opt in.
 - **Cloud bridge watch-ledger validation and sandbox lifecycle tracking.** Entries in `ledger/watching.txt` from the public `cloud-requests` branch are strictly validated against malformed inputs and non-finite timestamps or timeouts, skipping corrupted lines instead of crashing or freezing the bridge. The bridge also tracks asynchronous sandbox lifecycle jobs (`sandbox-up`, `sandbox-down`) through terminal responses in the watch ledger. See [`docs/architecture/cloud-bridge.md`](docs/architecture/cloud-bridge.md).
+- **Cloud `test-bin` and `test-all` limits match how long the suites take, and every stage reports its duration.** A timed run on the hub (2026-11-27) measured `test` 517 s and `test-bin` 2983 s against limits of 1200 s and 300 s, so every cloud `make-test-all` was killed at 1800 s partway through `test-bin`. Limits are now `test-bin` 4200 s and `test-all` 5400 s, and the acceptance live leg waits 6000 s (job plus bridge slack). Each `[test-all] stage-complete` line carries `seconds=<n>` when the stage finishes, and `k3dm-test-metrics` exports `k3dm_test_stage_duration_seconds{stage}` even from a cut-off log; `k3dm_test_suite_duration_seconds` is unchanged.
+- **Unrouted cloud make jobs keep every Slack notice in one thread.** The fallback post that starts a thread now records its channel, so later notices reply in that thread instead of being dropped.
+- **Cloud request helper works where Python lacks `POSIX_SPAWN_SETSID`.** Cloud session images raised `NotImplementedError` on every git call; the helper now retries with `setpgroup=0`, so its timeout still stops the whole process tree.
+- **Pre-push hook skips the fast gate only for the `cloud-requests` data branch.** The helper's push diffed the whole tree against an unrelated base and hit its 120 s timeout; code refs and the `main` guard are unchanged.
+- **e2e M2 preflight reads disk with POSIX `df -Pk`.** GNU `df` rejected `df -g`, so every Hermes slot skipped as out of disk; an unreadable disk is now `probe_failed` with a reason that Hermes carries into the skip message.
 
 ## [1.45.1] - 2026-11-25
 
