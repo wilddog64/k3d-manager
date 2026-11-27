@@ -1,11 +1,11 @@
 # Bug: a job with no Slack context posts only its first Slack notice; every later notice is dropped
 
-**Status:** OPEN — reviewed (Fable and Neon, 2026-11-27: NEEDS FIXES, folded in below); ready for dispatch
+**Status:** LANDED — `35d42bc8` (Luna; Claude-verified offline); live U-E2 owed after a hub promote
 **Priority:** P2
 **Introduced by:** v1.43.5 `401e4eca` (fallback guard `not thread_ts and not response_url and SLACK_CHANNEL_ID`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** investigation — since 2026-11-27 (spec review), then dispatch to Luna
+**Waiting on:** live check — since 2026-11-27
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (fell back to glob). Read
 `2026-11-01-slack-relay-cluster-up-down-omit-channel-id.md` — related shape (job without `channel_id` loses later
 notices), different entry point (Slack relay); `2026-10-23-api-cluster-status-posts-to-command-channel.md` — routing of
