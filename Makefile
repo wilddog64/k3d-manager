@@ -346,7 +346,7 @@ fleet-up:
 
 ## Remove stale state from an expired k3s-aws sandbox (dry-run unless CONFIRM=1)
 cleanup-stale-sandbox:
-	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" bin/cleanup-stale-sandbox
+	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" bin/cleanup-stale-sandbox $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
 
 ## Remove expired, managed ephemeral ArgoCD cluster registrations (dry-run by default)
 cleanup-stale-clusters:
@@ -2414,7 +2414,7 @@ help:
 	@echo "    make acg-restart   Recover an expired sandbox: delete, recreate, re-extract creds (needs a TTY)"
 	@echo "    make acg-recover   Full recovery: chrome-cdp + acg-restart + a clean make up (needs a TTY)"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
-	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state (CONFIRM=1 to remove)"
+	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state and the dead sandbox's ArgoCD ApplicationSet (CONFIRM=1 to remove)"
 	@echo "    make cleanup-stale-clusters Preview/remove expired managed ArgoCD registrations (CONFIRM=1 to remove)"
 	@echo "    make cleanup-stale-resources Run both cleanup paths (CONFIRM=1 to remove)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"

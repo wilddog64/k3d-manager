@@ -519,6 +519,7 @@ setup() {
   ARGOCD_NAMESPACE="cicd"
   K3D_MANAGER_BRANCH="k3d-manager-v1.12.0"
   APP_CLUSTER_NAME="ubuntu-hostinger"
+  ISTIO_AMBIENT_APPSET_ENABLE=1
   _hostinger_load_argocd_plugin() { :; }
   _argocd_hub_kubectl_cmd() {
     printf '%s\n' "kubectl --context k3d-k3d-cluster"
@@ -579,6 +580,36 @@ setup() {
     run grep -q 'name: services-git' "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
     [ "$status" = 1 ]
   done
+}
+
+@test "_hostinger_reapply_gitops_applicationsets skips ambient by default" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  SCRIPT_DIR="${REPO_ROOT}/scripts"
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  K3D_MANAGER_BRANCH="test-branch"
+  APP_CLUSTER_NAME="ubuntu-hostinger"
+  unset ISTIO_AMBIENT_APPSET_ENABLE
+  _hostinger_load_argocd_plugin() { :; }
+  _argocd_hub_kubectl_cmd() { printf '%s\n' "kubectl --context k3d-k3d-cluster"; }
+  _info() { printf '%s\n' "$*"; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _run_command() { return 0; }
+  kubectl() {
+    if [[ "$*" == "--context k3d-k3d-cluster apply -f -" ]]; then
+      cat >> "${BATS_TEST_TMPDIR}/ambient-default.yaml"
+      printf '\n---\n' >> "${BATS_TEST_TMPDIR}/ambient-default.yaml"
+      return 0
+    fi
+    return 1
+  }
+  run _hostinger_reapply_gitops_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipping istio-ambient.yaml"* ]]
+  [ "$(grep -c '^---$' "${BATS_TEST_TMPDIR}/ambient-default.yaml")" -eq 4 ]
+  run grep -q 'name: istio-ambient' "${BATS_TEST_TMPDIR}/ambient-default.yaml"
+  [ "$status" -ne 0 ]
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {

@@ -241,6 +241,9 @@ default — a reapply never retargets. It also runs `argocd_check_values_branch`
 unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 `ARGOCD_APPSET_IGNORE_LIVE=1`.
 
+The `istio-ambient` ApplicationSet is not recreated by this reapply unless
+`ISTIO_AMBIENT_APPSET_ENABLE=1` is set deliberately. This keeps Hostinger's running Istio unmanaged.
+
 ### 5. Verify
 
 - [ ] `kubectl --context k3d-k3d-cluster get pods -A` — diff against `~/hub-rebuild-pods-before.txt`

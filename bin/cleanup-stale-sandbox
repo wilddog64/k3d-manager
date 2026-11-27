@@ -3,9 +3,11 @@ set -euo pipefail
 
 provider="${CLUSTER_PROVIDER:-k3s-aws}"
 confirm="${CONFIRM:-0}"
+argo_confirm=0
 case "${1:-}" in
-  --confirm|--apply) confirm=1 ;;
-  --dry-run|"") : ;;
+  --confirm|--apply) confirm=1; argo_confirm=1 ;;
+  --dry-run) confirm=0 ;;
+  "") : ;;
   *)
     printf 'Usage: cleanup-stale-sandbox [--dry-run|--confirm|--apply]\n'
     exit 2
@@ -16,20 +18,103 @@ if [[ "${provider}" != "k3s-aws" ]]; then
   exit 1
 fi
 context="${ACG_KUBE_CONTEXT:-ubuntu-k3s}"
+hub_ctx="${ARGOCD_HUB_CONTEXT:-${INFRA_CONTEXT:-k3d-k3d-cluster}}"
+argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+sandbox_name="${ARGOCD_APP_CLUSTER_NAME-ubuntu-k3s}"
 agents=(com.k3d-manager.frontend-port-forward com.k3d-manager.sandbox.pushgateway-port-forward com.k3d-manager.sandbox.prometheus-port-forward)
 printf 'Stale ACG sandbox cleanup (provider=%s, context=%s)\n' "${provider}" "${context}"
 printf '  - stop launchd agents: %s\n' "${agents[*]}"
 printf '  - remove kube context: %s\n' "${context}"
-if [[ "${confirm}" != 1 ]]; then
-  printf 'DRY RUN: no changes made (rerun with --confirm or --apply)\n'
-  exit 0
-fi
 
 failed=0
 report_failure() {
   printf '  - FAILED: %s\n' "$1"
   failed=1
 }
+
+argo_refused=0
+argo_discovery_ok=0
+declare -a candidate_sets=() delete_sets=()
+appsets_json='' apps_json='' secrets_json=''
+if [[ ! "${sandbox_name}" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || \
+   [[ " ${sandbox_name} " == *' ubuntu-hostinger '* || " ${sandbox_name} " == *' k3d-cluster '* || \
+      " ${sandbox_name} " == *' in-cluster '* || " ${sandbox_name} " == *' ubuntu-gcp '* || \
+      " ${sandbox_name} " == *' ubuntu-azure '* || " ${sandbox_name} " == *' k3s-oci '* ]]; then
+  printf "  - skipped ArgoCD sweep: refusing sandbox name '%s'\n" "${sandbox_name}"
+  argo_refused=1
+  failed=1
+else
+  discovery_kind=''
+  discovery_out=''
+  if discovery_out="$(kubectl --context "${hub_ctx}" -n "${argocd_ns}" --request-timeout=5s get applicationsets.argoproj.io -o json 2>&1)"; then
+    appsets_json="${discovery_out}"
+    if discovery_out="$(kubectl --context "${hub_ctx}" -n "${argocd_ns}" --request-timeout=5s get applications.argoproj.io -o json 2>&1)"; then
+      apps_json="${discovery_out}"
+      if discovery_out="$(kubectl --context "${hub_ctx}" -n "${argocd_ns}" --request-timeout=5s get secrets -l argocd.argoproj.io/secret-type=cluster -o json 2>&1)"; then
+        secrets_json="${discovery_out}"
+        argo_discovery_ok=1
+      else
+        discovery_kind='cluster secret'
+      fi
+    else
+      discovery_kind='Application'
+    fi
+  else
+    discovery_kind='ApplicationSet'
+  fi
+  if [[ -n "${discovery_kind}" ]]; then
+    discovery_first="${discovery_out%%$'\n'*}"
+    printf '  - could not inspect ArgoCD %s on %s: %s\n' "${discovery_kind}" "${hub_ctx}" "${discovery_first}"
+    if [[ "${argo_confirm}" == 1 ]]; then report_failure "could not inspect ArgoCD ${discovery_kind}"; fi
+  fi
+  if [[ "${argo_discovery_ok}" == 1 ]]; then
+    while IFS= read -r set_name; do
+      [[ -n "${set_name}" ]] && candidate_sets+=("${set_name}")
+    done < <(printf '%s' "${appsets_json}" | jq -r --arg name "${sandbox_name}" '.items[]? | select(.metadata.name | startswith("-") | not) | select(.spec.template.spec.destination.name == $name) | select((.spec.template.spec.destination.server // "") == "") | .metadata.name')
+    for set_name in "${candidate_sets[@]}"; do
+      printf '  - ArgoCD ApplicationSet targeting %s: %s\n' "${sandbox_name}" "${set_name}"
+      owned_elsewhere="$(printf '%s' "${apps_json}" | jq --arg set "${set_name}" --arg name "${sandbox_name}" '[.items[]? | select(any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and .name == $set)) | select((.spec.destination.name // "") != $name or ((.spec.destination.server // "") != ""))] | length')"
+      if (( owned_elsewhere > 0 )); then
+        printf '  - ArgoCD ApplicationSet %s owns Applications on other clusters; not deleting\n' "${set_name}"
+        if [[ "${argo_confirm}" == 1 ]]; then failed=1; fi
+      else
+        delete_sets+=("${set_name}")
+      fi
+    done
+    if (( ${#candidate_sets[@]} == 0 )); then printf '  - no ArgoCD ApplicationSet targets %s\n' "${sandbox_name}"; fi
+
+    app_count=0
+    while IFS= read -r app_name; do
+      [[ -n "${app_name}" ]] || continue
+      app_count=$((app_count + 1))
+      printf '  - ArgoCD Application targeting %s: %s (remove with make cleanup-stale-clusters / cleanup-stale-registration)\n' "${sandbox_name}" "${app_name}"
+    done < <(printf '%s' "${apps_json}" | jq -r --arg name "${sandbox_name}" '.items[]? | select(.spec.destination.name == $name) | .metadata.name')
+    (( app_count > 0 )) || printf '  - no ArgoCD Application targets %s\n' "${sandbox_name}"
+
+    sandbox_b64="$(printf '%s' "${sandbox_name}" | base64 | tr -d '\r\n')"
+    secret_count=0
+    while IFS= read -r secret_name; do
+      [[ -n "${secret_name}" ]] || continue
+      secret_count=$((secret_count + 1))
+      printf '  - ArgoCD cluster secret targeting %s: %s (remove with make cleanup-stale-clusters / cleanup-stale-registration)\n' "${sandbox_name}" "${secret_name}"
+    done < <(printf '%s' "${secrets_json}" | jq -r --arg name "${sandbox_b64}" --arg hub "$(printf '%s' 'https://kubernetes.default.svc' | base64 | tr -d '\r\n')" '.items[]? | select(.data.name == $name and .data.server != $hub) | .metadata.name')
+    (( secret_count > 0 )) || printf '  - no ArgoCD cluster secret targets %s\n' "${sandbox_name}"
+  fi
+fi
+
+if [[ "${confirm}" != 1 ]]; then
+  printf 'DRY RUN: no changes made (rerun with --confirm or --apply)\n'
+  if [[ "${argo_refused}" == 1 ]]; then
+    printf 'Cleanup incomplete: one or more local cleanup operations failed.\n'
+    exit 1
+  fi
+  exit 0
+fi
+
+readyz_reachable=0
+if [[ "${argo_confirm}" == 1 && "${argo_discovery_ok}" == 1 && ${#delete_sets[@]} -gt 0 ]]; then
+  kubectl --context "${context}" --request-timeout=5s get --raw=/readyz >/dev/null 2>&1 && readyz_reachable=1 || :
+fi
 
 for label in "${agents[@]}"; do
   plist="${HOME}/Library/LaunchAgents/${label}.plist"
@@ -41,11 +126,7 @@ for label in "${agents[@]}"; do
     printf '  - already absent launchd agent: %s\n' "${label}"
   fi
   if [[ -e "${plist}" ]]; then
-    if rm -f "${plist}"; then
-      printf '  - removed launchd plist: %s\n' "${label}"
-    else
-      report_failure "could not remove launchd plist: ${label}"
-    fi
+    if rm -f "${plist}"; then printf '  - removed launchd plist: %s\n' "${label}"; else report_failure "could not remove launchd plist: ${label}"; fi
   else
     printf '  - already absent launchd plist: %s\n' "${label}"
   fi
@@ -54,16 +135,24 @@ done
 contexts=""
 if contexts="$(kubectl config get-contexts -o name 2>&1)"; then
   if grep -Fxq "${context}" <<<"${contexts}"; then
-    if kubectl config delete-context "${context}" >/dev/null 2>&1; then
-      printf '  - removed kube context: %s\n' "${context}"
+    if kubectl config delete-context "${context}" >/dev/null 2>&1; then printf '  - removed kube context: %s\n' "${context}"; else report_failure "could not remove kube context: ${context}"; fi
+  else printf '  - already absent kube context: %s\n' "${context}"; fi
+else report_failure "could not inspect kube contexts: ${contexts}"; fi
+
+if [[ "${argo_refused}" != 1 ]]; then
+  if [[ "${argo_confirm}" != 1 ]]; then
+    printf '  - ArgoCD deletes need --confirm (CONFIRM env is not enough)\n'
+  elif [[ "${argo_discovery_ok}" == 1 ]]; then
+    if [[ "${readyz_reachable}" == 1 ]]; then
+      printf '  - sandbox API is reachable; not deleting ArgoCD objects\n'
     else
-      report_failure "could not remove kube context: ${context}"
+      for set_name in "${delete_sets[@]}"; do
+        if kubectl --context "${hub_ctx}" -n "${argocd_ns}" --request-timeout=5s delete applicationset.argoproj.io --wait=false -- "${set_name}"; then
+          printf '  - deleted ArgoCD ApplicationSet: %s\n' "${set_name}"
+        else report_failure "could not delete ArgoCD ApplicationSet: ${set_name}"; fi
+      done
     fi
-  else
-    printf '  - already absent kube context: %s\n' "${context}"
   fi
-else
-  report_failure "could not inspect kube contexts: ${contexts}"
 fi
 
 if [[ "${failed}" -eq 0 ]]; then

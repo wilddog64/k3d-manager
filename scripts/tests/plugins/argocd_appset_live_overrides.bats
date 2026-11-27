@@ -111,6 +111,7 @@ _applied_for() {
 
 @test "ApplicationSet reapply uses CNI resolver when no live set exists" {
   _stub_no_live_appsets
+  export ISTIO_AMBIENT_APPSET_ENABLE=1
   _istio_ambient_target_provider() { printf 'k3d\n'; }
 
   run _argocd_deploy_applicationsets
@@ -126,6 +127,7 @@ _applied_for() {
 
 @test "ApplicationSet reapply keeps CNI environment defaults without a provider label" {
   _stub_no_live_appsets
+  export ISTIO_AMBIENT_APPSET_ENABLE=1
   _istio_ambient_target_provider() { :; }
 
   run _argocd_deploy_applicationsets
@@ -134,6 +136,42 @@ _applied_for() {
   local istio
   istio="$(_applied_for istio-ambient)"
   [[ "$(yq -r '.spec.generators[0].list.elements[] | select(.name == "istio-cni") | .values' "${istio}")" == *"cniBinDir: /opt/cni/bin"* ]]
+}
+
+@test "ambient reapply skips absent set by default while applying observability" {
+  _stub_no_live_appsets
+  unset ISTIO_AMBIENT_APPSET_ENABLE
+
+  run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipping istio-ambient.yaml: no live ApplicationSet"* ]]
+  [[ "$output" == *"Successfully deployed 2/2 all ApplicationSet(s)"* ]]
+  run grep -q 'APPLY:istio-ambient' "${KUBECTL_LOG}"
+  [ "$status" -ne 0 ]
+  grep -q 'APPLY:observability-acg' "${KUBECTL_LOG}"
+}
+
+@test "ambient reapply skips unexpected lookup errors and can be explicitly enabled" {
+  _kubectl() {
+    [[ "${1:-}" == "--no-exit" ]] && shift
+    if [[ "${1:-}" == get && "${2:-}" == applicationset && "${3:-}" == istio-ambient ]]; then
+      printf 'forbidden' >&2
+      return 1
+    fi
+    _stub_no_live_appsets
+  }
+  unset ISTIO_AMBIENT_APPSET_ENABLE
+  run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"could not inspect live ApplicationSet: forbidden"* ]]
+  run grep -q 'APPLY:istio-ambient' "${KUBECTL_LOG}"
+  [ "$status" -ne 0 ]
+
+  _stub_no_live_appsets
+  export ISTIO_AMBIENT_APPSET_ENABLE=1
+  run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  grep -q 'APPLY:istio-ambient' "${KUBECTL_LOG}"
 }
 
 @test "ApplicationSet reapply ignores live values when requested" {

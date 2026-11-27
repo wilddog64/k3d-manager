@@ -1443,6 +1443,25 @@ function _argocd_appset_live_overrides() {
    return 0
 }
 
+function _argocd_ambient_appset_wanted() {
+   local _live_probe
+   [[ "${1:-}" == istio-ambient.yaml ]] || return 0
+   [[ "${ISTIO_AMBIENT_APPSET_ENABLE:-0}" == 1 ]] && return 0
+   if [[ "${ARGOCD_APPSET_IGNORE_LIVE:-0}" == 1 ]]; then
+      _info "[argocd] skipping istio-ambient.yaml: live reads disabled and ISTIO_AMBIENT_APPSET_ENABLE unset"
+      return 1
+   fi
+   if _live_probe="$(_kubectl --no-exit get applicationset istio-ambient -n "${ARGOCD_NAMESPACE:-cicd}" -o name 2>&1)"; then
+      return 0
+   fi
+   if [[ "${_live_probe}" == *NotFound* ]]; then
+      _info "[argocd] skipping istio-ambient.yaml: no live ApplicationSet and ISTIO_AMBIENT_APPSET_ENABLE unset (Hostinger Istio adoption needs its own spec)"
+      return 1
+   fi
+   _warn "[argocd] skipping istio-ambient.yaml: could not inspect live ApplicationSet: ${_live_probe}"
+   return 1
+}
+
 function _argocd_retire_legacy_observability_acg_apps() {
    local ns="${ARGOCD_NAMESPACE:-cicd}" app json owned=0
    local -a legacy_apps=(acg-kube-prometheus-stack loki acg-trivy-operator)
@@ -1528,6 +1547,7 @@ function _argocd_deploy_applicationsets() {
    fi
 
    local selected_count=0
+   local skipped_count=0
    for file in "${appset_files[@]}"; do
       _argocd_appset_in_stage "$file" "$stage" || continue
       selected_count=$((selected_count + 1))
@@ -1544,6 +1564,11 @@ function _argocd_deploy_applicationsets() {
       local filename
       filename=$(basename "$file")
       _argocd_appset_in_stage "$file" "$stage" || continue
+
+      _argocd_ambient_appset_wanted "$filename" || {
+         skipped_count=$((skipped_count + 1))
+         continue
+      }
       _info "[argocd] Deploying ApplicationSet: $filename"
 
       _argocd_retire_legacy_observability_acg_apps "${filename}" || return 1
@@ -1584,6 +1609,8 @@ function _argocd_deploy_applicationsets() {
          done <<< "${_apply_err}"
       fi
    done
+
+   selected_count=$((selected_count - skipped_count))
 
    _info "[argocd] Successfully deployed $deployed_count/${selected_count} ${stage} ApplicationSet(s)"
    if (( failed_count > 0 )); then
