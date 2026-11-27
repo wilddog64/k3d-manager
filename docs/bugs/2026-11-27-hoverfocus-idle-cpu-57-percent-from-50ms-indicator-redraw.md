@@ -2,7 +2,7 @@
 
 **Status:** OPEN — captured, not triaged
 **Priority:** P2 (proposed: degraded battery/heat; workaround: `focusIndicator` off or pause)
-**Introduced by:** hoverfocus `4a3940f` (v0.0.3 U2 focus border), on top of the 50 ms tick from `4cbd377` (M1a)
+**Introduced by:** hoverfocus `4cbd377` (M1a 50 ms tick, per profile); `4a3940f` (U2 border) contribution unconfirmed
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-27
@@ -15,7 +15,18 @@
 
 `ps`: 53.7% CPU, 3:27 CPU time; `top -stats pid,cpu,idlew,power`: 57.4% CPU, 4887 idle wakeups per sample, power 57.9.
 
-## Cause (from code; not yet profiled)
+**Correction (Fable review + Claude re-measure, 2026-11-27 03:14Z, m4 macOS 26.5.2, same pid):** the "4887 idle
+wakeups" figure was `top`'s cumulative count (default `-c n`). Per-sample deltas (`top -l 4 -s 5 -c d`): CPU 57.5%,
+26.0%, 3.9%; idle wakeups 6, 15, 6 per 5 s sample. So this is expensive work per tick, not a wakeup storm, and the cost
+varies (pointer activity, window count). `sample 2455 5` (1 ms interval, `scratchpad/hf-sample.txt`): of 300 onTick
+samples, 297 were in `systemState()` (`Controller.swift:108`): `menuWindowIsAt` `:292` 166 (two full
+`SLWindowListCopyWindowInfo` per tick), `frontmostWindowID` AX IPC `:236` 68, Mission Control `windowAtLevel` `:242` 61.
+**No samples in `FocusIndicatorPanel.show` or `windowBounds`.** The measured cost is mainly from M1a `4cbd377`, so
+"Introduced by" and the `focusIndicator`-off workaround are unconfirmed until the indicator-off control is run.
+Also: `setFrame` is already guarded by `lastFrame` (`FocusIndicatorPanel.swift:49-50`); only the four `order` calls run
+every tick.
+
+## Cause (from code; superseded in part by the correction above)
 
 A repeating 50 ms timer (`Controller.swift:85`) runs `onTick` whether or not the pointer moved. Each tick:
 
