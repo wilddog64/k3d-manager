@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Run isolated offline operator acceptance scenarios."""
+"""Run isolated offline operator acceptance scenarios or the opt-in live profile."""
 import argparse
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/lib"))
+from acceptance.drafts import process_run_drafts
+from acceptance.live import LiveRefusedError, run_live_profile
 from acceptance.runner import REGISTRY, run_scenarios
 
 
@@ -12,15 +14,44 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenario", action="append", dest="scenarios")
     parser.add_argument("--run-root")
+    parser.add_argument("--live", action="store_true")
+    parser.add_argument("--with-test-all", action="store_true")
+    parser.add_argument("--with-prior-art", action="store_true")
     args = parser.parse_args(argv)
-    known = {item[0] for item in REGISTRY}
-    unknown = set(args.scenarios or ()) - known
-    if unknown:
-        parser.error("unknown scenario: " + ", ".join(sorted(unknown)))
-    run_dir, report, passed = run_scenarios(args.run_root, args.scenarios)
+    if args.live:
+        if args.scenarios:
+            parser.error("--scenario cannot be combined with --live")
+        try:
+            run_dir, report, passed = run_live_profile(
+                args.run_root,
+                with_test_all=args.with_test_all,
+                with_prior_art=args.with_prior_art,
+            )
+        except LiveRefusedError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+    else:
+        if args.with_test_all:
+            parser.error("--with-test-all requires --live")
+        known = {item[0] for item in REGISTRY}
+        unknown = set(args.scenarios or ()) - known
+        if unknown:
+            parser.error("unknown scenario: " + ", ".join(sorted(unknown)))
+        run_dir, report, passed = run_scenarios(args.run_root, args.scenarios)
+        if args.with_prior_art or any(
+            s.get("outcome") == "failed" and s.get("cause") == "product_contract"
+            for s in report.get("scenarios", [])
+        ):
+            process_run_drafts(
+                run_dir,
+                report,
+                run_root=args.run_root,
+                with_prior_art=args.with_prior_art,
+            )
     print(f"acceptance run: {run_dir}")
     for result in report["scenarios"]:
-        print(f"{result['id']}: {result['outcome']} ({result['cause']})" + (f" [{result['linked_bug']}]" if result["linked_bug"] else ""))
+        suffix = f" [{result['linked_bug']}]" if result["linked_bug"] else ""
+        print(f"{result['id']}: {result['outcome']} ({result['cause']}){suffix}")
     return 0 if passed else 1
 
 
