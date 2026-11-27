@@ -34,3 +34,12 @@ blue border on m4 stays.
 
 - Hide or dim the indicator when no pointer event has arrived for N seconds and the last pointer was at a display edge.
 - If keys stay on m2: document as a Universal Control limit (hover cannot move the keyboard between Macs).
+
+## Update — 2026-11-27 20:30 PST (after C1 `6bd845c`, signed build on m4)
+
+Operator: crossing from m2 to m4, HoverFocus focuses the hovered m4 window ("it does have focus"), but typed text does
+not arrive. Together with the m4-local control (keys reach a hover-focused, unraised window when m4's own keyboard is
+used), this points to Universal Control keeping keyboard input on m2 until a click on m4. HoverFocus cannot move the
+keyboard between Macs (no public API; a synthetic click would click into the window). Proposed resolution for triage:
+document as a limitation with the workaround "click once after crossing"; keep the stale-border half as the fixable
+part (hide the border when the pointer leaves the screen).
