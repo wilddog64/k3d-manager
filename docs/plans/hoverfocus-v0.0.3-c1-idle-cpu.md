@@ -1,7 +1,7 @@
 # hoverfocus v0.0.3 C1 — stop the idle CPU drain (menu-bar icon redraw loop; adaptive tick)
 
 **Status:** SPEC rev 1 — from blind reviews of the bug doc by Fable and Neon (dispatch `hf003-cpu-review-neon`), both
-NEEDS FIXES, folded in below, plus Claude's control and profiles (2026-11-27). Waiting on operator intent approval.
+NEEDS FIXES, folded in below, plus Claude's control and profiles (2026-11-27). Intents approved; dispatched to Luna (`hf003-c1`).
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent:** [`hoverfocus-v0.0.3-plan.md`](hoverfocus-v0.0.3-plan.md); fixes
 [`2026-11-27-hoverfocus-idle-cpu-57-percent-from-50ms-indicator-redraw.md`](../bugs/2026-11-27-hoverfocus-idle-cpu-57-percent-from-50ms-indicator-redraw.md)
@@ -11,7 +11,8 @@ NEEDS FIXES, folded in below, plus Claude's control and profiles (2026-11-27). W
 **Implementer:** Luna (codex, `gpt-6-luna`).
 **Verifier:** Claude, from `## Acceptance` only; live budget measured by Claude on m4, behaviour checks by the operator.
 **Filed:** 2026-11-27
-**Approval:** operator 2026-11-27 "can you have fable, neon review P2 bug then dispatch to Luna"
+**Intent approved:** operator, 2026-11-27
+**Approval:** operator 2026-11-27 "can you have fable, neon review P2 bug then dispatch to Luna"; "approved" (intents)
 
 ## Context (you cannot read the bug doc; this is what it established)
 
