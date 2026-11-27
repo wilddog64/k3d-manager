@@ -43,3 +43,12 @@ hub-deploy restarts each long-running agent whose code paths changed between old
 mapped per agent: webhook → `bin/k3dm-webhook`, `scripts/lib/webhook/`; cloud bridge; Hermes), prints which it
 restarted, and confirms the new PID started after the deploy. Paired test: a code-only diff restarts the webhook; a
 docs-only diff restarts nothing.
+
+## Recurrence — 2026-11-27 (v1.46.0 unrouted-notices live check)
+
+Operator promoted `1c74deb3` (`make hub-deploy`, ~03:06Z), which carries the `_notify_job` fix `35d42bc8`. Claude's
+unrouted probe `d812d065` (03:12Z) still recorded the second notice `route: none`, `delivered: false` (operator `cat`
+of its `delivery.jsonl`), the pre-fix shape: the webhook process was still running pre-promote code. The earlier p2b
+live check only worked because `make update-webhook-slack-routes` restarts the webhook. Workaround again:
+`make restart-webhook` on the hub, then re-probe. This bug now blocks live verification of every webhook fix in
+v1.46.0.
