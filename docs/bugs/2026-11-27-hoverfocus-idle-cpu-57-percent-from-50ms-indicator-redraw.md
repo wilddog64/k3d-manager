@@ -1,11 +1,11 @@
 # Bug: HoverFocus uses ~55% CPU while idle — the menu-bar icon's appearance observer and its redraw feed each other
 
-**Status:** LANDED — hoverfocus `6bd845c` (C1, Claude-verified offline); live idle-budget check owed on m4
+**Status:** LANDED — hoverfocus `6bd845c` (C1, Claude-verified offline); live idle budget PASS on m4 2026-11-27 (C-E2), C-E3 PASS except the light/dark icon check (07:30 PST)
 **Priority:** P1 (proposed after control; reviews Fable + Neon: release blocker — degraded battery/heat; no workaround except quitting HoverFocus — `focusIndicator` off and a relaunch do not help)
 **Introduced by:** hoverfocus `87322d6` (M1b app shell, 2026-11-22: `effectiveAppearance` observer → `updateIcon`), shipped in v0.0.1 and v0.0.2; secondary cost from the M1a 50 ms tick `4cbd377`
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** live check — since 2026-11-27
+**Waiting on:** live check (light/dark icon switch at 07:30 PST only) — since 2026-11-27
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run
 **Filed:** 2026-11-27, Claude, from operator report (macOS battery menu lists HoverFocus under "Using Significant Energy")
 **Component:** `hoverfocus` `Sources/HoverFocusPlatform/Controller.swift` `onTick` (:100), `FocusIndicatorPanel.swift`
@@ -89,3 +89,19 @@ continuously.
 - macOS battery menu (operator screenshot, ~20:20 PST): "No Apps Using Significant Energy" (before: HoverFocus listed).
 - Owed: a hands-off 60 s measurement against the C-M3 budget, and the operator behaviour checks (C-E3).
 - Side note: the m4 build is ad-hoc signed (no "HoverFocus Local Signing" identity on m4; Makefile falls back by design).
+
+## Live evidence — C-E2 / C-E3 (m4, 2026-11-27 13:53Z and 14:07Z, signed build `6bd845c`, pid 49985)
+
+- C-E2 border off / no tracked window, hands-off (13:53Z, `top -l 7 -s 10 -c d -stats pid,cpu,idlew,power`):
+  0.0, 0.1, 0.1, 0.1, 0.1, 0.9, 0.0% CPU; 0–1 idle wakeups per 10 s sample. `sample 49985 5`: main thread blocked in
+  `__CFRunLoopServiceMachPort` for all 4266 samples; 0 `_updateReplicants` frames. Budget ≤0.5% / ≤2 wakeups/s: PASS.
+- C-E2 border up on a still m4 Chrome window, operator typing on m2 (14:07Z): 1.2, 1.1, 1.1, 1.1, 1.1, 1.1% CPU;
+  16–32 idle wakeups per 10 s (≈2–3/s, the 0.25 s tracked tick); `sample`: 0 `_updateReplicants`, remaining time in
+  `rearmTimer` closure (`Controller.swift:416`) and `onTick` (`:111`). Budget ≤2.0% / ≤10 wakeups/s: PASS. C-N4
+  (>5% in any sample): not seen. Before: 51–58%.
+- C-E3 operator on m4's own trackpad (2026-11-27 ~06:00 PST): hover gives focus (border blue); the border follows a
+  dragged window; Cmd-Tab clears it; pause and resume from the menu hides it at once; clicking a window brings it back.
+  Light/dark icon switch: pending the scheduled appearance change at 07:30 PST.
+- Not a C1 regression: after crossing m4→m2 with Universal Control, the border stays on the m4 window and keys stay on m2
+  until a click (operator: "blue line on m4 chrome still on" while typing on m2) — m4's frontmost window is unchanged by
+  UC; tracked in `2026-11-27-hoverfocus-universal-control-border-without-keyboard-and-stale-border.md` (P3).
