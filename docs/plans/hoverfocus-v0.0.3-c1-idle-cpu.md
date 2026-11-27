@@ -78,7 +78,9 @@ stay as they are in this child), config keys, menus, install or signing.
 
 ## Files
 
-- `Sources/HoverFocusCore/` — new `MenuBarIconState.swift`, new `TickPolicy.swift`; `Engine.swift` (`hasPendingCandidate` only)
+- `Sources/HoverFocusCore/MenuBarIconState.swift` (new)
+- `Sources/HoverFocusCore/TickPolicy.swift` (new)
+- `Sources/HoverFocusCore/Engine.swift` (`hasPendingCandidate` only)
 - `Sources/hoverfocus/AppDelegate.swift`
 - `Sources/HoverFocusPlatform/Controller.swift`
 - `Sources/hoverfocus-selftest/main.swift`
