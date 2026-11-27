@@ -1,11 +1,11 @@
 # Bug: the hub webhook's `python3` has no pytest, so `make test-python` fails on m5
 
-**Status:** OPEN — spec rev 1 (2026-11-27), intents approved
+**Status:** LANDED — `60e15c51` + `27d32d14`, 2026-11-27 (Flash; Claude added broken-venv rebuild, made fast-gate Y-N1 observable, fixed a PATH leak in two tests); offline Y-E1 PASS, live Y-E2 owed
 **Priority:** P2
 **Introduced by:** unknown (likely the Homebrew Python upgrade to 3.15 on m5; pytest lived in an older site-packages)
 **Should have been caught by:** live check
 **Introducing change reviewed:** no
-**Waiting on:** fix running — since 2026-11-27 (Flash), then operator install on m5
+**Waiting on:** live check — since 2026-11-27 (promote, then operator runs `make install-pytest-venv` on m5)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (no k3d-k3d-cluster context) — not run
 **Severity:** medium — every hub `test-python` / `test-pytest` / `test-all` run ends exit 2 even with enough time.
 **Filed:** 2026-11-27, Claude, from the timed run for `2026-11-27-hub-make-test-all-exceeds-1800s-job-timeout.md`

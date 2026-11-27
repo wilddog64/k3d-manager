@@ -63,6 +63,8 @@
 
 ## v1.45.0 status (compressed 2026-11-22)
 - [ ] v1.46.0 release PR — opened 2026-11-27 (CHANGELOG promoted to [1.46.0], releases tables); Argon review (Copilot capped to 12-01); live owed: W2 after squash-merge, W3 part 2 next promote, W4 ACG make up, test-all T-E2 after pytest venv + promote; Tailscale L-E2 deferred to next reboot/macOS upgrade (operator).
+- [x] pytest venv fix LANDED `60e15c51`+`27d32d14` (2026-11-27): `make install-pytest-venv`, venv fallback at 5 sites; verified hub PATH + fast-gate PATH, pre-fix red, venv-first and no-rebuild mutants red. Live Y-E2 owed: promote → operator install on m5 → Claude overnight test-all.
+- [ ] Bug captured 2026-11-27 P3: release dashboard counts child specs as plans; add plan-level dependencies (operator: include) — `docs/bugs/2026-11-27-release-dashboard-counts-child-specs-as-plans.md`, triage 11-29, target v1.47.0.
 - [ ] v1.46.0 W4 ACG ssh fragment — lib-foundation v0.5.12 released; k3d-manager half LANDED `9557ede6` 2026-11-27 (manual ff; fast gate green); live ACG `make up` check owed (operator).
 - [ ] v1.46.0 plan 7 Tailscale break-glass — rev 3 `4387194c`; 7a LANDED `77d4e814`, 7b LANDED `8e7afe56`, both verified 2026-11-25; P1+P2 PASS 2026-11-26; L-E1 waits on lib-foundation v0.5.11 `_install_tailscale_app`; live test 2026-11-26 morning
 
