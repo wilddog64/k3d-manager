@@ -11,6 +11,8 @@
 v1.46.0 p3b's `--with-test-all` leg cannot pass. Local `make test-all` on a workstation is a workaround for the result,
 not for the cloud path.
 **Filed:** 2026-11-27, Claude, from the v1.46.0 p2b live check (operator: "go ahead to file those two P2 bugs")
+**Approval:** operator, 2026-11-27 ("go ahead to file those two P2 bugs and have Fable and Neon to review them. after that dispatch to Flash and Luna")
+**Intent approved:** operator, 2026-11-27
 **Component:** `scripts/lib/webhook/make_targets.py:37` (`"test-all": {"timeout": 1800}`); bridge watch timeout follows
 it (`bin/k3dm-cloud-bridge` `_watch_entry` uses `MAKE_TARGETS[target]["timeout"]`)
 

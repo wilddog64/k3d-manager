@@ -13,6 +13,8 @@ API-origin reports, different defect.
 **Severity:** medium — the cloud session still gets the result through the bridge, but Slack shows "started" and never
 the outcome for every cloud-request make job, so the operator cannot follow cloud work in Slack
 **Filed:** 2026-11-27, Claude, from the v1.46.0 p2b live control (operator: "go ahead to file those two P2 bugs")
+**Approval:** operator, 2026-11-27 ("go ahead to file those two P2 bugs and have Fable and Neon to review them. after that dispatch to Flash and Luna")
+**Intent approved:** operator, 2026-11-27
 **Component:** `bin/k3dm-webhook` `_notify_job` (~1296-1395)
 
 ## Evidence (live, 2026-11-27, hub m5 on `deploy/hub` `54a13982`)
