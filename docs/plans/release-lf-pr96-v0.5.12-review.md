@@ -6,7 +6,7 @@
 **Risk:** low (review only; no code changes)
 **Agent:** Argon (agy, `gemini-4-argon-medium`), role review
 
-`bin/k3dm-codex-dispatch start --spec docs/plans/release-lf-pr96-v0.5.12-review.md --repo ~/src/gitrepo/personal/lib-foundation --branch release/v0.5.12 --agent agy --model gemini-4-argon-medium --coordinator anthropic/claude-opus-5-5 --role review`
+`bin/k3dm-codex-dispatch start --spec docs/plans/release-lf-pr96-v0.5.12-review.md --repo ~/src/gitrepo/personal/lib-foundation --branch release/v0.5.12 --agent agy --model gemini-4-argon-medium --coordinator anthropic/claude-opus-5-5`
 
 ## Task
 
