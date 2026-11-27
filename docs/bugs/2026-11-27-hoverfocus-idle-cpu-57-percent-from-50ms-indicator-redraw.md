@@ -1,8 +1,8 @@
-# Bug: HoverFocus uses ~57% CPU while idle — the focus border re-frames and re-orders four panels every 50 ms
+# Bug: HoverFocus uses ~55% CPU while idle — the menu-bar icon's appearance observer and its redraw feed each other
 
 **Status:** OPEN — captured, not triaged
-**Priority:** P2 (proposed: degraded battery/heat; workaround: `focusIndicator` off or pause)
-**Introduced by:** hoverfocus `4cbd377` (M1a 50 ms tick, per profile); `4a3940f` (U2 border) contribution unconfirmed
+**Priority:** P2 (proposed: degraded battery/heat; no reliable workaround — `focusIndicator` off does not help; quitting HoverFocus does)
+**Introduced by:** hoverfocus `87322d6` (M1b app shell, 2026-11-22: `effectiveAppearance` observer → `updateIcon`), shipped in v0.0.1 and v0.0.2; secondary cost from the M1a 50 ms tick `4cbd377`
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
 **Waiting on:** operator decision — since 2026-11-27
@@ -14,6 +14,29 @@
 ## Evidence (m4, 2026-11-27 ~19:00, v0.0.3 branch `a4244b6`, pid 2455, operator idle)
 
 `ps`: 53.7% CPU, 3:27 CPU time; `top -stats pid,cpu,idlew,power`: 57.4% CPU, 4887 idle wakeups per sample, power 57.9.
+
+## Root cause (control + profile, Claude, 2026-11-27 03:22Z, m4 macOS 26.5.2, pid 2455)
+
+**Control:** `focusIndicator: false` (Claude wrote `~/.config/hoverfocus/config.json`; operator clicked Reload Config).
+`top -l 7 -s 5 -c d`: CPU 51.1, 54.0, 52.6, 55.6, 54.0, 54.2% — unchanged. The border is not the cause.
+
+**Profile** (`sample 2455 5`, 1 ms, border off, `scratchpad/hf-sample-off.txt`), main thread ~3500 samples:
+
+- ~1830 (≈52%) in `__NSFireDelayedPerform` → `-[NSStatusItem _updateReplicants]` → `_redrawReplicantSnapshot` →
+  `CALayer renderInContext:` — AppKit re-rendering the menu-bar icon's replicant snapshots.
+- 186 in the KVO closure `AppDelegate.swift:51` (`button.observe(\.effectiveAppearance)`) → `updateIcon()` →
+  `button.image = image` (`:234`), reached from `NSKeyValueDidChange`.
+- ~316 (≈9%) in `onTick` → `systemState()` (the window-list copies and AX call below).
+
+Loop: setting `button.image` makes AppKit rebuild the status item's replicants; that re-resolves the button's
+`effectiveAppearance`, which fires the observer, which builds a new image and sets it again. `updateIcon` never checks
+whether anything changed. The earlier border-on sample at 3.9% CPU (03:14Z) had only the 2 s trust-timer path
+(`AppDelegate.swift:42` → `updateUI` `:187` → `updateIcon`, 47 samples) and no KVO frames, so the loop is intermittent:
+once started it persists. That explains the 57 / 26 / 3.9 / steady-54% readings.
+
+Fix direction: `updateIcon` computes the `(style, darkBar, dimmed)` key and returns early when it equals the last one it
+applied (never re-assign `button.image` for an unchanged key); the 2 s `updateUI` must not touch the icon unless that
+key changed. Secondary (separate child or same spec): one window-list snapshot per tick and a slower idle tick (Fable).
 
 **Correction (Fable review + Claude re-measure, 2026-11-27 03:14Z, m4 macOS 26.5.2, same pid):** the "4887 idle
 wakeups" figure was `top`'s cumulative count (default `-c n`). Per-sample deltas (`top -l 4 -s 5 -c d`): CPU 57.5%,
