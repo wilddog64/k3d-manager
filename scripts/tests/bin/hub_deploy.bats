@@ -12,6 +12,7 @@ setup() {
   mkdir -p "$BATS_TEST_TMPDIR/guards"
   export HOME="${BATS_TEST_TMPDIR}/home" XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
   export K3DM_REPO_SYNC_STATE_DIR="${BATS_TEST_TMPDIR}/repo-sync" K3DM_HUB_DEPLOY_CHECKOUT_WAIT=0
+  export K3DM_JOB_DIR="$BATS_TEST_TMPDIR/jobs" K3DM_HUB_DEPLOY_AGENT_WAIT=0
   mkdir -p "$WORK/bin" "$WORK/scripts/lib/foundation/scripts/lib" "$WORK/scripts/etc/argocd/applicationsets" "$HOME" "$XDG_CONFIG_HOME/k3d-manager" "${BATS_TEST_TMPDIR}/stubs"
   printf 'hub\n' > "$XDG_CONFIG_HOME/k3d-manager/machine-role"
   printf 'fixture\n' > "$WORK/.fixture-root"
@@ -73,6 +74,25 @@ EOF
 #!/usr/bin/env bash
 [[ -f "$FIXTURE_ROOT" && "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
 target="${*: -1}"
+if [[ "$target" == restart-webhook ]]; then
+  printf 'restart-webhook\n' >> "$CALLS"
+  [[ ! -e /dev/fd/9 ]] || exit 96
+  [[ "$(cat "$K3DM_REPO_SYNC_STATE_DIR/lock/pid")" == "$PPID" ]] || exit 97
+  [[ -z "${K3DM_AGENT_LOAD+x}" ]] || exit 95
+  [[ "$("$REAL_GIT" -C "$TEST_WORK" rev-parse HEAD)" == "$(awk '$1 == "appsets" { print $2; exit }' "$HOME/.local/share/k3d-manager/hub-deploy/state")" && -z "$("$REAL_GIT" -C "$TEST_WORK" status --porcelain --untracked-files=no)" ]] || exit 94
+  [[ "${FAIL_STEP:-}" != restart-webhook ]] || exit "${FAIL_CODE:-23}"
+  if [[ "${NO_PID_BUMP:-0}" != 1 ]]; then
+    mkdir -p "$HOME/.test-launchctl"
+    for label in com.k3d-manager.webhook com.k3d-manager.cloud-bridge; do
+      [[ "$label" != com.k3d-manager.cloud-bridge || -e "$HOME/Library/LaunchAgents/$label.plist" ]] || continue
+      previous=999
+      [[ ! -r "$HOME/.test-launchctl/$label.pid" ]] || previous="$(cat "$HOME/.test-launchctl/$label.pid")"
+      touch "$HOME/.test-launchctl/$label"
+      printf '%s\n' "$((previous + 1))" > "$HOME/.test-launchctl/$label.pid"
+    done
+  fi
+  exit 0
+fi
 if [[ "${E4_MAKE_MODE:-0}" == 1 ]]; then
   printf '%s\n' "$*" >> "$BATS_TEST_TMPDIR/e4-make-args"
   if [[ ! -e "$BATS_TEST_TMPDIR/e4-state-at-make" ]]; then
@@ -153,9 +173,19 @@ fi
 EOF
   cat > "$BATS_TEST_TMPDIR/stubs/launchctl" <<'EOF'
 #!/usr/bin/env bash
+# Output shape captured read-only from m5-air.local on 2026-11-27.
 [[ "$HOME" == "$BATS_TEST_TMPDIR/home" ]] || exit 98
+printf 'launchctl %s\n' "$*" >> "$CALLS"
 [[ "$1" == print && "${PRINT_FAIL:-0}" == 0 ]] || exit 113
 [[ -f "$HOME/.test-launchctl/${2##*/}" ]] || exit 113
+label="${2##*/}"
+if [[ -r "$HOME/.test-launchctl/$label.pid" ]]; then printf 'pid = %s\n' "$(cat "$HOME/.test-launchctl/$label.pid")"; fi
+if [[ -r "$HOME/.test-launchctl/$label.port" ]]; then printf 'K3DM_WEBHOOK_PORT => %s\n' "$(cat "$HOME/.test-launchctl/$label.port")"; fi
+EOF
+  cat > "$BATS_TEST_TMPDIR/stubs/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$BATS_TEST_TMPDIR/curl.args"
+printf '%s' "${CURL_CODE:-401}"
 EOF
   cat > "$BATS_TEST_TMPDIR/stubs/kubectl" <<'EOF'
 #!/usr/bin/env bash
@@ -222,7 +252,8 @@ GUARD
   # ahead of the fail-closed guard after verifying the guard resolution above.
   export PATH="$BATS_TEST_TMPDIR/stubs:$BATS_TEST_TMPDIR/guards:$PATH"
   [[ "$HOME" == "$BATS_TEST_TMPDIR/home" && "$K3DM_REPO_SYNC_STATE_DIR" == "$BATS_TEST_TMPDIR/repo-sync" ]]
-  [[ -d "$WORK/.git" && "$(command -v make)" == "$BATS_TEST_TMPDIR/stubs/make" && "$(command -v launchctl)" == "$BATS_TEST_TMPDIR/stubs/launchctl" ]]
+  [[ -d "$WORK/.git" && "$(command -v make)" == "$BATS_TEST_TMPDIR/stubs/make" && "$(command -v launchctl)" == "$BATS_TEST_TMPDIR/stubs/launchctl" && "$(command -v curl)" == "$BATS_TEST_TMPDIR/stubs/curl" ]]
+  [[ "$K3DM_JOB_DIR" == "$BATS_TEST_TMPDIR"/* ]]
 }
 
 teardown() {
@@ -234,6 +265,237 @@ _prepare_e4_approval() {
   : > "$BATS_TEST_TMPDIR/e4-make-args"
   : > "$BATS_TEST_TMPDIR/e4-make-env"
   export APPROVAL_NEW_SHA="$CHANGED_SHA" APPROVAL_OLD_SHA="$BASE_SHA" E4_MAKE_MODE=1 E4_GOT_SHA="$OTHER_SHA" CHANGED_SHA OTHER_SHA
+}
+
+_prepare_agent_change() {
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  mkdir -p "$WORK/scripts/lib/webhook"
+  printf 'changed agent code\n' > "$WORK/scripts/lib/webhook/agent.py"
+  "$REAL_GIT" -C "$WORK" add scripts/lib/webhook/agent.py
+  "$REAL_GIT" -C "$WORK" commit -qm 'fixture webhook code change'
+  CHANGED_SHA="$($REAL_GIT -C "$WORK" rev-parse HEAD)"
+  export CHANGED_SHA
+  "$REAL_GIT" -C "$WORK" push --quiet origin "$CHANGED_SHA:refs/heads/agent-change"
+  "$REAL_GIT" -C "$WORK" branch -f agent-change "$CHANGED_SHA"
+  "$REAL_GIT" -C "$WORK" checkout -q --detach "$BASE_SHA"
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.test-launchctl"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  touch "$HOME/.test-launchctl/com.k3d-manager.webhook"
+  printf '700\n' > "$HOME/.test-launchctl/com.k3d-manager.webhook.pid"
+}
+
+_prepare_agent_docs_change() {
+  "$REAL_GIT" -C "$WORK" checkout -q changed
+  printf 'docs only\n' > "$WORK/agent-docs.md"
+  "$REAL_GIT" -C "$WORK" add agent-docs.md
+  "$REAL_GIT" -C "$WORK" commit -qm 'fixture docs only'
+  CHANGED_SHA="$($REAL_GIT -C "$WORK" rev-parse HEAD)"
+  export CHANGED_SHA
+  "$REAL_GIT" -C "$WORK" push --quiet origin "+$CHANGED_SHA:refs/heads/agent-docs"
+  "$REAL_GIT" -C "$WORK" branch -f agent-docs "$CHANGED_SHA"
+  "$REAL_GIT" -C "$WORK" checkout -q --detach "$BASE_SHA"
+}
+
+_write_agent_state() {
+  local sha="$1"
+  mkdir -p "$HOME/.local/share/k3d-manager/hub-deploy"
+  printf 'appsets %s\nlaunchd %s\nagents %s\n' "$sha" "$sha" "$sha" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents: changed webhook code restarts once and records the promoted sha' {
+  _prepare_agent_change
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'restarted webhook (pid 701)'* && "$output" == *'; agents restarted'* ]]
+  [[ "$output" != *'cloud-bridge'* ]]
+  [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+  grep -qx "agents $CHANGED_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  grep -q 'http://127.0.0.1:7443/api/v1/health' "$BATS_TEST_TMPDIR/curl.args"
+  ! grep -q -- '-H\|Authorization' "$BATS_TEST_TMPDIR/curl.args"
+}
+
+@test 'agents: a fresh queued job defers without advancing state' {
+  _prepare_agent_change
+  mkdir -p "$K3DM_JOB_DIR/job-queued"
+  printf ' queued \n' > "$K3DM_JOB_DIR/job-queued/status"
+  run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 3 ]
+  [[ "$output" == *'; agents pending'* && "$stderr" == *'webhook job job-queued is queued'* ]]
+  [ "$(grep -cx restart-webhook "$CALLS" || true)" -eq 0 ]
+  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents M2: docs-only change advances agents without restarting' {
+  _prepare_agent_docs_change
+  _write_agent_state "$BASE_SHA"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-docs
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agents unchanged between '* ]]
+  [[ "$output" == *'; agents unchanged' ]]
+  [ "$(grep -cx restart-webhook "$CALLS" || true)" -eq 0 ]
+  grep -qx "agents $CHANGED_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents M3: two-line state is accepted and agent change restarts' {
+  _prepare_agent_change
+  mkdir -p "$HOME/.local/share/k3d-manager/hub-deploy"
+  printf 'appsets %s\nlaunchd %s\n' "$BASE_SHA" "$BASE_SHA" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'state unreadable'* && "$output" == *'; agents restarted' ]]
+  [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+}
+
+@test 'agents M3: garbage line after agents state triggers recovery and restart' {
+  _prepare_agent_change
+  mkdir -p "$HOME/.local/share/k3d-manager/hub-deploy"
+  printf 'appsets %s\nlaunchd %s\nagents %s\ngarbage\n' "$BASE_SHA" "$BASE_SHA" "$BASE_SHA" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'state unreadable; full launchd reconcile and appsets reapply owed'* && "$output" == *'; agents restarted' ]]
+  [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+}
+
+@test 'agents M3: invalid agents lines each force unreadable-state recovery' {
+  _prepare_agent_change
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.local/share/k3d-manager/hub-deploy"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  for invalid_agent in full not-a-sha "$(printf 'z%.0s' {1..40})" "$(printf 'f%.0s' {1..40})"; do
+    : > "$CALLS"
+    if [[ "$invalid_agent" == full ]]; then
+      printf 'appsets %s\nlaunchd %s\nagents full\n' "$BASE_SHA" "$BASE_SHA" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+    elif [[ "$invalid_agent" == not-a-sha ]]; then
+      printf 'appsets %s\nlaunchd %s\nagents not-a-sha\n' "$BASE_SHA" "$BASE_SHA" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+    elif [[ "$invalid_agent" == "$(printf 'z%.0s' {1..40})" ]]; then
+      printf 'appsets %s\nlaunchd %s\nagents %s\nagents %s\n' "$BASE_SHA" "$BASE_SHA" "$BASE_SHA" "$BASE_SHA" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+    else
+      printf 'appsets %s\nlaunchd %s\nagents %s\n' "$BASE_SHA" "$BASE_SHA" "$invalid_agent" > "$HOME/.local/share/k3d-manager/hub-deploy/state"
+    fi
+    run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'state unreadable'* ]]
+    [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+  done
+}
+
+@test 'agents M4: missing webhook plist records not-installed and skips restart' {
+  _prepare_agent_change
+  rm -f "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist" "$HOME/.test-launchctl/com.k3d-manager.webhook"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agents: webhook not installed on this host; skipping'* && "$output" == *'; agents not installed' ]]
+  [ "$(grep -cx restart-webhook "$CALLS" || true)" -eq 0 ]
+  grep -qx "agents $CHANGED_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents M5: fresh running job defers without advancing state' {
+  _prepare_agent_change
+  mkdir -p "$K3DM_JOB_DIR/job-running"
+  printf 'running\n' > "$K3DM_JOB_DIR/job-running/status"
+  run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 3 ]
+  [[ "$output" == *'; agents pending'* && "$stderr" == *'webhook job job-running is running'* ]]
+  [ "$(grep -cx restart-webhook "$CALLS" || true)" -eq 0 ]
+  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents M5: stale running and success jobs do not defer restart' {
+  _prepare_agent_change
+  mkdir -p "$K3DM_JOB_DIR/job-stale" "$K3DM_JOB_DIR/job-success"
+  printf 'running\n' > "$K3DM_JOB_DIR/job-stale/status"
+  printf 'success\n' > "$K3DM_JOB_DIR/job-success/status"
+  touch -t 200001010000 "$K3DM_JOB_DIR/job-stale/status"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'; agents restarted' ]]
+  [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+}
+
+@test 'agents M6 N6: rollback re-promote restarts when old-to-new includes agent code' {
+  _prepare_agent_change
+  _write_agent_state "$CHANGED_SHA"
+  "$REAL_GIT" -C "$WORK" push --quiet origin "$BASE_SHA:refs/heads/deploy/hub"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'; agents restarted' && "$output" != *'agents unchanged'* ]]
+  [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+}
+
+@test 'agents N3: disabled load defers without advancing' {
+  _prepare_agent_change
+  mkdir -p "$HOME/Library/LaunchAgents"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  run --separate-stderr env K3DM_AGENT_LOAD=0 PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *'agent load disabled (K3DM_AGENT_LOAD=0)'* ]]
+  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+
+  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents N3: checkout mismatch defers without advancing' {
+  _prepare_agent_change
+  mkdir -p "$HOME/Library/LaunchAgents"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  install_fixture
+  run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" MOVE_HEAD=1 MOVE_TO="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *'hub checkout is not at '* ]]
+  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+}
+
+@test 'agents N3: failed restart and confirmation timeouts preserve agents state' {
+  _prepare_agent_change
+  mkdir -p "$HOME/Library/LaunchAgents"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" FAIL_STEP=restart-webhook "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *'stopped at agent-restart'* && "$stderr" == *'webhook is loaded (pid 700)'* && "$stderr" == *'cloud-bridge is not installed'* ]]
+  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+
+  for knob in pid curl; do
+    : > "$CALLS"
+    if [[ "$knob" == pid ]]; then run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" NO_PID_BUMP=1 "$WORK/bin/k3dm-hub-deploy" agent-change
+    else run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" CURL_CODE=000 "$WORK/bin/k3dm-hub-deploy" agent-change; fi
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *'webhook is '* && "$stderr" == *'restore with make restart-webhook'* ]]
+    ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  done
+}
+
+@test 'agents N5: launchctl prints only; restart-webhook handles the bridge and curl stays unauthenticated' {
+  _prepare_agent_change
+  mkdir -p "$HOME/Library/LaunchAgents"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+  touch "$HOME/.test-launchctl/com.k3d-manager.cloud-bridge"
+  printf '800\n' > "$HOME/.test-launchctl/com.k3d-manager.cloud-bridge.pid"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'restarted webhook (pid 701) and cloud-bridge (pid 801)'* ]]
+  [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
+  [ "$(grep '^launchctl ' "$CALLS" | grep -vc 'launchctl print ' || true)" -eq 0 ]
+  [[ "$(<"$CALLS")" != *restart-cloud-bridge* ]]
+  ! grep -q '^launchctl kickstart ' "$CALLS"
+  ! grep -q -- '-H\|Authorization' "$BATS_TEST_TMPDIR/curl.args"
+}
+
+@test 'agents summary places agents after unwired launchd count' {
+  _prepare_agent_docs_change
+  _write_agent_state "$BASE_SHA"
+  mkdir -p "$WORK/scripts/etc/launchd" "$HOME/Library/LaunchAgents"
+  printf 'unknown\n' > "$WORK/scripts/etc/launchd/com.k3d-manager.unwired-fixture.plist.tmpl"
+  "$REAL_GIT" -C "$WORK" add scripts/etc/launchd/com.k3d-manager.unwired-fixture.plist.tmpl
+  "$REAL_GIT" -C "$WORK" commit -qm 'fixture unwired agent template'
+  CHANGED_SHA="$($REAL_GIT -C "$WORK" rev-parse HEAD)"; export CHANGED_SHA
+  "$REAL_GIT" -C "$WORK" push --quiet origin "+$CHANGED_SHA:refs/heads/agent-docs"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.unwired-fixture.plist"
+  : > "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  run env PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-docs
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'; launchd unwired 1; agents unchanged' ]]
 }
 
 @test "M1: changed ApplicationSets run every step in order" {

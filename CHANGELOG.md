@@ -12,6 +12,7 @@
 ### Fixed
 
 - **Repo sync ignores CI-green commits whose content is already in `deploy/hub`.** Squash-merged release branches no longer keep `K3dmPromoteWaiting` active; new or reverted content remains promotable.
+- **Hub deploy restarts changed webhook and cloud-bridge code.** Active queued or running webhook jobs defer the restart with exit 3 and a rerun hint; unchanged code does not interrupt the agents.
 - **Cloud bridge watch-ledger validation and sandbox lifecycle tracking.** Entries in `ledger/watching.txt` from the public `cloud-requests` branch are strictly validated against malformed inputs and non-finite timestamps or timeouts, skipping corrupted lines instead of crashing or freezing the bridge. The bridge also tracks asynchronous sandbox lifecycle jobs (`sandbox-up`, `sandbox-down`) through terminal responses in the watch ledger. See [`docs/architecture/cloud-bridge.md`](docs/architecture/cloud-bridge.md).
 
 ## [1.45.1] - 2026-11-25

@@ -55,46 +55,52 @@ write_state() {
   local name
   {
     printf 'appsets %s\nlaunchd %s\n' "$appsets" "$launchd"
+    [[ -z "$agents" ]] || printf 'agents %s\n' "$agents"
     for name in "${pending[@]}"; do printf 'pending %s\n' "$name"; done
   } > "$STATE_DIR/state.tmp.$$" && _run_command --soft -- mv -f "$STATE_DIR/state.tmp.$$" "$STATE_DIR/state" 9>&-
 }
 valid_state() {
-  local kind value line name
-  appsets='' launchd='' pending=()
+  local kind value line name parsed_appsets='' parsed_launchd='' parsed_agents='' parsed_pending=() seen_agents=0
+  appsets='' launchd='' agents='' pending=()
   [[ -f "$STATE_DIR/state" && -r "$STATE_DIR/state" ]] || return 1
   while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" =~ ^(appsets|launchd|pending)\ ([a-z0-9-]+)$ ]] || return 1
+    [[ "$line" =~ ^(appsets|launchd|agents|pending)\ ([a-z0-9-]+)$ ]] || return 1
     kind="${BASH_REMATCH[1]}"; value="${BASH_REMATCH[2]}"
     case "$kind" in
       appsets|launchd)
         [[ "$value" == full || "$value" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || return 1
         if [[ "$value" != full ]]; then _run_command --soft -- git -C "$REPO_ROOT" cat-file -e "$value^{commit}" 9>&- || return 1; fi
-        if [[ "$kind" == appsets ]]; then [[ -z "$appsets" ]] || return 1; appsets="$value"
-        else [[ -z "$launchd" ]] || return 1; launchd="$value"; fi ;;
+        if [[ "$kind" == appsets ]]; then [[ -z "$parsed_appsets" ]] || return 1; parsed_appsets="$value"
+        else [[ -z "$parsed_launchd" ]] || return 1; parsed_launchd="$value"; fi ;;
+      agents)
+        [[ "$seen_agents" == 0 && "$value" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || return 1
+        _run_command --soft -- git -C "$REPO_ROOT" cat-file -e "$value^{commit}" 9>&- || return 1
+        parsed_agents="$value"; seen_agents=1 ;;
       pending)
         [[ "$value" =~ ^[a-z0-9-]+$ ]] || return 1
-        for name in "${pending[@]}"; do [[ "$name" != "$value" ]] || return 1; done
-        pending+=("$value") ;;
+        for name in "${parsed_pending[@]}"; do [[ "$name" != "$value" ]] || return 1; done
+        parsed_pending+=("$value") ;;
       *) return 1 ;;
     esac
   done < "$STATE_DIR/state"
-  [[ -n "$appsets" && -n "$launchd" ]]
+  [[ -n "$parsed_appsets" && -n "$parsed_launchd" ]] || return 1
+  appsets="$parsed_appsets"; launchd="$parsed_launchd"; agents="$parsed_agents"; pending=("${parsed_pending[@]}")
 }
 if [[ "$stage2" == 1 ]]; then old="$prev"
 elif [[ -n "$approval_id" ]]; then old=''
 elif old="$(remote_sha)"; then :; else code=$?; stop read-deploy-hub "$code"; fi
-pending=()
+pending=(); agents=''
 approval_first_run=0
 if [[ -n "$approval_id" ]] && valid_state; then :
 elif [[ -n "$approval_id" ]]; then
-  approval_first_run=1; appsets=''; launchd=full; pending=()
+  approval_first_run=1; appsets=''; launchd=full; agents=''; pending=()
 elif valid_state; then :
 elif [[ ! -e "$STATE_DIR/state" && "$(_run_command --soft -- ls -A "$STATE_DIR" 9>&-)" == run.lock ]]; then
-  appsets="$old"; launchd=full; pending=()
+  appsets="$old"; launchd=full; agents=''; pending=()
   printf 'hub-deploy: no reconcile state yet; full launchd reconcile owed; appsets base %s\n' "${old:0:7}"
   write_state || stop state-write 1
 else
-  appsets=full; launchd=full; pending=()
+  appsets=full; launchd=full; agents=''; pending=()
   printf 'hub-deploy: state unreadable; full launchd reconcile and appsets reapply owed\n'
   write_state || stop state-write 1
 fi
@@ -300,6 +306,103 @@ if ((${#ready[@]})); then
 fi
 if ((${#pending[@]})); then result="pending ${#pending[@]}"; printf 'hub-deploy: launchd pending: %s\n' "${pending[*]}" >&2
 elif [[ "$ran" == 1 ]]; then result='ran 0'; else result='skipped 0'; fi
+agents_result='pending'; agents_reason=''; agents_deferred=0
+webhook_plist="$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+bridge_plist="$HOME/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+watched=(bin/k3dm-webhook bin/k3dm-cloud-bridge scripts/lib/webhook/ scripts/lib/hermes/)
+agent_changed() {
+  local rc
+  if _run_command --soft -- git -C "$REPO_ROOT" diff --quiet --no-renames "$1" "$new" -- "${watched[@]}" 9>&-; then return 1
+  else rc=$?; fi
+  [[ "$rc" == 1 ]] || stop agent-diff "$rc"
+  return 0
+}
+if [[ ! -e "$webhook_plist" ]]; then
+  printf 'hub-deploy: agents: webhook not installed on this host; skipping\n'
+  agents="$new"; write_state || stop state-write 1; agents_result='not installed'
+elif [[ -n "$agents" ]] && ! agent_changed "$agents" && { [[ -z "$old" || "$old" == "$agents" ]] || ! agent_changed "$old"; }; then
+  printf 'hub-deploy: agents unchanged between %s and %s\n' "${agents:0:7}" "${new:0:7}"
+  agents="$new"; write_state || stop state-write 1; agents_result='unchanged'
+else
+  if [[ "${K3DM_AGENT_LOAD:-}" == 0 ]]; then agents_reason='agent load disabled (K3DM_AGENT_LOAD=0)'
+  else
+    agent_deadline=$(( $(_run_command --soft -- date +%s 9>&-) + ${K3DM_HUB_DEPLOY_CHECKOUT_WAIT:-330} )); agent_caught=0
+    while :; do
+      if take_lock && checkout_ok; then agent_caught=1; break; fi
+      release_lock
+      agent_now="$(_run_command --soft -- date +%s 9>&-)"; (( agent_now < agent_deadline )) || break
+      agent_delay=$((agent_deadline-agent_now)); (( agent_delay <= 10 )) || agent_delay=10
+      _run_command --soft -- sleep "$agent_delay" 9>&-
+    done
+    if [[ "$agent_caught" == 0 ]]; then agents_reason="hub checkout is not at ${new:0:7} with a clean tracked tree"
+    else
+      job_dir="${K3DM_JOB_DIR:-$HOME/.local/share/k3d-manager/webhook-jobs}"
+      now="$(_run_command --soft -- date +%s 9>&-)"
+      if [[ -d "$job_dir" ]]; then
+        while IFS= read -r status_file; do
+          job_state="$(_run_command --soft -- tr -d '[:space:]' < "$status_file" 9>&-)"
+          [[ "$job_state" == queued || "$job_state" == running ]] || continue
+          stamp="$(lock_stamp "$status_file" 9>&-)" || continue
+          if (( stamp >= now - 10800 )); then
+            job_id="${status_file%/status}"; job_id="${job_id##*/}"
+            release_lock; agents_reason="webhook job $job_id is $job_state"; break
+          fi
+        done < <(_run_command --soft -- find "$job_dir" -mindepth 2 -maxdepth 2 -name status -type f 9>&-)
+      fi
+      if [[ -z "$agents_reason" ]]; then
+        uid="$(_run_command --soft -- id -u 9>&-)"
+        webhook_before="$(_run_command --soft -- launchctl print "gui/$uid/com.k3d-manager.webhook" 9>&- 2>/dev/null || :)"
+        old_w=''
+        while IFS= read -r pid_line; do [[ "$pid_line" =~ ^[[:space:]]*pid[[:space:]]*=[[:space:]]*([1-9][0-9]*)$ ]] && old_w="${BASH_REMATCH[1]}"; done <<< "$webhook_before"
+        bridge_installed=0; old_b=''
+        if [[ -e "$bridge_plist" ]]; then
+          bridge_installed=1
+          bridge_before="$(_run_command --soft -- launchctl print "gui/$uid/com.k3d-manager.cloud-bridge" 9>&- 2>/dev/null || :)"
+          [[ "$bridge_before" =~ (^|$'\n')[[:space:]]*pid[[:space:]]*=[[:space:]]*([1-9][0-9]*)$ ]] && old_b="${BASH_REMATCH[2]}"
+        fi
+        if _run_command --soft -- env -u K3DM_AGENT_LOAD make --no-print-directory -C "$REPO_ROOT" restart-webhook 9>&-; then restart_code=0; else restart_code=$?; fi
+        wait="${K3DM_HUB_DEPLOY_AGENT_WAIT:-30}"; [[ "$wait" =~ ^[0-9]+$ ]] || wait=30
+        start="$(_run_command --soft -- date +%s 9>&-)"; confirmed=0
+        while :; do
+          webhook_now="$(_run_command --soft -- launchctl print "gui/$uid/com.k3d-manager.webhook" 9>&- 2>/dev/null || :)"
+          webhook_pid=''; port=''
+          while IFS= read -r pid_line; do [[ "$pid_line" =~ ^[[:space:]]*pid[[:space:]]*=[[:space:]]*([1-9][0-9]*)$ ]] && webhook_pid="${BASH_REMATCH[1]}"; done <<< "$webhook_now"
+          port_re='K3DM_WEBHOOK_PORT[[:space:]]*=>[[:space:]]*([0-9]+)'
+          while IFS= read -r port_line; do [[ "$port_line" =~ $port_re ]] && port="${BASH_REMATCH[1]}"; done <<< "$webhook_now"
+          if [[ -z "$port" ]]; then port="${K3DM_WEBHOOK_PORT:-7443}"; fi
+          if [[ ! "$port" =~ ^[1-9][0-9]{0,4}$ ]] || (( 10#$port > 65535 )); then port=7443; fi
+          bridge_ok=1; bridge_pid=''
+          if (( bridge_installed )); then
+            bridge_now="$(_run_command --soft -- launchctl print "gui/$uid/com.k3d-manager.cloud-bridge" 9>&- 2>/dev/null || :)"
+            while IFS= read -r pid_line; do [[ "$pid_line" =~ ^[[:space:]]*pid[[:space:]]*=[[:space:]]*([1-9][0-9]*)$ ]] && bridge_pid="${BASH_REMATCH[1]}"; done <<< "$bridge_now"
+            [[ -n "$bridge_pid" && "$bridge_pid" != "$old_b" ]] || bridge_ok=0
+          fi
+          health="$(_run_command --soft --quiet -- curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$port/api/v1/health" 9>&- 2>/dev/null || :)"
+          if [[ "$restart_code" == 0 && -n "$webhook_pid" && "$webhook_pid" != "$old_w" && "$bridge_ok" == 1 && ( "$health" == 401 || "$health" == 200 ) ]]; then confirmed=1; break; fi
+          current="$(_run_command --soft -- date +%s 9>&-)"; (( current < start + wait )) || break
+          _run_command --soft -- sleep 1 9>&-
+        done
+        if [[ "$confirmed" == 1 ]]; then
+          if (( bridge_installed )); then printf 'hub-deploy: restarted webhook (pid %s) and cloud-bridge (pid %s) for %s..%s\n' "$webhook_pid" "$bridge_pid" "${old:0:7}" "${new:0:7}"
+          else printf 'hub-deploy: restarted webhook (pid %s) for %s..%s\n' "$webhook_pid" "${old:0:7}" "${new:0:7}"; fi
+          agents="$new"; write_state || stop state-write 1; release_lock; agents_result='restarted'
+        else
+          agent_status='not loaded'; [[ -n "$webhook_pid" ]] && agent_status="loaded (pid $webhook_pid)"
+          bridge_status='not installed'; if (( bridge_installed )); then bridge_status='not loaded'; [[ -n "$bridge_pid" ]] && bridge_status="loaded (pid $bridge_pid)"; fi
+          printf 'hub-deploy: webhook is %s; cloud-bridge is %s; restore with make restart-webhook (bridge: make install-cloud-bridge) on the hub\n' "$agent_status" "$bridge_status" >&2
+          stop agent-restart 1
+        fi
+      fi
+    fi
+  fi
+  if [[ -n "$agents_reason" ]]; then agents_deferred=1; release_lock; fi
+fi
 printf 'hub-deploy: deploy/hub %s..%s; reapply %s; appsets-check ok; platform-ops ok; exporter rolled out; launchd %s' "${old:0:7}" "${new:0:7}" "$reapply" "$result"
 if (( unwired )); then printf '; launchd unwired %s' "$unwired"; fi
+printf '; agents %s' "$agents_result"
 printf '\n'
+if (( agents_deferred )); then
+  if [[ -n "$approval_id" ]]; then printf 'hub-deploy: agents pending: %s; rerun bin/k3dm-hub-deploy %s --approval %s after it clears (or make restart-webhook)\n' "$agents_reason" "$new" "$approval_id" >&2
+  else printf 'hub-deploy: agents pending: %s; rerun make hub-deploy REF=%s after it clears (or make restart-webhook)\n' "$agents_reason" "$ref" >&2; fi
+  exit 3
+fi
