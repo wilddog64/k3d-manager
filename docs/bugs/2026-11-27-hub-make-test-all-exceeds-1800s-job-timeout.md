@@ -71,7 +71,10 @@ absent on m5); pytest on the hub (separate bug).
 - `scripts/etc/grafana/dashboards/k3dm-tests-configmap.yaml` (one panel for the new metric)
 - `docs/guides/grafana-dashboards/k3dm-tests.md`, `docs/guides/operator-acceptance.md`, `docs/howto/cloud-session-requests.md`
 - Tests: `scripts/tests/bin/test_k3dm_test_metrics.py`, `scripts/tests/bin/webhook_make_targets.py`,
-  `scripts/tests/bin/test_cloud_bridge.py`, `scripts/tests/bin/makefile_test_all.bats`, the live.py test file
+  `scripts/tests/bin/test_cloud_bridge.py`, `scripts/tests/bin/makefile_test_all.bats`,
+  `scripts/tests/bin/test_operator_acceptance_live.py` (named after dispatch; rev 2 said "the live.py test file")
+- `scripts/lib/acceptance/scenarios/k3dm_tests.py` (dashboard panel fixture; Fable cited `:105`; missed in rev 2 Files —
+  spec defect found at land, 2026-11-27)
 
 ## Contract readers
 
