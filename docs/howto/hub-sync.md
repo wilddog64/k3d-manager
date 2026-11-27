@@ -25,22 +25,26 @@ automatically; the operator stays the gate.
 
 1. It lists up to 10 commits on the release branch that `deploy/hub` lacks, newest first, and asks
    `bin/k3dm-hub-promote is-green <sha>` about each, the same check-run rule `hub-promote` enforces
-   (exit 0 green, 3 not green, 2 check-run lookup failed). It stops at the first green commit.
+   (exit 0 green, 3 not green, 2 check-run lookup failed). It stops at the first green commit. A commit whose
+   content is already in `deploy/hub` (including a squash-merged release branch) and its older commits do not count.
 2. It publishes, with the other `k3dm_repo_sync_*` series:
 
    | Series | Meaning |
    |---|---|
-   | `k3dm_repo_sync_promotable{sha,branch}` = 1 | the newest green commit `deploy/hub` lacks; absent when there is none |
+   | `k3dm_repo_sync_promotable{sha,branch}` = 1 | the newest green commit not already contained by `deploy/hub`; absent when there is none |
    | `k3dm_repo_sync_promote_backlog_commits` | how many commits `deploy/hub` is behind the release branch |
    | `k3dm_repo_sync_promote_lookup_failed` = 1 | a check-run lookup failed, so the answer is unknown |
 
 3. The `hub-sync` summary line ends with `promote backlog: <n>; promotable: <sha7>|none|unknown`.
-   `unknown` means a lookup failed, or none of the 10 newest commits is green while more than 10 are waiting.
+   `unknown` means a lookup failed, or none of the 10 newest commits is green while more than 10 are waiting. `none`
+   means there is no promotable green commit; after a squash merge the backlog may remain above zero with `none`
+   until the hub checkout switches to the next release branch.
 
 Alerts (`scripts/etc/prometheus/rules/repo-sync.yaml`, `severity: warning`, `cluster: hub`):
 
 - **`K3dmPromoteWaiting`** — a green commit has waited 15 minutes. It names the SHA and a command to run. A newer green
-  commit replaces the series, so the alert always names the newest one. The everyday command is
+  commit replaces the series, so the alert always names the newest one. Content already in `deploy/hub` after a
+  squash-merged branch does not count. The everyday command is
   `make hub-deploy REF=<sha>` ([hub promote](hub-promote.md)), which the alert names; `make hub-promote` alone only moves
   the ref.
 - **`K3dmPromoteLookupFailed`** — the check-run lookup has failed for 30 minutes (GitHub outage, token). To promote during an outage, use the

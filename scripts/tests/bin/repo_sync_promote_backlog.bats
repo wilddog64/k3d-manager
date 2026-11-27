@@ -47,6 +47,7 @@ sha="${3#*/commits/}"
 sha="${sha%%/*}"
 # gh api check-runs shape captured read-only on m4-air.local, 2026-11-11: records contain conclusion, name, status.
 if [[ "${GH_FAIL_SHA:-}" == "$sha" ]]; then exit 1; fi
+if [[ "${GH_GREEN_ALL:-}" == 1 ]]; then printf '{"status":"completed","conclusion":"success","name":"CI"}\n'; exit 0; fi
 if [[ "${GH_GREEN_SHA:-}" == "$sha" ]]; then printf '{"status":"completed","conclusion":"success","name":"CI"}\n'; else printf '{"status":"in_progress","conclusion":null,"name":"CI"}\n'; fi
 SH
   chmod +x "$SCRATCH/stubs"/*
@@ -360,6 +361,23 @@ assert_scratch_fixture() {
   [ -d "$HUB_ROOT/.git" ]
 }
 
+prepare_merge_tree_candidate() {
+  local base
+  base="$(git -C "$SCRATCH/seed" rev-parse origin/deploy/hub)"
+  printf 'candidate\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m candidate >/dev/null
+  CONTAIN_TEST_SHA="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  git -C "$SCRATCH/seed" checkout -b hub-extra "$base" >/dev/null 2>&1
+  printf 'hub-only\n' > "$SCRATCH/seed/other"
+  git -C "$SCRATCH/seed" add other
+  git -C "$SCRATCH/seed" commit -m hub-extra >/dev/null
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+  git -C "$SCRATCH/seed" checkout main >/dev/null 2>&1
+  export GH_GREEN_ALL=1
+}
+
 @test "E1: hub-sync promote backlog equals commits upstream has that deploy/hub lacks even when local ref was stale" {
   assert_scratch_fixture
 
@@ -622,4 +640,282 @@ SH
   run "$HUB_ROOT/bin/k3dm-repo-sync" --hub-summary
   [ "$status" -eq 0 ]
   [[ "$output" == *"promote backlog: unknown"* ]]
+}
+
+@test "S1: squash-merged release tip is contained and logged once" {
+  assert_scratch_fixture
+  export GH_GREEN_ALL=1
+  for n in 1 2 3; do
+    printf 'release-%s\n' "$n" >> "$SCRATCH/seed/change"
+    git -C "$SCRATCH/seed" add change
+    git -C "$SCRATCH/seed" commit -m "release $n" >/dev/null
+  done
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$tip^{tree}" -p origin/deploy/hub -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+
+  run bash -c '"$1" >"$2" 2>"$3"' _ "$HUB_ROOT/bin/k3dm-repo-sync" "$SCRATCH/run.stdout" "$SCRATCH/run.stderr"
+  [ "$status" -eq 0 ]
+  if grep -q 'k3dm_repo_sync_promotable{' "$CURL_BODY"; then return 1; fi
+  grep -Fq "promotable: ${tip:0:7} on main already in deploy/hub by content; ignoring it and older commits" "$SCRATCH/run.stdout"
+  if grep -q 'already in deploy/hub by content' "$SCRATCH/run.stderr"; then return 1; fi
+  run "$HUB_ROOT/bin/k3dm-repo-sync" --hub-summary
+  [[ "$output" == *"promotable: none"* ]]
+  run bash -c '"$1" >"$2" 2>"$3"' _ "$HUB_ROOT/bin/k3dm-repo-sync" "$SCRATCH/run.stdout" "$SCRATCH/run.stderr"
+  [ "$status" -eq 0 ]
+  if grep -q 'already in deploy/hub by content' "$SCRATCH/run.stdout"; then return 1; fi
+  if grep -q 'already in deploy/hub by content' "$SCRATCH/run.stderr"; then return 1; fi
+}
+
+@test "S1b: a contained tip is decisive even when the backlog exceeds the lookup window" {
+  assert_scratch_fixture
+  export GH_GREEN_ALL=1
+  for n in {1..12}; do
+    printf 'release-%s\n' "$n" >> "$SCRATCH/seed/change"
+    git -C "$SCRATCH/seed" add change
+    git -C "$SCRATCH/seed" commit -m "release $n" >/dev/null
+  done
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$tip^{tree}" -p origin/deploy/hub -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  if grep -q 'k3dm_repo_sync_promotable{' "$CURL_BODY"; then return 1; fi
+  grep -q 'k3dm_repo_sync_promote_lookup_failed{repo="k3d-manager"} 0' "$CURL_BODY"
+  run "$HUB_ROOT/bin/k3dm-repo-sync" --hub-summary
+  [[ "$output" == *"promotable: none"* ]]
+}
+
+@test "S6: squash-contained prior SHA is not carried through lookup failure" {
+  assert_scratch_fixture
+  printf 'T\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m T >/dev/null
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  export GH_GREEN_SHA="$tip"
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  grep -q "sha=\"${tip:0:7}\"" "$CURL_BODY"
+
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$tip^{tree}" -p origin/deploy/hub -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  printf 'N\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m N >/dev/null
+  newer="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  export GH_FAIL_SHA="$newer"
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  grep -q 'k3dm_repo_sync_promote_lookup_failed{repo="k3d-manager"} 1' "$CURL_BODY"
+  if grep -q 'k3dm_repo_sync_promotable{' "$CURL_BODY"; then return 1; fi
+}
+
+@test "S3: new work after a squash remains promotable" {
+  assert_scratch_fixture
+  export GH_GREEN_ALL=1
+  printf 'release\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m release >/dev/null
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$tip^{tree}" -p origin/deploy/hub -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  printf 'new work\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m new-work >/dev/null
+  newer="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  grep -q "sha=\"${newer:0:7}\"" "$CURL_BODY"
+}
+
+@test "S5: a post-squash revert of shipped content remains promotable" {
+  assert_scratch_fixture
+  export GH_GREEN_ALL=1
+  base="$(git -C "$SCRATCH/seed" rev-parse origin/deploy/hub)"
+  printf 'A=base\n' > "$SCRATCH/seed/change-a"
+  printf 'B=base\n' > "$SCRATCH/seed/change-b"
+  git -C "$SCRATCH/seed" add change-a change-b
+  git -C "$SCRATCH/seed" commit -m release-fork-point >/dev/null
+  fork_point="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+  git -C "$SCRATCH/seed" checkout -b hub-unrelated "$fork_point" >/dev/null 2>&1
+  printf 'hub-only\n' > "$SCRATCH/seed/other"
+  git -C "$SCRATCH/seed" add other
+  git -C "$SCRATCH/seed" commit -m hub-unrelated >/dev/null
+  unrelated="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+  git -C "$SCRATCH/seed" checkout main >/dev/null 2>&1
+  python3 -c 'from pathlib import Path; p=Path(__import__("sys").argv[1]); p.write_text(p.read_text().replace("A=base", "A=shipped"))' "$SCRATCH/seed/change-a"
+  git -C "$SCRATCH/seed" add change-a
+  git -C "$SCRATCH/seed" commit -m first-release-change >/dev/null
+  python3 -c 'from pathlib import Path; p=Path(__import__("sys").argv[1]); p.write_text(p.read_text().replace("B=base", "B=shipped"))' "$SCRATCH/seed/change-b"
+  git -C "$SCRATCH/seed" add change-b
+  git -C "$SCRATCH/seed" commit -m last-release-change >/dev/null
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  squash_index="$SCRATCH/squash.index"
+  other_blob="$(git -C "$SCRATCH/seed" rev-parse "$unrelated:other")"
+  GIT_INDEX_FILE="$squash_index" git -C "$SCRATCH/seed" read-tree "$tip^{tree}"
+  GIT_INDEX_FILE="$squash_index" git -C "$SCRATCH/seed" update-index --add --cacheinfo "100644,$other_blob,other"
+  squash_tree="$(GIT_INDEX_FILE="$squash_index" git -C "$SCRATCH/seed" write-tree)"
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$squash_tree" -p "$unrelated" -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  git -C "$SCRATCH/seed" revert --no-edit "$tip" >/dev/null
+  reverted="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  hub_tree="$(git -C "$SCRATCH/seed" rev-parse "$squash^{tree}")"
+  run git -C "$SCRATCH/seed" merge-tree --write-tree --no-messages "$squash" "$reverted"
+  [ "$status" -eq 0 ]
+  [ "${output%%$'\n'*}" = "$hub_tree" ]
+  run git -C "$SCRATCH/seed" merge-tree --write-tree --no-messages "--merge-base=$tip" "$squash" "$reverted"
+  [ "$status" -eq 0 ]
+  [ "${output%%$'\n'*}" != "$hub_tree" ]
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  grep -q "sha=\"${reverted:0:7}\"" "$CURL_BODY"
+}
+
+@test "S2/S2r: containment record survives later overlapping deploy and expires on rollback" {
+  assert_scratch_fixture
+  export GH_GREEN_ALL=1
+  base="$(git -C "$SCRATCH/seed" rev-parse origin/deploy/hub)"
+  git -C "$SCRATCH/seed" checkout -b hub-unrelated "$base" >/dev/null 2>&1
+  printf 'hub-only\n' > "$SCRATCH/seed/other"
+  git -C "$SCRATCH/seed" add other
+  git -C "$SCRATCH/seed" commit -m hub-unrelated >/dev/null
+  unrelated="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+  git -C "$SCRATCH/seed" checkout main >/dev/null 2>&1
+  printf 'release-1\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m release-1 >/dev/null
+  printf 'release-2\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m release-2 >/dev/null
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  squash_index="$SCRATCH/squash.index"
+  other_blob="$(git -C "$SCRATCH/seed" rev-parse "$unrelated:other")"
+  GIT_INDEX_FILE="$squash_index" git -C "$SCRATCH/seed" read-tree "$tip^{tree}"
+  GIT_INDEX_FILE="$squash_index" git -C "$SCRATCH/seed" update-index --add --cacheinfo "100644,$other_blob,other"
+  squash_tree="$(GIT_INDEX_FILE="$squash_index" git -C "$SCRATCH/seed" write-tree)"
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$squash_tree" -p "$unrelated" -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["promote_contained"]["sha"]' "$SCRATCH/state/state.json"
+
+  git -C "$SCRATCH/seed" checkout -b hub-overlap "$squash" >/dev/null 2>&1
+  printf 'deploy-overlap\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m deploy-overlap >/dev/null
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+  git -C "$SCRATCH/seed" checkout main >/dev/null 2>&1
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  if grep -q 'k3dm_repo_sync_promotable{' "$CURL_BODY"; then return 1; fi
+
+  git -C "$SCRATCH/seed" push --force origin "$unrelated:refs/heads/deploy/hub" >/dev/null 2>&1
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  python3 -c 'import json,sys; assert "promote_contained" not in json.load(open(sys.argv[1]))' "$SCRATCH/state/state.json"
+}
+
+@test "S4: conflicting unshipped work remains promotable" {
+  assert_scratch_fixture
+  export GH_GREEN_ALL=1
+  printf 'release\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m release >/dev/null
+  tip="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  squash="$(git -C "$SCRATCH/seed" commit-tree "$tip^{tree}" -p origin/deploy/hub -m squash)"
+  git -C "$SCRATCH/seed" push origin "$squash:refs/heads/deploy/hub" >/dev/null 2>&1
+  printf 'release-side\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m release-side >/dev/null
+  candidate="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+
+  git -C "$SCRATCH/seed" checkout -b hub-conflict "$squash" >/dev/null 2>&1
+  printf 'hub-side\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m hub-side >/dev/null
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/deploy/hub >/dev/null 2>&1
+
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  grep -q "sha=\"${candidate:0:7}\"" "$CURL_BODY"
+}
+
+@test "S7: merge-tree error is contained as unknown and does not fail lookup" {
+  assert_scratch_fixture
+  prepare_merge_tree_candidate
+  real_git_bin="$(command -v git)"
+  export REAL_GIT_BIN="$real_git_bin" MERGE_TREE_HITS="$SCRATCH/merge-tree.hits"
+  cat > "$SCRATCH/stubs/git" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "$arg" == merge-tree ]]; then printf 'hit\n' >> "$MERGE_TREE_HITS"; exit 128; fi
+done
+exec "$REAL_GIT_BIN" "$@"
+SH
+  chmod +x "$SCRATCH/stubs/git"
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  [ -s "$MERGE_TREE_HITS" ]
+  grep -q "sha=\"${CONTAIN_TEST_SHA:0:7}\"" "$CURL_BODY"
+  grep -q 'k3dm_repo_sync_promote_lookup_failed{repo="k3d-manager"} 0' "$CURL_BODY"
+}
+
+@test "S8: merge-tree timeout is contained as unknown and does not fail lookup" {
+  assert_scratch_fixture
+  prepare_merge_tree_candidate
+  real_git_bin="$(command -v git)"
+  export REAL_GIT_BIN="$real_git_bin" MERGE_TREE_HITS="$SCRATCH/merge-tree.hits"
+  cat > "$SCRATCH/stubs/git" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "$arg" == merge-tree ]]; then printf 'hit\n' >> "$MERGE_TREE_HITS"; exec sleep 3; fi
+done
+exec "$REAL_GIT_BIN" "$@"
+SH
+  chmod +x "$SCRATCH/stubs/git"
+  export K3DM_REPO_SYNC_CONTAIN_TIMEOUT=1
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  [ -s "$MERGE_TREE_HITS" ]
+  grep -q "sha=\"${CONTAIN_TEST_SHA:0:7}\"" "$CURL_BODY"
+  grep -q 'k3dm_repo_sync_promote_lookup_failed{repo="k3d-manager"} 0' "$CURL_BODY"
+}
+
+@test "S9: --check never invokes merge-tree when carrying a prior promotable SHA" {
+  assert_scratch_fixture
+  printf 'candidate\n' >> "$SCRATCH/seed/change"
+  git -C "$SCRATCH/seed" add change
+  git -C "$SCRATCH/seed" commit -m candidate >/dev/null
+  candidate="$(git -C "$SCRATCH/seed" rev-parse HEAD)"
+  git -C "$SCRATCH/seed" push origin HEAD:refs/heads/main >/dev/null 2>&1
+  export GH_GREEN_SHA="$candidate"
+  run "$HUB_ROOT/bin/k3dm-repo-sync"
+  [ "$status" -eq 0 ]
+  grep -q "sha=\"${candidate:0:7}\"" "$CURL_BODY"
+
+  real_git_bin="$(command -v git)"
+  export REAL_GIT_BIN="$real_git_bin" MERGE_TREE_HITS="$SCRATCH/merge-tree.hits"
+  cat > "$SCRATCH/stubs/git" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "$arg" == merge-tree ]]; then printf 'hit\n' >> "$MERGE_TREE_HITS"; fi
+done
+exec "$REAL_GIT_BIN" "$@"
+SH
+  chmod +x "$SCRATCH/stubs/git"
+  run "$HUB_ROOT/bin/k3dm-repo-sync" --check
+  [ "$status" -eq 0 ]
+  [ ! -e "$MERGE_TREE_HITS" ]
 }
