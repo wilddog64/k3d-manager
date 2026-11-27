@@ -24,6 +24,10 @@ blue border on m4 stays.
 - Not yet known: whether the keys stay on m2 (Universal Control keeps the keyboard on the Mac that last had a click)
   or are lost on m4 (activation did not take). Operator test: with the border showing and no click, type and see where
   the letters go.
+- **Local control (operator screenshot, m4, 2026-11-27 18:52):** with m4's own keyboard and trackpad, hovering iTerm
+  behind BetterTouchTool gives iTerm the blue border and typed text lands in iTerm while BetterTouchTool stays on top.
+  Focus-without-raise works on m4, so the cross-Mac failure is not an m4 install, grant or focus-call problem; the
+  leading explanation is that Universal Control keeps the keyboard on m2 until a click on m4 (still to confirm).
 - Stale border: after the cursor leaves m4, m4's HoverFocus gets no more events, so the indicator keeps its last state.
 
 ## Possible directions (for triage, not a spec)
