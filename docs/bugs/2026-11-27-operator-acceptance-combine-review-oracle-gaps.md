@@ -28,3 +28,5 @@
 4. **MINORs** — duplicated helpers across p3a/p3b (redaction, run-root resolution), guide/Makefile mismatches,
    scenario-order coupling on `stub.log`, git stub flag handling, untested size retention, narrow `prior_art`
    exception handling (details in the Neon report, dispatch run `v1460-plan3-combine-neon`).
+5. **Cosmetic (live run 2026-11-27):** passed scenarios report `cause: unknown` in report.md/report.json; use `none`
+   (or blank) for passed outcomes.
