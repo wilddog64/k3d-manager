@@ -311,7 +311,7 @@ _write_agent_state() {
   [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
   grep -qx "agents $CHANGED_SHA" "$HOME/.local/share/k3d-manager/hub-deploy/state"
   grep -q 'http://127.0.0.1:7443/api/v1/health' "$BATS_TEST_TMPDIR/curl.args"
-  ! grep -q -- '-H\|Authorization' "$BATS_TEST_TMPDIR/curl.args"
+  run ! grep -q -- '-H\|Authorization' "$BATS_TEST_TMPDIR/curl.args"
 }
 
 @test 'agents: a fresh queued job defers without advancing state' {
@@ -322,7 +322,7 @@ _write_agent_state() {
   [ "$status" -eq 3 ]
   [[ "$output" == *'; agents pending'* && "$stderr" == *'webhook job job-queued is queued'* ]]
   [ "$(grep -cx restart-webhook "$CALLS" || true)" -eq 0 ]
-  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
 }
 
 @test 'agents M2: docs-only change advances agents without restarting' {
@@ -398,7 +398,7 @@ _write_agent_state() {
   [ "$status" -eq 3 ]
   [[ "$output" == *'; agents pending'* && "$stderr" == *'webhook job job-running is running'* ]]
   [ "$(grep -cx restart-webhook "$CALLS" || true)" -eq 0 ]
-  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
 }
 
 @test 'agents M5: stale running and success jobs do not defer restart' {
@@ -430,9 +430,9 @@ _write_agent_state() {
   run --separate-stderr env K3DM_AGENT_LOAD=0 PROMOTE_TO_SHA="$CHANGED_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
   [ "$status" -eq 3 ]
   [[ "$stderr" == *'agent load disabled (K3DM_AGENT_LOAD=0)'* ]]
-  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
 
-  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
 }
 
 @test 'agents N3: checkout mismatch defers without advancing' {
@@ -443,7 +443,7 @@ _write_agent_state() {
   run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" MOVE_HEAD=1 MOVE_TO="$BASE_SHA" "$WORK/bin/k3dm-hub-deploy" agent-change
   [ "$status" -eq 3 ]
   [[ "$stderr" == *'hub checkout is not at '* ]]
-  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
 }
 
 @test 'agents N3: failed restart and confirmation timeouts preserve agents state' {
@@ -453,7 +453,7 @@ _write_agent_state() {
   run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" FAIL_STEP=restart-webhook "$WORK/bin/k3dm-hub-deploy" agent-change
   [ "$status" -eq 1 ]
   [[ "$stderr" == *'stopped at agent-restart'* && "$stderr" == *'webhook is loaded (pid 700)'* && "$stderr" == *'cloud-bridge is not installed'* ]]
-  ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+  run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
 
   for knob in pid curl; do
     : > "$CALLS"
@@ -461,7 +461,7 @@ _write_agent_state() {
     else run --separate-stderr env PROMOTE_TO_SHA="$CHANGED_SHA" CURL_CODE=000 "$WORK/bin/k3dm-hub-deploy" agent-change; fi
     [ "$status" -eq 1 ]
     [[ "$stderr" == *'webhook is '* && "$stderr" == *'restore with make restart-webhook'* ]]
-    ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
+    run ! grep -q '^agents ' "$HOME/.local/share/k3d-manager/hub-deploy/state"
   done
 }
 
@@ -478,8 +478,8 @@ _write_agent_state() {
   [ "$(grep -cx restart-webhook "$CALLS")" -eq 1 ]
   [ "$(grep '^launchctl ' "$CALLS" | grep -vc 'launchctl print ' || true)" -eq 0 ]
   [[ "$(<"$CALLS")" != *restart-cloud-bridge* ]]
-  ! grep -q '^launchctl kickstart ' "$CALLS"
-  ! grep -q -- '-H\|Authorization' "$BATS_TEST_TMPDIR/curl.args"
+  run ! grep -q '^launchctl kickstart ' "$CALLS"
+  run ! grep -q -- '-H\|Authorization' "$BATS_TEST_TMPDIR/curl.args"
 }
 
 @test 'agents summary places agents after unwired launchd count' {
