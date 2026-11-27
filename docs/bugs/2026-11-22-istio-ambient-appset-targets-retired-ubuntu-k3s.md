@@ -5,7 +5,7 @@
 **Introduced by:** unknown (ApplicationSet created 2026-10-30 14:18, the hub rebuild; `scripts/etc/argocd/vars.sh:68` defaults `ARGOCD_APP_CLUSTER_NAME` to `ubuntu-k3s`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** unknown
-**Waiting on:** dispatch — since 2026-11-22
+**Waiting on:** dispatch — since 2026-11-27 (check: still present)
 **Triage:** carry → v1.46.0 (operator 2026-11-22: schedule the fix)
 **Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Branch:** k3d-manager-v1.46.0
@@ -74,3 +74,9 @@ render. Revised reading:
 3. Collision: give sandbox and Hostinger renders distinct ApplicationSet names (e.g. `istio-ambient-${APP_CLUSTER_NAME}`),
    then restore Argo management of Hostinger Istio (adoption needs its own spec; live mesh).
 
+
+## Check — 2026-11-27 (Claude, read-only, m5 hub over ssh)
+
+Still present: `kubectl get applicationset -n cicd istio-ambient` conditions `ErrorOccurred=True` and
+`ResourcesUpToDate=False` — `application destination spec is invalid: there are no clusters with this name: ubuntu-k3s
+(and 3 more)`. Operator re-triage 2026-11-27: not resolved → fix in v1.46.0 (spec, Fable + Neon review, dispatch).

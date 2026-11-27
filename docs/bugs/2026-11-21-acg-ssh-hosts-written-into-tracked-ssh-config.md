@@ -9,7 +9,7 @@
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (ACG sandbox setup mutates tracked `~/.ssh/config` in place with `StrictHostKeyChecking no` and stale host IPs, requiring manual `git checkout` cleanup.)
-**Waiting on:** operator decision — since 2026-11-21
+**Waiting on:** dispatch — since 2026-11-27 (check: still present)
 **Prior art:** not run (find-similar-docs: vector store unavailable); exact-slug glob found none. Read, different root cause: `docs/bugs/2026-10-22-ssh-config-lost-operator-host-aliases.md` (operator aliases lost on rewrite; fixed by `~/.ssh/config.d/operator` + guard).
 
 ## Symptom
@@ -36,3 +36,9 @@ operator config starts with `Include ~/.ssh/config.d/operator` only (m5, 2026-11
 for it and warns instead of editing the main file. Sandbox teardown (`acg-down`) deletes the fragment. Offline test: fake HOME
 with `~/.ssh/config` as a symlink; after upsert the symlink target is byte-identical and the fragment holds the hosts;
 positive control that `ssh -G -F <fake config> ubuntu` resolves the IP.
+
+## Check — 2026-11-27 (Claude, read-only)
+
+Still present in code: `scripts/lib/foundation/scripts/lib/acg/acg.sh:18` `_ACG_SSH_CONFIG="${HOME}/.ssh/config"`;
+`scripts/lib/providers/k3s-gcp.sh:86,286` and `k3s-az.sh:88,287` `local ssh_config="${HOME}/.ssh/config"`. Not resolved →
+fix in v1.46.0, upstream in lib-foundation first, then subtree pull (spec, Fable + Neon review, dispatch).

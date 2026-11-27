@@ -1,11 +1,10 @@
 # Bug: KubeJobFailed in secrets and platform-ops
 
-**Status:** OPEN — narrowed 2026-11-06: one stale Job still fires, and `acg-expiry-check` failure bursts have no logs left
+**Status:** CLOSED — resolved without a code fix; live check 2026-11-27 found no failed Job and no KubeJob alert (reopen with a Recurrence section if seen again)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Alerting and ACG expiry Slack notifications are degraded by a stale retained Job object and intermittent `acg-expiry-check` webhook failures, while manual job deletion and webhook rotation/email alerts serve as workar…); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (live check, no code) — grooming 2026-11-12, operator.
 **Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
-**Waiting on:** live check — since 2026-11-12
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
 **Branch:** `k3d-manager-v1.46.0`
@@ -56,3 +55,14 @@ Earlier `KubeJobFailed` bugs include `docs/bugs/2026-10-02-ldap-password-rotator
   minutes mean the logs survive only about 90 minutes once later runs also fail. Next step on the M5 (read-only):
   `kubectl -n platform-ops logs job/<latest failed acg-expiry-check> --all-containers`, the pod exit code (56 = revoked
   webhook again), and whether an ACG expiry notice reached #grafana-notification at 10:00 PST. Do not delete the Jobs first.
+
+## Check — 2026-11-27 (Claude, read-only, m5 hub over ssh, `k3d-k3d-cluster`)
+
+- `kubectl get jobs -n secrets` / `-n platform-ops`: every retained Job `COMPLETE 1`, none with `status.failed`
+  (latest: `vault-unseal-watchdog-29929825` 14:25Z, `acg-expiry-check-29929800` 14:00Z, `cve-remediation-verify-29929815` 14:15Z,
+  `app-cve-scan-29929500` 09:00Z).
+- CronJobs `acg-expiry-check`, `app-cve-scan`, `argocd-cve-scan`, `cve-remediation-verify`, `vault-unseal-watchdog`: not
+  suspended, 0 active, last schedule on time.
+- Alertmanager `/api/v2/alerts?filter=alertname=~"KubeJob.*"`: 0 alerts.
+- Decision (operator re-triage 2026-11-27, "close if already resolved"): closed. The 2026-11-06 stale Job is gone and
+  no `acg-expiry-check` failure burst is retained.
