@@ -65,6 +65,14 @@ continuously.
 - Acceptance should include an idle CPU/wakeup budget measured with `top -stats cpu,idlew` (before/after), with
   `focusIndicator` on and off as the control.
 
+## Files
+
+| File | Change |
+|---|---|
+| `Sources/HoverFocusPlatform/Controller.swift` | read only (start here) |
+| `Sources/HoverFocusPlatform/FocusIndicatorPanel.swift` | read only |
+| `Sources/HoverFocusCore/FocusIndicator.swift` | read only |
+
 ## What NOT to Do
 
 - Do not edit, create, stage or commit any file. Do not run the app or install anything.
