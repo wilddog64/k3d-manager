@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import sys
+import urllib.request
 from pathlib import Path
 from importlib.machinery import SourceFileLoader
 
@@ -37,7 +38,8 @@ def metrics_totals(ctx):
     with FakePushgateway() as fake:
         proc = _export(ctx, fake, _fixture("totals.log"))
         payload = next(iter(fake.groups.values()), "")
-        (ctx.run_dir / "transport.log").write_text(json.dumps(fake.requests, sort_keys=True))
+        from ..runner import redact
+        (ctx.run_dir / "transport.log").write_text(redact(json.dumps(fake.requests, sort_keys=True)))
         return [_assert("exporter exited successfully", proc.returncode == 0, proc.stdout + proc.stderr),
                 _assert("declared totals published", "k3dm_test_cases_total{target=\"test-all\"} 4" in payload and "k3dm_test_cases_failed{target=\"test-all\"} 1" in payload),
                 _assert("fake Pushgateway recorded exporter PUT", any(method == "PUT" for method, _path, _body in fake.requests))]
@@ -53,9 +55,11 @@ def metrics_sequence(ctx):
         for index, code in enumerate((0, 1, 2, 0)):
             parsed = module.parse_log(_fixture("fail.log" if code else "pass.log").read_text())
             payload = module.build_payload(parsed, "test-all", code, now=t[index])
-            module.push_metrics(payload, "test-all", "local", endpoint=fake.url)
+            endpoint = validate_url(fake.url)
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            module.push_metrics(payload, "test-all", "local", endpoint=endpoint, opener=opener.open)
             if code == 0:
-                module.push_metrics(module.build_success_marker(now=t[index]), "test-all", "local", endpoint=fake.url, group_suffix="-last-success")
+                module.push_metrics(module.build_success_marker(now=t[index]), "test-all", "local", endpoint=endpoint, group_suffix="-last-success", opener=opener.open)
             observed.append((payload, dict(fake.groups)))
         p0, p1, p2, p3 = (v[0] for v in observed)
         final_failure_group = observed[3][1].get("/metrics/job/k3dm-tests/instance/test-all-local", "")

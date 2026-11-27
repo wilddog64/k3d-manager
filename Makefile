@@ -1728,7 +1728,7 @@ test-pytest:
 
 ## Run the offline operator acceptance scenarios and retain their report
 test-operator-acceptance:
-	@bin/k3dm-operator-acceptance $(if $(RUN_ROOT),--run-root '$(RUN_ROOT)',)
+	@scripts/tests/tripwire.sh bin/k3dm-operator-acceptance $(if $(RUN_ROOT),--run-root '$(RUN_ROOT)',)
 
 ## Run the opt-in live operator acceptance profile (PROFILE=k3dm-tests; requires K3DM_ACCEPTANCE_LIVE=1 and a TTY)
 test-operator-acceptance-live:

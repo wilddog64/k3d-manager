@@ -43,7 +43,7 @@ REGISTRY = [_scenario(entry) for entry in SCENARIOS + [
 ]]
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
 RUN_RE = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{8}$")
-SECRET_RE = re.compile(r"https://hooks\.slack\.com/\S+|xox[abpors]-[A-Za-z0-9-]+")
+SECRET_RE = re.compile(r"https://hooks\.slack\.com/\S+|xox[abpors]-[A-Za-z0-9-]+|glsa_[A-Za-z0-9_]+")
 
 
 @dataclass
@@ -52,13 +52,17 @@ class Context:
     capabilities: set
 
 
-def redact(value):
+def redact(value, extra_secrets=()):
     if isinstance(value, str):
-        return SECRET_RE.sub("***REDACTED***", scrub_credentials(value))
+        value = SECRET_RE.sub("***REDACTED***", scrub_credentials(value))
+        for secret in extra_secrets:
+            if secret:
+                value = value.replace(secret, "***REDACTED***")
+        return value
     if isinstance(value, list):
-        return [redact(v) for v in value]
+        return [redact(v, extra_secrets) for v in value]
     if isinstance(value, dict):
-        return {redact(k): redact(v) for k, v in value.items()}
+        return {redact(k, extra_secrets): redact(v, extra_secrets) for k, v in value.items()}
     return value
 
 
@@ -77,7 +81,7 @@ def _retention(root):
         shutil.rmtree(dirs.pop(0))
 
 
-def run_scenarios(run_root=None, scenario_ids=None, registry=None, capabilities=None):
+def run_scenarios(run_root=None, scenario_ids=None, registry=None, capabilities=None, extra_secrets=()):
     root = Path(run_root or os.environ.get("K3DM_ACCEPTANCE_RUN_ROOT", Path.home() / ".local/state/k3d-manager/acceptance")).expanduser()
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(root, 0o700)
@@ -113,21 +117,21 @@ def run_scenarios(run_root=None, scenario_ids=None, registry=None, capabilities=
     expected_count = len(selected)
     passed = len(results) == expected_count and len(results) > 0 and total_assertions > 0 and all(r["outcome"] in {"passed", "known_failing"} for r in results)
     report = {"schema": 1, "source_sha": "unknown", "started": started, "finished": finished, "scenarios": results}
-    payload = redact(report)
+    payload = redact(report, extra_secrets)
     (run_dir / "report.json").write_text(json.dumps(payload, indent=2) + "\n")
     suite = ET.Element("testsuite", name="operator-acceptance", tests=str(total_assertions), failures=str(sum(not a.get("passed") for r in results for a in r["assertions"])), skipped=str(sum(r["outcome"] == "inconclusive" for r in results)))
     for scenario in results:
-        case = ET.SubElement(suite, "testcase", name=redact(scenario["id"]))
+        case = ET.SubElement(suite, "testcase", name=redact(scenario["id"], extra_secrets))
         if scenario["outcome"] == "inconclusive":
-            ET.SubElement(case, "skipped", message=redact(scenario["cause"]))
+            ET.SubElement(case, "skipped", message=redact(scenario["cause"], extra_secrets))
         for assertion in scenario["assertions"]:
             if not assertion.get("passed"):
-                ET.SubElement(case, "failure", message=redact(assertion["name"])).text = redact(assertion.get("detail", ""))
+                ET.SubElement(case, "failure", message=redact(assertion["name"], extra_secrets)).text = redact(assertion.get("detail", ""), extra_secrets)
     ET.ElementTree(suite).write(run_dir / "junit.xml", encoding="utf-8", xml_declaration=True)
     md = ["# Operator acceptance report", "", "Schema: 1", f"Assertions: {total_assertions}", "", "| Scenario | Outcome | Cause | Bug |", "|---|---|---|---|"]
     md.extend(f"| {r['id']} | {r['outcome']} | {r['cause']} | {r['linked_bug'] or ''} |" for r in results)
-    (run_dir / "report.md").write_text(redact("\n".join(md) + "\n"))
-    for path in run_dir.iterdir():
-        if path.is_file():
-            path.chmod(0o600)
+    (run_dir / "report.md").write_text(redact("\n".join(md) + "\n", extra_secrets))
+    for path in run_dir.rglob("*"):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    run_dir.chmod(0o700)
     return run_dir, payload, passed

@@ -19,6 +19,14 @@ from acceptance import drafts, live  # noqa: E402
 from hermes.prior_art import RetrievalUnavailable  # noqa: E402
 
 
+@pytest.fixture(scope="module", autouse=True)
+def real_bugs_tree_unchanged():
+    bugs_dir = ROOT / "docs" / "bugs"
+    before = _dir_digest(bugs_dir)
+    yield
+    assert _dir_digest(bugs_dir) == before, "real docs/bugs tree changed during live acceptance tests"
+
+
 class FakeTTY:
     def __init__(self, interactive=True):
         self._interactive = interactive
@@ -285,6 +293,31 @@ def _default_helper_spec(python_unit_exit=0, python_unit_status="success", pytho
     }
 
 
+def test_bridge_gate_restores_auth_spawn_without_starting_security(monkeypatch):
+    from webhook import proc as webhook_proc
+
+    previous_auth = sys.modules.pop("webhook.auth", None)
+    previous_bridge = live._BRIDGE_MODULE
+    calls = []
+    def guarded_spawn(argv, **_kwargs):
+        calls.append(argv)
+        return 1, "", False
+    monkeypatch.setattr(webhook_proc, "_spawn_capture_text", guarded_spawn)
+    monkeypatch.setattr(live, "_BRIDGE_MODULE", None)
+    try:
+        live._bridge_gated("cluster-status")
+        auth = sys.modules.get("webhook.auth")
+        assert auth is not None
+        assert auth._spawn_capture_text is guarded_spawn
+        assert all(argv[0] == "security" for argv in calls)
+    finally:
+        if previous_auth is None:
+            sys.modules.pop("webhook.auth", None)
+        else:
+            sys.modules["webhook.auth"] = previous_auth
+        live._BRIDGE_MODULE = previous_bridge
+
+
 def _dir_digest(directory):
     h = hashlib.sha256()
     for path in sorted(Path(directory).glob("*.md")):
@@ -328,7 +361,7 @@ def isolated_live_env(tmp_path, monkeypatch):
     }
 
 
-def test_live_profile_submits_fixed_argv_and_writes_schema1_report(isolated_live_env):
+def test_live_profile_submits_fixed_argv_and_writes_schema1_report(isolated_live_env, tmp_path):
     out = io.StringIO()
     run_dir, report, passed = live.run_live_profile(
         isolated_live_env["run_root"],
@@ -337,6 +370,8 @@ def test_live_profile_submits_fixed_argv_and_writes_schema1_report(isolated_live
         out_stream=out,
         monotonic=lambda: 1000.0,
         sleep_fn=lambda _s: None,
+        bugs_dir=tmp_path / "bugs",
+        repo_root=tmp_path,
     )
     assert passed is True
     assert "planned actions: cluster-status, make-test-python-unit" in out.getvalue()
@@ -437,6 +472,29 @@ def test_python_unit_oracle_and_grafana_freshness_and_failed_count(isolated_live
     assert not next(a for a in graf_scen["assertions"] if a["id"] == "grafana-last-run-fresh")["passed"]
     assert not next(a for a in graf_scen["assertions"] if a["id"] == "grafana-failed-count-matches")["passed"]
 
+    grafana_no_data = StubGrafana(
+        expected_token="glsa_TestViewerToken_1",
+        last_run_ms=1795736245 * 1000,
+        failed_cases=0,
+        run_complete=None,
+    )
+    _dir4, report_no_data, passed_no_data = live.run_live_profile(
+        isolated_live_env["run_root"] / "all-no-panel9-data",
+        with_test_all=True,
+        helper_bin=isolated_live_env["helper_stub"],
+        grafana_url="https://grafana.stub.test",
+        grafana_opener=grafana_no_data,
+        bugs_dir=scratch_bugs,
+        repo_root=isolated_live_env["run_root"].parent,
+        stdin=FakeTTY(True),
+        out_stream=io.StringIO(),
+        clock=lambda: submitted_epoch,
+        sleep_fn=lambda _s: None,
+    )
+    no_data_scenario = next(s for s in report_no_data["scenarios"] if s["id"] == "grafana-k3dm-tests")
+    assert passed_no_data is False and no_data_scenario["outcome"] == "failed"
+    assert not next(a for a in no_data_scenario["assertions"] if a["id"] == "grafana-panels-evaluated")["passed"]
+
 
 def test_failed_product_contract_writes_canonical_draft_and_dedups_second_run(isolated_live_env, tmp_path):
     scratch_bugs = tmp_path / "bugs"
@@ -536,7 +594,7 @@ def test_disallowed_and_gated_actions_stop_with_harness_error_before_helper(isol
     assert not isolated_live_env["helper_calls"].exists()
 
 
-def test_refuses_without_env_or_tty_or_when_locked_with_positive_control(isolated_live_env, monkeypatch):
+def test_refuses_without_env_or_tty_or_when_locked_with_positive_control(isolated_live_env, monkeypatch, tmp_path):
     cli = str(ROOT / "bin" / "k3dm-operator-acceptance")
 
     # 1. K3DM_ACCEPTANCE_LIVE unset -> refuses (both API and Makefile/CLI), helper never called.
@@ -636,6 +694,8 @@ def test_refuses_without_env_or_tty_or_when_locked_with_positive_control(isolate
         stdin=FakeTTY(True),
         out_stream=io.StringIO(),
         sleep_fn=lambda _s: None,
+        bugs_dir=tmp_path / "bugs",
+        repo_root=tmp_path,
     )
     assert passed is True
     assert isolated_live_env["helper_calls"].exists()
@@ -672,7 +732,7 @@ def test_viewer_token_and_planted_secrets_never_leak_and_no_admin_or_vault_reads
     scratch_bugs.mkdir()
     out_buf = io.StringIO()
 
-    run_dir, _report, passed = live.run_live_profile(
+    run_dir, report, passed = live.run_live_profile(
         isolated_live_env["run_root"],
         with_test_all=True,
         helper_bin=isolated_live_env["helper_stub"],
@@ -707,6 +767,7 @@ def test_viewer_token_and_planted_secrets_never_leak_and_no_admin_or_vault_reads
             content = file_path.read_text(encoding="utf-8", errors="replace")
             for secret in canaries:
                 assert secret not in content, f"secret leaked in {file_path}"
+    assert canary_viewer not in json.dumps(report)
 
     captured = capsys.readouterr()
     combined_logs = out_buf.getvalue() + captured.out + captured.err + caplog.text

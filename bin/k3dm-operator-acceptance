@@ -18,6 +18,8 @@ def main(argv=None):
     parser.add_argument("--with-test-all", action="store_true")
     parser.add_argument("--with-prior-art", action="store_true")
     args = parser.parse_args(argv)
+    if args.with_prior_art and not args.live:
+        parser.error("--with-prior-art requires --live")
     if args.live:
         if args.scenarios:
             parser.error("--scenario cannot be combined with --live")
@@ -47,6 +49,7 @@ def main(argv=None):
                 report,
                 run_root=args.run_root,
                 with_prior_art=args.with_prior_art,
+                caught_by="offline test",
             )
     print(f"acceptance run: {run_dir}")
     for result in report["scenarios"]:

@@ -125,6 +125,7 @@ def _render_draft(
     pa_candidates,
     pa_error,
     extra_secrets=(),
+    caught_by="live check",
 ):
     assertion_name = scrub_text(str(assertion.get("name") or assertion_id), extra_secrets)
     detail = scrub_text(str(assertion.get("detail") or norm_actual), extra_secrets)
@@ -135,7 +136,7 @@ def _render_draft(
         "**Status:** OPEN — captured, not triaged",
         "**Priority:** P3 (proposed)",
         "**Introduced by:** unknown",
-        "**Should have been caught by:** live check",
+        f"**Should have been caught by:** {caught_by}",
         "**Introducing change reviewed:** unknown",
         f"**Waiting on:** operator decision — since {date_str}",
         "**Classified:** pending",
@@ -168,11 +169,12 @@ def process_run_drafts(
     with_prior_art=False,
     search_fn=None,
     extra_secrets=(),
+    caught_by="live check",
     now=None,
 ):
     """Write local-only bug drafts for failed product_contract scenarios and update the run report."""
     run_dir = Path(run_dir)
-    effective_root = Path(run_root) if run_root is not None else run_dir.parent
+    effective_root = Path(run_root).expanduser() if run_root is not None else run_dir.parent
     effective_repo = Path(repo_root) if repo_root is not None else ROOT
     effective_bugs = Path(bugs_dir) if bugs_dir is not None else (effective_repo / "docs" / "bugs")
     current_dt = now or datetime.now(timezone.utc)
@@ -269,6 +271,7 @@ def process_run_drafts(
             pa_candidates=pa_candidates,
             pa_error=pa_error,
             extra_secrets=extra_secrets,
+            caught_by=caught_by,
         )
         draft_path.write_text(draft_body, encoding="utf-8")
         os.chmod(draft_path, 0o600)

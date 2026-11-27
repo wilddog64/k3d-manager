@@ -61,7 +61,11 @@ def _bridge_gated(action):
     global _BRIDGE_MODULE
     if _BRIDGE_MODULE is None:
         saved_spawn = webhook_proc._spawn_capture_text
+        webhook_auth = sys.modules.get("webhook.auth")
+        saved_auth_spawn = getattr(webhook_auth, "_spawn_capture_text", None)
         webhook_proc._spawn_capture_text = lambda *_args, **_kwargs: (1, "", False)
+        if webhook_auth is not None:
+            webhook_auth._spawn_capture_text = lambda *_args, **_kwargs: (1, "", False)
         try:
             loader = SourceFileLoader("k3dm_cloud_bridge_live", str(ROOT / "bin" / "k3dm-cloud-bridge"))
             spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -70,6 +74,9 @@ def _bridge_gated(action):
             _BRIDGE_MODULE = module
         finally:
             webhook_proc._spawn_capture_text = saved_spawn
+            webhook_auth = sys.modules.get("webhook.auth")
+            if webhook_auth is not None:
+                webhook_auth._spawn_capture_text = saved_auth_spawn or saved_spawn
     return bool(_BRIDGE_MODULE.gated(action))
 
 
@@ -586,7 +593,7 @@ def build_k3dm_tests_legs(
 
         p9_vals = _extract_frame_numbers(panel_results.get(9), prefer_target="test-all")
         panel9_val = int(round(p9_vals[-1])) if p9_vals else None
-        complete_ok = api_ok and (panel9_val is None or panel9_val == 1)
+        complete_ok = api_ok and panel9_val == 1
 
         return [
             _assertion(
@@ -767,7 +774,12 @@ def run_live_profile(
                 )
             )
 
-        run_dir, report, passed = run_scenarios(run_root=root, registry=scenarios, capabilities=())
+        run_dir, report, passed = run_scenarios(
+            run_root=root,
+            registry=scenarios,
+            capabilities=(),
+            extra_secrets=tuple(state["extra_secrets"]),
+        )
         _rescrub_run_dir(run_dir, state["extra_secrets"])
         process_run_drafts(
             run_dir,
@@ -778,6 +790,7 @@ def run_live_profile(
             with_prior_art=with_prior_art,
             search_fn=search_fn,
             extra_secrets=tuple(state["extra_secrets"]),
+            caught_by="live check",
         )
         _rescrub_run_dir(run_dir, state["extra_secrets"])
         return run_dir, report, passed
