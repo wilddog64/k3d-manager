@@ -110,7 +110,7 @@ be red on the machine the tool ships on, and only the host can tell you. Each te
 behind `scripts/tests/tripwire.sh`, so it cannot reach a real cluster, cloud API or keychain even
 on the operator's machine — see `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`. Only one
 `/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 20 minutes, and a
-second make request is answered `409` until it finishes.
+second make request is answered `409` until it finishes. Automated live verification and dashboard checks against `make-test-all` are documented in the [live profile section of the operator acceptance guide](../guides/operator-acceptance.md#5-live-profile).
 
 **Every `make-*` and `diagnose-*` action is asynchronous.** The response carries `body.job_id`
 and `body.status: "queued"` within seconds, whatever the job's runtime. Poll it:

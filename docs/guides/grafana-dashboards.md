@@ -26,6 +26,10 @@ This guide is the entry point for the Grafana dashboards shipped by this reposit
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml`; `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` | hub and ACG dashboard ApplicationSets | hub + ACG | [Source definition](../../scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml) |
 | k3dm VectorDB Health | `k3dm-vectordb` | `platform-ops/grafana-dashboard-vectordb.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-vectordb.md) |
 
+### k3dm Tests
+
+Automated acceptance scenarios and live profile verification for the `k3dm-tests` dashboard and its metrics publication pipeline are documented in the [operator acceptance guide](operator-acceptance.md).
+
 Public endpoint probes (`probe_*`) are Prometheus blackbox-exporter metrics and `Probe` resources, not Grafana dashboards. See [probe triage](grafana-dashboards/shared-operations.md#triage-no-data-by-cause).
 
 ## Choosing a Grafana instance
