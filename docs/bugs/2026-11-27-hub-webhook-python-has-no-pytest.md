@@ -1,15 +1,17 @@
 # Bug: the hub webhook's `python3` has no pytest, so `make test-python` fails on m5
 
-**Status:** OPEN — spec rev 1 (2026-11-27), intents pending
+**Status:** OPEN — spec rev 1 (2026-11-27), intents approved
 **Priority:** P2
 **Introduced by:** unknown (likely the Homebrew Python upgrade to 3.15 on m5; pytest lived in an older site-packages)
 **Should have been caught by:** live check
 **Introducing change reviewed:** no
-**Waiting on:** operator decision — since 2026-11-27 (intents), then dispatch to Flash, then operator install on m5
+**Waiting on:** fix running — since 2026-11-27 (Flash), then operator install on m5
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (no k3d-k3d-cluster context) — not run
 **Severity:** medium — every hub `test-python` / `test-pytest` / `test-all` run ends exit 2 even with enough time.
 **Filed:** 2026-11-27, Claude, from the timed run for `2026-11-27-hub-make-test-all-exceeds-1800s-job-timeout.md`
 **Approval:** operator, 2026-11-27 ("I think you can do 1, 2, 4, and 5!" — item 1: pytest on the hub)
+**Intent approved:** operator, 2026-11-27
+**Intent approval words:** "intents approved" (Y-E1, Y-E2 as written in rev 1)
 **Component:** `Makefile` pytest lookups; `scripts/ci/fast_gate.sh` pytest lookup
 
 ## Evidence
