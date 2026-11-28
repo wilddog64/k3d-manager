@@ -67,3 +67,6 @@ evidence:
     intent: A second model checks the capture-kit spec against the capture plan before anyone builds it, so the scripts you run as root keep every safety rule.
 interface: none
 ```
+
+**Intent approved:** operator, 2026-11-27
+**Approval words and scope:** "can you also write the spec you said above and have Fable/Neon review" (review brief only; the kit spec's own intents are presented separately)
