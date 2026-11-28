@@ -7,7 +7,7 @@ starts after `a1` lands (imports `isolation`)
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E1, K-E5 and K-E6c,
 intents unchanged)
 **Approval:** operator, 2026-11-27 ("can this task split across Luna/Terra/Flash? worth a try?", then "go ahead")
-**Release / branch:** v1.47.0 plan 2 (operator 2026-11-28: "Slot now, displace plan 2"); `k3d-manager-v1.47.0`
+**Release / branch:** v1.47.0, carried enabling work of v1.45.0 plan 4 part B, outside the cap (operator 2026-11-28, rule `docs/process/rules.md#enabling-work`); `k3d-manager-v1.47.0`
 **Risk:** high (handles the Cloudflare capture token and decides what private data reaches the repo)
 **Implementer:** Luna (`codex`, `--model gpt-6-luna`). **Verifier:** Claude, from Acceptance.
 

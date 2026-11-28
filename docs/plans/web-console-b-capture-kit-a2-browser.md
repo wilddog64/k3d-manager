@@ -7,7 +7,7 @@ starts after `a3` lands (uses a1's `isolation`/`requests` and a3's `filters`/`sc
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E2, K-E3, K-E6b and
 K-E4e, intents unchanged)
 **Approval:** operator, 2026-11-27 ("can this task split across Luna/Terra/Flash? worth a try?", then "go ahead")
-**Release / branch:** v1.47.0 plan 2 (operator 2026-11-28: "Slot now, displace plan 2"); `k3d-manager-v1.47.0`
+**Release / branch:** v1.47.0, carried enabling work of v1.45.0 plan 4 part B, outside the cap (operator 2026-11-28, rule `docs/process/rules.md#enabling-work`); `k3d-manager-v1.47.0`
 **Risk:** high (decides whether a capture counts; the recorder is what Safari shows)
 **Implementer:** Luna (`codex`, `--model gpt-6-luna`). **Verifier:** Claude, from Acceptance.
 

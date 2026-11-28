@@ -43,6 +43,25 @@ moved and are not copied here.
 
 **Blocked on (operator, 2026-11-12):** each grooming records, per open-release plan and queued bug batch, what it is blocked on (`nothing`, `intent`, `dependency`, `file overlap`, `operator input`, `review`) and batches every operator ask into one list, so asks are answered at grooming instead of mid-week. Steps in `/release-groom`.
 
+<a id="enabling-work"></a>
+### Enabling work rides with its parent
+
+- **Enabling work rides with its parent; scope is decided when it appears (operator, 2026-11-28: "we should a rule for
+  this, the dependeices should not block current release"; adopted with "Adopt + apply retroactively").** When in-flight
+  work spawns new work (automating a manual step, a tool needed to produce a plan's evidence, a missing prerequisite),
+  Claude classifies it in the same turn and tells the operator which kind it is:
+  - **Enabling work:** needed to meet an existing plan's Acceptance or evidence. It is a child spec of that plan, takes
+    no new slot and does not count toward the 5-plan cap. If the parent was carried into the open release, it rides
+    with it into that release.
+  - **New feature:** useful, but the parent's acceptance does not need it: an ideas row, groomed as usual.
+- Enabling work is never parked until a groom: the operator decides at that moment whether it proceeds, and it is
+  dispatched within the WIP limit.
+- Enabling work never blocks the current release. If it cannot land in time, the parent's evidence stays owed (the manual
+  path remains allowed) and the release proceeds.
+- **Precedent (2026-11-27/28):** scripting the v1.45.0 plan 4 part B captures grew into the capture kit (a four-child
+  spec), which Claude treated as a new feature and parked for the 2026-11-29 groom; it was briefly slotted as v1.47.0
+  plan 2, displacing the Slack-agents slice, then reclassified as enabling work under this rule and the slice restored.
+
 <a id="dispatch-wip-limit"></a>
 ### Dispatch WIP limit and P3 batching
 

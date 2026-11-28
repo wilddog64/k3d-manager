@@ -4,8 +4,8 @@
 (NEEDS FIXES, no blocker); every finding applied or answered in `## Review log`; intents approved (rev 2 wording, unchanged
 in rev 3)
 **Priority:** P2 (enhancement)
-**Release:** v1.47.0 plan 2 (operator, 2026-11-28: "this should not wait until Sunday", then "Slot now, displace plan 2";
-displaced the Slack-agents first slice, which had no spec)
+**Release:** v1.47.0, carried enabling work of v1.45.0 plan 4 part B, outside the 5-plan cap (operator, 2026-11-28:
+"this should not wait until Sunday"; rule `docs/process/rules.md#enabling-work`, applied retroactively)
 **Branch:** `k3d-manager-v1.47.0`
 **Filed:** 2026-11-27, Claude
 **Approval:** operator, 2026-11-27 ("actually I wonder if you can write script for me to execute these probes?", then
