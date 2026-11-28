@@ -1,10 +1,11 @@
-## Handoff — 2026-11-27 23:40 PST — v1.46.0 shipped, post-merge checks — START HERE
+## Handoff — 2026-11-27 16:55 PST — v1.46.0 shipped, standing docs audited, promote next — START HERE
 
 - **Operator:** home this evening. Only they can promote (`make hub-deploy` in tmux on m5), merge, approve intents,
   and run sudo steps. Classifier blocks Claude from disabling `enforce_admins`: operator runs that DELETE at merge.
-- **First task after /clear (operator):** audit stale standing docs for v1.46.0 (post-merge Step 7b): `memory-bank/projectbrief.md`,
-  `.github/copilot-instructions.md`, `docs/api/functions.md` (new public functions this release, e.g. lib-foundation
-  `ssh_fragment` helpers, notify-route, acceptance runner). Fix on `k3d-manager-v1.47.0` in one commit.
+- **Step 7b standing-docs audit DONE (2026-11-27):** one commit on `k3d-manager-v1.47.0` (projectbrief cloud-runner
+  approval tier, notify_route, acceptance harness, SSH fragment, Tailscale, test-pytest row; copilot-instructions approval
+  gate, notify_route, SSH/tailnet rules; functions.md orphan v1.43.0 rows moved into Plugins, `_install_tailscale_app`).
+  No new public dispatcher functions in v1.46.0. That commit is the promote SHA once every check-run on it is green.
 
 1. **v1.46.0 SHIPPED.** PR #166 squash-merged `f2a5f7a3`; tag + latest release v1.46.0; enforce_admins restored;
    next branch `k3d-manager-v1.47.0` (head `d39ace80`: retro `docs/retro/2026-11-27-v1.46.0-retrospective.md`).

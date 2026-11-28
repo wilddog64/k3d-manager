@@ -1,17 +1,5 @@
 # Public Functions Reference
 
-| `vault_dr_shards_save` | `scripts/plugins/vault.sh` | Save durable Vault unseal shards in the DR Keychain service. |
-| `vault_dr_shards_export` | `scripts/plugins/vault.sh` | Stream the durable shard bundle for the operator's one-time transfer. |
-| `vault_dr_shards_import` | `scripts/plugins/vault.sh` | Read a shard bundle from stdin into the DR Keychain service. |
-| `hub_data_export` | `scripts/plugins/hub_data.sh` | Create an age-encrypted claim export in the data repository. |
-| `hub_data_restore` | `scripts/plugins/hub_data.sh` | Verify and restore an encrypted export with node pre-binding. |
-| `hub_data_export_setup` | `scripts/plugins/hub_data.sh` | Create the export service account and list-only Vault role, then self-test the login. |
-| `hub_data_export_scheduled` | `scripts/plugins/hub_data.sh` | The LaunchAgent entry point: lock, export with batch-mode SSH, push `k3dm-hub-data-export` metrics. |
-| `hub_data_export_schedule` | `scripts/plugins/hub_data.sh` | Render and bootstrap the 03:30 daily export LaunchAgent. |
-| `hub_data_export_unschedule` | `scripts/plugins/hub_data.sh` | Boot out the daily export LaunchAgent. |
-| `hub_data_prune` | `scripts/plugins/hub_data.sh` | Apply export retention on the `snapshots` branch; never prunes the newest or the last drill-proven export. |
-| `hub_data_verify_vault_paths` | `scripts/plugins/hub_data.sh` | Check every Vault path in an export inventory exists after a restore; fails closed. |
-
 All functions callable via `./scripts/k3d-manager <function> [args]`.
 
 Use `-h` or `--help` with any function for a brief usage message:
@@ -66,6 +54,17 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `hub_snapshot_schedule` | `scripts/plugins/hub_snapshot.sh` | Install the `com.k3d-manager.hub-snapshot` LaunchAgent that runs a hub snapshot every Sunday at 02:30 local time; `make snapshot-schedule` (v1.43.8+) |
 | `hub_snapshot_unschedule` | `scripts/plugins/hub_snapshot.sh` | Unload and remove the weekly snapshot LaunchAgent; `make snapshot-unschedule` (v1.43.8+) |
 | `hub_snapshot_scheduled` | `scripts/plugins/hub_snapshot.sh` | Entry point the LaunchAgent calls: takes the snapshot lock (skips if a capture is already running) and runs `hub_snapshot_capture`, whose prune removes verified snapshots older than `K3DM_SNAPSHOT_MAX_AGE_DAYS` (30) while keeping the newest three (v1.43.8+) |
+| `vault_dr_shards_save` | `scripts/plugins/vault.sh` | Save durable Vault unseal shards in the DR Keychain service. |
+| `vault_dr_shards_export` | `scripts/plugins/vault.sh` | Stream the durable shard bundle for the operator's one-time transfer. |
+| `vault_dr_shards_import` | `scripts/plugins/vault.sh` | Read a shard bundle from stdin into the DR Keychain service. |
+| `hub_data_export` | `scripts/plugins/hub_data.sh` | Create an age-encrypted claim export in the data repository. |
+| `hub_data_restore` | `scripts/plugins/hub_data.sh` | Verify and restore an encrypted export with node pre-binding. |
+| `hub_data_export_setup` | `scripts/plugins/hub_data.sh` | Create the export service account and list-only Vault role, then self-test the login. |
+| `hub_data_export_scheduled` | `scripts/plugins/hub_data.sh` | The LaunchAgent entry point: lock, export with batch-mode SSH, push `k3dm-hub-data-export` metrics. |
+| `hub_data_export_schedule` | `scripts/plugins/hub_data.sh` | Render and bootstrap the 03:30 daily export LaunchAgent. |
+| `hub_data_export_unschedule` | `scripts/plugins/hub_data.sh` | Boot out the daily export LaunchAgent. |
+| `hub_data_prune` | `scripts/plugins/hub_data.sh` | Apply export retention on the `snapshots` branch; never prunes the newest or the last drill-proven export. |
+| `hub_data_verify_vault_paths` | `scripts/plugins/hub_data.sh` | Check every Vault path in an export inventory exists after a restore; fails closed. |
 | `configure_vault_app_auth_for_context` | `scripts/plugins/vault.sh` | Provider-agnostic Kubernetes auth configuration for app cluster; resolves kubeconfig context to cluster name before CA/server lookup (v1.10.0+) |
 | `vault_install_unseal_watchdog` | `scripts/plugins/vault.sh` | Deploy in-cluster Vault auto-unseal watchdog CronJob (Tier 3 P2a); replays Shamir shard on `vault status` exit-code trigger |
 | `vault_deploy_hub_into_context` | `scripts/plugins/vault.sh` | Provision hub Vault inside an app cluster with least-privilege `app-cluster-reader` policy and kubernetes-auth ClusterSecretStore (v1.10.0+) |
@@ -238,6 +237,7 @@ Installs Kyverno (pinned chart `SIGNING_KYVERNO_HELM_CHART_VERSION`, A08) and ap
 ```
 
 Failed runs keep logs in `scratch/test-logs/<suite>/<case-hash>/<timestamp>.log`.
+
 ## Installation Helpers
 
 ### `_ensure_antigravity_ide`
@@ -294,3 +294,13 @@ Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (e.g
 | Env Var | Default | Description |
 |---|---|---|
 | `K3DM_ACG_SKIP_SESSION_CHECK` | `0` | Set to `1` to bypass the Pluralsight session check (useful for CI or if Playwright cannot launch) |
+
+### `_install_tailscale_app`
+
+Installs the Tailscale Standalone app (bundle `io.tailscale.ipn.macsys`) with `brew install --cask tailscale-app`; macOS only. Wrapped by `make install-tailscale` (lib-foundation v0.5.11+, k3d-manager v1.46.0+).
+
+- Refuses, without changing anything, when the Homebrew `tailscale` formula is installed or `/Applications/Tailscale.app` is the App Store variant (`io.tailscale.ipn.macos`) or an unknown bundle.
+- Returns 0 without reinstalling when the Standalone app is already present.
+- `TAILSCALE_APP_DIR` overrides the app path (default `/Applications/Tailscale.app`).
+
+Runbook: [`docs/howto/tailscale-break-glass.md`](../howto/tailscale-break-glass.md). Source: `scripts/lib/foundation/scripts/lib/system.sh`.

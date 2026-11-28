@@ -92,9 +92,18 @@ directory integration plugin, mirroring the same pattern as cluster providers.
 - SSH tunnel (autossh + launchd) with forward (k3s API) and reverse (Vault) port forwarding.
 - ArgoCD GitOps hub on infra cluster managing shopping-cart apps on app cluster.
 - Read-only remote and cloud-session access (v1.38.0+): a Slack `/k3dm` command surface and a
-  pull-model cloud bridge (`bin/k3dm-cloud-bridge`) that serves a fixed reader-tier action
-  allowlist from an untrusted git branch. No credential is ever placed in a cloud environment
-  and no cluster endpoint is exposed; operator-tier and admin-tier actions stay off both paths.
+  pull-model cloud bridge (`bin/k3dm-cloud-bridge`) that serves a fixed action allowlist from
+  an untrusted git branch. No credential is ever placed in a cloud environment and no cluster
+  endpoint is exposed; operator-tier and admin-tier actions stay off both paths. Reader actions
+  run at once; the cloud-runner actions (`sandbox-up`, `sandbox-down`, `make-e2e`,
+  `make-e2e-remote`, v1.41.0+) wait for the operator's Approve on a Slack card (v1.46.0+).
+  Routable requests may name a `notify_route` alias that keeps their Slack notices in a
+  low-audience channel (v1.46.0+).
+- Operator acceptance harness (v1.46.0+): `make test-operator-acceptance` runs isolated offline
+  scenarios (metrics publication, the `k3dm-tests` dashboard, webhook job output, cleanup
+  isolation) inside `make test-pytest`; `make test-operator-acceptance-live PROFILE=k3dm-tests`
+  is an opt-in, read-only check of the live cloud-request path and Grafana freshness
+  (`docs/guides/operator-acceptance.md`).
 - Prior-art retrieval over the docs corpus (v1.39.0+): a single-instance pgvector Postgres in the
   `vectordb` namespace backs `make index-docs` and `make find-similar-docs`. It is an explicitly
   **rebuildable cache, not a system of record** — losing it costs one re-index — and every path is
@@ -110,6 +119,11 @@ directory integration plugin, mirroring the same pattern as cluster providers.
   Root installers (web-console sshd and TOTP, promote authority) run from a commit staged
   by the root-owned bootstrap `bin/k3dm-verified-stage` (v1.45.1), installed once at the hub
   console and checked against GitHub on a second device, never from the writable checkout.
+- Cloud sandbox SSH aliases (v1.46.0+): AWS, GCP and Azure write only
+  `~/.ssh/k3dm-sandbox.conf` (lib-foundation `ssh_fragment.sh`), never the operator's main
+  `~/.ssh/config`, which needs a one-time `Include`.
+- Tailscale break-glass access (v1.46.0+, operator-run): a literal tailnet policy pinned by an
+  offline test and `make install-tailscale` (`docs/howto/tailscale-break-glass.md`).
 
 **Out of scope:**
 - Production cluster management.
@@ -245,7 +259,7 @@ Violations are bugs. Agents fix their own hook failures and recommit — they do
 | `make test` | `scripts/tests/{lib,core,plugins,etc}` by directory discovery | dispatcher |
 | `make test-bin` | `scripts/tests/bin` | `bats` directly |
 | `make test-python-unit` | `scripts/tests/bin/*.py` (stdlib `unittest`) | python |
-| `make test-pytest` | `scripts/tests/hermes` + `scripts/tests/bin/test_smoke_logins.py` | pytest |
+| `make test-pytest` | `scripts/tests/hermes` + `scripts/tests/bin/test_*.py`, then `bin/k3dm-operator-acceptance` | pytest |
 | `make test-all` | all of the above | — |
 
 `make test` deliberately does **not** include `scripts/tests/bin` — a different runner

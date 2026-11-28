@@ -59,6 +59,8 @@ Use the rules below to shape all code suggestions and PR reviews.
 - The action allowlist in `bin/k3dm-cloud-bridge` is the security boundary. Each action hard-codes its HTTP method and binds every parameter to a compiled anchored pattern, so a parameter cannot be declared without validation. Never derive the method from the request file; never add an `operator`/`admin` action, nor `ask`/`analyze`.
 - Any new push-triggered workflow must be branch-scoped and must never include `cloud-requests` in its trigger set.
 - Neither webhook token may be placed in a cloud environment, a third-party secret store, or the repo. The reader token reads env then Keychain only — a `TOKEN_FILE` fallback would collapse the two roles into one shared secret.
+- Cloud-runner actions (`gated()` in `bin/k3dm-cloud-bridge`: `sandbox-up`, `sandbox-down`, `make-e2e`, `make-e2e-remote`) run only after an operator Approve decision drained from the Slack relay (v1.46.0+). Flag any path that runs a gated action without a matching admitted approval, lets the request file mark itself approved, or adds an action to the cloud-runner tier without adding it to `gated()`.
+- A `notify_route` value is an alias, never a channel ID: it must match `ALIAS_RE` and resolve through the operator's route map (`K3DM_SLACK_NOTIFICATION_ROUTES` or Keychain `k3dm-slack-notification-routes`, `scripts/lib/webhook/notify_routes.py`). Flag code that accepts a raw channel from the request, logs the map contents, or falls back to a default channel when a named alias fails to resolve.
 
 ### Privilege Escalation
 - Bare `sudo` calls in production code are a bug — all privilege escalation must go through `_run_command`.
@@ -68,6 +70,10 @@ Use the rules below to shape all code suggestions and PR reviews.
 - When reviewing shell scripts, check that every privileged operation is routed through `_run_command`; only the runner internals may call `sudo` directly.
 - Root installers (`bin/k3dm-web-console-sshd`, `bin/k3dm-web-console-totp`, `bin/k3dm-promote-authority`) run only from a tree staged by the root-owned bootstrap `bin/k3dm-verified-stage` (v1.45.1+), never from the operator-writable checkout. Flag any change that lets them source a library from the checkout, fetch at install time, or keep a sudo ticket alive after a stage or run (`docs/howto/verified-stage.md`).
 - When reviewing shell scripts, call out unquoted variables, direct `eval`, ad hoc `sudo`, and commands that will fail non-interactively in CI.
+
+### Operator SSH config and tailnet policy (v1.46.0+)
+- Providers write sandbox SSH aliases only to `~/.ssh/k3dm-sandbox.conf` through lib-foundation `_ssh_fragment_*` helpers. Flag any code that edits the operator's main `~/.ssh/config`, or that makes a cloud VM before the GCP/Azure Include preflight passes.
+- `docs/howto/tailscale/policy.hujson` is pinned exactly by `scripts/tests/bin/test_tailscale_policy.py`. Flag a wildcard, CIDR, auth key, tailnet name or address, or real login in the policy, and any change to its grants that does not update the test's expected values in the same commit.
 
 ### Platform Detection
 - `_detect_platform` is the single source of truth for OS detection in `core.sh`.
