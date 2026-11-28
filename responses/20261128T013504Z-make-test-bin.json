@@ -1,0 +1,1 @@
+{"action": "make-test-bin", "body": {"job_id": "113a47d0", "status": "queued"}, "completed_at": "2026-11-28T01:35:16.916843Z", "http_status": 202, "id": "20261128T013504Z-make-test-bin", "schema": 1, "status": "ok"}
