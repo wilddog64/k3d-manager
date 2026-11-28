@@ -1,6 +1,6 @@
 # Web Console B capture kit — child c: simplify the operator path (one ID, no hand-made token file)
 
-**Status:** SPEC rev 2 — intents approved 2026-11-28, dispatched to Luna (`wcb-kit-c`); rev 1 reviewed blind by Fable and Neon (both NEEDS FIXES), every finding folded in (table at the end)
+**Status:** LANDED 2026-11-28 (`6b479708`, Luna, 2 runs; Claude verified outside the sandbox: make test-pytest 3178 passed, own mutants tmux-guard and team-anchor caught); S-E4 live in sitting 1 pending — rev 2, intents approved 2026-11-28; rev 1 reviewed blind by Fable and Neon (both NEEDS FIXES), every finding folded in (table at the end)
 **Parent:** [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) (enabling work of the parent; no release slot)
 **Branch:** task branch from `k3d-manager-v1.47.0`
 **Risk:** medium (how the capture token and the connector token reach the kit; the scan-term privacy contract)

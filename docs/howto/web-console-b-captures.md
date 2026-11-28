@@ -1,5 +1,7 @@
 # Web console part B — capture kit how-to guide
 
+> **Short version:** [the one-page card](web-console-b-captures-card.md). Since capture kit child c (`6b479708`), `api` asks only for the account ID (it resolves the app `wcb-capture`, the tunnel `k3dm-capture-tunnel`, the hostname and the team, and prompts only for a value it cannot resolve), offers to store a missing capture token through macOS's hidden prompt, and `stage` takes the connector token with one hidden paste. Steps 2 and 5 below (Keychain command, hand-made token file) and the five-ID list are kept for reference only.
+
 This guide walks the operator through running the remaining Web Console Part B captures (C1–C5, C7–C9, C13(c), C14 plain, C15) using the guided capture tool `bin/k3dm-wcb-capture`.
 
 Parent capture plan: [`docs/plans/v1.45.0-web-console-b-captures.md`](../plans/v1.45.0-web-console-b-captures.md).
