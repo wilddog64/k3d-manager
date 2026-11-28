@@ -35,13 +35,14 @@ ACME_EMAIL=you@example.com \
 ./scripts/k3d-manager acg_get_credentials              # Playwright auto-extract via Chrome CDP
 pbpaste | ./scripts/k3d-manager acg_import_credentials # fallback: paste from clipboard
 
-acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; updates ~/.ssh/config
+acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; writes ~/.ssh/k3dm-sandbox.conf
 acg_status                        # verify instance state + k3s health
 acg_extend                        # open browser to extend sandbox TTL (+4h)
 acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeconfig context
 ```
 
 > Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
+> Add `Include ~/.ssh/k3dm-sandbox.conf` near the top of `~/.ssh/config` once. GCP/Azure preflight stops before VM creation if it is missing; `K3DM_SSH_SANDBOX_PREFLIGHT=warn` downgrades the check.
 >
 > **First run:** `acg_extend_playwright` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the browser session check.
 
@@ -349,11 +350,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-11-27 | [Argon PR #166 review findings](docs/issues/2026-11-27-argon-pr166-review-findings.md) | v1.46.0 release diff / 2 fixed, 1 P3, 1 not a defect |
 | 2026-11-25 | [Argon PR #165 review findings](docs/issues/2026-11-25-argon-pr165-review-findings.md) | v1.45.1 release diff / no change |
 | 2026-11-23 | [Argon PR #164 review findings](docs/issues/2026-11-23-argon-pr164-review-findings.md) | v1.45.0 release diff / no change |
 | 2026-11-23 | [CodeQL PR #164: totpctl enrollment secret](docs/issues/2026-11-23-codeql-pr164-totpctl-enroll-secret.md) | False positive / TOTP enroll |
 | 2026-11-23 | [v1.45.0 red-team report](docs/issues/2026-11-23-v1.45.0-red-team.md) | Release security gate |
-| 2026-11-18 | [Argon PR #163 review findings](docs/issues/2026-11-18-argon-pr163-review-findings.md) | v1.44.2 release diff / xtrace |
 
 [All issues →](docs/issues/)
 
@@ -363,14 +364,15 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.46.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.46.0) | 2026-11-27 | Cloud-request safety and hub reliability. **Approvals:** cloud-runner requests (sandbox up/down, e2e) wait for an operator Approve/Deny card; requests can route Slack notices to an approved channel alias. **Acceptance:** offline operator acceptance runner (k3dm Tests pilot) plus an opt-in live profile. **Hub:** promotes restart changed webhook and cloud-bridge code; promote-waiting ignores squash-merged content; stale-sandbox sweep removes only the dead istio-ambient set; cloud test limits from a measured run, with per-stage durations. **Access:** sandbox SSH aliases in `~/.ssh/k3dm-sandbox.conf` (lib-foundation v0.5.12); Tailscale break-glass policy and `make install-tailscale`. |
 | [v1.45.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.45.1) | 2026-11-25 | Security and DR bug-fix release. **Security:** root installers run from a root-owned verified-stage bootstrap, never the writable checkout; app-cluster token off kubectl argv; console TOTP gate lockout and socket hardening; CVE pin overlay checks. **DR:** drill re-syncs the LDAP admin Secret (V4), refuses fast on a locked Keychain, pins istioctl 1.31.4. **Console:** scannable QR enrolment, pasted recovery codes accepted. |
 | [v1.45.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.45.0) | 2026-11-23 | Remote promote and secure remote access. **Promote:** approve a CI-green commit from a cloud session or Slack and the hub deploys it (approval store, root daemon, mover); **CVE:** overrides pinned on `cve-pins/hub`; **Console:** browser SSH behind Cloudflare Access with a TOTP gate; **Travel:** age-encrypted service-password bundle; **Dispatch:** Claude-diagnosed stall recovery; **Security:** red-team gate passed (no P0/P1). |
-| [v1.44.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.44.2) | 2026-11-17 | Vault-sealed bug-fix release. **Hermes:** `vault_seal` sensor; no cosign restore (r7) offered while Vault is sealed; cards lead with the root cause and say whether to approve. **Webhook:** alert diagnosis checks Vault and the ClusterSecretStore before asking Gemini. **Hub:** recovery rewrites the `vault-unseal` Secret from the restored shards (unseal watchdog stage 2). **Ops:** `codex-dispatch --project` for other repos; stall dashboard in plain words; Slack notice no longer shows the home path. |
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.44.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.44.2) | 2026-11-17 | Vault-sealed bug-fix release. **Hermes:** `vault_seal` sensor; no cosign restore (r7) offered while Vault is sealed; cards lead with the root cause and say whether to approve. **Webhook:** alert diagnosis checks Vault and the ClusterSecretStore before asking Gemini. **Hub:** recovery rewrites the `vault-unseal` Secret from the restored shards (unseal watchdog stage 2). **Ops:** `codex-dispatch --project` for other repos; stall dashboard in plain words; Slack notice no longer shows the home path. |
 | [v1.44.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.44.1) | 2026-11-17 | Bug-fix release (12 groomed bugs). **Security:** Vault tokens and SA JWT off `kubectl exec` argv; hub CronJobs on `alpine/k8s:1.33.13` and pgvector pinned by digest. **Hub:** promote containment sees squash merges; push hooks stop inheriting make vars; Pushgateway pushes only from the hub. **Ops:** dispatch stall detector and watcher; clearer Hermes CI page; Bugs dashboard shows the groomed release; CI split into shards. |
 | [v1.44.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.44.0) | 2026-11-16 | Dev hub and faster feedback. **Hub:** isolated dev vCluster with quota and alerts; one-command `make hub-deploy REF=`; promote reminder for CI-green commits `deploy/hub` lacks; Grafana pinned by digest. **Tests:** `make test-all PARALLEL=1`. **Ops:** Hermes Slack config sensors, dispatch stall-recovery panels, Vault/ESO restart fixes. |
 | [v1.43.15](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.15) | 2026-11-12 | Hub-safety and process release. **Hub:** the hub runs only promoted code: `make hub-promote` / `hub-rollback` move `deploy/hub` behind green checks and a typed confirmation, `make platform-ops` applies the promoted tree, and every ApplicationSet applier defaults to `deploy/hub`. **Machines:** each machine fast-forwards its checkouts on a five-minute timer and reports hub lag and pending deploy steps; an Ubuntu Linux control-node path. **Agents:** operator-approved plain-language intents before every dispatch, answered by every verification; Codex spend attributed by category with Dispatch coverage on Agent Cost. **Bugs:** ~57 fixed (2 P1), including the CVE promoter, Hermes approval and rollback guards; from 2026-11-11 P2/P3 bugs are captured, classified by a second agent and triaged instead of fixed at once. Dashboard renamed **k3dm Release Tracking**. |

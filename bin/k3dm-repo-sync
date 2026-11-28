@@ -18,6 +18,8 @@ LOCK = STATE_DIR / "lock"
 TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_TIMEOUT", "60"))
 UPSTREAM_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_UPSTREAM_TIMEOUT", "15"))
 APPSETS_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_APPSETS_TIMEOUT", "15"))
+CONTAIN_TIMEOUT = int(os.environ.get("K3DM_REPO_SYNC_CONTAIN_TIMEOUT", "5"))
+CONTAIN_BUDGET = 20
 
 
 def run(args, cwd=None, timeout=TIMEOUT, env=None):
@@ -80,13 +82,86 @@ def repo_label(path):
         return path.name
 
 
-def find_promotable(remote, upstream_ref, backlog_count):
+def containment_context(remote):
+    try:
+        hub = f"{remote}/deploy/hub"
+        tree = git(ROOT, "rev-parse", f"{hub}^{{tree}}", timeout=CONTAIN_TIMEOUT)
+        if tree.returncode or not re.fullmatch(r"[0-9a-fA-F]{40,64}", tree.stdout.strip()):
+            return None
+        shipped = git(ROOT, "log", "--first-parent", "--max-count=50", "--format=%T", hub,
+                      timeout=CONTAIN_TIMEOUT)
+        if shipped.returncode:
+            return None
+        return {"hub_tree": tree.stdout.strip(), "shipped_trees": set(shipped.stdout.splitlines()),
+                "started": time.monotonic(), "disabled": False}
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
+        return None
+
+
+def content_contained(remote, sha, ctx):
+    """Return True/False only when content containment is proven; otherwise unknown."""
+    if not ctx or ctx.get("disabled"):
+        return None
+    if time.monotonic() - ctx["started"] >= CONTAIN_BUDGET:
+        ctx["disabled"] = True
+        return None
+    try:
+        if ctx.get("disabled") or time.monotonic() - ctx["started"] >= CONTAIN_BUDGET:
+            ctx["disabled"] = True
+            return None
+        tree = git(ROOT, "rev-parse", f"{sha}^{{tree}}", timeout=CONTAIN_TIMEOUT)
+        if tree.returncode:
+            return None
+        if tree.stdout.strip() in ctx["shipped_trees"]:
+            return True
+        if os.environ.get("K3DM_REPO_SYNC_CHECK") == "1":
+            return None
+        parent = git(ROOT, "rev-parse", f"{sha}^", timeout=CONTAIN_TIMEOUT)
+        if parent.returncode:
+            return None
+        hub = f"{remote}/deploy/hub"
+        for args in (("--write-tree", "--no-messages", hub, sha),
+                     ("--write-tree", "--no-messages", f"--merge-base={sha}^", hub, sha)):
+            if ctx.get("disabled") or time.monotonic() - ctx["started"] >= CONTAIN_BUDGET:
+                ctx["disabled"] = True
+                return None
+            result = git(ROOT, "merge-tree", *args, timeout=CONTAIN_TIMEOUT)
+            if result.returncode == 1:
+                return False
+            if result.returncode:
+                return None
+            first = result.stdout.splitlines()[0].strip() if result.stdout.splitlines() else ""
+            if not first or first != ctx["hub_tree"]:
+                return False
+        return True
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
+        ctx["disabled"] = True
+        return None
+
+
+def record_contained(state, sha, branch):
+    prior = state.get("promote_contained") or {}
+    state["promote_contained"] = {"sha": sha, "branch": branch,
+                                  "deploy_hub": state.get("deploy_hub_sha")}
+    if prior.get("sha") != sha:
+        print(f"promotable: {sha[:7]} on {branch} already in deploy/hub by content; ignoring it and older commits")
+
+
+def find_promotable(remote, upstream_ref, backlog_count, state, ctx):
     """Return (sha, check_lookup_failed, candidate_list_unknown)."""
-    commits = git(ROOT, "rev-list", "--max-count=10", f"{remote}/deploy/hub..{upstream_ref}")
+    excluded = []
+    record = state.get("promote_contained")
+    if record and record.get("branch") == state.get("upstream_branch"):
+        excluded = [record["sha"]]
+    commits = git(ROOT, "rev-list", "--max-count=10", f"{upstream_ref}", "--not",
+                  f"{remote}/deploy/hub", *excluded)
     if commits.returncode:
         return None, False, True
     candidates = commits.stdout.splitlines()
     for commit in candidates:
+        if content_contained(remote, commit, ctx) is True:
+            record_contained(state, commit, state.get("upstream_branch", ""))
+            return None, False, False
         try:
             check = run([str(ROOT / "bin/k3dm-hub-promote"), "is-green", commit], cwd=ROOT)
         except (OSError, subprocess.TimeoutExpired):
@@ -99,7 +174,7 @@ def find_promotable(remote, upstream_ref, backlog_count):
     return None, False, len(candidates) == 10 and backlog_count > 10
 
 
-def carry_forward_promotable(state, previous_state, remote, upstream_ref):
+def carry_forward_promotable(state, previous_state, remote, upstream_ref, ctx=None):
     """Keep the prior alert series through an unknown cycle if it remains unpromoted."""
     sha = previous_state.get("promotable_sha")
     if not sha:
@@ -113,6 +188,16 @@ def carry_forward_promotable(state, previous_state, remote, upstream_ref):
     except (OSError, subprocess.TimeoutExpired):
         return
     if upstream_contains.returncode == 0 and deployed_contains.returncode == 1:
+        record = state.get("promote_contained")
+        if record and record.get("branch") == branch:
+            prior_contained = git(ROOT, "merge-base", "--is-ancestor", sha, record["sha"])
+            if prior_contained.returncode == 0:
+                return
+        if content_contained(remote, sha, ctx) is True:
+            return
+        if upstream_ref and content_contained(remote, upstream_ref, ctx) is True:
+            record_contained(state, upstream_ref, branch)
+            return
         state["promotable_sha"] = sha
         state["promotable_branch"] = branch
 
@@ -455,9 +540,20 @@ def main():
                             upstream_ref = f"{remote}/{branch}"
                     if upstream_ref.startswith(f"{remote}/"):
                         state["upstream_branch"] = upstream_ref.partition("/")[2]
+                    old_contained = previous_state.get("promote_contained")
+                    if old_contained and old_contained.get("branch") == state.get("upstream_branch"):
+                        old_hub = old_contained.get("deploy_hub")
+                        current_hub = f"{remote}/deploy/hub"
+                        hub_ok = bool(old_hub and git(ROOT, "merge-base", "--is-ancestor", old_hub, current_hub).returncode == 0)
+                        upstream_name = f"{remote}/{old_contained['branch']}"
+                        sha_ok = bool(old_contained.get("sha") and
+                                      git(ROOT, "merge-base", "--is-ancestor", old_contained["sha"], upstream_name).returncode == 0)
+                        if hub_ok and sha_ok:
+                            state["promote_contained"] = old_contained
                 if (root_rec and root_rec.get("result") != "fetch_failed"
                         and not root_rec.get("promote_backlog_unknown", False)):
                     upstream_branch = state.get("upstream_branch", "")
+                    contain_ctx = containment_context(remote)
                     backlog = (git(ROOT, "rev-list", "--count", f"{remote}/deploy/hub..{upstream_ref}")
                                if upstream_ref else None)
                     state["promote_backlog"] = int(backlog.stdout.strip()) if backlog and backlog.returncode == 0 else None
@@ -465,18 +561,18 @@ def main():
                         state["promotable_unknown"] = True
                     elif state["promote_backlog"] > 0:
                         (state["promotable_sha"], state["promote_lookup_failed"],
-                         state["promotable_unknown"]) = find_promotable(remote, upstream_ref, state["promote_backlog"])
+                         state["promotable_unknown"]) = find_promotable(remote, upstream_ref, state["promote_backlog"], state, contain_ctx)
                         if state["promotable_sha"]:
                             state["promotable_branch"] = upstream_branch
                 else:
                     state["promotable_unknown"] = True
                 if state["promotable_unknown"]:
-                    carry_forward_promotable(state, previous_state, remote, upstream_ref)
+                    carry_forward_promotable(state, previous_state, remote, upstream_ref, contain_ctx)
             except Exception:
                 state["promotable_unknown"] = True
                 state["promote_lookup_failed"] = True
                 try:
-                    carry_forward_promotable(state, previous_state, remote, upstream_ref)
+                    carry_forward_promotable(state, previous_state, remote, upstream_ref, locals().get("contain_ctx"))
                 except Exception as error:
                     print(f"WARNING: could not retain prior promotable SHA: {error}", file=sys.stderr)
         STATE.write_text(json.dumps(state, indent=2) + "\n")

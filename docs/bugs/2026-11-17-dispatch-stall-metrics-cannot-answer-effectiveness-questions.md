@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 (proposed: a measurement gap; no wrong behaviour, but the phase 2 gate has no evidence behind it)
+**Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** `docs/bugs/2026-11-14-dispatch-stall-a-detector.md` (v1.44.1) for detection; stages B and C are not built yet
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown

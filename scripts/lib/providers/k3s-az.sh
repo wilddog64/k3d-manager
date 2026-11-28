@@ -9,17 +9,22 @@
 source "${SCRIPT_DIR}/plugins/azure.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/lib/foundation/scripts/lib/ssh_fragment.sh"
 
 _AZ_VM_NAME="${AZ_VM_NAME:-k3d-azure-node}"
 _AZ_VM_SIZE="${AZ_VM_SIZE:-Standard_B2s}"
 _AZ_VM_IMAGE="${AZ_VM_IMAGE:-Ubuntu2204}"
 _AZ_NSG_RULE_NAME="${AZ_NSG_RULE_NAME:-k3d-manager-k3s-api}"
-_AZ_SSH_CONFIG_HOST="${AZ_SSH_CONFIG_HOST:-ubuntu-azure}"
 _AZ_KUBE_CONTEXT="${AZ_KUBE_CONTEXT:-ubuntu-azure}"
 _AZ_KUBECONFIG="${HOME}/.kube/k3s-az.yaml"
 
 function _az_ssh_key() {
   printf '%s' "${AZ_SSH_KEY:-${HOME}/.ssh/k3d-manager-azure-key}"
+}
+
+function _az_ssh_config_host() {
+  printf '%s' "${AZ_SSH_CONFIG_HOST:-ubuntu-azure}"
 }
 
 function _az_ssh_user() {
@@ -85,24 +90,25 @@ function _az_get_public_ip() {
 
 function _az_update_ssh_config() {
   local external_ip="$1" ssh_user="$2" ssh_key="$3"
-  local ssh_config="${HOME}/.ssh/config"
-  if grep -q "^Host ${_AZ_SSH_CONFIG_HOST}$" "${ssh_config}" 2>/dev/null; then
-    local tmp
-    tmp=$(mktemp)
-    awk "/^Host ${_AZ_SSH_CONFIG_HOST}$/{found=1} found && /^Host / && !/^Host ${_AZ_SSH_CONFIG_HOST}$/{found=0} !found{print}" \
-      "${ssh_config}" > "${tmp}"
-    mv "${tmp}" "${ssh_config}"
-    chmod 600 "${ssh_config}"
-  fi
-  cat >> "${ssh_config}" <<EOF
-Host ${_AZ_SSH_CONFIG_HOST}
+  local host tmp
+  host="$(_az_ssh_config_host)"
+  tmp=$(mktemp) || return 1
+  cat > "${tmp}" <<EOF
+Host ${host}
   HostName ${external_ip}
   User ${ssh_user}
   IdentityFile ${ssh_key}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 EOF
-  _info "[k3s-az] SSH config updated: Host ${_AZ_SSH_CONFIG_HOST} → ${external_ip}"
+  _ssh_fragment_upsert "${host}" "${tmp}" || { rm -f "${tmp}"; return 1; }
+  rm -f "${tmp}"
+  _ssh_fragment_check_resolves "${host}" "${external_ip}"
+  _info "[k3s-az] SSH config updated: Host ${host} → ${external_ip}"
+}
+
+function _az_remove_ssh_config() {
+  _ssh_fragment_remove exact "$(_az_ssh_config_host)" || _warn "[k3s-az] Could not remove SSH alias"
 }
 
 function _az_wait_for_ssh() {
@@ -186,6 +192,8 @@ Config (env overrides):
 HELP
     return 0
   fi
+
+  _ssh_fragment_include_preflight || return 1
 
   if ! _az_ok; then
     printf 'ERROR: %s\n' "[k3s-az] Not logged in to Azure — run: az login" >&2
@@ -283,17 +291,7 @@ HELP
     --yes 2>/dev/null || \
     _info "[k3s-az] VM not found — skipping"
 
-  # Remove SSH config entry
-  local ssh_config="${HOME}/.ssh/config"
-  if grep -q "^Host ${_AZ_SSH_CONFIG_HOST}$" "${ssh_config}" 2>/dev/null; then
-    local tmp
-    tmp=$(mktemp)
-    awk "/^Host ${_AZ_SSH_CONFIG_HOST}$/{found=1} found && /^Host / && !/^Host ${_AZ_SSH_CONFIG_HOST}$/{found=0} !found{print}" \
-      "${ssh_config}" > "${tmp}"
-    mv "${tmp}" "${ssh_config}"
-    chmod 600 "${ssh_config}"
-    _info "[k3s-az] Removed SSH config entry for ${_AZ_SSH_CONFIG_HOST}"
-  fi
+  _dry_guard "remove Azure SSH alias" _az_remove_ssh_config
 
   # Remove kubeconfig context
   if kubectl config get-contexts "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1; then

@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 (proposed: caught by land's dirty-checkout guard; no wrong code landed)
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown

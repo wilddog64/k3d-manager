@@ -4,6 +4,7 @@
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Offline `make test-all` is degraded on the M4 with 35 failing cases across four root causes (including an unstubbed test attempting to act on the live host's launchctl agent), though mitigated by the tripwire, CI, and…); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (test-hygiene batch) — grooming 2026-11-12, operator.
+**Re-triage:** 2026-11-27 — fix in v1.46.0, folded into the hub test-all timeout investigation (`2026-11-27-hub-make-test-all-exceeds-1800s-job-timeout.md`) (operator 2026-11-27)
 **Waiting on:** operator decision — since 2026-11-21 (recheck below: nothing reproduces on the M4)
 **Introduced by:** unknown (four root causes, each with its own origin; see the table)
 **Should have been caught by:** unknown

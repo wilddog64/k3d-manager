@@ -409,3 +409,44 @@ def test_nightly_plist_sets_pushgateway_url():
     substituted = re.sub(r"\{\{[^}]+\}\}", "/test/path", raw_content)
     parsed = plistlib.loads(substituted.encode("utf-8"))
     assert parsed.get("EnvironmentVariables", {}).get("K3DM_PUSHGATEWAY_URL") == "http://localhost:9091"
+
+
+def test_stage_duration_seconds_parsed_and_published():
+    log_text = (
+        "[test-all] stage-complete test seconds=45\n"
+        "[test-all] stage-complete test-bin seconds=230\n"
+        "[test-all] stage-complete test-python seconds=18\n"
+    )
+    parsed = METRICS.parse_log(log_text)
+    assert parsed["completed_stages"] == {"test", "test-bin", "test-python"}
+    assert parsed["stage_durations"] == {"test": 45, "test-bin": 230, "test-python": 18}
+    payload = METRICS.build_payload(parsed, "test-all", 0)
+    assert 'k3dm_test_stage_duration_seconds{stage="test"} 45' in payload
+    assert 'k3dm_test_stage_duration_seconds{stage="test-bin"} 230' in payload
+    assert 'k3dm_test_stage_duration_seconds{stage="test-python"} 18' in payload
+    # T-N2: suite_duration_seconds must not include stages
+    assert 'k3dm_test_suite_duration_seconds{suite="test"}' not in payload
+    assert 'k3dm_test_suite_duration_seconds{suite="test-bin"}' not in payload
+
+
+def test_old_stage_complete_line_without_seconds_parses_without_error():
+    # T-N4: backward compatibility with old lines
+    parsed = METRICS.parse_log("[test-all] stage-complete test\n")
+    assert "test" in parsed["completed_stages"]
+    assert "test" not in parsed.get("stage_durations", {})
+    payload = METRICS.build_payload(parsed, "test-all", 0)
+    assert "k3dm_test_stage_duration_seconds" not in payload
+
+
+def test_partial_log_cut_off_publishes_completed_stage_durations():
+    # T-M2 and T-N1: stage that finished has duration even when later stage was killed
+    log_text = (
+        "[test-all] stage-complete test seconds=517\n"
+        "make: *** [test-all] Terminated: 15\n"
+    )
+    parsed = METRICS.parse_log(log_text)
+    assert parsed["completed_stages"] == {"test"}
+    assert parsed["stage_durations"] == {"test": 517}
+    payload = METRICS.build_payload(parsed, "test-all", 124)
+    assert 'k3dm_test_stage_duration_seconds{stage="test"} 517' in payload
+    assert 'k3dm_test_stage_duration_seconds{stage="test-bin"}' not in payload

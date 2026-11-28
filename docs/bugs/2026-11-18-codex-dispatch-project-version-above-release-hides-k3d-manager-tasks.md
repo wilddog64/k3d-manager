@@ -2,11 +2,13 @@
 
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — latent; dirused versions are v0.0.x
+**Triage:** patch → v1.46.1 — triage 2026-11-25, operator ("go with your recommendation"); was: backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1`
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Argon, missed)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Latent version-sorting defect where a project version higher than k3d-manager's release hides k3d-manager tasks in `status` and `stalled`.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md — read; same helper, opposite direction (that one hides project tasks). `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18
 

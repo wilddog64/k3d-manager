@@ -2,11 +2,13 @@
 
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — defence-in-depth gap; seal safety holds through the precondition
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** pre-existing (approval flow on `main`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Defense-in-depth flaw where re-running a cycle before approval overwrites the pending proposal's digest and expiry timestamp while preconditions still hold.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** docs/bugs/2026-11-18-hermes-resolve-during-approval-resample-skips-withdraw.md — read; same re-sample call, different defect. `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18
 

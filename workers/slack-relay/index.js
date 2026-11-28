@@ -1,7 +1,7 @@
 const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
 const REAUTH_TTL_SECONDS   = 600
-const HERMES_ACTION_ID_RE  = /^[rd][0-9]+-[0-9a-f]{8}$/
+const HERMES_ACTION_ID_RE  = /^[rdc][0-9]+-[0-9a-f]{8}$/
 const HERMES_NONCE_RE      = /^[0-9a-f]{16}$/
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
@@ -231,6 +231,7 @@ async function handleDrain(req, pathname) {
         approved_by: String(value.approved_by || ''),
         approved_at: Number(value.approved_at || 0),
         nonce: String(value.nonce || ''),
+        decision: String(value.decision || 'approve'),
       })
     }
     return new Response(JSON.stringify(items), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -262,10 +263,13 @@ async function handleInteractivity(req, event) {
   event.waitUntil((async () => {
     const kv = approvalsKv()
     const decision = action.action_id === 'hermes_approve' ? 'Approve' : 'Deny'
+    const cloudRequest = actionId.startsWith('c')
     if (!kv) return postResponseUrl(responseUrl,
       `⚠️ Your ${decision} of ${actionId} was NOT recorded: Hermes approvals are not configured on the relay`, true, '', false)
     if (!approverAllowed(userId)) return postResponseUrl(responseUrl,
-      `⛔ Your ${decision} of ${actionId} was NOT recorded: you are not authorized to approve or deny Hermes repairs`, true, '', false)
+      cloudRequest
+        ? `⛔ Your ${decision} of ${actionId} was NOT recorded: you are not authorized to approve or deny cloud requests`
+        : `⛔ Your ${decision} of ${actionId} was NOT recorded: you are not authorized to approve or deny Hermes repairs`, true, '', false)
     if (!await kv.get(`reauth:${userId}`)) {
       return postResponseUrl(responseUrl,
         `🔐 Your ${decision} of ${actionId} was NOT recorded: re-authenticate with /hermes-auth; it lasts 10 minutes and covers the next Approve or Deny, then press again`, true, '', false)
@@ -275,6 +279,17 @@ async function handleInteractivity(req, event) {
     } catch (_) {
       return postResponseUrl(responseUrl,
         `⚠️ Your ${decision} of ${actionId} was NOT recorded: re-authentication could not be used; run /hermes-auth and try again`, true, '', false)
+    }
+    if (cloudRequest && await kv.get(`approval:${actionId}`)) {
+      return postResponseUrl(responseUrl, `ℹ️ ${actionId} was already decided; this press was not recorded`, true, '', false)
+    }
+    if (cloudRequest) {
+      await kv.put(`approval:${actionId}`,
+        JSON.stringify({ approved_by: userId, approved_at: Date.now(), nonce, decision: decision.toLowerCase() }),
+        { expirationTtl: APPROVAL_TTL_SECONDS })
+      return replaceResponseUrl(responseUrl, decision === 'Approve'
+        ? `✅ ${actionId} approved by <@${userId}> — the cloud bridge runs it on its next poll (up to ~1 min)`
+        : `🚫 ${actionId} denied by <@${userId}> — it will not run`)
     }
     if (action.action_id === 'hermes_approve') {
       await kv.put(`approval:${actionId}`,

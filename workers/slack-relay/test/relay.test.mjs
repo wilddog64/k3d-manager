@@ -636,3 +636,53 @@ test('d action id rejects malformed, unauthorized and unauthenticated clicks', a
     assert.equal(await kv.get('approval:d1-0123abcd'), null)
   }
 })
+
+test('cloud request approve and deny decisions are stored and listed', async () => {
+  for (const [action, decision, expected] of [
+    ['hermes_approve', 'approve', /approved by <@UAPPROVER1> — the cloud bridge runs it on its next poll \(up to ~1 min\)/],
+    ['hermes_deny', 'deny', /denied by <@UAPPROVER1> — it will not run/],
+  ]) {
+    const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1')
+    const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1', APPROVAL_DRAIN_TOKEN: token })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', action, 'c1-0123abcd|0123456789abcdef')))
+    const stored = JSON.parse(await kv.get('approval:c1-0123abcd'))
+    assert.equal(stored.decision, decision)
+    assert.equal(stored.approved_by, 'UAPPROVER1')
+    assert.equal(stored.nonce, '0123456789abcdef')
+    assert.equal(kv.puts.at(-1).opts.expirationTtl, 3600)
+    assert.match(JSON.parse(worker.fetches[0].init.body).text, expected)
+    const listed = await worker.dispatch(new Request('https://relay.test/hermes/approvals', { headers: { Authorization: `Bearer ${token}` } }))
+    assert.equal((await listed.json())[0].decision, decision)
+  }
+})
+
+test('a second cloud request press is not recorded', async () => {
+  const kv = fakeKv(); await kv.put('reauth:UAPPROVER1', '1')
+  const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1' })
+  const press = () => signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', 'c1-0123abcd|0123456789abcdef'))
+  await worker.dispatch(press())
+  const count = kv.puts.length
+  await kv.put('reauth:UAPPROVER1', '1')
+  await worker.dispatch(press())
+  assert.equal(kv.puts.length, count + 1) // only the re-auth fixture write
+  assert.equal(JSON.parse(worker.fetches.at(-1).init.body).text, 'ℹ️ c1-0123abcd was already decided; this press was not recorded')
+})
+
+test('cloud request IDs reject other prefixes and shapes', async () => {
+  for (const malformed of ['x1-0123abcd', 'c1-0123ABCD', 'c-0123abcd']) {
+    const kv = fakeKv(); const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1' })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody('UAPPROVER1', 'hermes_approve', `${malformed}|0123456789abcdef`)))
+    assert.equal(await kv.get(`approval:${malformed}`), null)
+    assert.equal(worker.fetches.length, 0)
+  }
+})
+
+test('cloud request presses require allowlisting and re-authentication', async () => {
+  for (const [user, authorized, reauth] of [['UOTHER', false, true], ['UAPPROVER1', true, false]]) {
+    const kv = fakeKv(); if (reauth) await kv.put('reauth:UOTHER', '1')
+    const worker = loadWorker({ APPROVALS_KV: kv, APPROVER_ALLOWLIST: 'UAPPROVER1' })
+    await worker.dispatch(signed('/slack/interactivity', interactivityBody(user, 'hermes_deny', 'c1-0123abcd|0123456789abcdef')))
+    assert.equal(await kv.get('approval:c1-0123abcd'), null)
+    if (!authorized) assert.match(JSON.parse(worker.fetches[0].init.body).text, /you are not authorized to approve or deny cloud requests/)
+  }
+})

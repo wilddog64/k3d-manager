@@ -1,11 +1,14 @@
 # Bug: `dr-drill` teardown ignores a failed `k3d cluster delete`, so the next drill is refused
 
 **Status:** OPEN — captured 2026-11-23 by Claude from the m2-air drill runs
-**Priority:** P3 (operator, 2026-11-23)
+**Priority:** P2 (operator, 2026-11-23) (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Classified:** P2 by gemini-4-argon-medium, 2026-11-25 — `dr-drill` teardown silently ignores partial cluster deletion and blocks the next drill, with manual `k3d cluster delete dr-drill` as a documented workaround
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** 38fbf3ab (v1.43.1, clean-room DR drill)
 **Should have been caught by:** offline test (teardown with a failing `k3d cluster delete` stub)
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-23
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** `docs/bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md` (exact-slug glob; vector store unavailable) — read, different root cause (KEEP path)
 **Detected by:** Claude, m2-air, 2026-11-23 ~05:25 PST
 

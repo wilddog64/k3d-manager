@@ -3,11 +3,12 @@
 **Status:** OPEN — captured 2026-11-13 from the round-2 cross-model review of plan 3 (Claude)
 **Priority:** P3 (proposed: test gaps plus a stale-count edge on a detached hub checkout; the normal path behaves correctly)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Beyond the test-coverage gaps, `k3dm-repo-sync` publishes stale promote-backlog counts and SHAs as fresh when the hub checkout is on a detached HEAD or mid-operation, which degrades monitoring accuracy in those states but has a straightforward workaround (keeping the hub root checked out on its branch).)
-**Triage:** carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** plan 3 `deploy-hub-behind-alert` (round 2 correction)
 **Should have been caught by:** offline test (items 1–2); spec (item 3: the round-2 brief named only `fetch_failed` as "did not fetch")
 **Prior art:** exact-slug glob, none; `make find-similar-docs` not run
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 
 ## Symptom
 

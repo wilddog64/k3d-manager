@@ -1,12 +1,14 @@
 # `codex-dispatch open --count` counts a review child whose role was set by `link`
 
 **Status:** OPEN
-**Priority:** P3
+**Priority:** P2 (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** 6972d10a (multi-project M1: `open --count`)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (`open --count` overstates WIP when a review role is attached via `link` after start, with a workaround of passing `--role` at `start` or counting from `open`.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** not run (vector store unreachable; exact-slug glob found none)
 
 ## Report

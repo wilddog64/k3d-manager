@@ -3,7 +3,8 @@
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P2 (Argon P2 accepted, grooming 2026-11-22, operator; was: P3 — wrong r7 offer/withhold in a two-cluster layout)
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
-**Branch:** `k3d-manager-v1.46.0`
+**Re-triage:** 2026-11-27 — move → v1.46.1 patch (unrelated to the v1.46.0 goal; operator 2026-11-27)
+**Branch:** `k3d-manager-v1.46.1`
 **Introduced by:** fadf8438 (Hermes r7 gate, v1.44.2) — the regex predates it
 **Should have been caught by:** offline test
 **Introducing change reviewed:** yes (Fable spec review)

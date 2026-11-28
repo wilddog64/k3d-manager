@@ -3,8 +3,9 @@
 **Status:** OPEN — captured 2026-11-15 by Claude
 **Priority:** P3
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (Recovery from a dead vCluster proxy during Helm wait still succeeds via the existing refresh-and-retry path, but degrades recovery time to the full 10-minute Helm timeout.)
-**Triage:** carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
-**Waiting on:** operator decision
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 as P3 (operator kept P3 over Argon P2) — triage 2026-11-14, operator
+**Branch:** `k3d-manager-v1.47.0`
+**Waiting on:** dispatch — since 2026-11-25
 **Introduced by:** pre-existing
 **Should have been caught by:** live check
 **Prior art:** exact-slug glob: none; find-similar-docs not run (vector store unreachable); parent `docs/bugs/2026-11-14-dev-hub-up-helm-wait-dies-with-vcluster-proxy-after-syncer-restart.md` (E5 attempt 3, where this was seen)

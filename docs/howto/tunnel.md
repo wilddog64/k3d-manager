@@ -6,6 +6,7 @@ The tunnel plugin creates a persistent SSH tunnel from the M2/M4 Air to the Ubun
 
 - `autossh` installed (`brew install autossh` on macOS)
 - SSH access to the Ubuntu k3s node (configured in `~/.ssh/config` as `ubuntu`)
+- Sandbox aliases are stored in `~/.ssh/k3dm-sandbox.conf`; add `Include ~/.ssh/k3dm-sandbox.conf` near the top of `~/.ssh/config` once. GCP and Azure provisioning require this Include (temporarily downgrade with `K3DM_SSH_SANDBOX_PREFLIGHT=warn`).
 - launchd (macOS) for boot persistence
 
 ## Start the Tunnel

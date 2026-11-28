@@ -1,12 +1,14 @@
 # prometheus-auth-proxy LaunchAgent has no standalone installer, so hub-deploy's "unwired" report cannot be acted on
 
 **Status:** OPEN — captured 2026-11-19
-**Priority:** P3 — the agent keeps running on its existing plist; a reinstall is only possible through `deploy_observability`
+**Priority:** P2 — the agent keeps running on its existing plist; a reinstall is only possible through `deploy_observability` (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** pre-existing
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Missing `make install-prometheus-auth-proxy` target prevents standalone reinstallation when reported unwired, with a workaround of running `deploy_observability`.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** none above threshold (slug `ls` empty; find-similar-docs not run, vector store context missing on the M4)
 
 ## Symptom

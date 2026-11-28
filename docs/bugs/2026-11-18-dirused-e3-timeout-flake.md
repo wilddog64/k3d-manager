@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `FleetRunnerTests.cs` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown

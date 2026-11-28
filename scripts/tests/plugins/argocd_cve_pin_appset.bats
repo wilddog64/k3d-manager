@@ -81,6 +81,7 @@ PY
 @test "deploy loop applies other sets even when the pin lookup fails" {
   source <(sed -n '/^function _argocd_services_pin_guard()/,/^}/p' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh")
   source <(sed -n '/^function _argocd_deploy_applicationsets()/,/^}/p' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh")
+  source <(sed -n '/^function _argocd_ambient_appset_wanted()/,/^}/p' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh")
   ARGOCD_CONFIG_DIR="$BATS_TEST_TMPDIR/config"
   mkdir -p "$ARGOCD_CONFIG_DIR/applicationsets"
   local log="$BATS_TEST_TMPDIR/applied" rc

@@ -80,11 +80,11 @@ is rejected by the bridge without being executed.
 | `make-e2e-remote` | `RUNNER` | Tier 1 e2e on the named remote runner |
 | `make-e2e` | none | Tier 1 e2e in a disposable vCluster |
 | `make-test` | none | the BATS dispatcher suites (`./scripts/k3d-manager test all`), ~15 min |
-| `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~1 min |
+| `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~50 min |
 | `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`), ~1.5 min; publishes `junit.xml` |
 | `make-test-python-unit` | none | the offline stdlib-unittest suites |
 | `make-test-python` | none | both Python groups above |
-| `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
+| `make-test-all` | none | every offline suite (BATS + Python), about 70 minutes |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
 `make-vuln-scan-report` reads existing Kubernetes/Trivy `VulnerabilityReport` resources without triggering a scan; `make-vuln-scan` remains a deprecated read-only alias. The actual `app-cve-scan` trigger is not exposed as a reader action and remains operator-only.
@@ -109,8 +109,8 @@ After either failure, the agent can request `sandbox-down`.
 be red on the machine the tool ships on, and only the host can tell you. Each test target runs
 behind `scripts/tests/tripwire.sh`, so it cannot reach a real cluster, cloud API or keychain even
 on the operator's machine — see `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`. Only one
-`/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 20 minutes, and a
-second make request is answered `409` until it finishes.
+`/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 70 minutes, and a
+second make request is answered `409` until it finishes. Automated live verification and dashboard checks against `make-test-all` are documented in the [live profile section of the operator acceptance guide](../guides/operator-acceptance.md#5-live-profile).
 
 **Every `make-*` and `diagnose-*` action is asynchronous.** The response carries `body.job_id`
 and `body.status: "queued"` within seconds, whatever the job's runtime. Poll it:
@@ -190,15 +190,54 @@ retry by probing or clearing the lock.
 
 Remote e2e is the only user of the M2 runner lock. It fails fast when another run holds the lock.
 
+## Requests that need operator approval
+
+Four cloud-runner actions require human operator approval before the bridge will execute them:
+- `sandbox-up`
+- `sandbox-down`
+- `make-e2e`
+- `make-e2e-remote`
+
+Reader actions (`cluster-status`, `health`, diagnostics, and unit/offline test targets) do not require approval and execute immediately.
+
+### What the cloud session sees
+
+When you file a gated request:
+1. **Notice on git branch:** The bridge commits an interim approval notice at `responses/<id>.pending.json` (with `status: "ok"`, HTTP status 202, `body.status: "approval-pending"`, `body.approval_id: "c1-..."`, and `body.expires_at`).
+2. **Stderr notice from helper:** When running with `--wait` or `--wait-final`, `bin/k3dm-cloud-request` detects the pending notice and prints to stderr:
+   `awaiting operator approval (<approval_id>) until <expires_at>`
+3. **Longer wait:** The helper automatically extends its polling deadline while awaiting approval (up to the request's expiry deadline, capped at 35 minutes).
+4. **Interactive Slack card:** In parallel, the bridge posts an interactive approval card to the operator's Slack channel with Approve and Deny buttons. Once the operator decides, the bridge executes or rejects the request on its next poll cycle (or when drained).
+
+### Rejection reasons and what to do
+
+If the request is rejected during the approval phase, `responses/<id>.json` contains `status: "rejected"` and `reason` contains one of the following exact messages:
+
+- `operator approval is not configured on the bridge`
+  **What to do:** The bridge is missing the drain URL, the drain token in Keychain (`k3dm-hermes-approval-drain-token`), or the Slack webhook in Keychain (`k3dm-slack-webhook`). The operator must run `make deploy-worker` and `make install-cloud-bridge` to configure approval draining and card delivery.
+- `approval state is unreadable on the bridge`
+  **What to do:** The bridge's persisted state file (`~/.k3d-manager/cloud-bridge/approvals.json`) is corrupt or unparseable. The operator needs to inspect the file or remove it and restart the bridge.
+- `too many requests awaiting approval; try again later`
+  **What to do:** The bridge enforces a cap of at most 3 concurrently pending approval requests and at most 10 approval cards per hour. Wait for existing requests to be approved, denied, or expired before submitting another request.
+- `request expires too soon for approval; file it with at least 5 minutes left`
+  **What to do:** The bridge requires at least 5 minutes (300 seconds) of lifetime between the current time and `expires_at` to admit a request for approval. File a new request with a longer lifetime (the helper defaults to 30 minutes).
+- `approval card not delivered; file a new request`
+  **What to do:** The bridge attempted to post the interactive approval card to Slack via incoming webhook, but delivery failed. Check network connectivity and the Slack incoming webhook URL in Keychain, then file a new request.
+- `denied by the operator`
+  **What to do:** The operator explicitly pressed the Deny button on the Slack card. Do not re-file the request without coordinating with the operator.
+- `not approved before the request expired`
+  **What to do:** The request reached its `expires_at` timestamp before an operator clicked Approve or Deny. If the operation is still needed, file a new request.
+
 ## Filing a request by hand
 
 The helper is preferred, but the format is plain git so you can do it directly. Branch
 `cloud-requests`, never merged to `main`:
 
 ```
-requests/<id>.json      you write these
-responses/<id>.json     the bridge writes these
-ledger/processed.txt    append-only, one id per line
+requests/<id>.json           you write these
+responses/<id>.json          the bridge writes these
+responses/<id>.pending.json  approval notices (for actions that need approval)
+ledger/processed.txt         append-only, one id per line
 ```
 
 The id is `<utc-iso-compact>-<slug>`, e.g. `20260925T201403Z-cluster-status`.
@@ -214,10 +253,22 @@ The id is `<utc-iso-compact>-<slug>`, e.g. `20260925T201403Z-cluster-status`.
 }
 ```
 
-All six fields are required. `schema` is compared with `==` — an unrecognized value is rejected
-rather than coerced, so an old bridge can never silently reinterpret a new format. Give
-`expires_at` a short window (the helper uses 30 minutes); a request the bridge picks up after it
-expires is rejected, and its id is still consumed.
+All six fields above are required, and `notify_route` is an optional seventh field naming a Slack channel alias configured on the bridge (for example, `"notify_route": "testing"`). You can pass it from the helper with `--notify-route`:
+
+```bash
+bin/k3dm-cloud-request make-test-pytest --notify-route testing
+```
+
+`schema` is compared with `==` — an unrecognized value is rejected rather than coerced, so an old bridge can never silently reinterpret a new format. Give `expires_at` a short window (the helper uses 30 minutes); a request the bridge picks up after it expires is rejected, and its id is still consumed.
+
+### Routing notices to another channel
+
+Routable actions are all `make-*` actions (whose allowlist path is `/api/v1/make`) plus `sandbox-up` and `sandbox-down`. For gated actions, the approval card displays the requested alias and still goes to the usual approval channel.
+
+If routing validation fails, the bridge rejects the request before any approval card with one of these exact `reason` strings:
+
+- `notification route not supported for this action`: `notify_route` was set on a non-routable action (such as `cluster-status`, `health`, `job-status`, or `diagnose-*`).
+- `invalid notification route`: the alias is unknown or malformed, or no valid route map is configured on the host.
 
 Commit and push to `cloud-requests` only. Never open a PR from it and never merge it.
 
@@ -240,11 +291,14 @@ branch of that name, and the helper does not create one.
 ```
 
 `status` is `ok`, `rejected` or `error`. On `rejected`, `reason` says which validation failed and
-`body` is absent — the request was never executed. An id is claimed before execution and is never
-sent to the webhook twice. If the bridge restarts after claiming an id but before saving its
-response, it publishes `status: "error"` with reason `bridge restarted before the request
-completed; outcome unknown — file a new request`; file a new request with a new id. A failed
-response push delays publication until a later tick, but never repeats the action.
+`body` is absent — the request was never executed. For gated actions awaiting operator approval,
+the bridge first writes `responses/<id>.pending.json` with `status: "ok"`, `http_status: 202`, and
+`body.status: "approval-pending"`, before committing the final result to `responses/<id>.json`.
+An id is claimed before execution and is never sent to the webhook twice. If the bridge restarts
+after claiming an id but before saving its response, it publishes `status: "error"` with reason
+`bridge restarted before the request completed; outcome unknown — file a new request`; file a new
+request with a new id. A failed response push delays publication until a later tick, but never
+repeats the action.
 
 ### Diagnostic artifacts on a finished job
 
@@ -299,7 +353,7 @@ are polling `health` with a short `--timeout`, raise it rather than assuming the
 
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design. The accepted actions and their arguments
-are the twenty-seven listed in the table above; the helper derives its choices and validation from the
+are the twenty-nine listed in the table above; the helper derives its choices and validation from the
 same shared table as the bridge.
 
 A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and
@@ -395,6 +449,15 @@ A healthy tick logs **nothing** — `process_tick` is silent on success and only
 `[cloud-bridge] <error>`. Watch `~/Library/Logs/k3dm-cloud-bridge.log`. Because the clone and every
 fetch go over SSH to `git@github.com`, a failure with a locked Keychain or an unavailable SSH
 agent shows up as a git error, not as a webhook 401.
+
+### Operator approval setup
+
+After the hub promote, configure the relay and bridge:
+
+1. `make deploy-worker` — deploys the updated Slack relay worker.
+2. `make install-cloud-bridge` — re-renders the LaunchAgent plist and re-bootstraps the agent. The plist gains `K3DM_HERMES_APPROVAL_DRAIN_URL`. Note that `make restart-cloud-bridge` is not enough because it does not re-render the plist template.
+
+The Keychain items used by the bridge (`k3dm-hermes-approval-drain-token` for draining decisions and `k3dm-slack-webhook` for posting cards) are the ones Hermes already uses.
 
 ### Revoking cloud access
 

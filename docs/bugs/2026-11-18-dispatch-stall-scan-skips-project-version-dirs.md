@@ -1,12 +1,14 @@
 # Stall detection scans only the highest `v*` directory, so project tasks are never sampled
 
 **Status:** OPEN — captured 2026-11-18 from Argon's blind review of PR #163 (v1.44.2), verified by Claude
-**Priority:** P3 — monitoring gap for project dispatches
+**Priority:** P2 — monitoring gap for project dispatches (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** 6972d10a (codex-dispatch multi-project M1, k3d-manager-v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-22 (Degraded stall monitoring that skips lower-versioned project directories (`v0.0.x`), requiring manual stall checks for project dispatches.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** docs/bugs/2026-11-17-stall-watch-ledger-events-lack-project.md (keyword) — read, different root cause (ledger field, not the scan). Exact slug: no match. `make find-similar-docs` not run (vector store unreachable).
 **Filed:** 2026-11-18
 

@@ -40,7 +40,9 @@ export ACG_ALLOWED_CIDR=$(curl -s ifconfig.me)/32
 ./scripts/k3d-manager acg_provision --confirm
 ```
 
-Creates: VPC, subnet, security group, key pair, t3.medium EC2 instance. Updates `~/.ssh/config` with the `ubuntu` host alias.
+Creates: VPC, subnet, security group, key pair, t3.medium EC2 instance. Writes the `ubuntu` alias to `~/.ssh/k3dm-sandbox.conf` (0600), shared with the GCP and Azure sandbox aliases.
+
+Add `Include ~/.ssh/k3dm-sandbox.conf` near the top of `~/.ssh/config` once. The GCP and Azure providers stop before creating a VM if this Include is missing; set `K3DM_SSH_SANDBOX_PREFLIGHT=warn` to downgrade that check temporarily. Keep the Include before any `Host` block.
 
 ### 2. Verify
 
@@ -162,6 +164,8 @@ exported value, so `acg-recover` always provisions from scratch.
 ```
 
 Terminates the EC2 instance, removes the VPC/SG/key pair, and removes the `ubuntu-k3s` context from `~/.kube/config`.
+
+Teardown removes only the ACG aliases from the sandbox fragment and deletes it when empty.
 
 ## Notes
 

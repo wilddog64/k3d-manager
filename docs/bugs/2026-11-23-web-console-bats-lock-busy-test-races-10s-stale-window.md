@@ -2,6 +2,8 @@
 
 **Status:** OPEN — captured 2026-11-23, not triaged
 **Priority:** P3 (test-only; intermittent; the installer behaves correctly)
+**Classified:** P3 by gemini-4-argon-medium, 2026-11-25 — test-only race condition where a holder-less lock directory in BATS expires under host load
+**Triage:** backlog — pull into a release that already touches `scripts/tests/bin/web_console_totp.bats` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.45.0 (`0c27b830`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

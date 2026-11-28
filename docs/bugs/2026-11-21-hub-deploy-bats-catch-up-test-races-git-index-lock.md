@@ -2,11 +2,13 @@
 
 **Status:** OPEN — captured 2026-11-21
 **Priority:** P3 — test-only; production is serialized by the repo-sync lock
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** 3b541f3b (test 36 added with the checkout catch-up)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Test-only race condition in `hub_deploy.bats` test 36 where an unlocked background `git checkout` collides with `git status` on `.git/index.lock`.)
-**Waiting on:** operator decision — since 2026-11-21
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** `docs/bugs/2026-11-19-hub-deploy-runs-stale-checkout-copy-of-itself.md` (not scored: `make find-similar-docs` vector store unavailable, cluster context missing) — read, different root cause (that bug added the catch-up this test covers)
 **Filed:** 2026-11-21
 

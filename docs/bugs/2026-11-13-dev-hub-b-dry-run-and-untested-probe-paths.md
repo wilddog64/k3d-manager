@@ -3,11 +3,12 @@
 **Status:** OPEN — captured 2026-11-13 from the round-6 cross-model review of dev-hub Part B (Claude)
 **Priority:** P3 (proposed: dry-run fidelity and test gaps; the live path behaves correctly)
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-14 (`DRY_RUN=1 make dev-hub-up` mutates live cluster and host state (applying host PriorityClass, namespace, ResourceQuota, and LimitRange, plus exporting kubeconfig and starting a proxy container) rather than performing a no-op preview, degrading dry-run functionality while leaving the normal execution path intact.)
-**Triage:** carry → v1.45.0 (one fix with dev-hub-dry-run-captures-preview-lines-as-values) — triage 2026-11-14, operator
+**Triage:** carry → v1.47.0 — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 (one fix with dev-hub-dry-run-captures-preview-lines-as-values) — triage 2026-11-14, operator
+**Branch:** `k3d-manager-v1.47.0`
 **Introduced by:** dev-hub Part B (`dev-hub-vcluster-b` dispatch, round 6 correction)
 **Should have been caught by:** spec (the round-6 brief said "return 0 right after the host objects", which allows host writes in dry run)
 **Prior art:** `docs/bugs/2026-11-12-dev-hub-bats-tmpdir-unset-on-linux-ci.md` (exact-slug glob; vector search unavailable, hub context absent on this machine) — read, different root cause
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 
 ## Symptom
 

@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-21
 **Priority:** P3 (cosmetic but misleading: an extra bar roughly equal to the exec count; exec and interactive bars are right)
+**Triage:** backlog — pull into a release that already touches `grafana-dashboard-agent-activity.yaml` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** aa1196ed (v1.43.15 added `k3dm_codex_sessions{window,category}` under the same metric name the v1.43.6 panel groups by `mode`)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown

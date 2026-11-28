@@ -1,7 +1,8 @@
 # lib-foundation file locks: no signal cleanup, no stale-lock recovery, non-regular lock paths accepted
 
 **Status:** OPEN — captured 2026-11-18 from the PR #89 blind reviews (Argon, Astra 6.2, Fable)
-**Priority:** P3 — needs Ctrl-C/SIGTERM mid-download, an interrupted pre-v0.5.7 run, or a planted symlink in a user-owned dir
+**Priority:** P2 — needs Ctrl-C/SIGTERM mid-download, an interrupted pre-v0.5.7 run, or a planted symlink in a user-owned dir (triage 2026-11-25: was P3; Argon P2, Claude agreed)
+**Triage:** upstream → lib-foundation (fix there first, then subtree-pull); backlog until a lib-foundation release takes it (operator, 2026-11-25)
 **Introduced by:** items 1-2 pre-existing (lib-foundation `f8025a2`); item 3 lib-foundation `a561b16` (v0.5.7, noclobber claims)
 **Should have been caught by:** review
 **Introducing change reviewed:** yes (Argon, Fable) for item 3 — found by Astra and Fable in the PR #89 review, accepted as low and deferred

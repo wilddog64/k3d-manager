@@ -1,10 +1,9 @@
 # Bug: hub data export reports failure when only the prune push timed out
 
-**Status:** OPEN — captured 2026-11-14 by Claude
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (triage 2026-11-25, operator ("go with your recommendation")); was: OPEN — captured 2026-11-14 by Claude
 **Priority:** P3
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (The snapshot export succeeded and data is safe on GitHub, so failing on the post-export retention prune and firing the export failure alert is a monitoring/hygiene inaccuracy rather than a functional outage or data loss.)
-**Triage:** carry → v1.45.0 — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-14
+**Triage:** close — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 — triage 2026-11-14, operator
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run (vector store unreachable from the M4); read `docs/bugs/2026-11-02-hub-data-export-never-ran.md` (different: setup never ran)

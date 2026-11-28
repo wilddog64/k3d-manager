@@ -3,6 +3,7 @@
 **Status:** OPEN — filed 2026-11-22
 **Priority:** P2 (a promoted fix silently does not take effect; workaround `make restart-webhook`)
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator
+**Re-triage:** 2026-11-27 — fix in v1.46.0 (operator 2026-11-27: "Go for your suggestions")
 **Branch:** `k3d-manager-v1.46.0`
 **Introduced by:** pre-existing (`bin/k3dm-hub-deploy` launchd reconcile, lines 186-222, keys only on plist template changes)
 **Should have been caught by:** live check
@@ -43,3 +44,12 @@ hub-deploy restarts each long-running agent whose code paths changed between old
 mapped per agent: webhook → `bin/k3dm-webhook`, `scripts/lib/webhook/`; cloud bridge; Hermes), prints which it
 restarted, and confirms the new PID started after the deploy. Paired test: a code-only diff restarts the webhook; a
 docs-only diff restarts nothing.
+
+## Recurrence — 2026-11-27 (v1.46.0 unrouted-notices live check)
+
+Operator promoted `1c74deb3` (`make hub-deploy`, ~03:06Z), which carries the `_notify_job` fix `35d42bc8`. Claude's
+unrouted probe `d812d065` (03:12Z) still recorded the second notice `route: none`, `delivered: false` (operator `cat`
+of its `delivery.jsonl`), the pre-fix shape: the webhook process was still running pre-promote code. The earlier p2b
+live check only worked because `make update-webhook-slack-routes` restarts the webhook. Workaround again:
+`make restart-webhook` on the hub, then re-probe. This bug now blocks live verification of every webhook fix in
+v1.46.0.

@@ -639,11 +639,39 @@ v1.43.0 and is superseded. On 2026-11-22 (grooming, operator chose Claude's and 
 and `bug-lifecycle-metrics` moved to the ordered backlog, so v1.46.0 holds five plans: the three above plus travel-bundle
 iPad SSH and tailscale (plans 6 and 7 below). Remote-promote 3a/3b went to the ordered backlog, positions 1 and 2 (grooming 2026-11-22, operator: no swap).
 
+**v1.46.0 plan 6 — moving out (operator, 2026-11-26: "plan 6 as you recommended"):** to be placed at the next `/release-groom` (2026-11-29) as a v1.47.0 candidate together with v1.45.0 plan 4 part B (Cloudflare Access captures, operator-attended at home, then spec, Fable + Astra review, go). Reason: it is blocked on part B, and plan 7 (Tailscale) already gives the iPad a path into the Macs that does not depend on cloudflared. Original entry:
+
 **v1.46.0 plan 6 (cap exception, operator 2026-11-21: "can we add iPad air ssh plan into v1.46.0 as an extra one. I consider it as part of travel bundle"):** [`v1.46.0-travel-bundle-ipad-ssh.md`](plans/v1.46.0-travel-bundle-ipad-ssh.md) (SPEC v1.1 2026-11-21; intent approved, D1-D3 = (a); proof P1-P4 then blind review pending; implemented in v1.46.0). The iPad Air reaches service passwords as a travel-bundle client without holding a decryption key: Safari (browser-rendered SSH, no app or key on the iPad) logs in to the M4's web-console sshd (v1.45.0 plan 4: part A console sshd, part B Cloudflare Access, part C TOTP gate) and runs `make console-show-passwords` there (pager, timeout, tmux scrollback cleared). Depends on v1.45.0 plan 4 parts B and C landing and live-verifying; critical (internet-facing interactive path), so dispatch needs the operator's go. Source: `docs/ideas.md` row 2026-11-21 (service-password access from non-macOS devices).
 
 **v1.46.0 plan 7 (cap exception, operator 2026-11-22: "put tailscale in v1.46.0 side by side with iPad SSH plan"):** [`v1.46.0-tailscale-break-glass-access.md`](plans/v1.46.0-tailscale-break-glass-access.md) (moved from v1.48.0 plan 5; spec only, scope revision owed before intent approval). An operator-only tailnet gives the iPad Air a second way into the Macs that does not depend on cloudflared, plus macOS Screen Sharing so a TCC or Keychain dialog on a clamshelled Mac can be answered while travelling (2026-11-22 password-bundle hang). Enrollment, system-extension approvals and live rollout need the operator at home and a separate go. Source: `docs/ideas.md` row 2026-11-22 (iPad-only travel GUI path).
 
+### Candidate milestone — v1.46.1 (patch)
+
+**Bug-fix release from the 2026-11-25 triage** (operator, 2026-11-25: "go with patch release v1.46.1"). Branch
+`k3d-manager-v1.46.1`, cut from `main` after v1.46.0 merges. Bug fixes only; batched by file, one dispatch per batch
+(Luna implements, Flash takes docs-only parts). Argon classified each doc blind; Claude verified.
+
+| Batch | Bugs | Priority |
+|---|---|---|
+| A1 `bin/k3dm-codex-dispatch` | `docs/bugs/2026-11-17-open-count-ignores-linked-review-role.md`, `docs/bugs/2026-11-18-codex-dispatch-status-project-task-state-unknown.md`, `docs/bugs/2026-11-18-dispatch-stall-scan-skips-project-version-dirs.md`, `docs/bugs/2026-11-20-agy-resume-violation-false-positive-after-coordinator-commit.md`; added by the 2026-11-25 evening triage: `docs/bugs/2026-11-18-codex-dispatch-project-version-above-release-hides-k3d-manager-tasks.md`, `docs/bugs/2026-11-18-codex-dispatch-branch-scheme-project-version-is-branch-name.md`, `docs/bugs/2026-11-18-codex-dispatch-non-semver-highest-tag-resets-project-version.md`, `docs/bugs/2026-11-18-codex-dispatch-multi-project-low-findings.md`, `docs/bugs/2026-11-18-codex-dispatch-resolve-version-slug-reused-across-projects.md` | P2, P3 (5) |
+| A2 rule violations | `docs/bugs/2026-11-25-ci-copilot-cli-installed-unpinned-latest.md` (A08), `docs/bugs/2026-11-18-hub-recovery-root-token-in-jq-argv.md` (A02) | P3 |
+| A3 ops tooling | `docs/bugs/2026-11-23-dr-drill-teardown-ignores-failed-cluster-delete.md`, `docs/bugs/2026-11-20-machine-setup-antigravity-cli-refuses-unowned-agy.md`, `docs/bugs/2026-11-19-prometheus-auth-proxy-has-no-standalone-installer.md`, `docs/bugs/2026-11-25-dr-drill-preflight-snapshots-clone-takes-15-minutes.md` (evening triage; Argon P2, costs ~15 min per drill) | P2 |
+| A4 Hermes | `docs/bugs/2026-11-18-hermes-approve-repropose-voids-digest-and-expiry-checks.md` (fix before v1.46.0 plan 1's approval gate depends on the Hermes approval path) | P3 |
+| B small | `docs/bugs/2026-11-21-host-disk-free-panel-always-red.md`, `docs/bugs/2026-11-21-hub-deploy-bats-catch-up-test-races-git-index-lock.md` | P3 |
+
+The same triage sent 6 bugs to the next `/release-groom` as v1.47.0 candidates, 42 to the backlog (each pulled into a release that
+already touches its file) and `docs/bugs/2026-11-18-lib-foundation-file-locks-no-signal-cleanup-or-stale-recovery.md` (P2) upstream to
+lib-foundation.
+
+The evening triage (operator, 2026-11-25: "go with your recommendation";
+[proposal](grooming/2026-11-25-triage-proposal.md)) added the 6 bugs above, which brings v1.46.1 to the 10-P3 cap, carried 14 bugs to v1.47.0 and
+closed 6 P3s passed over at two groomings. The 27 backlog bugs keep their backlog lines.
+
 ### Candidate milestone — v1.47.0
+
+**Bugs carried here (2026-11-25 evening triage, not counted toward the 5-plan cap):** 14 docs with
+`**Triage:** carry → v1.47.0`, including `docs/bugs/2026-11-23-promote-mover-trusts-any-pushed-ref.md` (Argon P2:
+all-skipped check runs count as green, a gate bypass; first in line at the v1.47.0 groom).
 
 **Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.47.0`, cut from
 `main` after v1.46.0 merges. Split out because v1.43.4 is bug-fix-only, v1.43.5 and v1.46.0 are at

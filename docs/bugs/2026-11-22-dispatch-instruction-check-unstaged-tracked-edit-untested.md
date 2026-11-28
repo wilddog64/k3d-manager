@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-22, not triaged
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `scripts/tests/bin/codex_dispatch_scope.bats` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** `0959fc6a` (instruction-file refusal)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown

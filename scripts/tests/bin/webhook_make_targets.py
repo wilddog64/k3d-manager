@@ -433,6 +433,13 @@ class MakeTargetTests(unittest.TestCase):
             (["app-cve-scan"], None),
         )
 
+    def test_offline_test_targets_match_measured_hub_execution_budgets(self):
+        self.assertEqual(wh.MAKE_TARGETS["test"]["timeout"], 1200)
+        self.assertEqual(wh.MAKE_TARGETS["test-bin"]["timeout"], 4200)
+        self.assertEqual(wh.MAKE_TARGETS["test-pytest"]["timeout"], 600)
+        self.assertEqual(wh.MAKE_TARGETS["test-python"]["timeout"], 900)
+        self.assertEqual(wh.MAKE_TARGETS["test-all"]["timeout"], 5400)
+
 
 if __name__ == "__main__":
     unittest.main()

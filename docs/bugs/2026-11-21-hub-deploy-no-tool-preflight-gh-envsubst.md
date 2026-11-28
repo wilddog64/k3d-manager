@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-21, not triaged.
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-hub-deploy` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.44.0 (46ec5b36, bin/k3dm-hub-deploy added)
 **Should have been caught by:** spec
 **Introducing change reviewed:** unknown

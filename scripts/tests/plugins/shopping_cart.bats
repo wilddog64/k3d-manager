@@ -411,7 +411,10 @@
     source scripts/plugins/shopping_cart.sh
     _ubuntu_k3s_trust_host() { :; }
     _info() { :; }
-    _run_command() { printf "%s\n" "$@"; }
+    _run_command() {
+      if [[ "${1:-}" == -- ]]; then shift; fi
+      if [[ "${1:-}" == python3 ]]; then "$@"; else printf "%s\n" "$@"; fi
+    }
     _k3sup_join_agent ubuntu-1 10.0.1.130
   '
   [ "$status" -eq 0 ]
@@ -431,7 +434,10 @@
     source scripts/plugins/shopping_cart.sh
     _ubuntu_k3s_trust_host() { :; }
     _info() { :; }
-    _run_command() { printf "%s\n" "$@"; }
+    _run_command() {
+      if [[ "${1:-}" == -- ]]; then shift; fi
+      if [[ "${1:-}" == python3 ]]; then "$@"; else printf "%s\n" "$@"; fi
+    }
     _k3sup_join_agent ubuntu-1 10.0.1.130
   '
   [ "$status" -eq 0 ]
@@ -455,6 +461,11 @@
     _ubuntu_k3s_wait_ssh_ready() { :; }
     _setup_vault_bridge() { :; }
     _run_command() {
+      if [[ "${1:-}" == -- ]]; then shift; fi
+      if [[ "${1:-}" == python3 ]]; then
+        "$@"
+        return $?
+      fi
       printf "%s\n" "$@"
       [[ "$*" == *"k3sup install"* ]] && : > "${UBUNTU_K3S_LOCAL_KUBECONFIG}"
       return 0
@@ -478,6 +489,26 @@
   [[ "$output" == *"--disable traefik --disable servicelb --kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi"* ]]
 }
 
+@test "shopping cart resolves agent aliases from sandbox fragment" {
+  run bash -c '
+    export SCRIPT_DIR="$(pwd)/scripts" HOME="${BATS_TEST_TMPDIR}"
+    mkdir -p "${HOME}/.ssh"
+    : > "${HOME}/.ssh/config"
+    printf "Host ubuntu-1\n  HostName 10.0.1.41\n" > "${HOME}/.ssh/k3dm-sandbox.conf"
+    source scripts/lib/system.sh
+    source scripts/lib/foundation/scripts/lib/ssh_fragment.sh
+    source scripts/plugins/shopping_cart.sh
+    printf "ADDRESS=%s\n" "$(_k3s_agent_address ubuntu-1)"
+    _ubuntu_k3s_trust_host() { :; }
+    _info() { :; }
+    _run_command() { printf "%s\n" "$@"; }
+    _k3sup_join_agent ubuntu-1 10.0.1.10
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ADDRESS=10.0.1.41"* ]]
+  [[ "$output" == *"10.0.1.41"* ]]
+}
+
 @test "deploy_app_cluster resolves source-time alias default to current SSH HostName for readiness and k3sup" {
   run bash -c '
     export HOME="${BATS_TEST_TMPDIR}"
@@ -498,6 +529,8 @@
     _ubuntu_k3s_wait_ssh_ready() { printf "READY_TARGET=%s\n" "$1"; }
     _setup_vault_bridge() { :; }
     _run_command() {
+      if [[ "${1:-}" == -- ]]; then shift; fi
+      if [[ "${1:-}" == python3 ]]; then "$@"; return $?; fi
       printf "%s\n" "$@"
       [[ "$*" == *"k3sup install"* ]] && : > "${UBUNTU_K3S_LOCAL_KUBECONFIG}"
       return 0

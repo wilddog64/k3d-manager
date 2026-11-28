@@ -26,8 +26,9 @@ Persist it in your shell profile (`.zshrc`, `.bashrc`, or `.envrc`):
 echo 'export K3DM_ENABLE_AI=1' >> ~/.zshrc
 ```
 
-On first run, `_ensure_copilot_cli` verifies authentication via `copilot auth status`.
-If auth fails, it prints an error — log in with `gh auth login` and retry.
+On first run, `_ensure_copilot_cli` checks authentication (`_copilot_auth_check`): a token in `COPILOT_GITHUB_TOKEN`,
+`GH_TOKEN` or `GITHUB_TOKEN`, then the Copilot CLI's stored login, then `gh auth status`. If none is found it prints an
+error — set one of those variables, or run `copilot /login` (or `gh auth login`) and retry.
 
 ## Triage a Failing Pod
 

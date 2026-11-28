@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — needs external-behaviour proof before dispatch
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-webhook` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** 59dd12e5 (W1 fix, v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** no

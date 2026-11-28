@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — operator-facing card contradiction
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-hermes` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** fadf8438 (root-cause and Recommended lines, v1.44.2)
 **Should have been caught by:** spec
 **Introducing change reviewed:** yes (Fable spec review)

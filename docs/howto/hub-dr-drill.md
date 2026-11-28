@@ -160,7 +160,7 @@ old. If list-only Vault login fails, rerun `make hub-data-export-setup`.
 | `run_timestamp` | When the drill reported (UTC). Freshness and `DRDrillStale` key on it. |
 | `export` | The export the drill restored. |
 | `success` | `true` only when every check V0–V7 passed. |
-| `failed` | The first failure that stopped the drill: `phase2` (hub build), `phase3` (restore), `unseal`, or `V0`. |
+| `failed` | The first failure that stopped the drill: `phase2` (hub build), `phase3` (restore), `unseal`, `V0`, or `ldap_resync` (the LDAP resync after restore; V4 is then false). |
 | `rto_seconds` | Phases 2–4, build to verified. This is the **data-services** RTO: Vault, Keycloak's database and LDAP. ArgoCD, monitoring and the M4 host services are not built or timed; see `docs/plans/v1.57.0-hub-e2e-promotion-gate.md`. |
 | `rpo_seconds` | Export age when the drill ran. |
 | `checks` | V0–V7, each `true` or `false`. |

@@ -5,7 +5,7 @@
 **Introduced by:** `4cbd377` (hoverfocus M1a, no-raise focus via `_SLPSSetFrontProcessWithOptions`)
 **Should have been caught by:** live check
 **Introducing change reviewed:** yes (Fable)
-**Waiting on:** investigation — since 2026-11-23 (P1 probe)
+**Waiting on:** live check — since 2026-11-25 (L3 landed; iTerm2 took typed text on hover, solid cursor not confirmed)
 **Triage:** carry → hoverfocus v0.0.3 (operator, 2026-11-24, D1: v0.0.2 = L1 + F1; deferred focus work moves to v0.0.3 batch L3)
 **Prior art:** none above threshold (no earlier hoverfocus bug docs)
 **Filed:** 2026-11-23

@@ -409,6 +409,13 @@ def _e2e_counts(summary):
     return {key: int(summary.get(key) or 0) for key in ("passed", "failed", "total")}
 
 
+def _e2e_preflight_reason(output):
+    for line in output.splitlines():
+        if line.startswith("reason="):
+            return re.sub(r"[^A-Za-z0-9 .,:%/()_-]", "?", line[len("reason="):])[:200]
+    return None
+
+
 def _e2e_text(slot, run, summary, filed, changes):
     counts = _e2e_counts(summary)
     passed, failed, total = (counts[key] for key in ("passed", "failed", "total"))
@@ -435,14 +442,20 @@ def _run_e2e(slot, runner=_e2e_run, now=None):
     manual = slot == "now"
     if manual:
         slot = "manual-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(now))
-    preflight, _output = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_preflight", "m2"], 120)
+    preflight, output = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_preflight", "m2"], 120)
     if preflight != 0:
         claim = e2e_schedule.retry_claim(directory, slot, datetime.fromtimestamp(now).astimezone())
         if claim["attempts"] < 6 and not manual:
             return 0
-        _e2e_write(directory / f"{slot}.json", {"outcome": "runner-unavailable"})
+        reason = _e2e_preflight_reason(output)
+        record = {"outcome": "runner-unavailable"}
+        message = f"Hermes e2e {slot}: skipped — M2 runner unavailable after 6 attempts"
+        if reason is not None:
+            record["reason"] = reason
+            message += f" ({reason})"
+        _e2e_write(directory / f"{slot}.json", record)
         (directory / f"{slot}.claim").unlink(missing_ok=True)
-        post_summary(_keychain_secret("k3dm-slack-webhook"), f"Hermes e2e {slot}: skipped — M2 runner unavailable after 6 attempts")
+        post_summary(_keychain_secret("k3dm-slack-webhook"), message)
         return 0
     started = time.time()
     rc, transcript = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_dispatch", "m2"], 5400)

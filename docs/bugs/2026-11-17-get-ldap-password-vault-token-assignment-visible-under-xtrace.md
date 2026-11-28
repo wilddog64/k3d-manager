@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-17 from Argon's blind review of PR #162 (v1.44.1), verified by Claude
 **Priority:** P3 — only when someone runs the script with xtrace; the script never enables it itself
+**Triage:** backlog — pull into a release that already touches `bin/get-ldap-password` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing (line identical on main)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

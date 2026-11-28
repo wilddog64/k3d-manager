@@ -2,11 +2,13 @@
 
 **Status:** OPEN — captured 2026-11-18 from Fable's blind diff review of PR #163 (v1.44.2), verified by Claude
 **Priority:** P3 — security rule violation (A02), local host only, short-lived process
+**Triage:** patch → v1.46.1 (operator, 2026-11-25: "go with patch release v1.46.1"); Argon blind classification, Claude verified
+**Branch:** `k3d-manager-v1.46.1` (not cut yet)
 **Introduced by:** pre-existing (`scripts/plugins/hub_recovery.sh:75` on `main`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-22 (Security hygiene rule violation where the Keychain fallback passes the Vault root token via `jq --arg` argv instead of stdin.)
-**Waiting on:** operator decision
+**Waiting on:** dispatch — since 2026-11-25
 **Prior art:** none above threshold. Exact slug: no match; keyword grep of docs/bugs: no match. `make find-similar-docs` not run (vector store unreachable from this machine: no k3d-k3d-cluster context).
 **Filed:** 2026-11-18
 

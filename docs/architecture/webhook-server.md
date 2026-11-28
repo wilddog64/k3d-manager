@@ -257,6 +257,7 @@ The targets with `confirm: True` are:
 
 | Target | Required confirmation |
 |--------|-----------------------|
+| `e2e-sandbox-provision` | `confirm` |
 | `e2e-runner-unlock` | `confirm` |
 | `fix-delete-pod` | `confirm` |
 | `fix-force-sync` | `confirm` |

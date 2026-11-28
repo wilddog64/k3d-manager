@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-20; incident contained (worker stopped, run abandoned)
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing
 **Should have been caught by:** none
 **Introducing change reviewed:** no

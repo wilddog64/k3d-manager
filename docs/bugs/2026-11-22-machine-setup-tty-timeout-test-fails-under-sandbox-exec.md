@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-22, not triaged
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `scripts/tests/bin/machine_setup.bats` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** `abcde772` (v1.43.13, `tty_limited` helper)
 **Should have been caught by:** offline test — the helper was never run under the sandbox that land and verifier runs use
 **Introducing change reviewed:** unknown

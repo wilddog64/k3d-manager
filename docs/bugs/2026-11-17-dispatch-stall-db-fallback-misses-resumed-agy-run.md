@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-17 from Argon's blind review of PR #162 (v1.44.1), verified by Claude
 **Priority:** P3 — only used when `lsof` cannot see the open conversation DB; worst case a stall sample is missing or counts another task's steps
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-codex-dispatch` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** f3828ad9 (stall detector A1, k3d-manager-v1.44.1)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** unknown

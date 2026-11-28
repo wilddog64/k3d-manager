@@ -2,6 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-22
 **Priority:** P3 (cosmetic: the restart succeeds, the message reads like a failure)
+**Triage:** backlog — pull into a release that already touches `Makefile` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** pre-existing (`Makefile` `restart-webhook`, lines 672-690)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-19 by Claude
 **Priority:** P3
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-dispatch-metrics` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** unknown
 **Should have been caught by:** unknown
 **Introducing change reviewed:** unknown

@@ -44,6 +44,19 @@ re-executes the promoted copy before applying anything. If the checkout is dirty
 diverged, or cannot catch up before its wait expires, nothing is applied; fix the
 checkout or let repo-sync resolve it, then rerun the same command.
 
+Hub-deploy also records `agents <sha>` in its state file after checking the
+webhook and cloud-bridge code. When those paths change, it restarts the webhook
+and confirms both processes and the unauthenticated health endpoint. If a
+queued or running webhook job is active, agent loading is disabled, or the
+checkout is not ready, deployment completes with exit 3 and `agents pending`;
+rerun the same `make hub-deploy REF=<ref>` after the reason clears (or run
+`make restart-webhook`). After `make hub-rollback`, run `make restart-webhook`
+to ensure the running webhook matches the rollback. If Ctrl-C lands between
+launchd bootout and bootstrap, the webhook can remain unloaded; run
+`make restart-webhook` to restore it. A rollback to code predating the
+`agents` state field treats that state as unreadable and performs a full
+reconcile, which is safe.
+
 The first promote that delivers this handoff still runs the old copy; it is the
 last one that requires a second `make hub-deploy REF=<sha>`. `k3dm-require-role`
 and `k3dm-hub-promote` also run from the pre-promote checkout, so changes to

@@ -199,6 +199,69 @@ _prepare_dispatch_fixture() {
   [[ "$output" == *"status=capacity_disk"* ]]
 }
 
+@test "empty or nonnumeric disk fails as probe_failed before capacity evaluation" {
+  for disk in '' abc; do
+    blob="$(printf '%s\n' docker_ok=1 lock=0 cpu_idle2=90 cpu_idle3=90 mem_free=90 "disk_gb=$disk")"
+    run _e2e_remote_eval_gates "$blob"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"reason=cannot read free disk on runner ${E2E_M2_SSH_HOST}"* ]]
+    [[ "$output" == *'status=probe_failed'* ]]
+  done
+}
+
+@test "preflight does not retry an unreadable disk probe" {
+  local calls="$BATS_TEST_TMPDIR/probe-calls"
+  : > "$calls"
+  _e2e_remote_probe() {
+    printf 'probe\n' >> "$calls"
+    _healthy_blob | sed 's/disk_gb=153/disk_gb=/'
+  }
+  sleep() { :; }
+  E2E_M2_CAPACITY_RETRY_INTERVAL=0
+  run _e2e_remote_preflight_with_retry
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$calls" | tr -d ' ')" -eq 1 ]
+  [[ "$output" == *'status=probe_failed'* ]]
+}
+
+@test "probe handles GNU df PATH and leaves failed disk empty" {
+  local stub="$BATS_TEST_TMPDIR/stub"
+  mkdir -p "$stub"
+  export E2E_M2_LOCK="$BATS_TEST_TMPDIR/runner.lock"
+  export E2E_M2_REMOTE_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  cat > "$stub/df" <<'DF'
+#!/usr/bin/env bash
+if [[ "$1" == "-g" ]]; then echo "df: invalid option -- 'g'" >&2; exit 1; fi
+printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on' 'map auto_home 322088920 1 322088920 1% /home'
+DF
+  cat > "$stub/docker" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  cat > "$stub/top" <<'SH'
+#!/usr/bin/env bash
+for n in 1 2 3 4 5 6; do echo 'CPU usage: 1% user, 1% sys, 98.0% idle'; done
+SH
+  cat > "$stub/memory_pressure" <<'SH'
+#!/usr/bin/env bash
+echo 'System-wide memory free percentage: 80%'
+SH
+  chmod +x "$stub"/*
+  [ "$(PATH="$stub:$PATH" bash -c 'command -v df')" = "$stub/df" ]
+  _e2e_remote_ssh() { PATH="$stub:$PATH" bash -s; }
+  run _e2e_remote_probe
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | grep -qx 'disk_gb=307'
+  cat > "$stub/df" <<'DF'
+#!/usr/bin/env bash
+exit 1
+DF
+  chmod +x "$stub/df"
+  run _e2e_remote_probe
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | grep -qx 'disk_gb='
+}
+
 @test "eval_gates treats missing metrics as a capacity stop, not available" {
   blob="$(printf '%s\n' docker_ok=1 lock=0 mem_free=90 disk_gb=900)"
   run _e2e_remote_eval_gates "$blob"

@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 — hygiene; the supported path (`k3dm-verified-stage run`, R2) scrubs the environment, this covers direct runs only
+**Triage:** next-minor → v1.47.0 candidate at the next /release-groom (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** v1.45.0 plans 2c, web-console A and C
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

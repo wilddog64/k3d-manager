@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-17 from Argon's blind review of PR #162 (v1.44.1), verified by Claude
 **Priority:** P3 — test strength only
+**Triage:** backlog — pull into a release that already touches `scripts/tests/bin/dispatch_stall_watch.bats` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** c91b4409 (stall detector A2, k3d-manager-v1.44.1)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

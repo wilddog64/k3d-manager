@@ -1,11 +1,11 @@
 # Bug: shopping-cart-frontend CI cannot open its deploy PR (`PACKAGES_TOKEN` 401), so no frontend image has deployed since 2026-10-27
 
-**Status:** OPEN
+**Status:** CLOSED — resolved by the operator's `PACKAGES_TOKEN` rotation (secret updated 2026-11-13); deploy PRs open again (live check 2026-11-27)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Automated frontend image deployment is broken due to an expired token and overlay digest pinning, but manual PR creation and overlay digest promotion work as a workaround and the CVE fix is already live); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (operator rotates PACKAGES_TOKEN) — grooming 2026-11-12, operator.
+**Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Branch:** `k3d-manager-v1.46.0`
-**Waiting on:** operator decision — since 2026-11-12
 **Severity:** High impact, silent. Images build, scan and push, but the live frontend stays on the last bumped tag. The CVE fix from #139 (libxslt 1.1.43-r4, CVE-2026-9947 CVSS 9.6) did not reach Hostinger. Workaround: open the deploy PR by hand from the branch CI pushed (done: #140).
 **Introduced by:** unknown (the token stopped working between 2026-10-27 and 2026-10-31; secret last set 2026-10-22)
 **Should have been caught by:** none (the main run fails, but nothing alerts on a failed main-branch publish run)
@@ -47,3 +47,11 @@ Open question for grooming: whether a promoter pin should be released when a new
 deploy flow should update the overlay instead of the base.
 
 **Live 2026-11-11 (Claude):** after promote `64e98c62` (tag `hub-promote/20261111T235223Z`), Hostinger pod `frontend-6cb766d98f-6whgt` runs `ghcr.io/wilddog64/shopping-cart-frontend@sha256:97d0b172db3bfeaaabb8e4d75b6183369be87d080b2f3d564779b38b2f7fe18c`, Ready; `apk info -v` in the pod: `libxslt-1.1.43-r4`, `libxml2-2.13.9-r2`. The CVE fix is live; the 401 in the deploy-PR step is still open.
+
+## Check — 2026-11-27 (Claude, `gh`, read-only)
+
+- `gh secret list -R wilddog64/shopping-cart-frontend`: `PACKAGES_TOKEN` updated 2026-11-13T00:26:59Z (value not read).
+- Main-branch runs green, e.g. 45322097977 (2026-11-24 `ci(deploy): frontend image sha-8c13efcb…`, success).
+- Deploy PR #146 `ci(deploy): frontend image sha-8c13efcb…` opened by CI 2026-11-24 and merged; the step no longer 401s.
+- Decision (operator re-triage 2026-11-27, "close if already resolved"): closed. The "nothing alerts on a failed
+  main-branch publish run" gap stays an idea, not this bug.

@@ -1,10 +1,9 @@
 # dev-hub-sync without a dev hub fails with a raw kubeconfig stat error
 
-**Status:** OPEN — captured 2026-11-13
+**Status:** CLOSED — P3 passed over at two groomings, won't-fix for now; reopen on recurrence (triage 2026-11-25, operator ("go with your recommendation")); was: OPEN — captured 2026-11-13
 **Priority:** P3 (Claude proposal: error wording only; the operation correctly fails)
 **Classified:** P3 by gemini-4-argon-medium, 2026-11-14 (Running `dev-hub-sync` without an active dev hub already fails as intended, making the raw `kubectl` stat message instead of a friendlier prerequisite prompt purely cosmetic.)
-**Triage:** carry → v1.45.0 — triage 2026-11-14, operator
-**Waiting on:** operator decision — since 2026-11-13
+**Triage:** close — triage 2026-11-25, operator ("go with your recommendation"); was: carry → v1.45.0 — triage 2026-11-14, operator
 **Introduced by:** pre-existing (dev-hub B, `scripts/plugins/dev_hub.sh` `dev_hub_sync`)
 **Should have been caught by:** spec
 **Prior art:** exact-slug glob, no match; `make find-similar-docs` unavailable (vector store context `k3d-k3d-cluster` missing)

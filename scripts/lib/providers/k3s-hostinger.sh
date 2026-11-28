@@ -935,6 +935,11 @@ function _hostinger_reapply_gitops_applicationsets() {
       return 1
     fi
 
+    if [[ "${appset}" == istio-ambient.yaml && "${ISTIO_AMBIENT_APPSET_ENABLE:-0}" != 1 ]]; then
+      _info "[k3s-hostinger] skipping istio-ambient.yaml (ISTIO_AMBIENT_APPSET_ENABLE unset; Hostinger Istio adoption needs its own spec)"
+      continue
+    fi
+
     if [[ "$appset" == services-git.yaml ]]; then
       local pin_lookup_rc=0
       GIT_TERMINAL_PROMPT=0 _run_command --soft -- git ls-remote --exit-code https://github.com/wilddog64/k3d-manager refs/heads/cve-pins/hub >/dev/null || pin_lookup_rc=$?
@@ -955,7 +960,7 @@ function _hostinger_reapply_gitops_applicationsets() {
   done
 
   (( pin_guard_failed == 0 )) || return 1
-  _info "[k3s-hostinger] reapplied data-git, services-git, platform-helm, and istio-ambient ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
+  _info "[k3s-hostinger] reapplied data-git, services-git and platform-helm ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT} (istio-ambient only with ISTIO_AMBIENT_APPSET_ENABLE=1)"
   return 0
 }
 

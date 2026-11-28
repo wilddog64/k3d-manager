@@ -2,6 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3 — hygiene; the two entry points can pick different pytest interpreters, with a workaround (`PYTEST=`).
+**Triage:** backlog — pull into a release that already touches `Makefile` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** 46ec5b36 (v1.44.0, `docs/plans/v1.44.0-parallel-offline-tests.md`)
 **Should have been caught by:** review
 **Introducing change reviewed:** unknown

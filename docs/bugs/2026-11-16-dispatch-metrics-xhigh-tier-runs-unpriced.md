@@ -2,6 +2,7 @@
 
 **Status:** OPEN — captured 2026-11-16 from Argon's blind review of the PR #161 post-Copilot delta
 **Priority:** P3 — cost metrics only, and only for a model tier no dispatch has used yet
+**Triage:** backlog — pull into a release that already touches `bin/k3dm-dispatch-metrics` (operator, 2026-11-25); Argon blind classification, Claude verified
 **Introduced by:** the commit "chore(metrics): allow and price gemini-4-hydrogen for dispatch runs" (k3d-manager-v1.44.0, 2026-11-15)
 **Should have been caught by:** offline test
 **Introducing change reviewed:** no (pushed after Copilot's last review of PR #161 at 34112fe3)

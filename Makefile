@@ -162,6 +162,7 @@ install-test-metrics:
 
 .PHONY: install-web-console-sshd uninstall-web-console-sshd revoke-web-console-sshd web-console-sshd-check install-web-console-totp uninstall-web-console-totp web-console-totp-enroll web-console-totp-rotate web-console-totp-status
 .PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-host test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: test-operator-acceptance test-operator-acceptance-live
 
 ## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
 trust-vault-ca:
@@ -345,7 +346,7 @@ fleet-up:
 
 ## Remove stale state from an expired k3s-aws sandbox (dry-run unless CONFIRM=1)
 cleanup-stale-sandbox:
-	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" bin/cleanup-stale-sandbox
+	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" bin/cleanup-stale-sandbox $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
 
 ## Remove expired, managed ephemeral ArgoCD cluster registrations (dry-run by default)
 cleanup-stale-clusters:
@@ -646,6 +647,11 @@ provision: ssm
 install-sudoers:
 	bin/install-sudoers.sh
 
+## Install the Tailscale Standalone app (refuses the Homebrew formula and App Store variants; run from a login shell)
+.PHONY: install-tailscale
+install-tailscale:
+	@./scripts/k3d-manager _install_tailscale_app
+
 ## Install the fixed system launchd socket relays for browser listeners
 install-browser-relays:
 	bin/install-browser-relays.sh
@@ -676,6 +682,20 @@ web-console-totp-rotate:
 
 web-console-totp-status:
 	bin/k3dm-web-console-totp status
+
+## Install dedicated pytest virtual environment for test suites on the hub
+.PHONY: install-pytest-venv
+install-pytest-venv:
+	@set -euo pipefail; \
+	 venv="$$HOME/.local/share/k3d-manager/pytest-venv"; \
+	 if [ ! -d "$$venv" ]; then \
+	   python3 -m venv "$$venv"; \
+	 elif ! "$$venv/bin/python" -c '' >/dev/null 2>&1; then \
+	   echo "[make] $$venv has a broken interpreter (Python upgraded?); rebuilding" >&2; \
+	   python3 -m venv --clear "$$venv"; \
+	 fi; \
+	 "$$venv/bin/python" -m pip install pytest==9.1.1 PyYAML==6.0.3; \
+	 "$$venv/bin/python" -m pytest --version
 
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
@@ -922,6 +942,10 @@ install-cloud-bridge:
 	  { echo "[install-cloud-bridge] ERROR: python@3.14 is not installed; run: brew install python@3.14" >&2; exit 1; }; \
 	security find-generic-password -s k3dm-webhook-token-reader -a k3dm >/dev/null 2>&1 || \
 	  { echo "[install-cloud-bridge] ERROR: Keychain item k3dm-webhook-token-reader (account k3dm) not found — create it from a real terminal first; see docs/howto/cloud-session-requests.md" >&2; exit 1; }; \
+	security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm >/dev/null 2>&1 || \
+	  echo "[install-cloud-bridge] WARNING: approval drain token is missing; gated requests will be rejected as not configured" >&2; \
+	security find-generic-password -s k3dm-slack-webhook -a k3dm >/dev/null 2>&1 || \
+	  echo "[install-cloud-bridge] WARNING: Slack approval webhook is missing; gated requests will be rejected as not configured" >&2; \
 	[ -n "$$(git ls-remote --heads origin cloud-requests)" ] || \
 	  { echo "[install-cloud-bridge] ERROR: origin/cloud-requests does not exist — run: make init-cloud-requests" >&2; exit 1; }
 	sed \
@@ -963,6 +987,13 @@ update-webhook-slack-roles:
 	@security add-generic-password -U -s k3dm-slack-role-map -a k3dm -w "$(K3DM_SLACK_ROLE_MAP)"
 	$(MAKE) restart-webhook
 	@echo "K3DM_SLACK_ROLE_MAP stored in Keychain — webhook restarted"
+
+## Store Slack notification route aliases in Keychain and restart the webhook
+update-webhook-slack-routes:
+	@[ -n "$${K3DM_SLACK_NOTIFICATION_ROUTES:-}" ] || { echo "ERROR: K3DM_SLACK_NOTIFICATION_ROUTES not set" >&2; exit 1; }
+	@PYTHONPATH=scripts/lib python3 -c 'import os,sys; from webhook.notify_routes import parse_routes, RouteMapError; raw=os.environ["K3DM_SLACK_NOTIFICATION_ROUTES"]; exec("try:\n parse_routes(raw)\nexcept RouteMapError:\n sys.exit(1)")' || { echo "ERROR: invalid notification route map" >&2; exit 1; }
+	@security add-generic-password -U -s k3dm-slack-notification-routes -a k3dm -w "$${K3DM_SLACK_NOTIFICATION_ROUTES}"
+	@$(MAKE) restart-webhook
 
 ## Inject SLACK_SIGNING_SECRET (Keychain k3dm-slack-signing-secret) into the webhook LaunchAgent plist and restart
 update-webhook-slack-secret:
@@ -1614,8 +1645,11 @@ check-release-milestones:
 	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	      && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest; \
 	 else \
-	   echo "[make] no pytest found. Install pytest or set PYTEST." >&2; \
+	   echo "[make] no pytest found. Install with make install-pytest-venv or set PYTEST." >&2; \
 	   exit 2; \
 	 fi; \
 	 "$$@" -q scripts/tests/bin/test_release_milestones_drift.py::test_release_milestones_stay_in_sync_with_roadmap
@@ -1698,16 +1732,29 @@ test-pytest:
 	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	      && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest; \
 	 else \
 	   echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
-	   echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
-	   echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
-	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	   echo "[make] \$$HOME/.pyenv/shims/python3 -m pytest, and" >&2; \
+	   echo "[make] \$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest." >&2; \
+	   echo "[make] This target runs from the webhook too, whose PATH excludes the pyenv shims." >&2; \
+	   echo "[make] install with: make install-pytest-venv" >&2; \
 	   exit 2; \
 	 fi; \
 	 if [ -n "$${K3DM_JUNIT_XML:-}" ]; then set -- "$$@" --junitxml "$$K3DM_JUNIT_XML" -o junit_logging=no; fi; \
 	 echo "[make] $$* (pytest suites)"; \
 	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
+
+## Run the offline operator acceptance scenarios and retain their report
+test-operator-acceptance:
+	@scripts/tests/tripwire.sh bin/k3dm-operator-acceptance $(if $(RUN_ROOT),--run-root '$(RUN_ROOT)',)
+
+## Run the opt-in live operator acceptance profile (PROFILE=k3dm-tests; requires K3DM_ACCEPTANCE_LIVE=1 and a TTY)
+test-operator-acceptance-live:
+	@if [ "$${PROFILE:-k3dm-tests}" != "k3dm-tests" ]; then echo "usage: make test-operator-acceptance-live PROFILE=k3dm-tests" >&2; exit 2; fi
+	@bin/k3dm-operator-acceptance --live $(if $(RUN_ROOT),--run-root '$(RUN_ROOT)',) $(if $(filter 1,$(WITH_TEST_ALL)),--with-test-all,) $(if $(filter 1,$(WITH_PRIOR_ART)),--with-prior-art,)
 
 test-alertmanager-behaviour:
 	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py scripts/tests/observability/test_kine_compaction_stalled.py scripts/tests/observability/test_cve_fix_available_alert.py -v
@@ -1777,6 +1824,7 @@ test-all:
 	    done; \
 	    local _stage_dir="$$_parallel_out/$$_stage"; \
 	    mkdir -p "$$_stage_dir"; \
+	    local _stage_start=$$(date -u +%s); \
 	    local _order_opt=(); \
 	    if [ -s "$$_order_file" ]; then \
 	      _order_opt=(--order-by "$$_order_file"); \
@@ -1855,7 +1903,8 @@ test-all:
 	      fi; \
 	    done; \
 	    if [ "$$_completed_count" -eq "$$_total_files" ]; then \
-	      echo "[test-all] stage-complete $$_stage"; \
+	      local _stage_dur=$$(( $$(date -u +%s) - _stage_start )); \
+	      echo "[test-all] stage-complete $$_stage seconds=$$_stage_dur"; \
 	    else \
 	      _stage_failed=1; \
 	    fi; \
@@ -1960,11 +2009,15 @@ test-all:
 	      elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	           && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	        _pytest_cmd="$$HOME/.pyenv/shims/python3 -m pytest"; \
+	      elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	           && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest"; \
 	      else \
 	        echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
-	        echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
-	        echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
-	        echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	        echo "[make] \$$HOME/.pyenv/shims/python3 -m pytest, and" >&2; \
+	        echo "[make] \$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest." >&2; \
+	        echo "[make] This target runs from the webhook too, whose PATH excludes the pyenv shims." >&2; \
+	        echo "[make] install with: make install-pytest-venv" >&2; \
 	        _stage_failed=1; \
 	        _stage3_failed=1; \
 	      fi; \
@@ -1992,6 +2045,7 @@ test-all:
 	  fi; \
 	  rm -rf "$$_parallel_out"; \
 	else \
+	  _stage1_start=$$(date -u +%s); \
 	  _stage1_override=0; \
 	  [ -n "$${STAGE_TEST_FILES+x}" ] && _stage1_override=1; \
 	  if [ "$$_stage1_override" -eq 1 ]; then \
@@ -2017,7 +2071,8 @@ test-all:
 	          _s_rc=0; \
 	          CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}" scripts/tests/tripwire.sh bats "$${_files[@]}" || _s_rc=$$?; \
 	          if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	            echo "[test-all] stage-complete test"; \
+	            _stage1_dur=$$(( $$(date -u +%s) - _stage1_start )); \
+	            echo "[test-all] stage-complete test seconds=$$_stage1_dur"; \
 	          fi; \
 	          if [ "$$_s_rc" -ne 0 ]; then \
 	            _stage_failed=1; \
@@ -2029,12 +2084,14 @@ test-all:
 	    _s_rc=0; \
 	    scripts/tests/tripwire.sh ./scripts/k3d-manager test all || _s_rc=$$?; \
 	    if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	      echo "[test-all] stage-complete test"; \
+	      _stage1_dur=$$(( $$(date -u +%s) - _stage1_start )); \
+	      echo "[test-all] stage-complete test seconds=$$_stage1_dur"; \
 	    fi; \
 	    if [ "$$_s_rc" -ne 0 ]; then \
 	      _stage_failed=1; \
 	    fi; \
 	  fi; \
+	  _stage2_start=$$(date -u +%s); \
 	  _stage2_override=0; \
 	  [ -n "$${STAGE_TEST_BIN_FILES+x}" ] && _stage2_override=1; \
 	  if [ "$$_stage2_override" -eq 1 ]; then \
@@ -2060,7 +2117,8 @@ test-all:
 	          _s_rc=0; \
 	          CLUSTER_ROLE="$${CLUSTER_ROLE:-infra}" scripts/tests/tripwire.sh bats "$${_files[@]}" || _s_rc=$$?; \
 	          if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	            echo "[test-all] stage-complete test-bin"; \
+	            _stage2_dur=$$(( $$(date -u +%s) - _stage2_start )); \
+	            echo "[test-all] stage-complete test-bin seconds=$$_stage2_dur"; \
 	          fi; \
 	          if [ "$$_s_rc" -ne 0 ]; then \
 	            _stage_failed=1; \
@@ -2076,13 +2134,15 @@ test-all:
 	      _s_rc=0; \
 	      scripts/tests/tripwire.sh bats scripts/tests/bin || _s_rc=$$?; \
 	      if [ "$$_s_rc" -eq 0 ] || [ "$$_s_rc" -eq 1 ]; then \
-	        echo "[test-all] stage-complete test-bin"; \
+	        _stage2_dur=$$(( $$(date -u +%s) - _stage2_start )); \
+	        echo "[test-all] stage-complete test-bin seconds=$$_stage2_dur"; \
 	      fi; \
 	      if [ "$$_s_rc" -ne 0 ]; then \
 	        _stage_failed=1; \
 	      fi; \
 	    fi; \
 	  fi; \
+	  _stage3_start=$$(date -u +%s); \
 	  _unit_files=(); \
 	  _pytest_files=(); \
 	  _has_py_override=0; \
@@ -2198,11 +2258,15 @@ test-all:
 	      elif [ -x "$$HOME/.pyenv/shims/python3" ] \
 	           && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
 	        _pytest_cmd="$$HOME/.pyenv/shims/python3 -m pytest"; \
+	      elif [ -x "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" ] \
+	           && "$$HOME/.local/share/k3d-manager/pytest-venv/bin/python" -m pytest --version >/dev/null 2>&1; then \
+	        _pytest_cmd="$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest"; \
 	      else \
 	        echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
-	        echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
-	        echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
-	        echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	        echo "[make] \$$HOME/.pyenv/shims/python3 -m pytest, and" >&2; \
+	        echo "[make] \$$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest." >&2; \
+	        echo "[make] This target runs from the webhook too, whose PATH excludes the pyenv shims." >&2; \
+	        echo "[make] install with: make install-pytest-venv" >&2; \
 	        _stage_failed=1; \
 	        _stage3_err=1; \
 	      fi; \
@@ -2225,7 +2289,8 @@ test-all:
 	      fi; \
 	    fi; \
 	  if [ "$$_stage3_killed" -eq 0 ] && [ "$$_stage3_err" -eq 0 ]; then \
-	    echo "[test-all] stage-complete test-python"; \
+	    _stage3_dur=$$(( $$(date -u +%s) - _stage3_start )); \
+	    echo "[test-all] stage-complete test-python seconds=$$_stage3_dur"; \
 	  fi; \
 	fi; \
 	if [ "$$_stage_failed" -ne 0 ]; then \
@@ -2347,6 +2412,7 @@ help:
 	@echo "    make fast-gate [BASE=<rev>]  Changed-file lint and tests before push (docs/howto/fast-gate.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
 	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
+	@echo "    make update-webhook-slack-routes  Store Slack notification route aliases and restart webhook"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"
@@ -2387,7 +2453,7 @@ help:
 	@echo "    make acg-restart   Recover an expired sandbox: delete, recreate, re-extract creds (needs a TTY)"
 	@echo "    make acg-recover   Full recovery: chrome-cdp + acg-restart + a clean make up (needs a TTY)"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
-	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state (CONFIRM=1 to remove)"
+	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state and the dead sandbox's ArgoCD ApplicationSet (CONFIRM=1 to remove)"
 	@echo "    make cleanup-stale-clusters Preview/remove expired managed ArgoCD registrations (CONFIRM=1 to remove)"
 	@echo "    make cleanup-stale-resources Run both cleanup paths (CONFIRM=1 to remove)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
@@ -2411,6 +2477,7 @@ help:
 	@echo "    make fleet-plan            Create a no-execute ACG fleet change set"
 	@echo "    make fleet-up              Provision/join the ACG fleet (node-join rung)"
 	@echo "    make install-sudoers       Install passwordless sudo rules (one-time macOS setup)"
+	@echo "    make install-tailscale     Install the Tailscale Standalone app (refuses formula/App Store copies)"
 	@echo ""
 	@echo "  Observability / credentials:"
 	@echo "    make observability              Deploy Prometheus+Grafana+Trivy to Hub k3d"

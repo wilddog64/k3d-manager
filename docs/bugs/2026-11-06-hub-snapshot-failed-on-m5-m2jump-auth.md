@@ -1,10 +1,10 @@
 # Bug: the M5 weekly hub snapshot failed on its only run, M2 auth denied
 
-**Status:** OPEN — one failure observed; next scheduled run Sunday 2026-11-08 02:30 local decides whether a fix is needed
+**Status:** CLOSED — resolved without a code fix; the next three scheduled runs exited 0 (live check 2026-11-27; reopen with a Recurrence section if seen again)
 **Priority:** P2
 **Classified:** P2 by gemini-4-argon-medium, 2026-11-12 (Unattended LaunchAgent snapshot failed once on SSH auth, but SSH from a login shell succeeds and `hub-data-export` continues to work); Claude proposed P2. Agreed.
 **Triage:** carry → v1.46.0 — grooming 2026-11-22, operator (second carry, operator); was: carry → v1.44.0 (next scheduled run, no code) — grooming 2026-11-12, operator.
-**Waiting on:** scheduled run — since 2026-11-12
+**Re-triage:** 2026-11-27 — check first in v1.46.0 — close if already resolved, else decide (operator 2026-11-27)
 **Approval:** pending
 **Branch:** `k3d-manager-v1.46.0`
 **Related:** `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md`; `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md`
@@ -48,3 +48,10 @@ interface:
   - "launchd label: com.k3d-manager.hub-snapshot"
   - "ssh alias: m2jump"
 ```
+
+## Check — 2026-11-27 (Claude, read-only, m5 hub over ssh)
+
+- `launchctl print gui/<uid>/com.k3d-manager.hub-snapshot`: `last exit code = 0`.
+- `~/Library/Logs/k3dm-hub-snapshot.log`: `scheduled capture ended at 2026-11-08T10:50:51Z (exit 0)`,
+  `2026-11-15T10:45:53Z (exit 0)`, `2026-11-22T10:48:54Z (exit 0)`; the only failure is the 2026-11-01 run above.
+- Decision (operator re-triage 2026-11-27, "close if already resolved"): closed; the 2026-11-01 auth denial did not recur.

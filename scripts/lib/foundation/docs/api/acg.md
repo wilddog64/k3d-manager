@@ -88,14 +88,37 @@ to the instant within 6 hours of now, because a sandbox never has more than 6 ho
 A zero or negative result skips the button wait and takes the expired-sandbox path. Passing
 `--check` as the second argument prints `REMAINING_MINS:<n>` and exits without extending.
 
-## Teardown
+## Provisioning and teardown
+
+### `acg_provision --confirm`
+
+Provisioning writes `ubuntu` and `ubuntu-<n>` to `~/.ssh/k3dm-sandbox.conf`. Add the following
+line to `~/.ssh/config` once, before any `Host` or `Match` block. Provisioning checks this Include
+before CloudFormation deployment; `K3DM_SSH_SANDBOX_PREFLIGHT=warn` changes a missing Include to
+a warning for operators who manage SSH configuration another way.
+
+```sshconfig
+Include ~/.ssh/k3dm-sandbox.conf
+```
 
 ### `acg_teardown [--confirm]`
 
 Deletes the ACG CloudFormation stack and removes the `ubuntu-k3s` kubeconfig context. The
 `--confirm` flag is required. A missing stack is treated as an already-complete teardown. Lookup
 and deletion failures return without removing the kubeconfig context, because the sandbox may
-still be alive.
+still be alive. On successful teardown, `ubuntu`, `ubuntu-tunnel` and `ubuntu-<n>` entries are
+removed from `~/.ssh/k3dm-sandbox.conf`.
+
+Before `acg_provision --confirm`, add this line to `~/.ssh/config` once, before any `Host` or
+`Match` block:
+
+```sshconfig
+Include ~/.ssh/k3dm-sandbox.conf
+```
+
+ACG writes sandbox SSH aliases to that fragment and verifies that OpenSSH resolves `ubuntu` to the
+new server address. Provisioning stops before CloudFormation if the unconditional Include is
+missing. Set `K3DM_SSH_SANDBOX_PREFLIGHT=warn` only when SSH configuration is managed another way.
 
 | Return code | Meaning |
 |---|---|

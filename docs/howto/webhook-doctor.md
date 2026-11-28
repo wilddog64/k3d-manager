@@ -7,7 +7,8 @@ processes, listeners, logs, or the network.
 
 On the m4 host, run `make webhook-doctor` (or `bin/k3dm-webhook-doctor --check`) to collect timestamped
 JSON. It reports launchd job presence, parsed PID and last exit code, the configured TCP
-listener presence, log modification time and bounded error categories, then
+listener presence, log modification time and bounded error categories, the Slack
+configuration (`slack_bot`, `status_channel`, `slack_role_map`), then
 probes only `http://127.0.0.1:7443/api/v1/health?quick=1` with the reader token held in
 memory. The dedicated opener bypasses proxy settings and refuses redirects, so
 the authorization header stays on the fixed loopback request. The reader token is read from `K3DM_WEBHOOK_TOKEN_READER` or macOS
