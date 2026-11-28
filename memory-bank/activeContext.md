@@ -14,6 +14,12 @@
 - **Web console part B:** re-scope of captures C1-C17 vs parts A/C evidence running (read-only subagent); then a capture
   script spec (operator: "write script for me to execute these probes"); browser captures from iPad on cellular later.
   Slot in v1.47.0 (at 5-plan cap) decided at Sunday groom; Claude recommends displacing plan 2 (no spec) if it goes in.
+- **Capture kit spec** `docs/plans/web-console-b-capture-kit.md` rev 1 (`137417ea`): Fable NEEDS FIXES (B1 C8 verdict
+  logic, B2 root log in operator dir, B3 sitting order/CA install; 9 majors); Neon `wcb-kit-review-neon` running. Operator
+  decisions 2026-11-27: K1 = home Wi-Fi first, K2 explained (Claude now recommends (a) second GitHub account; answer
+  pending), K3 = (a) repo, K4 = (a) tightened (git show <commit>, refuse dirty tree, blob ids). Run on **m4**, plain
+  Terminal at the desk. Next: rev 2 with both reviews, present intents. **Operator: "just tell me when is a time to run
+  it"** — Claude tells the operator when the kit is landed and sitting 1 can run.
 
 1. **v1.46.0 SHIPPED.** PR #166 squash-merged `f2a5f7a3`; tag + latest release v1.46.0; enforce_admins restored;
    next branch `k3d-manager-v1.47.0` (head `d39ace80`: retro `docs/retro/2026-11-27-v1.46.0-retrospective.md`).
