@@ -13,6 +13,16 @@
 (`supervisor.py`, `filters.py`, `scan.py`, `collect.py`, `isolation.py`). Parent contract:
 `docs/plans/web-console-b-capture-kit.md` (Contract between children; Token; §3 reads).
 
+## Files
+
+| File | Change |
+|---|---|
+| `docs/plans/web-console-b-capture-kit-c-simplify.md` | read only (start here) |
+| `scripts/lib/wcb_capture/api.py` | read only |
+| `scripts/lib/wcb_capture/stage.py` | read only |
+| `scripts/lib/wcb_capture/supervisor.py` | read only |
+| `docs/plans/web-console-b-capture-kit.md` | read only |
+
 ## Questions
 
 1. **Security:** can any resolved value, the capture token or the connector token leak (stdout, error text, argv,
