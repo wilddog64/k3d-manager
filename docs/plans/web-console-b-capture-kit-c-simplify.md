@@ -1,13 +1,13 @@
 # Web Console B capture kit — child c: simplify the operator path (one ID, no hand-made token file)
 
-**Status:** SPEC rev 2 — 2026-11-28; rev 1 reviewed blind by Fable and Neon (both NEEDS FIXES), every finding folded in (table at the end)
+**Status:** SPEC rev 2 — intents approved 2026-11-28, dispatched to Luna (`wcb-kit-c`); rev 1 reviewed blind by Fable and Neon (both NEEDS FIXES), every finding folded in (table at the end)
 **Parent:** [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) (enabling work of the parent; no release slot)
 **Branch:** task branch from `k3d-manager-v1.47.0`
 **Risk:** medium (how the capture token and the connector token reach the kit; the scan-term privacy contract)
 **Implementer:** Luna (codex, `gpt-6-luna`)
 **Verifier:** Claude, from `## Acceptance` only; the live run is sitting 1 itself, by the operator
 **Filed:** 2026-11-28
-**Intent approved:**
+**Intent approved:** operator, 2026-11-28 ("Approved", intents 1–5 and the three parent contract amendments)
 **Approval:** operator 2026-11-28, after deferring sitting 1: "this process still too complicate"; then "can you draft the spec and have neon/fable review it? send me intents when done. I can apporve it with my phone"
 
 ## Why
