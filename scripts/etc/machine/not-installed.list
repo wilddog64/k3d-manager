@@ -49,3 +49,4 @@ promote-authority-install|operator-run: root LaunchDaemon, installed by the oper
 promote-authority|operator-run: system LaunchDaemon installed by promote-authority-install
 install-tailscale|operator-run per Mac for break-glass access: the system extension approval and tailnet login are GUI steps (docs/howto/tailscale-break-glass.md)
 install-pytest-venv|operator-run on the hub: make install-pytest-venv installs pytest and PyYAML into a dedicated venv for test targets (docs/howto/webhook-operations.md)
+capture-sshd|not installed by setup: scratch LaunchDaemon bootstrapped from /private/var/db/k3dm-capture-<date>/ by bin/k3dm-wcb-capture during part B captures, removed by its down (docs/plans/web-console-b-capture-kit.md)

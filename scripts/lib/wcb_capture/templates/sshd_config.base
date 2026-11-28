@@ -1,0 +1,18 @@
+ListenAddress 127.0.0.1
+Port 42723
+AllowUsers {login}
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+AuthenticationMethods publickey
+AuthorizedKeysFile {authorized_keys}
+TrustedUserCAKeys {ca}
+DisableForwarding yes
+PermitUserEnvironment no
+PidFile none
+LogLevel VERBOSE
+HostKey {root}/host_key
+SetEnv ZDOTDIR={root}/zdotdir
+ForceCommand {root}/recorder.py {profile}
+{extra}

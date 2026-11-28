@@ -1,0 +1,32 @@
+#!/Library/Developer/CommandLineTools/usr/bin/python3 -IS
+"""Return certificate principals only for the permitted login."""
+import subprocess
+import sys
+
+
+def _run_command(argv, **kwargs):
+    return subprocess.run(argv, **kwargs)
+
+
+def main():
+    if len(sys.argv) != 5 or sys.argv[1] != sys.argv[2]:
+        return 1
+    result = _run_command(['/usr/bin/ssh-keygen', '-L', '-f', '-'],
+                            input=sys.argv[3] + ' ' + sys.argv[4] + '\n',
+                            text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if result.returncode:
+        return 1
+    indent = None
+    for line in result.stdout.splitlines():
+        if line.strip() == 'Principals:':
+            indent = len(line) - len(line.lstrip())
+        elif indent is not None:
+            if not line.strip() or len(line) - len(line.lstrip()) <= indent:
+                break
+            if line.strip() != '(none)':
+                print(line.strip())
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
