@@ -228,7 +228,7 @@ read-back does not match is not bootstrapped. The tables live in `rootd.py` next
 | `c8` | C8 | — | prints `reached` with a timestamp and exits 0 |
 | `c9-hold` | C9 | — | heartbeat line every 5 s until the session ends |
 | `c7` | C7 (sitting 3, local client) | overrides: `AuthorizedKeysFile <(2)>/c7_authorized_keys`, `TrustedUserCAKeys none` | the plan's C7 commands, outputs reduced to exit codes |
-| `c13-ca1`, `c13-ca2` | C13(c) (sitting 3, local client) | override: `TrustedUserCAKeys <(2)>/c13_ca.pub`, whose content `rootd` switches between the two scratch CAs without a restart (`up-c13-ca1` bootstraps; `up-c13-ca2` only rewrites the file while the daemon runs) | prints `accepted` |
+| `c13-ca1`, `c13-ca2` | C13(c) (sitting 3, local client) | override: `TrustedUserCAKeys <(2)>/c13_ca.pub`, whose content `rootd` switches between the two scratch CAs without a restart (`up-c13-ca1`: if no capture daemon runs, bootstraps with CA-1; if the daemon already runs a `c13-*` profile, only rewrites `c13_ca.pub` to CA-1 without a restart (the swap back); `up-c13-ca2`: only rewrites the file to CA-2 and is refused unless the daemon runs a `c13-*` profile; any other running profile refuses both; every rewrite logs the sshd PID before and after to `root-steps.log`, and a changed PID fails the step) | prints `accepted` |
 
 `principals-any` (`root:wheel 0755` in (2), invoked as `principals-any <login> %u %t %k`, the login written into the
 config by `rootd` from its validated `--login`): prints the certificate's own principals (from `ssh-keygen -L -f -` over
@@ -360,7 +360,7 @@ is deleted); the part B spec decides the production order from these timings.
 
 - **C13(c):** `rootd` generates two scratch CA keys and a user certificate from each (principal = login) in (2), then:
   CA-1 in `TrustedUserCAKeys`, bootstrap; a local `ssh` with cert 1 succeeds and cert 2 fails; replace the file content
-  with CA-2 **without restarting**; cert 2 succeeds and cert 1 fails; swap back and check both again. Each result is the
+  with CA-2 **without restarting** (`up-c13-ca2`); cert 2 succeeds and cert 1 fails; swap back with `up-c13-ca1` (daemon running, so a rewrite, not a bootstrap) and check both again. The sshd PID is the same across all three steps (from `root-steps.log`). Each result is the
   client exit code plus the sshd log slice.
 - **C7:** profile `c7` with a local `ssh` client and the throwaway key; outputs are the exit codes the plan lists.
 - **`c14-plain`:** refuses inside tmux/screen (§Where and when); runs `sudo /Library/Developer/CommandLineTools/usr/bin/
@@ -660,6 +660,7 @@ sshd log without timestamps; part A line 202; `ssh-keygen -lf` output shape).
 | `api` needs a GUI session | F minor | Where and when: seat at m4, not over SSH |
 | **Rev 2 re-review (Fable, NEEDS FIXES, no blocker)** | | |
 | Requests replay after a driver restart | F2 M1 | persisted `(2)/seq` plus highest-present at start; K-N6; restart test and red control |
+| a1 stop 2026-11-28 (Terra): C13 swap-back verb undefined | dispatch | `up-c13-ca1` rewrites when a `c13-*` daemon runs; PID logged, unchanged |
 | Read-back gate contradicts c7/C13; lowercase forms; presence-only; first host key; C13 profile | F2 M2 | per-profile normalised required/forbidden tables; first `up` makes the host key; `c13-ca1`/`c13-ca2` rows |
 | Forced command runs the operator's zsh startup files | F2 M3 | `SetEnv ZDOTDIR=<(2)>/zdotdir` in baseline and gate; recorder `-IS` shebang (C11 evidence) |
 | Scan blocks 127.0.0.1, algorithm names, @openssh.com, HH:MM:SS | F2 M4 | loopback, algorithm names and OpenSSH suffixes allowed; key bodies matched; K-E5 runs real 2026-11-19 files |
