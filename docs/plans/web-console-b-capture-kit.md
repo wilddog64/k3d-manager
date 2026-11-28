@@ -1,7 +1,7 @@
 # Web console part B — capture kit (guided scripts for the remaining captures)
 
 **Status:** SPEC rev 2 — 2026-11-27; rev 1 reviewed blind by Fable and Neon (both NEEDS FIXES), every finding applied
-or answered in `## Review log`; intents not yet approved
+or answered in `## Review log`; intents approved; Fable re-review of rev 2 pending
 **Priority:** P2 (enhancement)
 **Release:** unslotted — v1.47.0 candidate for `/release-groom` 2026-11-29 (v1.47.0 is at its 5-plan cap; enters only by
 displacing a not-started plan)
@@ -9,7 +9,8 @@ displacing a not-started plan)
 **Filed:** 2026-11-27, Claude
 **Approval:** operator, 2026-11-27 ("actually I wonder if you can write script for me to execute these probes?", then
 "sounds good" to: re-scope, kit spec, run in sittings; "can you also write the spec ... and have Fable/Neon review")
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-27
+**Intent approval words:** "agree, and itents approved" (K-E1..K-E10 as written in rev 2; "agree" = K2 (d) and a Fable re-review of rev 2)
 **Risk:** high — the kit stages and runs a root LaunchDaemon on m4, reads a Cloudflare token from the Keychain and calls
 the Cloudflare API. Every Cloudflare call stays `GET`; the kit never touches the production console.
 **Parent:** [`v1.45.0-web-console-b-captures.md`](v1.45.0-web-console-b-captures.md) (capture plan, DRAFT v5; its
@@ -415,7 +416,7 @@ v1.45.0 web-console plans), each line read:
   the denial, then restore the rule (the kit prompts both changes; `down`'s checklist repeats the restore). (d) proves
   the same thing (a GitHub identity that is not on the allow list is refused) without a second account. Option (b) of
   rev 1 (one-time PIN) is withdrawn: Access may send no PIN to a non-allowed email, so the denial may not be observable,
-  and part B pins GitHub as the only identity provider. **Recommended: (d).** Pending.
+  and part B pins GitHub as the only identity provider. **Decided (operator, 2026-11-27): (d).**
 - **K3 — Where the kit lives.** **Decided (operator, 2026-11-27): (a)** in the repo with offline tests, removed in the
   release after part B ships.
 - **K4 — Root staging trust.** **Decided (operator, 2026-11-27): (a)**, tightened after review: stage from
