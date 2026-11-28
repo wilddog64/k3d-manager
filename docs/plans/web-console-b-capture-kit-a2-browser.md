@@ -1,6 +1,6 @@
 # Web console part B capture kit — a2: browser side (recorder, supervisor, c8/c9, root-checks, end-to-end)
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28;
+**Status:** LANDED 2026-11-28 (`7ddd5b52`, Luna, 2 runs; Claude verified outside the sandbox: make test-pytest 3135 passed, own mutant real-HOME caught; P3 gap filed `docs/bugs/2026-11-28-wcb-capture-c8-cloudflared-guard-call-untested.md`) — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28;
 starts after `a3` lands (uses a1's `isolation`/`requests` and a3's `filters`/`scan` and CLI)
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
