@@ -1,6 +1,6 @@
 # Web console part B capture kit — a1: root side (root driver, isolation, stage, templates)
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3 (Fable + Neon reviewed rev 1,
+**Status:** LANDED 2026-11-28 (`7d51ca09`, Terra, 4 runs; Claude verified outside the sandbox: make test-pytest 3056 passed, two independent mutants red) — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3 (Fable + Neon reviewed rev 1,
 Fable re-reviewed rev 2); not dispatched
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
