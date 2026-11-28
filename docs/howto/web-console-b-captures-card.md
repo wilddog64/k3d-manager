@@ -8,9 +8,12 @@ Never paste a token into chat or a command line; the kit asks for it hidden.
 
 In the Cloudflare dashboard:
 
-1. **Token:** My Profile → API Tokens → Create Token → Custom. Read permissions only: Access Apps and Policies,
-   Access Certificates, Cloudflare Tunnel, Access Organizations/IdPs/Groups (account), DNS (your zone). TTL 24 h.
-   Keep the page open.
+1. **Token:** profile icon → My Profile → API Tokens → Create Token → **Start from scratch**. Account: yours.
+   Under **Cloudflare One / Zero Trust** tick **Read** only on: `Access: Apps and Policies`,
+   `Access: Organizations, Identity Providers, and Groups`, `Access: SSH Auditing` (the SSH certificate authorities
+   one; not mTLS or SAML), and `Cloudflare Tunnel` — the counter shows 4. No DNS needed. Keep the default 7-day
+   expiry (it covers all sittings; deleted at the end). The summary must show four lines, all `Read`. Create, and
+   keep the page open: the token is shown once.
 2. **App:** Zero Trust → Access → Applications → Add → Self-hosted. Name **exactly `wcb-capture`**, domain
    `capture.<your-domain>`, browser-rendered SSH, session 6 h, GitHub only, one Allow rule for your GitHub email,
    short-lived certificate CA on.
