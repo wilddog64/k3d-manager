@@ -2,6 +2,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -64,6 +65,7 @@ def _fixture_repo(tmp_path):
         {"version": "v1.0.2", "target": True}]}))
     import site
     env = {**os.environ, "HOME": str(tmp_path),
+           "PYTEST": f"{sys.executable} -m pytest",
            "PYTHONUSERBASE": os.environ.get("PYTHONUSERBASE") or site.getuserbase(),
            "GIT_AUTHOR_NAME": "Test",
            "GIT_AUTHOR_EMAIL": "test@example.invalid", "GIT_COMMITTER_NAME": "Test",

@@ -100,3 +100,16 @@ interface:
   - "make install-pytest-venv"
   - "$HOME/.local/share/k3d-manager/pytest-venv/bin/python -m pytest (fallback after the pyenv shim)"
 ```
+
+## Live check — 2026-11-27 (Claude, read-only plus one cloud request)
+
+- Promote `15660f42` (operator), then `make install-pytest-venv` on m5 (operator). Venv: pytest 9.1.1, PyYAML 6.0.3,
+  Python 3.15.2.
+- `make-test-pytest` through the webhook (request `20261127T235409Z-make-test-pytest`, job `46243ccb`): pytest
+  resolved from the venv and ran — **3005 passed**, 2 skipped, **2 failed** (Y-E2: the "no pytest found" stop is gone).
+- The 2 failures are a test-isolation defect exposed now that the hub runs pytest at all:
+  `test_release_milestones_drift.py` sets `HOME` to `tmp_path`, so the nested `make check-release-milestones` cannot
+  reach `$HOME/.local/share/k3d-manager/pytest-venv`; m4 passed only because pyenv/Homebrew python3 carry pytest.
+  Reproduced on m4 with a `python3` stand-in lacking pytest (2 failed), fixed by passing
+  `PYTEST="<sys.executable> -m pytest"` into the fixture env (3 passed under both PATHs; `make lint-python` clean).
+- Remaining: promote the test fix, rerun `make-test-pytest` (expect 0 failed), then the overnight `make-test-all`.
