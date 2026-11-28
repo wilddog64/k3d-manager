@@ -16,6 +16,14 @@
    `~/src/gitrepo/personal/shopping-carts/shopping-cart-e2e-tests` (`git show origin/main:tests/flows/order-management.spec.ts`,
    `playwright.config.ts`).
 
+## Files
+
+| File | Change |
+|---|---|
+| `docs/bugs/2026-11-25-e2e-order-cancel-flow-hits-order-rate-limit-429.md` | read only (start here) |
+| `scripts/etc/e2e/order.yaml` | read only |
+| `scripts/plugins/e2e.sh` | read only |
+
 ## Answer
 
 1. **Priority:** P2 or P3, with one paragraph of reasoning against the definitions (is the e2e signal broken without a
