@@ -1,6 +1,6 @@
 # hoverfocus — Universal Control pointer probe (read-only diagnostic for capture 2)
 
-**Status:** SPEC — dispatch approved 2026-11-28
+**Status:** LANDED 2026-11-28 on hoverfocus v0.0.3 (Flash `hf-uc-probe`; Claude verified P-E1 offline); P-E2 (live run by the operator on m4) pending
 **Tracked:** hoverfocus (OOB repo), not a k3d-manager release.
 **Parent bug:** [`2026-11-27-hoverfocus-universal-control-border-without-keyboard-and-stale-border.md`](../bugs/2026-11-27-hoverfocus-universal-control-border-without-keyboard-and-stale-border.md) (P3, operator approved 2026-11-28)
 **Repo / branch:** `wilddog64/hoverfocus`, task branch from `v0.0.3` (head `4a9bb6e`)
