@@ -5,7 +5,7 @@
 **Introduced by:** pre-existing (cross-Mac use never designed for)
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
-**Waiting on:** operator decision — since 2026-11-27
+**Waiting on:** investigation — since 2026-11-28 (Fable + Neon blind review; then intents for operator approval)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` not run
 **Filed:** 2026-11-27, Claude, from operator report (HoverFocus v0.0.3 branch `a4244b6`, installed on m4 and m2)
 **Component:** `hoverfocus` `Sources/HoverFocusPlatform/Controller.swift` (`handle` :141, `applyDecision` :322, indicator)
@@ -43,3 +43,15 @@ used), this points to Universal Control keeping keyboard input on m2 until a cli
 keyboard between Macs (no public API; a synthetic click would click into the window). Proposed resolution for triage:
 document as a limitation with the workaround "click once after crossing"; keep the stale-border half as the fixable
 part (hide the border when the pointer leaves the screen).
+
+## Update — 2026-11-28 (operator report on m4; return trip)
+
+Operator: "move cursor from m2 to m4 the iTerm window border will turn blue but not able to type. click the m4 iTerm2
+and move cursor back to m2 iterm, m4 iterm blue line will not go away, and can't type on m2 iterm until I click it".
+
+New: the **return trip** has the same shape. After a click on m4, moving back onto m2's iTerm2 does not bring typing
+back to m2 without a click. On m2, `Engine.observe` returns no action when the hovered window already equals
+`state.focusedWindowID` (hoverfocus `Sources/HoverFocusCore/Engine.swift:61`, v0.0.3 `6bd845c`); m2's iTerm2 was never
+unfocused locally, so HoverFocus has nothing to do, consistent with Universal Control holding the keyboard on m4 until a
+click on m2. The decisive capture is still open: with HoverFocus **quit on both Macs**, does typing follow the pointer
+without a click? (A duplicate doc filed in the hoverfocus repo on 2026-11-28 was removed in favour of this one.)
