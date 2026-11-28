@@ -1,7 +1,6 @@
 # Web console part B capture kit — b: how-to and plan fixes
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28; runs
-alongside `a1` (no shared file)
+**Status:** LANDED 2026-11-28 — Flash `wcb-kit-b`; Claude verified K-E7b and corrected four how-to lines; child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md)
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E7b, intent unchanged)
