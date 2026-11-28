@@ -1,6 +1,6 @@
 # Web console part B capture kit — a3: data side and CLI (api, filters, scan, collect, down)
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28;
+**Status:** LANDED 2026-11-28 (`45814dde`, Luna, 1 run; Claude verified outside the sandbox: make test-pytest 3100 passed, two independent mutants caught) — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28;
 starts after `a1` lands (imports `isolation`)
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
