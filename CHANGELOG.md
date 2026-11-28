@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **Hub test targets find pytest without touching system Python.** The webhook runs Homebrew Python, which has no pytest, so `make test-pytest`, `test-all` and the fast gate stopped at "no pytest found" on the hub. `make install-pytest-venv` (operator-run once per hub, no sudo) creates `~/.local/share/k3d-manager/pytest-venv` with pinned pytest 9.1.1 and PyYAML 6.0.3, rebuilding it if a Python upgrade breaks its interpreter; all five pytest lookups fall back to it after the existing ones. Live on m5: 3005 passed through the webhook. Two release-milestone drift tests that hid behind a developer machine's pytest now pass the running interpreter to their nested `make`.
+
 - **Cloud sandbox SSH aliases use `~/.ssh/k3dm-sandbox.conf`.** AWS, GCP and Azure no longer edit the operator's main SSH config; GCP/Azure check for its Include before creating a VM.
 - **Repo sync ignores CI-green commits whose content is already in `deploy/hub`.** Squash-merged release branches no longer keep `K3dmPromoteWaiting` active; new or reverted content remains promotable.
 - **Hub deploy restarts changed webhook and cloud-bridge code.** Active queued or running webhook jobs defer the restart with exit 3 and a rerun hint; unchanged code does not interrupt the agents.
