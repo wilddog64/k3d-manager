@@ -7,7 +7,8 @@
 **Implementer:** Luna (codex, `gpt-6-luna`)
 **Verifier:** Claude, from `## Acceptance` only; the live run is sitting 1 itself, by the operator
 **Filed:** 2026-11-28
-**Intent approved:** operator, 2026-11-28 ("Approved", intents 1–5 and the three parent contract amendments)
+**Intent approved:** operator, 2026-11-28
+**Intent approval words:** "Approved" (intents 1–5 and the three parent contract amendments)
 **Approval:** operator 2026-11-28, after deferring sitting 1: "this process still too complicate"; then "can you draft the spec and have neon/fable review it? send me intents when done. I can apporve it with my phone"
 
 ## Why
