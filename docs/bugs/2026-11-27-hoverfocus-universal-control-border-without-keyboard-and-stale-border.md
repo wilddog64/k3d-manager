@@ -1,7 +1,7 @@
 # Bug: HoverFocus under Universal Control draws the focus border on the second Mac but keys do not follow, and the border stays after the cursor leaves
 
 **Status:** OPEN — captured, not triaged
-**Priority:** P3 (proposed; Argon classifies)
+**Priority:** P3 (operator approved 2026-11-28: "P3 approved", after Fable P3 / Neon P2-then-P3; rises to P2 if, with HoverFocus quit on both Macs, typing follows the pointer without a click)
 **Introduced by:** pre-existing (cross-Mac use never designed for)
 **Should have been caught by:** none
 **Introducing change reviewed:** unknown
