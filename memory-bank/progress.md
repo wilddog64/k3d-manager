@@ -239,3 +239,5 @@
 - 2026-11-25: L4 `11e0e7c` landed (105 selftest, 4 red controls) and live-verified on m2 (Slack/VS Code content focus); README Tested apps filled `2e30655`; Electron, same-app, Safari bugs LIVE-VERIFIED; captures: trust-loss (investigation), make-install stale copy.
 - 2026-11-26: `make install-tailscale` target (`4f4cfafe`; machine manifest `e86afa2e` after pre-push gate caught UNLISTED target); U2 rev 2 committed and dispatched `hf003-u2` (Flash); P3 `docs/bugs/2026-11-26-dispatch-identity-flags-optional.md`; grooming 2026-11-29 agenda noted.
 - 2026-11-27: v1.46.0 post-merge Step 7b standing-docs audit committed on `k3d-manager-v1.47.0` (projectbrief, copilot-instructions, functions.md); promote SHA = that commit once CI green.
+- 2026-11-27: operator promoted hub to `d5c16fb0` (`hub-promote/20261128T011506Z`; first attempt had a stray `make` word and did not run); Y-E2 cloud `make-test-pytest` sent.
+- 2026-11-27: Y-E2 PASS — hub `make-test-pytest` 3007 passed / 0 failed (job `8f8334d1`, deploy/hub `d5c16fb0`); `docs/bugs/2026-11-27-hub-webhook-python-has-no-pytest.md` LIVE-VERIFIED.

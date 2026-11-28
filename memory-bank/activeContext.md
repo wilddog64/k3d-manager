@@ -1,11 +1,13 @@
-## Handoff — 2026-11-27 16:55 PST — v1.46.0 shipped, standing docs audited, promote next — START HERE
+## Handoff — 2026-11-27 17:35 PST — v1.46.0 shipped, hub on d5c16fb0, Y-E2 PASS, overnight test-all next — START HERE
 
 - **Operator:** home this evening. Only they can promote (`make hub-deploy` in tmux on m5), merge, approve intents,
   and run sudo steps. Classifier blocks Claude from disabling `enforce_admins`: operator runs that DELETE at merge.
 - **Step 7b standing-docs audit DONE (2026-11-27):** one commit on `k3d-manager-v1.47.0` (projectbrief cloud-runner
   approval tier, notify_route, acceptance harness, SSH fragment, Tailscale, test-pytest row; copilot-instructions approval
   gate, notify_route, SSH/tailnet rules; functions.md orphan v1.43.0 rows moved into Plugins, `_install_tailscale_app`).
-  No new public dispatcher functions in v1.46.0. That commit is the promote SHA once every check-run on it is green.
+  No new public dispatcher functions in v1.46.0. CI green (7/7; CodeQL runs on PRs only). **Promoted:** deploy/hub =
+  `d5c16fb0` (tag `hub-promote/20261128T011506Z`); Y-E2 cloud `make-test-pytest` PASS (3007 passed, 0 failed, job `8f8334d1`); pytest bug LIVE-VERIFIED. Next: overnight
+  T-E2 `make-test-all`, W3 part 2 check.
 
 1. **v1.46.0 SHIPPED.** PR #166 squash-merged `f2a5f7a3`; tag + latest release v1.46.0; enforce_admins restored;
    next branch `k3d-manager-v1.47.0` (head `d39ace80`: retro `docs/retro/2026-11-27-v1.46.0-retrospective.md`).

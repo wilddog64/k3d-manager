@@ -1,11 +1,12 @@
 # Bug: the hub webhook's `python3` has no pytest, so `make test-python` fails on m5
 
-**Status:** LANDED — `60e15c51` + `27d32d14`, 2026-11-27 (Flash; Claude added broken-venv rebuild, made fast-gate Y-N1 observable, fixed a PATH leak in two tests); offline Y-E1 PASS, live Y-E2 owed
+**Status:** LIVE-VERIFIED — 2026-11-27: Y-E2 PASS on the hub at `d5c16fb0` (deploy/hub), 3007 passed / 0 failed. Previously LANDED — `60e15c51` + `27d32d14`, 2026-11-27 (Flash; Claude added broken-venv rebuild, made fast-gate Y-N1 observable, fixed a PATH leak in two tests); offline Y-E1 PASS
 **Priority:** P2
+**Live evidence:** 2026-11-27 · run 20261128T011759Z-make-test-pytest · env hub/m5-air · scenario Y-E2-cloud-make-test-pytest-3007-passed-0-failed · commit d5c16fb0 · proves fix
+**Fix commit:** f2a5f7a3 (v1.46.0 squash of `60e15c51` + `27d32d14`)
 **Introduced by:** unknown (likely the Homebrew Python upgrade to 3.15 on m5; pytest lived in an older site-packages)
 **Should have been caught by:** live check
 **Introducing change reviewed:** no
-**Waiting on:** live check — since 2026-11-27 (promote, then operator runs `make install-pytest-venv` on m5)
 **Prior art:** exact-slug glob: none; `make find-similar-docs` unavailable on m4 (no k3d-k3d-cluster context) — not run
 **Severity:** medium — every hub `test-python` / `test-pytest` / `test-all` run ends exit 2 even with enough time.
 **Filed:** 2026-11-27, Claude, from the timed run for `2026-11-27-hub-make-test-all-exceeds-1800s-job-timeout.md`
@@ -112,4 +113,7 @@ interface:
   reach `$HOME/.local/share/k3d-manager/pytest-venv`; m4 passed only because pyenv/Homebrew python3 carry pytest.
   Reproduced on m4 with a `python3` stand-in lacking pytest (2 failed), fixed by passing
   `PYTEST="<sys.executable> -m pytest"` into the fixture env (3 passed under both PATHs; `make lint-python` clean).
-- Remaining: promote the test fix, rerun `make-test-pytest` (expect 0 failed), then the overnight `make-test-all`.
+- Test fix `390084e4` promoted with deploy/hub `d5c16fb0` (`hub-promote/20261128T011506Z`). `make-test-pytest` through
+  the webhook (request `20261128T011759Z-make-test-pytest`, job `8f8334d1`): **3007 passed**, 2 skipped, **0 failed**
+  in 420 s; `summary.json` `result_classification: passed`. **Y-E2 PASS.** The overnight `make-test-all` is tracked by
+  `2026-11-27-hub-make-test-all-exceeds-1800s-job-timeout.md` (T-E2).
