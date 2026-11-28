@@ -1,4 +1,4 @@
-## Handoff — 2026-11-27 19:45 PST — hub on d5c16fb0, Y-E2 PASS, T-E2 partial (no 124; seconds=/Grafana owed; hub test failures to capture), article published, L-E2 Sat morning — START HERE
+## Handoff — 2026-11-27 19:45 PST — hub on d5c16fb0, Y-E2 PASS, T-E2 partial (no 124; seconds=/Grafana owed; hub test failures to capture), article published, API-credit item on groom, L-E2 Sat morning — START HERE
 
 - **T-E2 (2026-11-28 UTC):** test-bin ~3,100 s and test-all ~4,000 s both exit 2 (not 124) → limits hold. Owed: `seconds=` lines + Grafana `k3dm_test_stage_duration_seconds` (hub-side look; no cloud action reads Prometheus; job output truncated at 2,000 chars). Hub test failures (appset_values_ref_default 24-27, ci_workflow_no_stage2 78 rc127, provider_contract 371, …) need comparing with CI, then a `docs/bugs/` capture. Evidence in the bug doc (`0513ff7c`).
 - **Article (2026-11-27):** dev.to published + LinkedIn posted (tech-articles PRs #4–#7). Lydia's LinkedIn needs her email to connect; suggested @mention in the post or X reply.
@@ -46,6 +46,11 @@
    `make up APP=none`; shopping-cart retirement vs travel demo; plan 6; triage P3 captures from 11-27 (fast-gate sed
    tests, land vs subtree, lib-foundation negation lint, webhook setsid fallback A1, release dashboard child specs +
    plan dependencies (operator wants deps), land reminder hook fires on failed land); ideas rows of 11-27.
+   **Also (operator 2026-11-27 "go ahead"):** use the $100 Claude API credit before it expires 2026-12-08 00:00 UTC
+   (Max grant, renews each cycle, no rollover; API/Agent SDK/Batch, not Claude Code; key `k3dm-anthropic-api-key` on
+   m4+m5 expires ~2026-12-13) — candidate: a small agent-loop experiment (Agent SDK) or jobhunt-kit's model choice
+   (private OOB repo `wilddog64/jobhunt-kit`, PR #1 outline; queued after HoverFocus + dirused verification). Not a
+   v1.47.0 slot.
 4. **tax-returns (OOB):** branch `plan/local-llm-tax-app` (`1fb9fc2`): roadmap + Phase 0 spec, intents approved;
    proof owned by k3d-manager. Target tax year 2026, fallback to OTS by 2027-03-15.
 
