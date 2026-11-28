@@ -1,4 +1,4 @@
-## Handoff — 2026-11-27 19:30 PST — hub on d5c16fb0, Y-E2 PASS, T-E2 running, L-E2 Sat morning, capture kit rev 2 — START HERE
+## Handoff — 2026-11-27 20:30 PST — hub on d5c16fb0, Y-E2 PASS, T-E2 running, L-E2 Sat morning, capture kit rev 3 + 4 children — START HERE
 
 - **Operator:** home this evening. Only they can promote (`make hub-deploy` in tmux on m5), merge, approve intents,
   and run sudo steps. Classifier blocks Claude from disabling `enforce_admins`: operator runs that DELETE at merge.
@@ -19,7 +19,11 @@
   decisions 2026-11-27: K1 = home Wi-Fi first, K2 explained (Claude now recommends (a) second GitHub account; answer
   pending), K3 = (a) repo, K4 = (a) tightened (git show <commit>, refuse dirty tree, blob ids). Run on **m4**, plain
   Terminal at the desk. Neon also NEEDS FIXES (5 blockers incl. machine-list classification, header-vs-scan). **Rev 2 written** with every finding
-  applied (Review log table in the spec); K2 now recommends (d) dummy-email rule; intents presented to operator. **Operator: "just tell me when is a time to run
+  applied (Review log table in the spec); K2 now recommends (d) dummy-email rule; intents presented to operator.
+  Intents APPROVED + K2 = (d). Fable re-review of rev 2: NEEDS FIXES (8 majors, no blocker) -> **rev 3** applied. Split
+  (operator "go ahead"): a1 root side Terra (`gpt-6.1-terra`) + b docs Flash first; a3 data/CLI Luna after a1; a2
+  browser + e2e Luna after a3; Claude runs integration. Record per-child coverage/rework/quota (model trial). Dispatch
+  only after Sunday groom gives a slot. **Operator: "just tell me when is a time to run
   it"** — Claude tells the operator when the kit is landed and sitting 1 can run.
 
 1. **v1.46.0 SHIPPED.** PR #166 squash-merged `f2a5f7a3`; tag + latest release v1.46.0; enforce_admins restored;

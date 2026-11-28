@@ -242,3 +242,4 @@
 - 2026-11-27: operator promoted hub to `d5c16fb0` (`hub-promote/20261128T011506Z`; first attempt had a stray `make` word and did not run); Y-E2 cloud `make-test-pytest` sent.
 - 2026-11-27: Y-E2 PASS — hub `make-test-pytest` 3007 passed / 0 failed (job `8f8334d1`, deploy/hub `d5c16fb0`); `docs/bugs/2026-11-27-hub-webhook-python-has-no-pytest.md` LIVE-VERIFIED.
 - 2026-11-27: web-console part B capture kit spec rev 1 (Fable + Neon blind reviews, both NEEDS FIXES) -> rev 2 with all findings applied; intents presented.
+- 2026-11-27: capture kit intents approved (K2 = d); Fable re-review rev 2 -> rev 3; split into a1 (Terra), a2/a3 (Luna), b (Flash) child specs with a contract section; awaiting groom slot.
