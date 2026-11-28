@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Operator entry point for the web console capture kit."""
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts' / 'lib'))
+
+from wcb_capture import isolation
+
+
+GUARDED = {'api', 'browser-up', 'c8', 'c9', 'collect', 'c14-plain'}
+DISPATCH = {
+    'api': ('api', 'main'), 'stage': ('stage', 'main'), 'browser-up': ('supervisor', 'main'),
+    'c8': ('c8c9', 'main_c8'), 'c9': ('c8c9', 'main_c9'),
+    'root-checks': ('rootchecks', 'main'), 'collect': ('collect', 'main_collect'),
+    'down': ('collect', 'main_down'),
+}
+
+
+def _ancestors():
+    ancestors = []
+    pid = os.getppid()
+    seen = set()
+    try:
+        while pid > 1 and pid not in seen:
+            seen.add(pid)
+            result = subprocess.run(['/bin/ps', '-o', 'pid=,ppid=,comm=', '-p', str(pid)],
+                                    capture_output=True, text=True, check=False)
+            fields = result.stdout.split(None, 2)
+            if len(fields) != 3:
+                break
+            ancestors.append(fields[2].strip())
+            pid = int(fields[1])
+    except OSError:
+        pass
+    return ancestors
+
+
+def _status(runner=subprocess.run):
+    operator, root = isolation.scratch_dirs()
+    print('date: ' + operator.name.removeprefix('k3dm-captures-'))
+    print('operator scratch: ' + ('present' if operator.exists() else 'absent'))
+    print('root scratch: ' + ('present' if root.exists() else 'absent'))
+    try:
+        isolation.check_label('com.k3d-manager.capture-sshd')
+        label = runner(['/bin/launchctl', 'print', 'system/com.k3d-manager.capture-sshd'],
+                       capture_output=True, text=True, check=False)
+        loaded = label.returncode == 0
+    except OSError:
+        loaded = False
+    try:
+        ports = runner(['/usr/sbin/netstat', '-anv', '-p', 'tcp'],
+                       capture_output=True, text=True, check=False)
+        listening = any('127.0.0.1.42723' in line and 'LISTEN' in line
+                        for line in ports.stdout.splitlines())
+    except OSError:
+        listening = False
+    print('label: ' + ('loaded' if loaded else 'not loaded'))
+    print('42723: ' + ('listening' if listening else 'not listening'))
+    browser = operator / 'browser'
+    if browser.exists():
+        for marker in sorted(browser.glob('done-*')):
+            print('done: ' + marker.name[5:])
+        for marker in sorted(browser.glob('abandoned-*')):
+            print('abandoned: ' + marker.name[10:])
+    return 0
+
+
+def _c14_plain(runner=subprocess.run):
+    isolation.refuse_multiplexer(os.environ, _ancestors())
+    result = runner(['/usr/bin/sudo', '/Library/Developer/CommandLineTools/usr/bin/python3', '-IS',
+                     '-c', 'open("/dev/tty","w").write("ok\\n")'],
+                    capture_output=True, text=True, check=False)
+    print('exit code: ' + str(result.returncode))
+    print('ok appeared: ' + ('yes' if 'ok' in result.stdout else 'no'))
+    return 0
+
+
+def main(argv=None, runner=subprocess.run):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv:
+        print('usage: k3dm-wcb-capture <subcommand>', file=sys.stderr)
+        return 1
+    command, args = argv[0], argv[1:]
+    try:
+        if command in GUARDED:
+            isolation.refuse_multiplexer(os.environ, _ancestors())
+        if command == 'status':
+            return _status(runner)
+        if command == 'c14-plain':
+            return _c14_plain(runner)
+        if command not in DISPATCH:
+            print('unknown subcommand: ' + command, file=sys.stderr)
+            return 1
+        from importlib import import_module
+        module, function = DISPATCH[command]
+        return getattr(import_module('wcb_capture.' + module), function)(args)
+    except isolation.Refused as exc:
+        print('refused: ' + str(exc), file=sys.stderr)
+        return 2
+    except Exception as exc:
+        print(command + ': failed (' + type(exc).__name__ + ')', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
