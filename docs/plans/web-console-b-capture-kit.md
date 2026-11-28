@@ -177,9 +177,11 @@ and C8 its tunnel.
   present in `req`, so a leftover request from an earlier run is never acted on. Only names with a higher sequence are
   acted on. Other names are counted, and the count is logged once per minute (no operator-chosen text enters the log). **The driver never
   writes, renames, unlinks or opens files in (1)**, except reading `(1)/ca/access_ca.pub` for `install-ca`, and
-  `(1)/ca/c7_key.pub` for `install-c7-key`: each opened with `O_NOFOLLOW | O_NONBLOCK` relative to the `ca` descriptor,
+  `(1)/ca/c7_key.pub` for `install-c7-key`, and `(1)/ca/c13_user1.pub`, `(1)/ca/c13_user2.pub` for the `up-c13-ca1`
+  bootstrap: each opened with `O_NOFOLLOW | O_NONBLOCK` relative to the `ca` descriptor,
   `fstat`-checked (regular file, owner the login, under 16 KiB) and content-validated with §2's two-field regex before it
-  is written to `(2)/access_ca.pub` or `(2)/c7_authorized_keys` (`root:wheel 0644`).
+  is written to `(2)/access_ca.pub` or `(2)/c7_authorized_keys` (`root:wheel 0644`), or, for C13, signed (see the C13
+  key layout in `## Contract between children`).
 - **Log:** `(2)/root-steps.log` (`root:wheel 0644`, the 2026-11-19 format `[root HH:MM:SS] <step>`); the supervisor
   reads it. The scratch sshd's log is `(2)/sshd.log` (`0644`), likewise readable.
 - **Actions** (all through `isolation`): render the profile's sshd config from the staged template into (2), run
@@ -421,6 +423,16 @@ spec defect raised to Claude.
 - **Scratch files:** `(1)/terms` (one scan term per line, `0600`, written by `api`, a3); `(1)/ca/access_ca.pub` (a3) and
   `(1)/ca/c7_key.pub` (a2's `root-checks`); `(1)/raw/`, `(1)/filtered/` (a3); `(1)/connector.log`, `(1)/cfhome/`,
   `(1)/tunnel-token` (operator, read by a2). Filtered output names: `<capture>-<n>.json|.txt`.
+- **C13 key layout (defined 2026-11-28 after a1's second stop; mirrors C7):** `root-checks` (a2) generates two
+  throwaway ed25519 user key pairs as the operator, `(1)/ca/c13_user1` and `(1)/ca/c13_user2` (`0600`, `.pub` `0644`),
+  before requesting `up-c13-ca1`; the bootstrap refuses if either `.pub` is missing or fails §3's validation. `rootd`
+  generates the two scratch CA keys `(2)/c13/ca1`, `(2)/c13/ca2` (`root:wheel 0600`, `.pub` `0644`; private CA keys never
+  leave (2)), signs each user public key with its CA (principal = login, validity 1 hour) into
+  `(2)/c13/c13_user1-cert.pub` and `(2)/c13/c13_user2-cert.pub` (`root:wheel 0644`; certificates are public), and writes
+  `(2)/c13_ca.pub` as §4 describes. The local client runs **as the operator, never under `sudo`**:
+  `ssh -F /dev/null -o IdentitiesOnly=yes -o IdentityFile=<(1)>/ca/c13_userN -o CertificateFile=<(2)>/c13/c13_userN-cert.pub
+  -o UserKnownHostsFile=<(1)>/known_hosts -p 42723 <login>@127.0.0.1 true`. No user private key is ever in (2); no CA
+  private key is ever in (1). `down` removes `(2)/c13/` with (2); the operator's (1) copies go with collect/discard.
 - **Filters and scan (a3) used by a2:** `filters.filter_text(text, kind) -> str` with kind `sshd|connector|launchctl|
   ps|recorder`; `scan.scan_file(path) -> list[Hit]` where `Hit` has `pattern` and `line` and never the matched text.
 - **Expected blob list:** `stage` (a1) passes `--expect <relpath>=<blob>` pairs to `rootd`; relpaths are relative to (2).
@@ -660,6 +672,7 @@ sshd log without timestamps; part A line 202; `ssh-keygen -lf` output shape).
 | `api` needs a GUI session | F minor | Where and when: seat at m4, not over SSH |
 | **Rev 2 re-review (Fable, NEEDS FIXES, no blocker)** | | |
 | Requests replay after a driver restart | F2 M1 | persisted `(2)/seq` plus highest-present at start; K-N6; restart test and red control |
+| a1 stop 2 2026-11-28 (Terra): C13 user key/cert files and client access undefined | dispatch | operator-side user keys in `(1)/ca/`, root-side CAs + certs in `(2)/c13/`; client as operator, no sudo |
 | a1 stop 2026-11-28 (Terra): C13 swap-back verb undefined | dispatch | `up-c13-ca1` rewrites when a `c13-*` daemon runs; PID logged, unchanged |
 | Read-back gate contradicts c7/C13; lowercase forms; presence-only; first host key; C13 profile | F2 M2 | per-profile normalised required/forbidden tables; first `up` makes the host key; `c13-ca1`/`c13-ca2` rows |
 | Forced command runs the operator's zsh startup files | F2 M3 | `SetEnv ZDOTDIR=<(2)>/zdotdir` in baseline and gate; recorder `-IS` shebang (C11 evidence) |
