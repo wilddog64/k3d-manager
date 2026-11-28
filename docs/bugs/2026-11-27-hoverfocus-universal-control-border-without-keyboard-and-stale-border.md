@@ -55,3 +55,32 @@ back to m2 without a click. On m2, `Engine.observe` returns no action when the h
 unfocused locally, so HoverFocus has nothing to do, consistent with Universal Control holding the keyboard on m4 until a
 click on m2. The decisive capture is still open: with HoverFocus **quit on both Macs**, does typing follow the pointer
 without a click? (A duplicate doc filed in the hoverfocus repo on 2026-11-28 was removed in favour of this one.)
+
+## Blind reviews — 2026-11-28 (Fable; Neon `gemini-4-neon-high`, brief `docs/plans/review-hoverfocus-universal-control.md`)
+
+**Priority:** Fable P3 (conditional); Neon P2 now, P3 once capture 1 rules HoverFocus out. Both: P2 if, with HoverFocus
+quit on both Macs, typing follows the pointer without a click (then the suspect is the SkyLight focus sequence,
+`Sources/CSkyLight/CSkyLight.c:79-97`).
+
+Agreed findings:
+- HoverFocus cannot touch keystrokes: the event tap is `.listenOnly` and mouse-only (`Controller.swift:69-73`, `:99-105`).
+- `Engine.swift:61` is right for the return trip but is not the cause; a second gate, `firedWindow`
+  (`Engine.swift:54-56`, `:65`, `:92`), blocks the same case. Re-firing would not help: on m4 the focus call succeeded
+  and the window had focus, yet keys did not arrive.
+- The stale border is designed behaviour, not "no more events": `onTick` keeps polling every 250 ms
+  (`TickPolicy.swift:6`) and `observeFocused` sees focused == tracked (`FocusIndicator.swift:47-48`). It also stays on
+  one Mac when the pointer goes to the desktop. Side cost: a 4 Hz CGWindowList + AX loop while the user is on the
+  other Mac.
+- Clicking the tracked window does not clear the border (`FocusIndicator.swift:37-42`, asserted in the selftest).
+- No proven "pointer left this Mac" signal: Quartz may clamp the cursor to the edge; `CGCursorIsVisible` is unsafe
+  (hidden while typing); edge + idle heuristics hide the border for someone parked at an edge, and must ignore seams
+  between local displays. Needs a probe before a spec.
+- Diagnostics: only `ax-enable` and `focus failed` are logged; no decision/skip lines.
+- Keyboard: no public API; any synthetic click (title bar, desktop, content) is unproven to move Universal Control's
+  keyboard and risks raising, tab hits, zoom or drags. Recommended: document the limitation.
+- Disagreement to settle in the spec: Fable says **suppress** the border (a reset never redraws on return to the same
+  still-focused window, since the Engine returns `.none`); Neon says **reset** (so the 4 Hz tick stops). Both goals hold
+  with a suspended state: hide and stop polling while away, redraw on the next pointer event over the tracked window.
+- Captures to add: keys land where (visible prompt on both Macs), both directions, with TextEdit as well as iTerm2;
+  `lsappinfo front` on each Mac during the excursion; the physical keyboard used; macOS versions; whether
+  BetterTouchTool or other taps run; border duration over 1 s.
