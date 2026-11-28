@@ -11,6 +11,7 @@
 - 2026-11-23: **hoverfocus v0.0.1 shipped** — PR #1 merged `d426f18` 14:09Z, enforce_admins re-enabled, tag v0.0.1 + GitHub release. v0.0.2 batches planned `docs/plans/hoverfocus-v0.0.2-bug-batches.md` (L1 Luna AppDelegate, F1 Flash Makefile/install, P1 live probe w/ operator ~15:30, L2 Luna Controller after P1); not dispatched, awaiting intent approval. Operator at work until ~15:30.
 - 2026-11-23: hoverfocus PR #1 Argon review done (exit 0, read-only): 3 confirmed low/medium (reload fails open, AX element cache leak, Makefile sed escaping) carry → v0.0.2, 2 speculative; `docs/issues/2026-11-23-argon-hoverfocus-pr1-review-findings.md`. iTerm focus-follows-mouse coexists with HoverFocus (operator test). Next: CI on a4d9abb, operator merge, tag v0.0.1.
 - 2026-11-23: hoverfocus PR #1 opened (m1-base → main, head a4d9abb, not draft); blind Argon review spec `docs/plans/review-hoverfocus-pr1-v0.0.1.md` dispatched (agy, role review).
+- [x] 2026-11-27 23:40 PST session handoff written (v1.46.0 shipped); prior activeContext sections archived to `memory-bank/archive/activeContext-2026-11-27.md`.
 - [ ] hoverfocus v0.0.1: PR m1-base → main, Argon blind review, merge, tag; bugs → v0.0.2.
 - [ ] hoverfocus: E-L1 done 2026-11-23 (1-2 pass, 3 known limitation, bug filed); next M1 PR decision.
 - [ ] hoverfocus E-L1: steps 1-2 pass 2026-11-23; step 3 pending; iTerm hollow-cursor P3 filed.
