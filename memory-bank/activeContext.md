@@ -1,4 +1,4 @@
-## Handoff — 2026-11-27 17:35 PST — v1.46.0 shipped, hub on d5c16fb0, Y-E2 PASS, overnight test-all next — START HERE
+## Handoff — 2026-11-27 17:55 PST — hub on d5c16fb0, Y-E2 PASS, T-E2 test-all running, L-E2 Sat morning — START HERE
 
 - **Operator:** home this evening. Only they can promote (`make hub-deploy` in tmux on m5), merge, approve intents,
   and run sudo steps. Classifier blocks Claude from disabling `enforce_admins`: operator runs that DELETE at merge.
@@ -8,6 +8,12 @@
   No new public dispatcher functions in v1.46.0. CI green (7/7; CodeQL runs on PRs only). **Promoted:** deploy/hub =
   `d5c16fb0` (tag `hub-promote/20261128T011506Z`); Y-E2 cloud `make-test-pytest` PASS (3007 passed, 0 failed, job `8f8334d1`); pytest bug LIVE-VERIFIED. Next: overnight
   T-E2 `make-test-all`, W3 part 2 check.
+- **Tailscale L-E2 — Sat 2026-11-28 morning (operator, out of home on iPad cellular):** steps 1-3 (revoke iPad in admin
+  console, SSH + Screen Sharing to Macs fail, re-auth + re-approve); Claude watches from m4 over LAN (`Tailscale status`,
+  `who`) and records evidence in `docs/plans/v1.46.0-tailscale-break-glass-access.md`. m2-only reboot (FileVault) later, at home.
+- **Web console part B:** re-scope of captures C1-C17 vs parts A/C evidence running (read-only subagent); then a capture
+  script spec (operator: "write script for me to execute these probes"); browser captures from iPad on cellular later.
+  Slot in v1.47.0 (at 5-plan cap) decided at Sunday groom; Claude recommends displacing plan 2 (no spec) if it goes in.
 
 1. **v1.46.0 SHIPPED.** PR #166 squash-merged `f2a5f7a3`; tag + latest release v1.46.0; enforce_admins restored;
    next branch `k3d-manager-v1.47.0` (head `d39ace80`: retro `docs/retro/2026-11-27-v1.46.0-retrospective.md`).
