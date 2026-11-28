@@ -1,13 +1,13 @@
 # Web console part B capture kit — a3: data side and CLI (api, filters, scan, collect, down)
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; not dispatched;
+**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28;
 starts after `a1` lands (imports `isolation`)
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E1, K-E5 and K-E6c,
 intents unchanged)
 **Approval:** operator, 2026-11-27 ("can this task split across Luna/Terra/Flash? worth a try?", then "go ahead")
-**Release / branch:** unslotted (v1.47.0 candidate, groom 2026-11-29); `k3d-manager-v1.47.0` once slotted
+**Release / branch:** v1.47.0 plan 2 (operator 2026-11-28: "Slot now, displace plan 2"); `k3d-manager-v1.47.0`
 **Risk:** high (handles the Cloudflare capture token and decides what private data reaches the repo)
 **Implementer:** Luna (`codex`, `--model gpt-6-luna`). **Verifier:** Claude, from Acceptance.
 

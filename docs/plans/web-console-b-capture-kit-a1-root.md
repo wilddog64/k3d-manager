@@ -7,7 +7,7 @@ Fable re-reviewed rev 2); not dispatched
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E4a, K-E6a and K-E7a,
 the parent's K-E4, K-E6 and K-E7 restricted to this child's files, intents unchanged)
 **Approval:** operator, 2026-11-27 ("can this task split across Luna/Terra/Flash? worth a try?", then "go ahead")
-**Release / branch:** unslotted (v1.47.0 candidate, groom 2026-11-29); `k3d-manager-v1.47.0` once slotted
+**Release / branch:** v1.47.0 plan 2 (operator 2026-11-28: "Slot now, displace plan 2"); `k3d-manager-v1.47.0`
 **Risk:** high (code that runs as root on m4; in this slice nothing runs as root: every privileged call is stubbed)
 **Implementer:** Terra (`codex`, `--model gpt-6.1-terra`; confirm the `model:` line in the run's `codex.log`). Runs
 first, alongside `b`. **Verifier:** Claude, from Acceptance.

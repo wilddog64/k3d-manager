@@ -1,13 +1,13 @@
 # Web console part B capture kit — a2: browser side (recorder, supervisor, c8/c9, root-checks, end-to-end)
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; not dispatched;
+**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28;
 starts after `a3` lands (uses a1's `isolation`/`requests` and a3's `filters`/`scan` and CLI)
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E2, K-E3, K-E6b and
 K-E4e, intents unchanged)
 **Approval:** operator, 2026-11-27 ("can this task split across Luna/Terra/Flash? worth a try?", then "go ahead")
-**Release / branch:** unslotted (v1.47.0 candidate, groom 2026-11-29); `k3d-manager-v1.47.0` once slotted
+**Release / branch:** v1.47.0 plan 2 (operator 2026-11-28: "Slot now, displace plan 2"); `k3d-manager-v1.47.0`
 **Risk:** high (decides whether a capture counts; the recorder is what Safari shows)
 **Implementer:** Luna (`codex`, `--model gpt-6-luna`). **Verifier:** Claude, from Acceptance.
 

@@ -1,12 +1,12 @@
 # Web console part B capture kit — b: how-to and plan fixes
 
-**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; not dispatched; runs
+**Status:** SPEC — child of [`web-console-b-capture-kit.md`](web-console-b-capture-kit.md) rev 3; dispatch approved 2026-11-28; runs
 alongside `a1` (no shared file)
 **Filed:** 2026-11-27
 **Intent approved:** operator, 2026-11-27
 **Intent approval words:** "agree, and itents approved" (parent K-E1..K-E10; this child carries K-E7b, intent unchanged)
 **Approval:** operator, 2026-11-27 ("can this task split across Luna/Terra/Flash? worth a try?", then "go ahead")
-**Release / branch:** unslotted (v1.47.0 candidate, groom 2026-11-29); `k3d-manager-v1.47.0` once slotted
+**Release / branch:** v1.47.0 plan 2 (operator 2026-11-28: "Slot now, displace plan 2"); `k3d-manager-v1.47.0`
 **Risk:** low (documentation only)
 **Implementer:** Flash (`agy`, `gemini-3.8-flash-medium`). **Verifier:** Claude, from Acceptance.
 

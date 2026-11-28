@@ -682,12 +682,7 @@ under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, 
 overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
 explicit exclusion of `e2e-sandbox`.
 
-Plan 2 (operator, 2026-10-23: "let's do v1.46.0"; placed in v1.47.0 because v1.46.0 is at its cap and
-this depends on its submitter authentication): **agents in Slack threads, first slice.**
-`@codex dispatch <spec>` and `@gemini review <task>` from the operator's Slack identity run through
-the relay, the webhook allowlist and `make codex-dispatch`, and each agent replies in the thread when
-its step finishes. Design and limits: [agents working together in Slack
-threads](#candidate-theme--v2x-agents-working-together-in-slack-threads). Spec to be written.
+Plan 2 (operator, 2026-11-28: "this should not wait until Sunday", then "Slot now, displace plan 2"): **web console part B capture kit** — [`web-console-b-capture-kit`](plans/web-console-b-capture-kit.md) rev 3 (intents approved 2026-11-27), built as four children: [a1 root side](plans/web-console-b-capture-kit-a1-root.md) (Terra) and [b docs](plans/web-console-b-capture-kit-b-docs.md) (Flash) in parallel, then [a3 data/CLI](plans/web-console-b-capture-kit-a3-data.md) (Luna), then [a2 browser](plans/web-console-b-capture-kit-a2-browser.md) (Luna). Delivers `bin/k3dm-wcb-capture` so the operator can run the v1.45.0 plan 4 part B captures on m4 in three sittings. Displaced the Slack-agents first slice (no spec), now first in the ordered backlog.
 
 Plan 3 (operator, 2026-10-24: "we should also track each agent's 5-hour session comsuption in agent
 dispatch dashboard in a proper rlease"): [`dispatch-agent-five-hour-window-usage`](plans/v1.47.0-dispatch-agent-five-hour-window-usage.md).
@@ -1660,6 +1655,7 @@ copy third-party question text or paywalled content.
 Plans already written but not in the open or next release. Release grooming orders them and numbers the top ones
 when a release has room; a new idea may be groomed in ahead of them, displacing a not-started plan (5 plans per release).
 
+1. **agents in Slack threads, first slice** (was v1.47.0 plan 2; displaced 2026-11-28 by the capture kit, operator: "Slot now, displace plan 2"): `@codex dispatch <spec>` and `@gemini review <task>` from the operator's Slack identity through the relay, the webhook allowlist and `make codex-dispatch`; each agent replies in the thread. Spec to be written.
 1. [`remote-promote-3a-cloud-request-card`](plans/remote-promote-3a-cloud-request-card.md) (DRAFT, not reviewed; grooming 2026-11-22, operator: drafts at the top of the backlog, no swap into v1.46.0): a cloud session asks for a promote through a request card. Q1 (where the early policy check lives) blocks dispatch.
 2. [`remote-promote-3b-relay-totp-signed-approval`](plans/remote-promote-3b-relay-totp-signed-approval.md) (DRAFT, not reviewed; grooming 2026-11-22, operator): the relay accepts a TOTP-signed approval. 11 open questions (key hex-decode, id regex keeps `d`, skew window).
 3. [`v1.45.0-web-console-b-captures`](plans/v1.45.0-web-console-b-captures.md) part B, carried out of v1.45.0 (operator, 2026-11-22; grooming 2026-11-22, operator): captures C1–C10 (agent-only C2, C6, C8, C10 done), then its spec; part C E10–E11 stay live-owed until B exists.

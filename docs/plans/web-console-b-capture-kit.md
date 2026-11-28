@@ -4,9 +4,9 @@
 (NEEDS FIXES, no blocker); every finding applied or answered in `## Review log`; intents approved (rev 2 wording, unchanged
 in rev 3)
 **Priority:** P2 (enhancement)
-**Release:** unslotted — v1.47.0 candidate for `/release-groom` 2026-11-29 (v1.47.0 is at its 5-plan cap; enters only by
-displacing a not-started plan)
-**Branch:** `k3d-manager-v1.47.0` (if slotted)
+**Release:** v1.47.0 plan 2 (operator, 2026-11-28: "this should not wait until Sunday", then "Slot now, displace plan 2";
+displaced the Slack-agents first slice, which had no spec)
+**Branch:** `k3d-manager-v1.47.0`
 **Filed:** 2026-11-27, Claude
 **Approval:** operator, 2026-11-27 ("actually I wonder if you can write script for me to execute these probes?", then
 "sounds good" to: re-scope, kit spec, run in sittings; "can you also write the spec ... and have Fable/Neon review")
