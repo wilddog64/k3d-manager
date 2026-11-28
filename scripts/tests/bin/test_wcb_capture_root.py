@@ -207,6 +207,8 @@ def test_stage_uses_git_show_and_refuses_dirty(capture, monkeypatch, capsys):
     import stage
     first, second = capture
     monkeypatch.setattr(stage.os, 'getlogin', lambda: 'tester')
+    monkeypatch.setattr(stage, '_secret_prompt', lambda _prompt: 'X' * 48)
+    monkeypatch.setattr(stage.sys, 'stdin', types.SimpleNamespace(isatty=lambda: True))
     calls = []
     dirty = {'value': True}
 
@@ -237,7 +239,173 @@ def test_stage_uses_git_show_and_refuses_dirty(capture, monkeypatch, capsys):
         assert any(call[-1] == str(second / dest) and call[call.index('-m') + 1] == mode
                    for call in calls if call[0] == '/usr/bin/sudo' and '-m' in call)
     assert all('-o' in call and 'root' in call and 'wheel' in call for call in calls if call[0] == '/usr/bin/sudo')
+    assert (first / 'tunnel-token').read_text() == 'X' * 48
+    assert (first / 'tunnel-token').stat().st_mode & 0o777 == 0o600
     assert first.is_dir() and second.is_relative_to(first.parent.parent)
+
+
+def _stage_stub(monkeypatch, tmp_path, first, second, *, tty=True, token='S' * 48, existing=None,
+                prompt_error=None, env_name=None):
+    import types
+    import stage
+    monkeypatch.setattr(stage.os, 'getlogin', lambda: 'tester')
+    monkeypatch.setattr(stage.sys, 'stdin', types.SimpleNamespace(isatty=lambda: tty))
+    monkeypatch.setattr(stage, '_operator_uid', lambda: __import__('os').getuid())
+    if env_name:
+        monkeypatch.setitem(stage.os.environ, env_name, 'multiplexer')
+    if existing == 'live-symlink':
+        target = first / 'token-target'
+        target.write_text(token)
+        (first / 'tunnel-token').symlink_to(target)
+    elif existing == 'dangling-symlink':
+        (first / 'tunnel-token').symlink_to(first / 'missing-target')
+    elif existing == '0644':
+        (first / 'tunnel-token').write_text(token)
+        (first / 'tunnel-token').chmod(0o644)
+    elif existing == 'foreign-owner':
+        monkeypatch.setattr(stage, '_operator_uid', lambda: __import__('os').getuid() + 1)
+        (first / 'tunnel-token').write_text(token)
+        (first / 'tunnel-token').chmod(0o600)
+    elif existing == 'empty':
+        (first / 'tunnel-token').write_text('')
+        (first / 'tunnel-token').chmod(0o600)
+    elif existing == 'valid':
+        (first / 'tunnel-token').write_text(token)
+        (first / 'tunnel-token').chmod(0o600)
+    calls = []
+    secret_calls = []
+    def runner(argv, **kwargs):
+        calls.append((list(argv), kwargs))
+        if argv[1:3] == ['status', '--porcelain']:
+            stdout = b''
+        elif argv[1] == 'rev-parse':
+            stdout = b'a' * 40 + b'\n'
+        elif argv[1] == 'show':
+            stdout = b'staged source bytes\n'
+        else:
+            stdout = b''
+        return types.SimpleNamespace(stdout=stdout)
+    def secret_prompt(_prompt):
+        secret_calls.append(_prompt)
+        if existing == 'race':
+            target = first / 'token-target'
+            target.write_text('pre-existing target contents')
+            (first / 'tunnel-token').symlink_to(target)
+        if prompt_error:
+            import getpass
+            if isinstance(prompt_error, getpass.GetPassWarning):
+                import warnings
+                warnings.warn(str(prompt_error), getpass.GetPassWarning)
+            else:
+                raise prompt_error
+        return token
+    monkeypatch.setattr(stage, '_secret_prompt', secret_prompt)
+    return stage, calls, runner, secret_calls
+
+
+def test_stage_existing_valid_token_skips_prompt_and_continues(capture, tmp_path, monkeypatch, capsys):
+    first, second = capture
+    token = 'V' * 48
+    stage, calls, runner, secret_calls = _stage_stub(monkeypatch, tmp_path, first, second,
+                                                      token=token, existing='valid')
+    prompts = []
+    assert stage.main([], runner=runner, prompt=lambda value: prompts.append(value) or 'yes',
+                      owner=__import__('os').getuid()) == 0
+    assert [argv[0] for argv, _kwargs in calls if argv[0] == '/usr/bin/sudo']
+    assert secret_calls == []
+    assert (first / 'tunnel-token').read_text() == token
+    assert token not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('existing', ['live-symlink', 'dangling-symlink', '0644', 'foreign-owner', 'empty'])
+def test_stage_refuses_unsafe_existing_token(capture, tmp_path, monkeypatch, capsys, existing):
+    first, second = capture
+    token = 'W' * 48
+    stage, calls, runner, _secret_calls = _stage_stub(monkeypatch, tmp_path, first, second,
+                                                       token=token, existing=existing)
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 2
+    output = capsys.readouterr().out
+    assert 'stage refused: unsafe token file' in output
+    assert token not in output
+    assert not any(argv[0] == '/usr/bin/sudo' for argv, _kwargs in calls)
+
+
+def test_stage_requires_tty_for_hidden_token(capture, tmp_path, monkeypatch, capsys):
+    first, second = capture
+    stage, calls, runner, secret_calls = _stage_stub(monkeypatch, tmp_path, first, second, tty=False)
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 2
+    assert 'stage refused: no terminal for hidden input' in capsys.readouterr().out
+    assert secret_calls == []
+
+
+def test_stage_refuses_getpass_echo_fallback(capture, tmp_path, monkeypatch, capsys):
+    import getpass
+    first, second = capture
+    stage, calls, runner, _secret_calls = _stage_stub(monkeypatch, tmp_path, first, second,
+                                                      prompt_error=getpass.GetPassWarning('echo enabled'))
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 2
+    output = capsys.readouterr().out
+    assert 'stage refused: cannot disable terminal echo' in output
+    assert 'echo enabled' not in output
+
+
+def test_stage_rejects_bad_connector_token_shape(capture, tmp_path, monkeypatch, capsys):
+    first, second = capture
+    stage, calls, runner, _secret_calls = _stage_stub(monkeypatch, tmp_path, first, second,
+                                                      token='bad-token')
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 2
+    output = capsys.readouterr().out
+    assert 'stage refused: token shape invalid' in output
+    assert 'bad-token' not in output
+    assert not (first / 'tunnel-token').exists()
+
+
+@pytest.mark.parametrize('env_name', ['TMUX', 'STY'])
+def test_stage_refuses_multiplexer_before_token_prompt(capture, tmp_path, monkeypatch, capsys, env_name):
+    first, second = capture
+    stage, calls, runner, secret_calls = _stage_stub(monkeypatch, tmp_path, first, second,
+                                                      env_name=env_name)
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 2
+    output = capsys.readouterr().out
+    assert 'stage refused: multiplexer session' in output
+    assert not (first / 'tunnel-token').exists()
+    assert secret_calls == []
+
+
+def test_stage_token_create_race_preserves_planted_symlink_target(capture, tmp_path, monkeypatch, capsys):
+    first, second = capture
+    token = 'Z' * 48
+    stage, calls, runner, _secret_calls = _stage_stub(monkeypatch, tmp_path, first, second,
+                                                       token=token, existing='race')
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 2
+    output = capsys.readouterr().out
+    assert 'stage refused: unsafe token file' in output
+    assert (first / 'tunnel-token').is_symlink()
+    assert (first / 'token-target').read_text() == 'pre-existing target contents'
+    assert token not in output
+
+
+def test_stage_connector_token_is_written_only_to_private_file(capture, tmp_path, monkeypatch, capsys):
+    first, second = capture
+    token = 'Q' * 48
+    stage, calls, runner, _secret_calls = _stage_stub(monkeypatch, tmp_path, first, second, token=token)
+    assert stage.main([], runner=runner, prompt=lambda _prompt: 'yes',
+                      owner=__import__('os').getuid()) == 0
+    captured = capsys.readouterr()
+    assert token not in captured.out + captured.err
+    assert token not in repr(calls)
+    assert _secret_calls == ['Paste the tunnel connector token (hidden): ']
+    for base in (first, second):
+        for path in base.rglob('*'):
+            if path.is_file() and path != first / 'tunnel-token':
+                assert token not in path.read_text(errors='replace')
+    assert (first / 'tunnel-token').read_text() == token
 
 
 @pytest.mark.parametrize('source,dest,event', [('access_ca.pub', 'access_ca.pub', 'install-ca'),

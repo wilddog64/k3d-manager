@@ -63,7 +63,16 @@ def campaign(tmp_path, monkeypatch):
             elif name == 'security':
                 stdout = 'T' * 32 + '\n' if '-w' in argv else ''
             elif name == 'curl':
-                body = {'result': {'public_key': 'ssh-ed25519 AAAAB3NzaC1yc2EAAAADAQAB'}} if '/ca' in kwargs.get('input', '') else {'result': {'status': 'healthy'}}
+                config = kwargs.get('input', '')
+                if '?name=wcb-capture' in config:
+                    body = {'result': [{'name': 'wcb-capture', 'id': 'b' * 32,
+                                        'domain': 'capture.example.net/path'}]}
+                elif '?name=k3dm-capture-tunnel' in config:
+                    body = {'result': [{'name': 'k3dm-capture-tunnel', 'id': 'c' * 32}]}
+                elif '/access/organizations' in config and 'request = "GET"' in config and self.hash_count == 0:
+                    body = {'result': [{'auth_domain': 'team-name.cloudflareaccess.com'}]}
+                else:
+                    body = {'result': {'public_key': 'ssh-ed25519 AAAAB3NzaC1yc2EAAAADAQAB'}} if '/ca' in config else {'result': {'status': 'healthy'}}
                 stdout = json.dumps(body)
             elif name == 'ssh-keyscan':
                 stdout = '127.0.0.1 ssh-ed25519 AAAAfixture\n'
@@ -147,7 +156,7 @@ def campaign(tmp_path, monkeypatch):
     monkeypatch.setattr(collect.main_down, '__defaults__', (None, runner, lambda _prompt: 'discard', print))
 
     original_api_init = api.Api.__init__
-    api_answers = iter(['a' * 32, 'b' * 32, 'c' * 32, 'capture.example.net', 'team-name', 'n'])
+    api_answers = iter(['a' * 32, 'n'])
     def api_init(instance, *args, **kwargs):
         kwargs.update(runner=runner, binary_dir=tmp_path / 'stubs',
                       input_fn=lambda _prompt: next(api_answers), output_fn=lambda _line: None,
