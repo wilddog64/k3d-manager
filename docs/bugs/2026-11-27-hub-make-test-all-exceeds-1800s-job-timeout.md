@@ -17,6 +17,7 @@ dashboard is stale; v1.46.0 p3b's `--with-test-all` leg cannot pass.
 
 ## Evidence
 
+- **T-E2 partial, 2026-11-28, hub m5 on `deploy/hub` `d5c16fb0`:** cloud `make-test-bin` `20261128T013504Z-make-test-bin` (job `113a47d0`, 01:35→02:26 UTC, ~3,100 s) and `make-test-all` `20261128T022748Z-make-test-all` (job `0f383153`, 02:28→03:35 UTC, ~4,000 s) both finished with exit 2 (real test failures, `failed_untriaged`), not 124: the raised limits hold. Not yet shown: `seconds=` per stage (the job response keeps only the first 2,000 characters of output) and the Grafana `k3dm_test_stage_duration_seconds` panel (no cloud action reads Prometheus); both need a look on the hub. Failures seen in the truncated output include `appset_values_ref_default.bats` 24-27, `ci_workflow_no_stage2.bats` 78 (status 127), `provider_contract.bats` 371 and more; to be captured as a separate bug after comparing with CI.
 - **Live, 2026-11-27, hub m5 on `deploy/hub` `54a13982`:** cloud request `make-test-all` → job `16aadbe5`, final
   `body.exit_code` 124, output tail `ok 757 E1 approval never pushes, …` then `make: *** [test-all] Terminated: 15`.
 - **Timed run, m5, 2026-11-27 18:36–19:35Z (Claude, read-only scratch clone `/tmp/k3dm-timing` at `deploy/hub`
